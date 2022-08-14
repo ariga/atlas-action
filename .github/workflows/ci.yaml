@@ -1,0 +1,30 @@
+name: Atlas Action Continuous Integration
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2.4.0
+      - name: init migrations folder
+        run: mkdir -p migrations
+      - uses: ./atlasci-action
+  code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2.4.0
+      - name: Use Node.js 16
+        uses: actions/setup-node@v2.4.1
+        with:
+          node-version: 16.x
+      - name: Install
+        run: npm i
+      - name: All
+        run: npm run all
+      - name: check dirty
+        run: git diff --quiet --exit-code

@@ -1,0 +1,44 @@
+"""Maps a Bytes GraphQL scalar to a byte type."""
+scalar Bytes
+
+"""Input type of CreateReport"""
+input CreateReportInput {
+    """The Environment of the report."""
+    envName: String!
+    """The Project of the report."""
+    projectName: String!
+    """The branch of the report."""
+    branch: String!
+    """The branch of the report."""
+    commit: String!
+    """The URL back to the CI system."""
+    url: String!
+    """The status of the CI run."""
+    status: RunStatus!
+    """The output of atlas lint."""
+    payload: Bytes
+}
+
+
+"""Return type of CreateReport."""
+type CreateReportPayload {
+    """The ID of the run."""
+    runID: ID!
+    """The URL for the report."""
+    url: String!
+}
+
+type Mutation {
+    createReport(input: CreateReportInput!): CreateReportPayload!
+}
+
+type Query {
+    _dummy: String
+}
+
+"""RunStatus is enum for the field status"""
+enum RunStatus {
+    SUCCESSFUL
+    FAILED
+    UNKNOWN
+}

@@ -1,0 +1,57 @@
+{
+  "name": "atlasci-action",
+  "version": "0.1.1",
+  "description": "atlasci github action",
+  "main": "lib/src/main.js",
+  "scripts": {
+    "build": "tsc",
+    "format": "prettier --write '**/*.ts'",
+    "format-check": "prettier --check '**/*.ts'",
+    "lint": "eslint src/**/*.ts",
+    "package": "ncc build --source-map --license licenses.txt",
+    "test": "jest",
+    "all": "npm run build && npm run format && npm run lint && npm test && npm run package"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/ariga/ariga.git"
+  },
+  "keywords": [
+    "atlas",
+    "atlasci",
+    "github",
+    "action"
+  ],
+  "author": "ariga",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/ariga/ariga/issues"
+  },
+  "homepage": "https://github.com/ariga/ariga#readme",
+  "devDependencies": {
+    "@types/jest": "^27.4.1",
+    "@types/node": "^17.0.23",
+    "@typescript-eslint/eslint-plugin": "^5.31.0",
+    "@typescript-eslint/parser": "^5.31.0",
+    "@vercel/ncc": "^0.33.3",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-github": "^4.3.6",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-jest": "^26.1.4",
+    "eslint-plugin-unused-imports": "^2.0.0",
+    "jest": "^27.5.1",
+    "nock": "^13.2.9",
+    "prettier": "^2.6.2",
+    "ts-jest": "^27.1.4",
+    "typescript": "^4.6.3"
+  },
+  "dependencies": {
+    "@actions/core": "^1.6.0",
+    "@actions/github": "^5.0.3",
+    "@actions/io": "^1.1.2",
+    "@actions/tool-cache": "^1.7.2",
+    "graphql": "^16.5.0",
+    "graphql-request": "^4.3.0",
+    "simple-git": "^3.11.0"
+  }
+}
