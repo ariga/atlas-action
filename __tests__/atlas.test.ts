@@ -143,14 +143,10 @@ describe('run with latest', () => {
     expect(res.exitCode).toEqual(ExitCodes.Success)
     expect(res.fileReports).toHaveLength(2)
     expect(res.fileReports?.[0].Name).toEqual('1_initial.up.sql')
-    expect(res.fileReports?.[0].Text.replace(/\s\s+|\n/g, ' ')).toEqual(
-      'CREATE TABLE tbl ( col INT );'
-    )
+    expect(res.fileReports?.[0].Text).toContain('CREATE TABLE tbl')
     expect(res.fileReports?.[0].Error).toBeFalsy()
     expect(res.fileReports?.[1].Name).toEqual('2_second_migration.up.sql')
-    expect(res.fileReports?.[1].Text.replace(/\s\s+|\n/g, ' ')).toEqual(
-      'CREATE TABLE tbl_2 (col INT);'
-    )
+    expect(res.fileReports?.[1].Text).toContain('CREATE TABLE tbl_2')
     expect(res.fileReports?.[1].Error).toBeFalsy()
   })
 
