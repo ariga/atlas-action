@@ -25,7 +25,10 @@ inputs:
   ariga-token:
     description: 'Token for sending the report to the cloud (should be passed as a secret)'
     required: false
-
+  dir-format:
+    description: 'Dir format for migration files ("atlas", "golang-migrate", "goose", "flyway", "liquibase", "dbmate")'
+    default: 'atlas'
+    required: false
 runs:
   using: 'node16'
   main: 'dist/index.js'

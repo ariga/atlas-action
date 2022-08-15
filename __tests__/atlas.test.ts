@@ -133,6 +133,36 @@ describe('run with latest', () => {
     ]
     expect(res.raw).toBe(JSON.stringify(expectedRaw))
   })
+
+  test('successful run with golang migrate format', async () => {
+    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
+    process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
+    process.env['INPUT_DIR-FORMAT'] = 'golang-migrate'
+    process.env['INPUT_LATEST'] = '4'
+    const res = (await run()) as AtlasResult
+    expect(res.exitCode).toEqual(ExitCodes.Success)
+    expect(res.fileReports).toHaveLength(2)
+    expect(res.fileReports?.[0].Name).toEqual('1_initial.up.sql')
+    expect(res.fileReports?.[0].Text.replace(/\s\s+|\n/g, ' ')).toEqual(
+      'CREATE TABLE tbl ( col INT );'
+    )
+    expect(res.fileReports?.[0].Error).toBeFalsy()
+    expect(res.fileReports?.[1].Name).toEqual('2_second_migration.up.sql')
+    expect(res.fileReports?.[1].Text.replace(/\s\s+|\n/g, ' ')).toEqual(
+      'CREATE TABLE tbl_2 (col INT);'
+    )
+    expect(res.fileReports?.[1].Error).toBeFalsy()
+  })
+
+  test('fail on wrong migration dir format', async () => {
+    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
+    process.env['INPUT_DIR-FORMAT'] = 'incorrect'
+    const res = (await run()) as AtlasResult
+    expect(res.exitCode).toEqual(ExitCodes.Failure)
+    expect(res.raw.trimEnd()).toEqual(
+      'Error: sql/migrate: stat : no such file or directory'
+    )
+  })
 })
 
 describe('run with git base', () => {

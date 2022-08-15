@@ -21,6 +21,7 @@ export async function run(): Promise<AtlasResult | void> {
     const dir = getMigrationDir()
     const devDB = getInput('dev-db')
     const runLatest = Number(getInput('latest'))
+    const dirFormat = getInput('dir-format')
     const gitRoot = path.resolve(await getWorkingDirectory())
     info(`Migrations directory set to ${dir}`)
     info(`Dev Database set to ${devDB}`)
@@ -30,7 +31,8 @@ export async function run(): Promise<AtlasResult | void> {
       devDB,
       gitRoot,
       runLatest,
-      bin
+      bin,
+      dirFormat
     })
     const out = res.fileReports?.length
       ? JSON.stringify(res.fileReports, null, 2)

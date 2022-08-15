@@ -17,6 +17,7 @@ interface RunAtlasParams {
   gitRoot: string
   runLatest: number
   bin: string
+  dirFormat: string
 }
 
 export enum ExitCodes {
@@ -72,7 +73,8 @@ export async function runAtlas({
   devDB,
   gitRoot,
   runLatest,
-  bin
+  bin,
+  dirFormat
 }: RunAtlasParams): Promise<AtlasResult> {
   const args = [
     'migrate',
@@ -84,7 +86,9 @@ export async function runAtlas({
     '--git-dir',
     gitRoot,
     '--log',
-    '{{ json .Files }}'
+    '{{ json .Files }}',
+    '--dir-format',
+    dirFormat
   ]
   if (!isNaN(runLatest) && runLatest > 0) {
     args.push('--latest', runLatest.toString())

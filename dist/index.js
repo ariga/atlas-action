@@ -68,7 +68,7 @@ function installAtlas(version = exports.LATEST_RELEASE) {
     });
 }
 exports.installAtlas = installAtlas;
-function runAtlas({ dir, devDB, gitRoot, runLatest, bin }) {
+function runAtlas({ dir, devDB, gitRoot, runLatest, bin, dirFormat }) {
     return __awaiter(this, void 0, void 0, function* () {
         const args = [
             'migrate',
@@ -80,7 +80,9 @@ function runAtlas({ dir, devDB, gitRoot, runLatest, bin }) {
             '--git-dir',
             gitRoot,
             '--log',
-            '{{ json .Files }}'
+            '{{ json .Files }}',
+            '--dir-format',
+            dirFormat
         ];
         if (!isNaN(runLatest) && runLatest > 0) {
             args.push('--latest', runLatest.toString());
@@ -367,6 +369,7 @@ function run() {
             const dir = (0, atlas_1.getMigrationDir)();
             const devDB = (0, core_1.getInput)('dev-db');
             const runLatest = Number((0, core_1.getInput)('latest'));
+            const dirFormat = (0, core_1.getInput)('dir-format');
             const gitRoot = path_1.default.resolve(yield (0, github_1.getWorkingDirectory)());
             (0, core_1.info)(`Migrations directory set to ${dir}`);
             (0, core_1.info)(`Dev Database set to ${devDB}`);
@@ -376,7 +379,8 @@ function run() {
                 devDB,
                 gitRoot,
                 runLatest,
-                bin
+                bin,
+                dirFormat
             });
             const out = ((_a = res.fileReports) === null || _a === void 0 ? void 0 : _a.length)
                 ? JSON.stringify(res.fileReports, null, 2)
