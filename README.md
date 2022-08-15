@@ -13,7 +13,8 @@ accepted by different schema migration tools:
 * [golang-migrate](https://github.com/golang-migrate/migrate)
 
 ### Analyzers
-This action supports via Atlas the following analyzers: 
+The following analyzers are supported: 
+
 * Detection of destructive changes
 * Detection of data-dependant changes
 * Invalid SQL statements
