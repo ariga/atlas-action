@@ -381,7 +381,8 @@ describe('all reports', () => {
         }
       }
     })
-    gqlScope = nock(process.env['INPUT_CLOUD-URL'] as string)
+    const url = process.env['INPUT_CLOUD-URL'] as string
+    gqlScope = nock(url)
       .post('/api/query')
       .matchHeader(
         'Authorization',
