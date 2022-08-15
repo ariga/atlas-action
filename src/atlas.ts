@@ -1,22 +1,20 @@
 import { getInput, info, warning } from '@actions/core'
 import { downloadTool } from '@actions/tool-cache'
 import { exec, getExecOutput } from '@actions/exec'
-import * as os from 'os'
 import { resolveGitBase } from './github'
 import { exists } from '@actions/io/lib/io-util'
+import { getDownloadURL, LATEST_RELEASE } from './cloud'
 
-const BASE_ADDRESS = 'https://release.ariga.io'
-const S3_FOLDER = 'atlas'
-export const LATEST_RELEASE = 'latest'
-const LINUX_ARCH = 'linux-amd64'
-const APPLE_ARCH = 'darwin-amd64'
+// Remove Atlas update messages.
+process.env.ATLAS_NO_UPDATE_NOTIFIER = '1'
 
 interface RunAtlasParams {
   dir: string
-  devDB: string
+  devURL: string
   gitRoot: string
   runLatest: number
   bin: string
+  dirFormat: string
 }
 
 export enum ExitCodes {
@@ -52,27 +50,26 @@ interface Diagnostic {
 export async function installAtlas(
   version: string = LATEST_RELEASE
 ): Promise<string> {
-  const arch = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH
-  const downloadURL = new URL(
-    `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${arch}-${version}`
-  ).toString()
-  info(`Downloading atlas ${version}`)
-  const bin = await downloadTool(
-    downloadURL,
-    undefined,
-    undefined,
-    getUserAgent()
-  )
+  const downloadURL = getDownloadURL(version).toString()
+  info(`Downloading atlas, version: ${version}`)
+  // Setting user-agent for downloadTool is currently not supported.
+  const bin = await downloadTool(downloadURL)
   await exec(`chmod +x ${bin}`)
+  const res = await getExecOutput(bin, ['version'], {
+    failOnStdErr: false,
+    ignoreReturnCode: true
+  })
+  info(`Installed Atlas version:\n${res.stdout ?? res.stderr}`)
   return bin
 }
 
 export async function runAtlas({
   dir,
-  devDB,
+  devURL,
   gitRoot,
   runLatest,
-  bin
+  bin,
+  dirFormat
 }: RunAtlasParams): Promise<AtlasResult> {
   const args = [
     'migrate',
@@ -80,16 +77,18 @@ export async function runAtlas({
     '--dir',
     `file://${dir}`,
     '--dev-url',
-    devDB,
+    devURL,
     '--git-dir',
     gitRoot,
     '--log',
-    '{{ json .Files }}'
+    '{{ json .Files }}',
+    '--dir-format',
+    dirFormat
   ]
   if (!isNaN(runLatest) && runLatest > 0) {
     args.push('--latest', runLatest.toString())
   } else {
-    args.push('--git-base', await resolveGitBase(gitRoot))
+    args.push('--git-base', `origin/${await resolveGitBase(gitRoot)}`)
   }
   const res = await getExecOutput(bin, args, {
     failOnStdErr: false,
@@ -117,7 +116,7 @@ export function getUserAgent(): { 'User-Agent': string } {
 
 export function getMigrationDir(): string {
   const dir = getInput('dir')
-  if (!exists(dir)) {
+  if (!dir || !exists(dir)) {
     throw new Error(`Migration directory ${dir} doesn't exist`)
   }
   return dir

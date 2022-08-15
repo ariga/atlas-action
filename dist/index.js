@@ -6,29 +6,6 @@ require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -39,36 +16,39 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getMigrationDir = exports.getUserAgent = exports.runAtlas = exports.installAtlas = exports.ExitCodes = exports.LATEST_RELEASE = void 0;
+exports.getMigrationDir = exports.getUserAgent = exports.runAtlas = exports.installAtlas = exports.ExitCodes = void 0;
 const core_1 = __nccwpck_require__(2186);
 const tool_cache_1 = __nccwpck_require__(7784);
 const exec_1 = __nccwpck_require__(1514);
-const os = __importStar(__nccwpck_require__(2037));
 const github_1 = __nccwpck_require__(5865);
 const io_util_1 = __nccwpck_require__(1962);
-const BASE_ADDRESS = 'https://release.ariga.io';
-const S3_FOLDER = 'atlas';
-exports.LATEST_RELEASE = 'latest';
-const LINUX_ARCH = 'linux-amd64';
-const APPLE_ARCH = 'darwin-amd64';
+const cloud_1 = __nccwpck_require__(217);
+// Remove Atlas update messages.
+process.env.ATLAS_NO_UPDATE_NOTIFIER = '1';
 var ExitCodes;
 (function (ExitCodes) {
     ExitCodes[ExitCodes["Success"] = 0] = "Success";
     ExitCodes[ExitCodes["Failure"] = 1] = "Failure";
     ExitCodes[ExitCodes["Error"] = 2] = "Error";
 })(ExitCodes = exports.ExitCodes || (exports.ExitCodes = {}));
-function installAtlas(version = exports.LATEST_RELEASE) {
+function installAtlas(version = cloud_1.LATEST_RELEASE) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
-        const arch = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH;
-        const downloadURL = new URL(`${BASE_ADDRESS}/${S3_FOLDER}/atlas-${arch}-${version}`).toString();
-        (0, core_1.info)(`Downloading atlas ${version}`);
-        const bin = yield (0, tool_cache_1.downloadTool)(downloadURL, undefined, undefined, getUserAgent());
+        const downloadURL = (0, cloud_1.getDownloadURL)(version).toString();
+        (0, core_1.info)(`Downloading atlas, version: ${version}`);
+        // Setting user-agent for downloadTool is currently not supported.
+        const bin = yield (0, tool_cache_1.downloadTool)(downloadURL);
         yield (0, exec_1.exec)(`chmod +x ${bin}`);
+        const res = yield (0, exec_1.getExecOutput)(bin, ['version'], {
+            failOnStdErr: false,
+            ignoreReturnCode: true
+        });
+        (0, core_1.info)(`Installed Atlas version:\n${(_a = res.stdout) !== null && _a !== void 0 ? _a : res.stderr}`);
         return bin;
     });
 }
 exports.installAtlas = installAtlas;
-function runAtlas({ dir, devDB, gitRoot, runLatest, bin }) {
+function runAtlas({ dir, devURL, gitRoot, runLatest, bin, dirFormat }) {
     return __awaiter(this, void 0, void 0, function* () {
         const args = [
             'migrate',
@@ -76,17 +56,19 @@ function runAtlas({ dir, devDB, gitRoot, runLatest, bin }) {
             '--dir',
             `file://${dir}`,
             '--dev-url',
-            devDB,
+            devURL,
             '--git-dir',
             gitRoot,
             '--log',
-            '{{ json .Files }}'
+            '{{ json .Files }}',
+            '--dir-format',
+            dirFormat
         ];
         if (!isNaN(runLatest) && runLatest > 0) {
             args.push('--latest', runLatest.toString());
         }
         else {
-            args.push('--git-base', yield (0, github_1.resolveGitBase)(gitRoot));
+            args.push('--git-base', `origin/${yield (0, github_1.resolveGitBase)(gitRoot)}`);
         }
         const res = yield (0, exec_1.getExecOutput)(bin, args, {
             failOnStdErr: false,
@@ -117,7 +99,7 @@ function getUserAgent() {
 exports.getUserAgent = getUserAgent;
 function getMigrationDir() {
     const dir = (0, core_1.getInput)('dir');
-    if (!(0, io_util_1.exists)(dir)) {
+    if (!dir || !(0, io_util_1.exists)(dir)) {
         throw new Error(`Migration directory ${dir} doesn't exist`);
     }
     return dir;
@@ -164,8 +146,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getCloudURL = exports.reportToCloud = exports.mutation = void 0;
+exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.mutation = exports.ARCHITECTURE = exports.LATEST_RELEASE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
 const github = __importStar(__nccwpck_require__(5438));
 const github_1 = __nccwpck_require__(5438);
 const core_1 = __nccwpck_require__(2186);
@@ -173,6 +158,13 @@ const atlas_1 = __nccwpck_require__(1236);
 const url = __importStar(__nccwpck_require__(7310));
 const graphql_request_1 = __nccwpck_require__(2476);
 const http = __importStar(__nccwpck_require__(6255));
+const os_1 = __importDefault(__nccwpck_require__(2037));
+const LINUX_ARCH = 'linux-amd64';
+const APPLE_ARCH = 'darwin-amd64';
+exports.BASE_ADDRESS = 'https://release.ariga.io';
+exports.S3_FOLDER = 'atlas';
+exports.LATEST_RELEASE = 'latest';
+exports.ARCHITECTURE = os_1.default.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH;
 exports.mutation = (0, graphql_request_1.gql) `
   mutation CreateReportInput($input: CreateReportInput!) {
     createReport(input: $input) {
@@ -225,12 +217,16 @@ function reportToCloud(res) {
 }
 exports.reportToCloud = reportToCloud;
 function getCloudURL() {
-    return new url.URL('/api/query', (0, core_1.getInput)(`cloud-url`)).toString();
+    return new url.URL('/api/query', (0, core_1.getInput)(`ariga-url`)).toString();
 }
 exports.getCloudURL = getCloudURL;
 function getHeaders(token) {
     return Object.assign({ Authorization: `Bearer ${token}` }, (0, atlas_1.getUserAgent)());
 }
+function getDownloadURL(version) {
+    return new URL(`${exports.BASE_ADDRESS}/${exports.S3_FOLDER}/atlas-${exports.ARCHITECTURE}-${version}`);
+}
+exports.getDownloadURL = getDownloadURL;
 
 
 /***/ }),
@@ -362,21 +358,22 @@ function run() {
     var _a, _b, _c, _d;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const bin = yield (0, atlas_1.installAtlas)(atlas_1.LATEST_RELEASE);
-            (0, core_1.info)(`Atlas installed: ${bin}`);
+            const bin = yield (0, atlas_1.installAtlas)(cloud_1.LATEST_RELEASE);
             const dir = (0, atlas_1.getMigrationDir)();
-            const devDB = (0, core_1.getInput)('dev-db');
+            const devURL = (0, core_1.getInput)('dev-url');
             const runLatest = Number((0, core_1.getInput)('latest'));
+            const dirFormat = (0, core_1.getInput)('dir-format');
             const gitRoot = path_1.default.resolve(yield (0, github_1.getWorkingDirectory)());
             (0, core_1.info)(`Migrations directory set to ${dir}`);
-            (0, core_1.info)(`Dev Database set to ${devDB}`);
+            (0, core_1.info)(`Dev Database set to ${devURL}`);
             (0, core_1.info)(`Git Root set to ${gitRoot}`);
             const res = yield (0, atlas_1.runAtlas)({
                 dir,
-                devDB,
+                devURL,
                 gitRoot,
                 runLatest,
-                bin
+                bin,
+                dirFormat
             });
             const out = ((_a = res.fileReports) === null || _a === void 0 ? void 0 : _a.length)
                 ? JSON.stringify(res.fileReports, null, 2)

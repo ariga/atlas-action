@@ -5,6 +5,14 @@ import { AtlasResult, ExitCodes, getMigrationDir, getUserAgent } from './atlas'
 import * as url from 'url'
 import { ClientError, gql, request } from 'graphql-request'
 import * as http from '@actions/http-client'
+import os from 'os'
+
+const LINUX_ARCH = 'linux-amd64'
+const APPLE_ARCH = 'darwin-amd64'
+export const BASE_ADDRESS = 'https://release.ariga.io'
+export const S3_FOLDER = 'atlas'
+export const LATEST_RELEASE = 'latest'
+export const ARCHITECTURE = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH
 
 export const mutation = gql`
   mutation CreateReportInput($input: CreateReportInput!) {
@@ -76,7 +84,7 @@ export async function reportToCloud(
 }
 
 export function getCloudURL(): string {
-  return new url.URL('/api/query', getInput(`cloud-url`)).toString()
+  return new url.URL('/api/query', getInput(`ariga-url`)).toString()
 }
 
 function getHeaders(token: string): { [p: string]: string } {
@@ -84,4 +92,10 @@ function getHeaders(token: string): { [p: string]: string } {
     Authorization: `Bearer ${token}`,
     ...getUserAgent()
   }
+}
+
+export function getDownloadURL(version: string): URL {
+  return new URL(
+    `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}`
+  )
 }

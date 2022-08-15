@@ -10,16 +10,18 @@ jobs:
   sanity:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3.0.2
+        with:
+          fetch-depth: 0
       - name: init migrations folder
         run: mkdir -p migrations
       - uses: ./
   code:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3.0.2
       - name: Use Node.js 16
-        uses: actions/setup-node@v2.4.1
+        uses: actions/setup-node@v3.4.1
         with:
           node-version: 16.x
       - name: Install

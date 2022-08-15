@@ -6,26 +6,29 @@ inputs:
     description: 'select migration directory relative to working directory'
     default: "migrations"
     required: false
-  dev-db:
+  dir-format:
+    description: 'Dir format for migration files ("atlas", "golang-migrate", "goose", "flyway", "liquibase", "dbmate")'
+    default: 'atlas'
+    required: false
+  dev-url:
     description: 'select development db URL using atlas URL format'
     default: "sqlite://test?mode=memory&cache=shared&_fk=1"
     required: false
   latest:
     description: 'run analysis on the latest N migration files'
-    default: '1'
+    default: '0'
     required: false
   working-directory:
     description: 'path to the repository working directory (default ".")'
     default: '.'
     required: false
-  cloud-url:
+  ariga-url:
     description: 'The URL of ariga cloud server.'
     default: 'https://ci.ariga.cloud/'
     required: false
   ariga-token:
     description: 'Token for sending the report to the cloud (should be passed as a secret)'
     required: false
-
 runs:
   using: 'node16'
   main: 'dist/index.js'

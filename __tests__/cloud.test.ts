@@ -35,12 +35,12 @@ describe('report to cloud', () => {
         GITHUB_REPOSITORY: 'someProject/someRepo',
         GITHUB_SHA: '71d0bfc1',
         INPUT_DIR: 'migrations',
-        'INPUT_CLOUD-URL': `https://ci.ariga.cloud`,
+        'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
         'INPUT_ARIGA-TOKEN': `mysecrettoken`,
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
     }
-    gqlScope = nock(process.env['INPUT_CLOUD-URL'] as string)
+    gqlScope = nock(process.env['INPUT_ARIGA-URL'] as string)
       .post('/api/query')
       .matchHeader(
         'Authorization',
@@ -58,7 +58,7 @@ describe('report to cloud', () => {
   })
 
   test('correct cloud url', async () => {
-    expect(getCloudURL()).toEqual(`${process.env['INPUT_CLOUD-URL']}/api/query`)
+    expect(getCloudURL()).toEqual(`${process.env['INPUT_ARIGA-URL']}/api/query`)
   })
 
   test('successful', async () => {

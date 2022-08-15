@@ -4,12 +4,40 @@ import { tmpdir } from 'os'
 import { getExecOutput } from '@actions/exec'
 import * as path from 'path'
 import { SimpleGit, simpleGit } from 'simple-git'
-import { copyFile, mkdir, mkdtemp, readdir, rm, stat } from 'fs/promises'
-import { AtlasResult, ExitCodes, installAtlas } from '../src/atlas'
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat
+} from 'fs/promises'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import nock from 'nock'
 import * as http from '@actions/http-client'
+import { AtlasResult, ExitCodes, installAtlas } from '../src/atlas'
+import {
+  ARCHITECTURE,
+  BASE_ADDRESS,
+  getDownloadURL,
+  LATEST_RELEASE,
+  S3_FOLDER
+} from '../src/cloud'
+
+jest.mock('../src/cloud', () => {
+  const actual = jest.requireActual('../src/cloud')
+  return {
+    ...actual,
+    getDownloadURL: jest.fn(
+      (version: string) =>
+        new URL(
+          `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}?test=1`
+        )
+    )
+  }
+})
 
 jest.setTimeout(30000)
 const originalENV = { ...process.env }
@@ -30,10 +58,11 @@ describe('install', () => {
   afterEach(() => {
     rm(base, { recursive: true })
     process.env = { ...originalENV }
+    nock.cleanAll()
   })
 
   test('install the latest version of atlas', async () => {
-    const bin = await installAtlas('latest')
+    const bin = await installAtlas(LATEST_RELEASE)
     await expect(stat(bin)).resolves.toBeTruthy()
   })
 
@@ -43,6 +72,22 @@ describe('install', () => {
     await expect(stat(bin)).resolves.toBeTruthy()
     const output = await getExecOutput(`${bin}`, ['version'])
     expect(output.stdout.includes(expectedVersion)).toBeTruthy()
+  })
+
+  test('append test query params', async () => {
+    const url = getDownloadURL(LATEST_RELEASE)
+    expect(url.toString()).toEqual(
+      `https://release.ariga.io/atlas/atlas-${ARCHITECTURE}-latest?test=1`
+    )
+    const content = 'OK'
+    const scope = nock(`${url.protocol}//${url.host}`)
+      .get(`${url.pathname}${url.search}`)
+      .matchHeader('user-agent', 'actions/tool-cache')
+      .reply(200, content)
+    const bin = await installAtlas('latest')
+    expect(scope.isDone()).toBeTruthy()
+    await expect(stat(bin)).resolves.toBeTruthy()
+    await expect(readFile(bin)).resolves.toEqual(Buffer.from(content))
   })
 })
 
@@ -55,7 +100,7 @@ describe('run with latest', () => {
       ...process.env,
       ...{
         RUNNER_TEMP: base,
-        'INPUT_DEV-DB': 'sqlite://test?mode=memory&cache=shared&_fk=1',
+        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         INPUT_LATEST: '1',
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
@@ -133,6 +178,33 @@ describe('run with latest', () => {
     ]
     expect(res.raw).toBe(JSON.stringify(expectedRaw))
   })
+
+  test('successful run with golang migrate format', async () => {
+    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
+    process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
+    process.env['INPUT_DIR-FORMAT'] = 'golang-migrate'
+    process.env['INPUT_LATEST'] = '4'
+    const res = (await run()) as AtlasResult
+    expect(res.exitCode).toEqual(ExitCodes.Success)
+    expect(res.fileReports).toHaveLength(2)
+    expect(res.fileReports?.[0].Name).toEqual('1_initial.up.sql')
+    expect(res.fileReports?.[0].Text).toContain('CREATE TABLE tbl')
+    expect(res.fileReports?.[0].Error).toBeFalsy()
+    expect(res.fileReports?.[1].Name).toEqual('2_second_migration.up.sql')
+    expect(res.fileReports?.[1].Text).toContain('CREATE TABLE tbl_2')
+    expect(res.fileReports?.[1].Error).toBeFalsy()
+  })
+
+  test('fail on wrong migration dir format', async () => {
+    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
+    process.env['INPUT_DIR-FORMAT'] = 'incorrect'
+    process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
+    const res = (await run()) as AtlasResult
+    expect(res.exitCode).toEqual(ExitCodes.Failure)
+    expect(res.raw).toEqual(
+      '[{"Name":"1_initial.down.sql","Error":"executing statement: \\"DROP TABLE tbl;\\": no such table: tbl"}]'
+    )
+  })
 })
 
 describe('run with git base', () => {
@@ -151,7 +223,7 @@ describe('run with git base', () => {
       ...{
         RUNNER_TEMP: base,
         GITHUB_BASE_REF: baseBranch,
-        'INPUT_DEV-DB': 'sqlite://test?mode=memory&cache=shared&_fk=1',
+        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         INPUT_LATEST: '0',
         GITHUB_WORKSPACE: gitRepo,
         INPUT_DIR: migrationsDir,
@@ -166,6 +238,7 @@ describe('run with git base', () => {
       ]
     })
     await git.init()
+    await git.remote(['add', 'origin', gitRepo])
     const baseBranchFiles = path.join(
       '__tests__',
       'testdata',
@@ -179,6 +252,7 @@ describe('run with git base', () => {
       )
     }
     await git.add('.').commit('Initial commit')
+    await git.push('origin', baseBranch)
     await git.checkoutLocalBranch(changesBranch)
     const changesPath = path.join(
       '__tests__',
@@ -245,7 +319,7 @@ describe('report to GitHub', () => {
       ...{
         RUNNER_TEMP: base,
         INPUT_LATEST: '1',
-        'INPUT_DEV-DB': 'sqlite://test?mode=memory&cache=shared&_fk=1',
+        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
     }
@@ -331,8 +405,8 @@ describe('all reports', () => {
       ...{
         RUNNER_TEMP: base,
         INPUT_LATEST: '1',
-        'INPUT_DEV-DB': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        'INPUT_CLOUD-URL': `https://ci.ariga.cloud`,
+        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
+        'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
         'INPUT_ARIGA-TOKEN': `mysecrettoken`,
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
@@ -351,7 +425,8 @@ describe('all reports', () => {
         }
       }
     })
-    gqlScope = nock(process.env['INPUT_CLOUD-URL'] as string)
+    const url = process.env['INPUT_ARIGA-URL'] as string
+    gqlScope = nock(url)
       .post('/api/query')
       .matchHeader(
         'Authorization',
