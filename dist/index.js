@@ -119,7 +119,7 @@ function getUserAgent() {
 exports.getUserAgent = getUserAgent;
 function getMigrationDir() {
     const dir = (0, core_1.getInput)('dir');
-    if (!(0, io_util_1.exists)(dir)) {
+    if (!dir || !(0, io_util_1.exists)(dir)) {
         throw new Error(`Migration directory ${dir} doesn't exist`);
     }
     return dir;

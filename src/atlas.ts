@@ -121,7 +121,7 @@ export function getUserAgent(): { 'User-Agent': string } {
 
 export function getMigrationDir(): string {
   const dir = getInput('dir')
-  if (!exists(dir)) {
+  if (!dir || !exists(dir)) {
     throw new Error(`Migration directory ${dir} doesn't exist`)
   }
   return dir

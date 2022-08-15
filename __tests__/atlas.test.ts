@@ -157,10 +157,11 @@ describe('run with latest', () => {
   test('fail on wrong migration dir format', async () => {
     // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
     process.env['INPUT_DIR-FORMAT'] = 'incorrect'
+    process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Failure)
-    expect(res.raw.trimEnd()).toEqual(
-      'Error: sql/migrate: stat : no such file or directory'
+    expect(res.raw).toEqual(
+      '[{"Name":"1_initial.down.sql","Error":"executing statement: \\"DROP TABLE tbl;\\": no such table: tbl"}]'
     )
   })
 })
