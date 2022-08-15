@@ -3,7 +3,13 @@
 A GitHub Action for [Atlas](https://github.com/ariga/atlas).
 
 This action is used for [linting migration directories](https://atlasgo.io/versioned/lint)
-to detect potentially dangerous changes to database schemas.
+using the `atlas migrate lint` command. This command  validates and analyzes the contents of the migration directory and generates insights and diagnostics on the selected changes:
+
+* Ensure the migration history can be replayed from any point at time.
+* Protect from unexpected history changes when concurrent migrations are written to the migration directory by 
+  multiple team members. Read more about the consistency checks in the section below.
+* Detect whether destructive or irreversible changes have been made or whether they are dependent on tables'  
+  contents and can cause a migration failure.
 
 ### Supported directory formats
 
