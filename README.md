@@ -3,7 +3,8 @@
 A GitHub Action for [Atlas](https://github.com/ariga/atlas).
 
 This action is used for [linting migration directories](https://atlasgo.io/versioned/lint)
-using the `atlas migrate lint` command. This command  validates and analyzes the contents of the migration directory and generates insights and diagnostics on the selected changes:
+using the `atlas migrate lint` command. This command  validates and analyzes the contents
+of migration directories and generates insights and diagnostics on the selected changes:
 
 * Ensure the migration history can be replayed from any point at time.
 * Protect from unexpected history changes when concurrent migrations are written to the migration directory by 
@@ -17,16 +18,6 @@ This action supports analyzing migrations directories in formats
 accepted by different schema migration tools: 
 * [Atlas](https://atlasgo.io)
 * [golang-migrate](https://github.com/golang-migrate/migrate)
-
-### Analyzers
-The following analyzers are supported: 
-
-* Detection of destructive changes
-* Detection of data-dependant changes
-* Invalid SQL statements
-* Migration directory integrity (order, history changes)
-
-[Read more about Atlas analyzers](https://atlasgo.io/lint/analyzers)
 
 ### Usage
 
