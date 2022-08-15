@@ -1,15 +1,9 @@
 import { getInput, info, warning } from '@actions/core'
 import { downloadTool } from '@actions/tool-cache'
 import { exec, getExecOutput } from '@actions/exec'
-import * as os from 'os'
 import { resolveGitBase } from './github'
 import { exists } from '@actions/io/lib/io-util'
-
-const BASE_ADDRESS = 'https://release.ariga.io'
-const S3_FOLDER = 'atlas'
-export const LATEST_RELEASE = 'latest'
-const LINUX_ARCH = 'linux-amd64'
-const APPLE_ARCH = 'darwin-amd64'
+import { getDownloadURL, LATEST_RELEASE } from './cloud'
 
 interface RunAtlasParams {
   dir: string
@@ -53,17 +47,10 @@ interface Diagnostic {
 export async function installAtlas(
   version: string = LATEST_RELEASE
 ): Promise<string> {
-  const arch = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH
-  const downloadURL = new URL(
-    `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${arch}-${version}`
-  ).toString()
-  info(`Downloading atlas ${version}`)
-  const bin = await downloadTool(
-    downloadURL,
-    undefined,
-    undefined,
-    getUserAgent()
-  )
+  const downloadURL = getDownloadURL(version).toString()
+  info(`Downloading atlas, version: ${version}`)
+  // Setting user-agent for downloadTool is currently not supported.
+  const bin = await downloadTool(downloadURL)
   await exec(`chmod +x ${bin}`)
   return bin
 }

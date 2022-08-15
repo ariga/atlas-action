@@ -3,7 +3,6 @@ import {
   ExitCodes,
   getMigrationDir,
   installAtlas,
-  LATEST_RELEASE,
   runAtlas
 } from './atlas'
 import { getInput, info, setFailed } from '@actions/core'
@@ -11,7 +10,7 @@ import { getInput, info, setFailed } from '@actions/core'
 import path from 'path'
 import { getWorkingDirectory, report } from './github'
 import { context } from '@actions/github'
-import { reportToCloud } from './cloud'
+import { LATEST_RELEASE, reportToCloud } from './cloud'
 
 // Entry point for GitHub Action runner.
 export async function run(): Promise<AtlasResult | void> {

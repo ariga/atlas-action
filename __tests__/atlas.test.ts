@@ -4,12 +4,40 @@ import { tmpdir } from 'os'
 import { getExecOutput } from '@actions/exec'
 import * as path from 'path'
 import { SimpleGit, simpleGit } from 'simple-git'
-import { copyFile, mkdir, mkdtemp, readdir, rm, stat } from 'fs/promises'
-import { AtlasResult, ExitCodes, installAtlas } from '../src/atlas'
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat
+} from 'fs/promises'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import nock from 'nock'
 import * as http from '@actions/http-client'
+import { AtlasResult, ExitCodes, installAtlas } from '../src/atlas'
+import {
+  ARCHITECTURE,
+  BASE_ADDRESS,
+  getDownloadURL,
+  LATEST_RELEASE,
+  S3_FOLDER
+} from '../src/cloud'
+
+jest.mock('../src/cloud', () => {
+  const actual = jest.requireActual('../src/cloud')
+  return {
+    ...actual,
+    getDownloadURL: jest.fn(
+      (version: string) =>
+        new URL(
+          `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}?test=1`
+        )
+    )
+  }
+})
 
 jest.setTimeout(30000)
 const originalENV = { ...process.env }
@@ -30,10 +58,11 @@ describe('install', () => {
   afterEach(() => {
     rm(base, { recursive: true })
     process.env = { ...originalENV }
+    nock.cleanAll()
   })
 
   test('install the latest version of atlas', async () => {
-    const bin = await installAtlas('latest')
+    const bin = await installAtlas(LATEST_RELEASE)
     await expect(stat(bin)).resolves.toBeTruthy()
   })
 
@@ -43,6 +72,22 @@ describe('install', () => {
     await expect(stat(bin)).resolves.toBeTruthy()
     const output = await getExecOutput(`${bin}`, ['version'])
     expect(output.stdout.includes(expectedVersion)).toBeTruthy()
+  })
+
+  test('append test query params', async () => {
+    const url = getDownloadURL(LATEST_RELEASE)
+    expect(url.toString()).toEqual(
+      'https://release.ariga.io/atlas/atlas-darwin-amd64-latest?test=1'
+    )
+    const content = 'OK'
+    const scope = nock(`${url.protocol}//${url.host}`)
+      .get(`${url.pathname}${url.search}`)
+      .matchHeader('user-agent', 'actions/tool-cache')
+      .reply(200, content)
+    const bin = await installAtlas('latest')
+    expect(scope.isDone()).toBeTruthy()
+    await expect(stat(bin)).resolves.toBeTruthy()
+    await expect(readFile(bin)).resolves.toEqual(Buffer.from(content))
   })
 })
 
