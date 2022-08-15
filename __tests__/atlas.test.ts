@@ -238,6 +238,7 @@ describe('run with git base', () => {
       ]
     })
     await git.init()
+    await git.remote(['add', 'origin', gitRepo])
     const baseBranchFiles = path.join(
       '__tests__',
       'testdata',
@@ -251,6 +252,7 @@ describe('run with git base', () => {
       )
     }
     await git.add('.').commit('Initial commit')
+    await git.push('origin', baseBranch)
     await git.checkoutLocalBranch(changesBranch)
     const changesPath = path.join(
       '__tests__',

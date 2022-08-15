@@ -88,7 +88,7 @@ export async function runAtlas({
   if (!isNaN(runLatest) && runLatest > 0) {
     args.push('--latest', runLatest.toString())
   } else {
-    args.push('--git-base', await resolveGitBase(gitRoot))
+    args.push('--git-base', `origin/${await resolveGitBase(gitRoot)}`)
   }
   const res = await getExecOutput(bin, args, {
     failOnStdErr: false,

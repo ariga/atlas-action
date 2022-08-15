@@ -68,7 +68,7 @@ function runAtlas({ dir, devURL, gitRoot, runLatest, bin, dirFormat }) {
             args.push('--latest', runLatest.toString());
         }
         else {
-            args.push('--git-base', yield (0, github_1.resolveGitBase)(gitRoot));
+            args.push('--git-base', `origin/${yield (0, github_1.resolveGitBase)(gitRoot)}`);
         }
         const res = yield (0, exec_1.getExecOutput)(bin, args, {
             failOnStdErr: false,
