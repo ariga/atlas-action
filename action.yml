@@ -16,7 +16,7 @@ inputs:
     required: false
   latest:
     description: 'run analysis on the latest N migration files'
-    default: '0'
+    default: '1'
     required: false
   working-directory:
     description: 'path to the repository working directory (default ".")'
