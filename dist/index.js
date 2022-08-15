@@ -40,7 +40,7 @@ function installAtlas(version = cloud_1.LATEST_RELEASE) {
     });
 }
 exports.installAtlas = installAtlas;
-function runAtlas({ dir, devDB, gitRoot, runLatest, bin, dirFormat }) {
+function runAtlas({ dir, devURL, gitRoot, runLatest, bin, dirFormat }) {
     return __awaiter(this, void 0, void 0, function* () {
         const args = [
             'migrate',
@@ -48,7 +48,7 @@ function runAtlas({ dir, devDB, gitRoot, runLatest, bin, dirFormat }) {
             '--dir',
             `file://${dir}`,
             '--dev-url',
-            devDB,
+            devURL,
             '--git-dir',
             gitRoot,
             '--log',
@@ -209,7 +209,7 @@ function reportToCloud(res) {
 }
 exports.reportToCloud = reportToCloud;
 function getCloudURL() {
-    return new url.URL('/api/query', (0, core_1.getInput)(`cloud-url`)).toString();
+    return new url.URL('/api/query', (0, core_1.getInput)(`ariga-url`)).toString();
 }
 exports.getCloudURL = getCloudURL;
 function getHeaders(token) {
@@ -353,16 +353,16 @@ function run() {
             const bin = yield (0, atlas_1.installAtlas)(cloud_1.LATEST_RELEASE);
             (0, core_1.info)(`Atlas installed: ${bin}`);
             const dir = (0, atlas_1.getMigrationDir)();
-            const devDB = (0, core_1.getInput)('dev-db');
+            const devURL = (0, core_1.getInput)('dev-url');
             const runLatest = Number((0, core_1.getInput)('latest'));
             const dirFormat = (0, core_1.getInput)('dir-format');
             const gitRoot = path_1.default.resolve(yield (0, github_1.getWorkingDirectory)());
             (0, core_1.info)(`Migrations directory set to ${dir}`);
-            (0, core_1.info)(`Dev Database set to ${devDB}`);
+            (0, core_1.info)(`Dev Database set to ${devURL}`);
             (0, core_1.info)(`Git Root set to ${gitRoot}`);
             const res = yield (0, atlas_1.runAtlas)({
                 dir,
-                devDB,
+                devURL,
                 gitRoot,
                 runLatest,
                 bin,

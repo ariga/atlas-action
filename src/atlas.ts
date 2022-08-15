@@ -7,7 +7,7 @@ import { getDownloadURL, LATEST_RELEASE } from './cloud'
 
 interface RunAtlasParams {
   dir: string
-  devDB: string
+  devURL: string
   gitRoot: string
   runLatest: number
   bin: string
@@ -57,7 +57,7 @@ export async function installAtlas(
 
 export async function runAtlas({
   dir,
-  devDB,
+  devURL,
   gitRoot,
   runLatest,
   bin,
@@ -69,7 +69,7 @@ export async function runAtlas({
     '--dir',
     `file://${dir}`,
     '--dev-url',
-    devDB,
+    devURL,
     '--git-dir',
     gitRoot,
     '--log',

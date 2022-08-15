@@ -18,16 +18,16 @@ export async function run(): Promise<AtlasResult | void> {
     const bin = await installAtlas(LATEST_RELEASE)
     info(`Atlas installed: ${bin}`)
     const dir = getMigrationDir()
-    const devDB = getInput('dev-db')
+    const devURL = getInput('dev-url')
     const runLatest = Number(getInput('latest'))
     const dirFormat = getInput('dir-format')
     const gitRoot = path.resolve(await getWorkingDirectory())
     info(`Migrations directory set to ${dir}`)
-    info(`Dev Database set to ${devDB}`)
+    info(`Dev Database set to ${devURL}`)
     info(`Git Root set to ${gitRoot}`)
     const res = await runAtlas({
       dir,
-      devDB,
+      devURL,
       gitRoot,
       runLatest,
       bin,

@@ -77,7 +77,7 @@ describe('install', () => {
   test('append test query params', async () => {
     const url = getDownloadURL(LATEST_RELEASE)
     expect(url.toString()).toEqual(
-      'https://release.ariga.io/atlas/atlas-darwin-amd64-latest?test=1'
+      `https://release.ariga.io/atlas/atlas-${ARCHITECTURE}-latest?test=1`
     )
     const content = 'OK'
     const scope = nock(`${url.protocol}//${url.host}`)
@@ -100,7 +100,7 @@ describe('run with latest', () => {
       ...process.env,
       ...{
         RUNNER_TEMP: base,
-        'INPUT_DEV-DB': 'sqlite://test?mode=memory&cache=shared&_fk=1',
+        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         INPUT_LATEST: '1',
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
@@ -223,7 +223,7 @@ describe('run with git base', () => {
       ...{
         RUNNER_TEMP: base,
         GITHUB_BASE_REF: baseBranch,
-        'INPUT_DEV-DB': 'sqlite://test?mode=memory&cache=shared&_fk=1',
+        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         INPUT_LATEST: '0',
         GITHUB_WORKSPACE: gitRepo,
         INPUT_DIR: migrationsDir,
@@ -317,7 +317,7 @@ describe('report to GitHub', () => {
       ...{
         RUNNER_TEMP: base,
         INPUT_LATEST: '1',
-        'INPUT_DEV-DB': 'sqlite://test?mode=memory&cache=shared&_fk=1',
+        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
     }
@@ -403,8 +403,8 @@ describe('all reports', () => {
       ...{
         RUNNER_TEMP: base,
         INPUT_LATEST: '1',
-        'INPUT_DEV-DB': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        'INPUT_CLOUD-URL': `https://ci.ariga.cloud`,
+        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
+        'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
         'INPUT_ARIGA-TOKEN': `mysecrettoken`,
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
@@ -423,7 +423,7 @@ describe('all reports', () => {
         }
       }
     })
-    const url = process.env['INPUT_CLOUD-URL'] as string
+    const url = process.env['INPUT_ARIGA-URL'] as string
     gqlScope = nock(url)
       .post('/api/query')
       .matchHeader(
