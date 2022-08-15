@@ -14,7 +14,7 @@ of migration directories and generates insights and diagnostics on the selected 
 
 ### Supported directory formats
 
-This action supports analyzing migrations directories in formats
+This action supports analyzing migration directories in formats
 accepted by different schema migration tools: 
 * [Atlas](https://atlasgo.io)
 * [golang-migrate](https://github.com/golang-migrate/migrate)
