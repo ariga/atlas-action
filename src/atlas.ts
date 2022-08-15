@@ -5,6 +5,9 @@ import { resolveGitBase } from './github'
 import { exists } from '@actions/io/lib/io-util'
 import { getDownloadURL, LATEST_RELEASE } from './cloud'
 
+// Remove Atlas update messages.
+process.env.ATLAS_NO_UPDATE_NOTIFIER = '1'
+
 interface RunAtlasParams {
   dir: string
   devURL: string
@@ -52,6 +55,11 @@ export async function installAtlas(
   // Setting user-agent for downloadTool is currently not supported.
   const bin = await downloadTool(downloadURL)
   await exec(`chmod +x ${bin}`)
+  const res = await getExecOutput(bin, ['version'], {
+    failOnStdErr: false,
+    ignoreReturnCode: true
+  })
+  info(`Installed Atlas version:\n${res.stdout ?? res.stderr}`)
   return bin
 }
 

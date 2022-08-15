@@ -23,6 +23,8 @@ const exec_1 = __nccwpck_require__(1514);
 const github_1 = __nccwpck_require__(5865);
 const io_util_1 = __nccwpck_require__(1962);
 const cloud_1 = __nccwpck_require__(217);
+// Remove Atlas update messages.
+process.env.ATLAS_NO_UPDATE_NOTIFIER = '1';
 var ExitCodes;
 (function (ExitCodes) {
     ExitCodes[ExitCodes["Success"] = 0] = "Success";
@@ -30,12 +32,18 @@ var ExitCodes;
     ExitCodes[ExitCodes["Error"] = 2] = "Error";
 })(ExitCodes = exports.ExitCodes || (exports.ExitCodes = {}));
 function installAtlas(version = cloud_1.LATEST_RELEASE) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const downloadURL = (0, cloud_1.getDownloadURL)(version).toString();
         (0, core_1.info)(`Downloading atlas, version: ${version}`);
         // Setting user-agent for downloadTool is currently not supported.
         const bin = yield (0, tool_cache_1.downloadTool)(downloadURL);
         yield (0, exec_1.exec)(`chmod +x ${bin}`);
+        const res = yield (0, exec_1.getExecOutput)(bin, ['version'], {
+            failOnStdErr: false,
+            ignoreReturnCode: true
+        });
+        (0, core_1.info)(`Installed Atlas version:\n${(_a = res.stdout) !== null && _a !== void 0 ? _a : res.stderr}`);
         return bin;
     });
 }
@@ -351,7 +359,6 @@ function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const bin = yield (0, atlas_1.installAtlas)(cloud_1.LATEST_RELEASE);
-            (0, core_1.info)(`Atlas installed: ${bin}`);
             const dir = (0, atlas_1.getMigrationDir)();
             const devURL = (0, core_1.getInput)('dev-url');
             const runLatest = Number((0, core_1.getInput)('latest'));

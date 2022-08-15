@@ -16,7 +16,6 @@ import { LATEST_RELEASE, reportToCloud } from './cloud'
 export async function run(): Promise<AtlasResult | void> {
   try {
     const bin = await installAtlas(LATEST_RELEASE)
-    info(`Atlas installed: ${bin}`)
     const dir = getMigrationDir()
     const devURL = getInput('dev-url')
     const runLatest = Number(getInput('latest'))
