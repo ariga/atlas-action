@@ -15,6 +15,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getMigrationDir = exports.getUserAgent = exports.runAtlas = exports.installAtlas = exports.ExitCodes = void 0;
 const core_1 = __nccwpck_require__(2186);
@@ -23,6 +26,7 @@ const exec_1 = __nccwpck_require__(1514);
 const github_1 = __nccwpck_require__(5865);
 const io_util_1 = __nccwpck_require__(1962);
 const cloud_1 = __nccwpck_require__(217);
+const path_1 = __importDefault(__nccwpck_require__(1017));
 // Remove Atlas update messages.
 process.env.ATLAS_NO_UPDATE_NOTIFIER = '1';
 var ExitCodes;
@@ -41,15 +45,29 @@ function installAtlas(version = cloud_1.LATEST_RELEASE) {
         yield (0, exec_1.exec)(`chmod +x ${bin}`);
         const res = yield (0, exec_1.getExecOutput)(bin, ['version'], {
             failOnStdErr: false,
-            ignoreReturnCode: true
+            ignoreReturnCode: true,
+            silent: true
         });
         (0, core_1.info)(`Installed Atlas version:\n${(_a = res.stdout) !== null && _a !== void 0 ? _a : res.stderr}`);
         return bin;
     });
 }
 exports.installAtlas = installAtlas;
-function runAtlas({ dir, devURL, gitRoot, runLatest, bin, dirFormat }) {
+function runAtlas(bin) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
+        const dir = getMigrationDir();
+        const devURL = (0, core_1.getInput)('dev-url');
+        const runLatest = Number((0, core_1.getInput)('latest'));
+        const dirFormat = (0, core_1.getInput)('dir-format');
+        const schemaInsights = (0, core_1.getInput)('schema-insights');
+        const gitRoot = path_1.default.resolve(yield (0, github_1.getWorkingDirectory)());
+        (0, core_1.info)(`Migrations Directory: ${dir}`);
+        (0, core_1.info)(`Dev Database: ${devURL}`);
+        (0, core_1.info)(`Git Root: ${gitRoot}`);
+        (0, core_1.info)(`Latest Param: ${runLatest}`);
+        (0, core_1.info)(`Dir Format: ${dirFormat}`);
+        (0, core_1.info)(`Schema Insights: ${schemaInsights}`);
         const args = [
             'migrate',
             'lint',
@@ -60,7 +78,7 @@ function runAtlas({ dir, devURL, gitRoot, runLatest, bin, dirFormat }) {
             '--git-dir',
             gitRoot,
             '--log',
-            '{{ json .Files }}',
+            '{{ json . }}',
             '--dir-format',
             dirFormat
         ];
@@ -80,7 +98,14 @@ function runAtlas({ dir, devURL, gitRoot, runLatest, bin, dirFormat }) {
         };
         if (res.stdout && res.stdout.length > 0) {
             try {
-                a.fileReports = JSON.parse(res.stdout);
+                a.summary = JSON.parse(res.stdout);
+                if (schemaInsights == 'true') {
+                    return a;
+                }
+                if ((_a = a.summary) === null || _a === void 0 ? void 0 : _a.Schema) {
+                    a.summary.Schema = null;
+                    a.raw = JSON.stringify(a.summary);
+                }
             }
             catch (e) {
                 (0, core_1.warning)(`Failed to parse JSON output from Atlas CLI, ${e}: ${a.raw}`);
@@ -152,7 +177,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.mutation = exports.ARCHITECTURE = exports.LATEST_RELEASE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
 const github = __importStar(__nccwpck_require__(5438));
-const github_1 = __nccwpck_require__(5438);
 const core_1 = __nccwpck_require__(2186);
 const atlas_1 = __nccwpck_require__(1236);
 const url = __importStar(__nccwpck_require__(7310));
@@ -189,10 +213,6 @@ function getMutationVariables(res) {
 }
 function reportToCloud(res) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (github_1.context.eventName !== `pull_request`) {
-            (0, core_1.warning)(`Skipping report to cloud for non pull request trigger`);
-            return;
-        }
         const token = (0, core_1.getInput)('ariga-token');
         if (!token) {
             (0, core_1.warning)(`Skipping report to cloud missing ariga-token input`);
@@ -211,6 +231,7 @@ function reportToCloud(res) {
                     errMsg = `Invalid Token`;
                 }
             }
+            (0, core_1.warning)(`Received error: ${e}`);
             (0, core_1.warning)(`Failed reporting to Ariga Cloud: ${errMsg}`);
         }
     });
@@ -294,34 +315,29 @@ function resolveGitBase(gitRoot) {
 }
 exports.resolveGitBase = resolveGitBase;
 function report(res) {
-    if (!res.fileReports) {
-        return;
-    }
-    for (const fileReport of res.fileReports) {
-        if (fileReport.Error) {
-            (0, core_1.error)(fileReport.Error, {
-                file: fileReport.Name,
+    var _a, _b, _c;
+    for (const file of (_b = (_a = res === null || res === void 0 ? void 0 : res.summary) === null || _a === void 0 ? void 0 : _a.Files) !== null && _b !== void 0 ? _b : []) {
+        if (file.Error) {
+            (0, core_1.error)(file.Error, {
+                file: file.Name,
                 title: `Error in Migrations file`,
                 startLine: 0
             });
             continue;
         }
-        if (!fileReport.Reports) {
-            continue;
-        }
-        fileReport.Reports.map(report => {
+        (_c = file === null || file === void 0 ? void 0 : file.Reports) === null || _c === void 0 ? void 0 : _c.map(report => {
             var _a;
             (_a = report.Diagnostics) === null || _a === void 0 ? void 0 : _a.map(diagnostic => {
                 (0, core_1.notice)(`${report.Text}: ${diagnostic.Text}`, {
                     // Atm we don't take into account the line number.
                     startLine: 0,
-                    file: fileReport.Name,
+                    file: file.Name,
                     title: report.Text
                 });
             });
         });
-        res.cloudURL && (0, core_1.notice)(`For full report visit: ${res.cloudURL}`);
     }
+    res.cloudURL && (0, core_1.notice)(`For full report visit: ${res.cloudURL}`);
 }
 exports.report = report;
 
@@ -342,58 +358,35 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const atlas_1 = __nccwpck_require__(1236);
 const core_1 = __nccwpck_require__(2186);
-const path_1 = __importDefault(__nccwpck_require__(1017));
 const github_1 = __nccwpck_require__(5865);
 const github_2 = __nccwpck_require__(5438);
 const cloud_1 = __nccwpck_require__(217);
 // Entry point for GitHub Action runner.
 function run() {
-    var _a, _b, _c, _d;
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const bin = yield (0, atlas_1.installAtlas)(cloud_1.LATEST_RELEASE);
-            const dir = (0, atlas_1.getMigrationDir)();
-            const devURL = (0, core_1.getInput)('dev-url');
-            const runLatest = Number((0, core_1.getInput)('latest'));
-            const dirFormat = (0, core_1.getInput)('dir-format');
-            const gitRoot = path_1.default.resolve(yield (0, github_1.getWorkingDirectory)());
-            (0, core_1.info)(`Migrations directory set to ${dir}`);
-            (0, core_1.info)(`Dev Database set to ${devURL}`);
-            (0, core_1.info)(`Git Root set to ${gitRoot}`);
-            const res = yield (0, atlas_1.runAtlas)({
-                dir,
-                devURL,
-                gitRoot,
-                runLatest,
-                bin,
-                dirFormat
-            });
-            const out = ((_a = res.fileReports) === null || _a === void 0 ? void 0 : _a.length)
-                ? JSON.stringify(res.fileReports, null, 2)
-                : res.raw;
-            if (res.exitCode !== atlas_1.ExitCodes.Success &&
-                ((_c = (_b = res.fileReports) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) === 0) {
-                (0, core_1.setFailed)(`Atlas failed with code ${res.exitCode}: ${out}`);
-                return res;
-            }
-            (0, core_1.info)(`Atlas output: ${out}`);
+            const res = yield (0, atlas_1.runAtlas)(bin);
+            const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw;
+            (0, core_1.info)(`\nAtlas output:\n${out}`);
             (0, core_1.info)(`Event type: ${github_2.context.eventName}`);
             const payload = yield (0, cloud_1.reportToCloud)(res);
             if (payload) {
                 res.cloudURL = payload.createReport.url;
             }
             (0, github_1.report)(res);
+            if (res.exitCode !== atlas_1.ExitCodes.Success) {
+                (0, core_1.setFailed)(`Atlas failed with code ${res.exitCode}: ${out}`);
+            }
             return res;
         }
         catch (error) {
-            (0, core_1.setFailed)((_d = error === null || error === void 0 ? void 0 : error.message) !== null && _d !== void 0 ? _d : error);
+            (0, core_1.setFailed)((_a = error === null || error === void 0 ? void 0 : error.message) !== null && _a !== void 0 ? _a : error);
         }
     });
 }

@@ -24,6 +24,13 @@ jobs:
         uses: actions/setup-node@v3.4.1
         with:
           node-version: 16.x
+      - name: Cache Dependencies
+        uses: actions/cache@v3.0.7
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
       - name: Install
         run: npm i
       - name: All

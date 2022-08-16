@@ -43,31 +43,25 @@ export async function resolveGitBase(gitRoot: string): Promise<string> {
 }
 
 export function report(res: AtlasResult): void {
-  if (!res.fileReports) {
-    return
-  }
-  for (const fileReport of res.fileReports) {
-    if (fileReport.Error) {
-      error(fileReport.Error, {
-        file: fileReport.Name,
+  for (const file of res?.summary?.Files ?? []) {
+    if (file.Error) {
+      error(file.Error, {
+        file: file.Name,
         title: `Error in Migrations file`,
         startLine: 0
       })
       continue
     }
-    if (!fileReport.Reports) {
-      continue
-    }
-    fileReport.Reports.map(report => {
+    file?.Reports?.map(report => {
       report.Diagnostics?.map(diagnostic => {
         notice(`${report.Text}: ${diagnostic.Text}`, {
           // Atm we don't take into account the line number.
           startLine: 0,
-          file: fileReport.Name,
+          file: file.Name,
           title: report.Text
         })
       })
     })
-    res.cloudURL && notice(`For full report visit: ${res.cloudURL}`)
   }
+  res.cloudURL && notice(`For full report visit: ${res.cloudURL}`)
 }

@@ -19,7 +19,7 @@ inputs:
     default: '0'
     required: false
   working-directory:
-    description: 'path to the repository working directory (default ".")'
+    description: 'path to the repository working directory'
     default: '.'
     required: false
   ariga-url:
@@ -27,7 +27,11 @@ inputs:
     default: 'https://ci.ariga.cloud/'
     required: false
   ariga-token:
-    description: 'Token for sending the report to the cloud (should be passed as a secret)'
+    description: 'Token for sending report to Ariga cloud (should be passed as a secret)'
+    required: false
+  schema-insights:
+    description: 'Enable reporting of schema insights (requires ariga-token)'
+    default: 'true'
     required: false
 runs:
   using: 'node16'
