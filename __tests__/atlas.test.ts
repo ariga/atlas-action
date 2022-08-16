@@ -23,8 +23,10 @@ import {
   BASE_ADDRESS,
   getDownloadURL,
   LATEST_RELEASE,
+  mutation,
   S3_FOLDER
 } from '../src/cloud'
+import { Variables } from 'graphql-request/src/types'
 
 jest.mock('../src/cloud', () => {
   const actual = jest.requireActual('../src/cloud')
@@ -91,7 +93,7 @@ describe('install', () => {
   })
 })
 
-describe('run with latest', () => {
+describe('run with "latest" flag', () => {
   let base: string
 
   beforeEach(async () => {
@@ -102,7 +104,8 @@ describe('run with latest', () => {
         RUNNER_TEMP: base,
         'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         INPUT_LATEST: '1',
-        ATLASCI_USER_AGENT: 'test-atlasci-action'
+        ATLASCI_USER_AGENT: 'test-atlasci-action',
+        'INPUT_REPORT-SCHEMA': 'false'
       }
     }
   })
@@ -115,16 +118,52 @@ describe('run with latest', () => {
   test('successful no issues', async () => {
     const migrationsDir = path.join(base, 'migrations')
     await mkdir(migrationsDir)
-    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
     process.env.INPUT_DIR = migrationsDir
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
-    expect(res.raw).toBe('[]')
-    expect(res.fileReports).toEqual([])
+    expect(res.summary?.Files).toBeUndefined()
+    expect(res.summary?.Schema).toBeNull()
+    const expected = {
+      Env: {
+        Driver: 'sqlite3',
+        URL: {
+          Scheme: 'sqlite',
+          Opaque: '',
+          User: null,
+          Host: 'test',
+          Path: '',
+          RawPath: '',
+          ForceQuery: false,
+          RawQuery: 'mode=memory&cache=shared&_fk=1',
+          Fragment: '',
+          RawFragment: '',
+          DSN: 'file:test?mode=memory&cache=shared&_fk=1',
+          Schema: 'main'
+        },
+        // This value is random and changes on every run.
+        Dir: (res.summary?.Env as { [key: string]: string }).Dir
+      },
+      Steps: [
+        {
+          Name: 'Migration Integrity Check',
+          Text: 'File atlas.sum is valid'
+        },
+        {
+          Name: 'Detect New Migration Files',
+          Text: 'Found 0 new migration files (from 0 total)'
+        },
+        {
+          Name: 'Replay Migration Files',
+          Text: 'Loaded 0 changes on dev database'
+        }
+      ],
+      Schema: null
+    }
+    expect(res.summary).toEqual(expected)
+    expect(res.raw).toEqual(JSON.stringify(expected))
   })
 
   test('successful with wrong sum file', async () => {
-    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
     process.env.INPUT_DIR = path.join(
       '__tests__',
       'testdata',
@@ -132,16 +171,45 @@ describe('run with latest', () => {
     )
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Failure)
-    expect(res.fileReports).toHaveLength(1)
-    expect(res.fileReports?.[0].Name).toEqual('atlas.sum')
-    expect(res.fileReports?.[0].Error).toEqual('checksum mismatch')
-    expect(res.raw).toEqual(
-      '[{"Name":"atlas.sum","Error":"checksum mismatch"}]'
-    )
+    const expected = {
+      Env: {
+        Driver: 'sqlite3',
+        URL: {
+          Scheme: 'sqlite',
+          Opaque: '',
+          User: null,
+          Host: 'test',
+          Path: '',
+          RawPath: '',
+          ForceQuery: false,
+          RawQuery: 'mode=memory&cache=shared&_fk=1',
+          Fragment: '',
+          RawFragment: '',
+          DSN: 'file:test?mode=memory&cache=shared&_fk=1',
+          Schema: 'main'
+        },
+        Dir: '__tests__/testdata/sqlite-wrong-sum'
+      },
+      Steps: [
+        {
+          Name: 'Migration Integrity Check',
+          Text: 'File atlas.sum is invalid',
+          Error: 'checksum mismatch'
+        }
+      ],
+      Schema: null,
+      Files: [
+        {
+          Name: 'atlas.sum',
+          Error: 'checksum mismatch'
+        }
+      ]
+    }
+    expect(res.summary).toEqual(expected)
+    expect(res.raw).toEqual(JSON.stringify(expected))
   })
 
   test('successful with diagnostics', async () => {
-    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
     process.env.INPUT_DIR = path.join(
       '__tests__',
       'testdata',
@@ -150,60 +218,109 @@ describe('run with latest', () => {
 
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
-    expect(res.fileReports).toHaveLength(1)
-    expect(res.fileReports?.[0].Name).toBe('20220619130911_second.sql')
-    expect(res.fileReports?.[0].Text).toBe(
-      '-- DROP "tbl2" table\nDROP TABLE tbl2;\n'
-    )
-    expect(res.fileReports?.[0].Reports).toHaveLength(1)
-    expect(res.fileReports?.[0].Reports?.[0].Text).toBe(
-      'Destructive changes detected in file 20220619130911_second.sql'
-    )
-    expect(res.fileReports?.[0].Reports?.[0].Diagnostics).toHaveLength(1)
-    expect(res.fileReports?.[0].Reports?.[0].Diagnostics?.[0].Text).toBe(
-      'Dropping table "tbl2"'
-    )
-    expect(res.fileReports?.[0].Reports?.[0].Diagnostics?.[0].Pos).toBe(21)
-    const expectedRaw = [
-      {
-        Name: '20220619130911_second.sql',
-        Text: '-- DROP "tbl2" table\nDROP TABLE tbl2;\n',
-        Reports: [
-          {
-            Text: 'Destructive changes detected in file 20220619130911_second.sql',
-            Diagnostics: [{ Pos: 21, Text: 'Dropping table "tbl2"' }]
+    const expected = {
+      Env: {
+        Driver: 'sqlite3',
+        URL: {
+          Scheme: 'sqlite',
+          Opaque: '',
+          User: null,
+          Host: 'test',
+          Path: '',
+          RawPath: '',
+          ForceQuery: false,
+          RawQuery: 'mode=memory&cache=shared&_fk=1',
+          Fragment: '',
+          RawFragment: '',
+          DSN: 'file:test?mode=memory&cache=shared&_fk=1',
+          Schema: 'main'
+        },
+        Dir: '__tests__/testdata/sqlite-with-diagnostics'
+      },
+      Steps: [
+        {
+          Name: 'Migration Integrity Check',
+          Text: 'File atlas.sum is valid'
+        },
+        {
+          Name: 'Detect New Migration Files',
+          Text: 'Found 1 new migration files (from 3 total)'
+        },
+        {
+          Name: 'Replay Migration Files',
+          Text: 'Loaded 1 changes on dev database'
+        },
+        {
+          Name: 'Analyze 20220619130911_second.sql',
+          Text: '1 reports were found in analysis',
+          Result: {
+            Name: '20220619130911_second.sql',
+            Text: '-- DROP "tbl2" table\nDROP TABLE tbl2;\n',
+            Reports: [
+              {
+                Text: 'Destructive changes detected in file 20220619130911_second.sql',
+                Diagnostics: [
+                  {
+                    Pos: 21,
+                    Text: 'Dropping table "tbl2"'
+                  }
+                ]
+              }
+            ]
           }
-        ]
-      }
-    ]
-    expect(res.raw).toBe(JSON.stringify(expectedRaw))
+        }
+      ],
+      Schema: null,
+      Files: [
+        {
+          Name: '20220619130911_second.sql',
+          Text: '-- DROP "tbl2" table\nDROP TABLE tbl2;\n',
+          Reports: [
+            {
+              Text: 'Destructive changes detected in file 20220619130911_second.sql',
+              Diagnostics: [
+                {
+                  Pos: 21,
+                  Text: 'Dropping table "tbl2"'
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    expect(res.summary).toEqual(expected)
+    expect(res.raw).toEqual(JSON.stringify(expected))
   })
 
   test('successful run with golang migrate format', async () => {
-    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
     process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
     process.env['INPUT_DIR-FORMAT'] = 'golang-migrate'
     process.env['INPUT_LATEST'] = '4'
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Success)
-    expect(res.fileReports).toHaveLength(2)
-    expect(res.fileReports?.[0].Name).toEqual('1_initial.up.sql')
-    expect(res.fileReports?.[0].Text).toContain('CREATE TABLE tbl')
-    expect(res.fileReports?.[0].Error).toBeFalsy()
-    expect(res.fileReports?.[1].Name).toEqual('2_second_migration.up.sql')
-    expect(res.fileReports?.[1].Text).toContain('CREATE TABLE tbl_2')
-    expect(res.fileReports?.[1].Error).toBeFalsy()
+    expect(res.summary?.Files).toHaveLength(2)
+    expect(res.summary?.Files[0].Name).toEqual('1_initial.up.sql')
+    expect(res.summary?.Files[0].Text).toContain('CREATE TABLE tbl')
+    expect(res.summary?.Files[0].Error).toBeFalsy()
+    expect(res.summary?.Files[1].Name).toEqual('2_second_migration.up.sql')
+    expect(res.summary?.Files[1].Text).toContain('CREATE TABLE tbl_2')
+    expect(res.summary?.Files[1].Error).toBeFalsy()
+    expect(res.summary?.Schema).toBeNull()
   })
 
   test('fail on wrong migration dir format', async () => {
-    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE_NAME>.
+    // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE-NAME>.
     process.env['INPUT_DIR-FORMAT'] = 'incorrect'
     process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Failure)
-    expect(res.raw).toEqual(
-      '[{"Name":"1_initial.down.sql","Error":"executing statement: \\"DROP TABLE tbl;\\": no such table: tbl"}]'
-    )
+    expect(res.summary?.Files).toEqual([
+      {
+        Name: '1_initial.down.sql',
+        Error: 'executing statement: "DROP TABLE tbl;": no such table: tbl'
+      }
+    ])
   })
 })
 
@@ -227,7 +344,8 @@ describe('run with git base', () => {
         INPUT_LATEST: '0',
         GITHUB_WORKSPACE: gitRepo,
         INPUT_DIR: migrationsDir,
-        ATLASCI_USER_AGENT: 'test-atlasci-action'
+        ATLASCI_USER_AGENT: 'test-atlasci-action',
+        'INPUT_REPORT-SCHEMA': 'false'
       }
     }
     const git: SimpleGit = simpleGit(gitRepo, {
@@ -278,31 +396,19 @@ describe('run with git base', () => {
   test('successful', async () => {
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
-    expect(res.fileReports).toHaveLength(1)
-    expect(res.fileReports?.[0].Name).toBe('20220728131023.sql')
-    expect(res.fileReports?.[0].Text).toBe(
+    expect(res.summary?.Files).toHaveLength(1)
+    expect(res.summary?.Files[0].Name).toBe('20220728131023.sql')
+    expect(res.summary?.Files[0].Text).toBe(
       `-- DROP "tbl" table\nDROP TABLE tbl;\n`
     )
-    expect(res.fileReports?.[0].Reports).toHaveLength(1)
-    expect(res.fileReports?.[0].Reports?.[0].Text).toBe(
+    expect(res.summary?.Files[0].Reports).toHaveLength(1)
+    expect(res.summary?.Files[0].Reports?.[0].Text).toBe(
       'Destructive changes detected in file 20220728131023.sql'
     )
-    expect(res.fileReports?.[0].Reports?.[0].Diagnostics?.[0].Text).toBe(
+    expect(res.summary?.Files[0].Reports?.[0].Diagnostics?.[0].Text).toBe(
       `Dropping table "tbl"`
     )
-    const expectedRaw = [
-      {
-        Name: '20220728131023.sql',
-        Text: '-- DROP "tbl" table\nDROP TABLE tbl;\n',
-        Reports: [
-          {
-            Text: 'Destructive changes detected in file 20220728131023.sql',
-            Diagnostics: [{ Pos: 20, Text: 'Dropping table "tbl"' }]
-          }
-        ]
-      }
-    ]
-    expect(res.raw).toBe(JSON.stringify(expectedRaw))
+    expect(res.summary?.Schema).toBeNull()
   })
 })
 
@@ -320,7 +426,8 @@ describe('report to GitHub', () => {
         RUNNER_TEMP: base,
         INPUT_LATEST: '1',
         'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        ATLASCI_USER_AGENT: 'test-atlasci-action'
+        ATLASCI_USER_AGENT: 'test-atlasci-action',
+        'INPUT_REPORT-SCHEMA': 'false'
       }
     }
     spyOnNotice = jest.spyOn(core, 'notice')
@@ -393,7 +500,8 @@ describe('report to GitHub', () => {
 describe('all reports', () => {
   const originalContext = { ...github.context }
   let base: string,
-    gqlScope: nock.Interceptor,
+    actualRequestBody: { [key: string]: string & Variables },
+    gqlInterceptor: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
     spyOnWarning: jest.SpyInstance
@@ -408,7 +516,9 @@ describe('all reports', () => {
         'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
         'INPUT_ARIGA-TOKEN': `mysecrettoken`,
-        ATLASCI_USER_AGENT: 'test-atlasci-action'
+        ATLASCI_USER_AGENT: 'test-atlasci-action',
+        'INPUT_REPORT-SCHEMA': 'false',
+        GITHUB_REPOSITORY: 'someProject/someRepo'
       }
     }
     spyOnNotice = jest.spyOn(core, 'notice')
@@ -426,8 +536,11 @@ describe('all reports', () => {
       }
     })
     const url = process.env['INPUT_ARIGA-URL'] as string
-    gqlScope = nock(url)
-      .post('/api/query')
+    gqlInterceptor = nock(url)
+      .post('/api/query', function (body) {
+        actualRequestBody = body
+        return body
+      })
       .matchHeader(
         'Authorization',
         `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
@@ -444,6 +557,8 @@ describe('all reports', () => {
     Object.defineProperty(github, 'context', {
       value: originalContext
     })
+    nock.cleanAll()
+    actualRequestBody = {}
   })
 
   test('successfully', async () => {
@@ -453,7 +568,7 @@ describe('all reports', () => {
       'testdata',
       'sqlite-with-diagnostics'
     )
-    const scope = gqlScope.reply(http.HttpCodes.OK, {
+    const scope = gqlInterceptor.reply(http.HttpCodes.OK, {
       data: {
         createReport: {
           runID: '8589934593',
@@ -480,5 +595,71 @@ describe('all reports', () => {
       2,
       'For full report visit: https://ariga.cloud.test/ci-runs/8589934593'
     )
+    expect(actualRequestBody).toEqual({
+      query: mutation,
+      variables: {
+        envName: 'CI',
+        projectName:
+          'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
+        url: 'https://github.com/ariga/atlasci-action/pull/1',
+        status: 'successful',
+        payload: expect.anything()
+      },
+      operationName: 'CreateReportInput'
+    })
+    const payloadParsed = JSON.parse(actualRequestBody.variables.payload)
+    expect(payloadParsed).toEqual({
+      Env: res.summary?.Env,
+      Steps: res.summary?.Steps,
+      Schema: null,
+      Files: res.summary?.Files
+    })
+  })
+
+  test('successfully with schema', async () => {
+    const cloudURL = 'https://ariga.cloud.test/ci-runs/8589934593'
+    process.env.INPUT_DIR = path.join(
+      '__tests__',
+      'testdata',
+      'sqlite-with-diagnostics'
+    )
+    process.env['INPUT_REPORT-SCHEMA'] = 'true'
+    const scope = gqlInterceptor.reply(http.HttpCodes.OK, {
+      data: {
+        createReport: {
+          runID: '8589934593',
+          url: cloudURL
+        }
+      }
+    })
+    const res = (await run()) as AtlasResult
+    expect(res.exitCode).toBe(ExitCodes.Success)
+    expect(scope.isDone()).toBeTruthy()
+    expect(spyOnNotice).toHaveBeenCalledTimes(2)
+    expect(spyOnWarning).toHaveBeenCalledTimes(0)
+    expect(spyOnError).toHaveBeenCalledTimes(0)
+    expect(actualRequestBody).toEqual({
+      query: mutation,
+      variables: {
+        envName: 'CI',
+        projectName:
+          'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
+        url: 'https://github.com/ariga/atlasci-action/pull/1',
+        status: 'successful',
+        payload: expect.anything()
+      },
+      operationName: 'CreateReportInput'
+    })
+    const payloadParsed = JSON.parse(actualRequestBody.variables.payload)
+    expect(payloadParsed).toEqual({
+      Env: res.summary?.Env,
+      Steps: res.summary?.Steps,
+      Schema: {
+        Current:
+          'table "tbl2" {\n  schema = schema.main\n  column "col" {\n    null = false\n    type = int\n  }\n}\nschema "main" {\n}\n',
+        Desired: 'schema "main" {\n}\n'
+      },
+      Files: res.summary?.Files
+    })
   })
 })

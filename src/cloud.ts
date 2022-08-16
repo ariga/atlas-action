@@ -1,5 +1,4 @@
 import * as github from '@actions/github'
-import { context } from '@actions/github'
 import { getInput, info, setSecret, warning } from '@actions/core'
 import { AtlasResult, ExitCodes, getMigrationDir, getUserAgent } from './atlas'
 import * as url from 'url'
@@ -53,10 +52,6 @@ function getMutationVariables(res: AtlasResult): {
 export async function reportToCloud(
   res: AtlasResult
 ): Promise<CreateReportPayload | void> {
-  if (context.eventName !== `pull_request`) {
-    warning(`Skipping report to cloud for non pull request trigger`)
-    return
-  }
   const token = getInput('ariga-token')
   if (!token) {
     warning(`Skipping report to cloud missing ariga-token input`)
@@ -80,6 +75,7 @@ export async function reportToCloud(
       }
     }
     warning(`Failed reporting to Ariga Cloud: ${errMsg}`)
+    warning(`Raw error: ${e}`)
   }
 }
 

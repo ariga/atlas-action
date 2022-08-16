@@ -11,7 +11,7 @@ jest.setTimeout(30000)
 
 describe('report to cloud', () => {
   let spyOnWarning: jest.SpyInstance
-  let gqlScope: nock.Interceptor
+  let gqlInterceptor: nock.Interceptor
   const originalContext = { ...github.context }
   const originalENV = { ...process.env }
 
@@ -40,7 +40,7 @@ describe('report to cloud', () => {
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
     }
-    gqlScope = nock(process.env['INPUT_ARIGA-URL'] as string)
+    gqlInterceptor = nock(process.env['INPUT_ARIGA-URL'] as string)
       .post('/api/query')
       .matchHeader(
         'Authorization',
@@ -66,9 +66,14 @@ describe('report to cloud', () => {
     const res: AtlasResult = {
       exitCode: ExitCodes.Success,
       raw: '[{"Name":"test","Text":"test"}]',
-      fileReports: [{ Name: 'test', Text: 'test' }]
+      summary: {
+        Files: [{ Name: 'test', Text: 'test' }],
+        Env: {},
+        Steps: {},
+        Schema: null
+      }
     }
-    const scope = gqlScope.reply(http.HttpCodes.OK, {
+    const scope = gqlInterceptor.reply(http.HttpCodes.OK, {
       data: {
         createReport: {
           runID: '8589934593',
@@ -107,9 +112,14 @@ describe('report to cloud', () => {
     const res: AtlasResult = {
       exitCode: ExitCodes.Success,
       raw: '[{"Name":"test","Text":"test"}]',
-      fileReports: [{ Name: 'test', Text: 'test' }]
+      summary: {
+        Files: [{ Name: 'test', Text: 'test' }],
+        Env: {},
+        Steps: {},
+        Schema: null
+      }
     }
-    const scope = gqlScope.reply(
+    const scope = gqlInterceptor.reply(
       http.HttpCodes.InternalServerError,
       'Internal server error'
     )
@@ -125,8 +135,9 @@ describe('report to cloud', () => {
       expect.anything(),
       expect.anything()
     )
-    expect(spyOnWarning).toHaveBeenCalledTimes(1)
-    expect(spyOnWarning).toHaveBeenCalledWith(
+    expect(spyOnWarning).toHaveBeenCalledTimes(2)
+    expect(spyOnWarning).toHaveBeenNthCalledWith(
+      1,
       'Failed reporting to Ariga Cloud: Internal server error'
     )
   })
@@ -135,37 +146,25 @@ describe('report to cloud', () => {
     const res: AtlasResult = {
       exitCode: ExitCodes.Success,
       raw: '[{"Name":"test","Text":"test"}]',
-      fileReports: [{ Name: 'test', Text: 'test' }]
+      summary: {
+        Files: [{ Name: 'test', Text: 'test' }],
+        Env: {},
+        Steps: {},
+        Schema: null
+      }
     }
-    const scope = gqlScope.reply(http.HttpCodes.Unauthorized, 'Unauthorized')
+    const scope = gqlInterceptor.reply(
+      http.HttpCodes.Unauthorized,
+      'Unauthorized'
+    )
     const spyOnRequest = jest.spyOn(gql, 'request')
 
     await reportToCloud(res)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
-    expect(spyOnWarning).toHaveBeenCalledTimes(1)
+    expect(spyOnWarning).toHaveBeenCalledTimes(2)
     expect(spyOnWarning).toHaveBeenCalledWith(
       'Failed reporting to Ariga Cloud: Invalid Token'
-    )
-  })
-
-  test('ignore non pull request', async () => {
-    Object.defineProperty(github, 'context', {
-      value: {
-        eventName: 'branch'
-      }
-    })
-    const res: AtlasResult = {
-      exitCode: ExitCodes.Success,
-      raw: '[{"Name":"test","Text":"test"}]',
-      fileReports: [{ Name: 'test', Text: 'test' }]
-    }
-    const spyOnRequest = jest.spyOn(gql, 'request')
-    await reportToCloud(res)
-    expect(spyOnRequest).not.toHaveBeenCalled()
-    expect(spyOnWarning).toHaveBeenCalledTimes(1)
-    expect(spyOnWarning).toHaveBeenCalledWith(
-      'Skipping report to cloud for non pull request trigger'
     )
   })
 
@@ -174,7 +173,12 @@ describe('report to cloud', () => {
     const res: AtlasResult = {
       exitCode: ExitCodes.Success,
       raw: '[{"Name":"test","Text":"test"}]',
-      fileReports: [{ Name: 'test', Text: 'test' }]
+      summary: {
+        Files: [{ Name: 'test', Text: 'test' }],
+        Env: {},
+        Steps: {},
+        Schema: null
+      }
     }
     const spyOnRequest = jest.spyOn(gql, 'request')
     await reportToCloud(res)

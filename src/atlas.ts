@@ -1,21 +1,13 @@
 import { getInput, info, warning } from '@actions/core'
 import { downloadTool } from '@actions/tool-cache'
 import { exec, getExecOutput } from '@actions/exec'
-import { resolveGitBase } from './github'
+import { getWorkingDirectory, resolveGitBase } from './github'
 import { exists } from '@actions/io/lib/io-util'
 import { getDownloadURL, LATEST_RELEASE } from './cloud'
+import path from 'path'
 
 // Remove Atlas update messages.
 process.env.ATLAS_NO_UPDATE_NOTIFIER = '1'
-
-interface RunAtlasParams {
-  dir: string
-  devURL: string
-  gitRoot: string
-  runLatest: number
-  bin: string
-  dirFormat: string
-}
 
 export enum ExitCodes {
   Success = 0,
@@ -27,10 +19,17 @@ export interface AtlasResult {
   cloudURL?: string
   exitCode: ExitCodes
   raw: string
-  fileReports?: FileReport[]
+  summary?: Summary
 }
 
-interface FileReport {
+export interface Summary {
+  Files: FileReport[]
+  Env: unknown
+  Steps: unknown
+  Schema: unknown | null
+}
+
+export interface FileReport {
   Name: string
   Text: string
   Reports?: Report[]
@@ -57,20 +56,27 @@ export async function installAtlas(
   await exec(`chmod +x ${bin}`)
   const res = await getExecOutput(bin, ['version'], {
     failOnStdErr: false,
-    ignoreReturnCode: true
+    ignoreReturnCode: true,
+    silent: true
   })
   info(`Installed Atlas version:\n${res.stdout ?? res.stderr}`)
   return bin
 }
 
-export async function runAtlas({
-  dir,
-  devURL,
-  gitRoot,
-  runLatest,
-  bin,
-  dirFormat
-}: RunAtlasParams): Promise<AtlasResult> {
+export async function runAtlas(bin: string): Promise<AtlasResult> {
+  const dir = getMigrationDir()
+  const devURL = getInput('dev-url')
+  const runLatest = Number(getInput('latest'))
+  const dirFormat = getInput('dir-format')
+  const reportSchema = getInput('report-schema')
+  const gitRoot = path.resolve(await getWorkingDirectory())
+  info(`Migrations Directory: ${dir}`)
+  info(`Dev Database: ${devURL}`)
+  info(`Git Root: ${gitRoot}`)
+  info(`Latest Param: ${runLatest}`)
+  info(`Dir Format: ${dirFormat}`)
+  info(`Report Schema: ${reportSchema}`)
+
   const args = [
     'migrate',
     'lint',
@@ -81,7 +87,7 @@ export async function runAtlas({
     '--git-dir',
     gitRoot,
     '--log',
-    '{{ json .Files }}',
+    '{{ json . }}',
     '--dir-format',
     dirFormat
   ]
@@ -100,7 +106,14 @@ export async function runAtlas({
   }
   if (res.stdout && res.stdout.length > 0) {
     try {
-      a.fileReports = JSON.parse(res.stdout)
+      a.summary = JSON.parse(res.stdout)
+      if (reportSchema == 'true') {
+        return a
+      }
+      if (a.summary?.Schema) {
+        a.summary.Schema = null
+        a.raw = JSON.stringify(a.summary)
+      }
     } catch (e) {
       warning(`Failed to parse JSON output from Atlas CLI, ${e}: ${a.raw}`)
     }
