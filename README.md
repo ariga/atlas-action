@@ -38,7 +38,7 @@ on:
     paths:
       - 'path/to/migration/dir/*'
 jobs:
-  ent:
+  lint:
     services:
       # Spin up a mysql:8.0.29 container to be used as the dev-database for analysis. 
       # If you use a different database, change the image configuration and update
