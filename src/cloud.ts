@@ -29,9 +29,19 @@ interface CreateReportPayload {
   }
 }
 
-function getMutationVariables(res: AtlasResult): {
-  [p: string]: string | number | undefined
-} {
+type CreateReportInput = {
+  input: {
+    payload: string
+    envName: string
+    commit?: string
+    projectName: string
+    branch?: string
+    url: string | undefined
+    status: string
+  }
+}
+
+function getMutationVariables(res: AtlasResult): CreateReportInput {
   const {
     GITHUB_REPOSITORY: repository,
     GITHUB_SHA: commitID,
@@ -39,13 +49,15 @@ function getMutationVariables(res: AtlasResult): {
   } = process.env
   const migrationDir = getMigrationDir().replace('file://', '')
   return {
-    envName: 'CI',
-    projectName: `${repository}-${migrationDir}`,
-    branch: sourceBranch,
-    commit: commitID,
-    url: github?.context?.payload?.pull_request?.html_url,
-    status: res.exitCode === ExitCodes.Success ? 'successful' : 'failed',
-    payload: res.raw
+    input: {
+      envName: 'CI',
+      projectName: `${repository}-${migrationDir}`,
+      branch: sourceBranch,
+      commit: commitID,
+      url: github?.context?.payload?.pull_request?.html_url,
+      status: res.exitCode === ExitCodes.Success ? 'successful' : 'failed',
+      payload: res.raw
+    }
   }
 }
 

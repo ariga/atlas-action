@@ -130,7 +130,7 @@ function getMigrationDir() {
     return dir;
 }
 exports.getMigrationDir = getMigrationDir;
-
+//# sourceMappingURL=atlas.js.map
 
 /***/ }),
 
@@ -202,13 +202,15 @@ function getMutationVariables(res) {
     const { GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID, GITHUB_REF_NAME: sourceBranch } = process.env;
     const migrationDir = (0, atlas_1.getMigrationDir)().replace('file://', '');
     return {
-        envName: 'CI',
-        projectName: `${repository}-${migrationDir}`,
-        branch: sourceBranch,
-        commit: commitID,
-        url: (_c = (_b = (_a = github === null || github === void 0 ? void 0 : github.context) === null || _a === void 0 ? void 0 : _a.payload) === null || _b === void 0 ? void 0 : _b.pull_request) === null || _c === void 0 ? void 0 : _c.html_url,
-        status: res.exitCode === atlas_1.ExitCodes.Success ? 'successful' : 'failed',
-        payload: res.raw
+        input: {
+            envName: 'CI',
+            projectName: `${repository}-${migrationDir}`,
+            branch: sourceBranch,
+            commit: commitID,
+            url: (_c = (_b = (_a = github === null || github === void 0 ? void 0 : github.context) === null || _a === void 0 ? void 0 : _a.payload) === null || _b === void 0 ? void 0 : _b.pull_request) === null || _c === void 0 ? void 0 : _c.html_url,
+            status: res.exitCode === atlas_1.ExitCodes.Success ? 'successful' : 'failed',
+            payload: res.raw
+        }
     };
 }
 function reportToCloud(res) {
@@ -248,7 +250,7 @@ function getDownloadURL(version) {
     return new URL(`${exports.BASE_ADDRESS}/${exports.S3_FOLDER}/atlas-${exports.ARCHITECTURE}-${version}`);
 }
 exports.getDownloadURL = getDownloadURL;
-
+//# sourceMappingURL=cloud.js.map
 
 /***/ }),
 
@@ -340,7 +342,7 @@ function report(res) {
     res.cloudURL && (0, core_1.notice)(`For full report visit: ${res.cloudURL}`);
 }
 exports.report = report;
-
+//# sourceMappingURL=github.js.map
 
 /***/ }),
 
@@ -392,7 +394,7 @@ function run() {
 }
 exports.run = run;
 run();
-
+//# sourceMappingURL=main.js.map
 
 /***/ }),
 

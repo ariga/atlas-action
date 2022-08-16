@@ -607,18 +607,20 @@ describe('all reports', () => {
     expect(actualRequestBody).toEqual({
       query: mutation,
       variables: {
-        branch: 'test',
-        commit: '71d0bfc1',
-        envName: 'CI',
-        projectName:
-          'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
-        url: 'https://github.com/ariga/atlasci-action/pull/1',
-        status: 'successful',
-        payload: expect.anything()
+        input: {
+          branch: 'test',
+          commit: '71d0bfc1',
+          envName: 'CI',
+          projectName:
+            'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
+          url: 'https://github.com/ariga/atlasci-action/pull/1',
+          status: 'successful',
+          payload: expect.anything()
+        }
       },
       operationName: 'CreateReportInput'
     })
-    const payloadParsed = JSON.parse(actualRequestBody.variables.payload)
+    const payloadParsed = JSON.parse(actualRequestBody.variables.input.payload)
     expect(payloadParsed).toEqual({
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,
@@ -652,18 +654,20 @@ describe('all reports', () => {
     expect(actualRequestBody).toEqual({
       query: mutation,
       variables: {
-        branch: 'test',
-        commit: '71d0bfc1',
-        envName: 'CI',
-        projectName:
-          'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
-        url: 'https://github.com/ariga/atlasci-action/pull/1',
-        status: 'successful',
-        payload: expect.anything()
+        input: {
+          branch: 'test',
+          commit: '71d0bfc1',
+          envName: 'CI',
+          projectName:
+            'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
+          url: 'https://github.com/ariga/atlasci-action/pull/1',
+          status: 'successful',
+          payload: expect.anything()
+        }
       },
       operationName: 'CreateReportInput'
     })
-    const payloadParsed = JSON.parse(actualRequestBody.variables.payload)
+    const payloadParsed = JSON.parse(actualRequestBody.variables.input.payload)
     expect(payloadParsed).toEqual({
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,

@@ -93,13 +93,15 @@ describe('report to cloud', () => {
       'https://ci.ariga.cloud/api/query',
       mutation,
       {
-        branch: process.env.GITHUB_REF_NAME,
-        commit: process.env.GITHUB_SHA,
-        envName: 'CI',
-        payload: '[{"Name":"test","Text":"test"}]',
-        projectName: `${process.env.GITHUB_REPOSITORY}-${getMigrationDir()}`,
-        status: 'successful',
-        url: 'https://github.com/ariga/atlasci-action/pull/1'
+        input: {
+          branch: process.env.GITHUB_REF_NAME,
+          commit: process.env.GITHUB_SHA,
+          envName: 'CI',
+          payload: '[{"Name":"test","Text":"test"}]',
+          projectName: `${process.env.GITHUB_REPOSITORY}-${getMigrationDir()}`,
+          status: 'successful',
+          url: 'https://github.com/ariga/atlasci-action/pull/1'
+        }
       },
       {
         Authorization: 'Bearer mysecrettoken',
