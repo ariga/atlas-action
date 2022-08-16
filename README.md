@@ -101,5 +101,5 @@ The full list of input options can be found in [action.yml](action.yml).
 The source code for this GitHub Action is released under the Apache 2.0
 License, see [LICENSE](LICENSE).
 
-This action downloads a binary version of [https://atlasgo.io](Atlas) which
+This action downloads a binary version of [Atlas](https://atlasgo.io) which
 is distributed under the [Ariga EULA](https://ariga.io/legal/atlas/eula).
