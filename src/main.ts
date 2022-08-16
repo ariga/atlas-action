@@ -10,13 +10,6 @@ export async function run(): Promise<AtlasResult | void> {
     const bin = await installAtlas(LATEST_RELEASE)
     const res = await runAtlas(bin)
     const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw
-    if (
-      res.exitCode !== ExitCodes.Success &&
-      (res.summary?.Files?.length ?? 0) === 0
-    ) {
-      setFailed(`Atlas failed with code ${res.exitCode}: ${out}`)
-      return res
-    }
     info(`\nAtlas output:\n${out}`)
     info(`Event type: ${context.eventName}`)
     const payload = await reportToCloud(res)
@@ -24,6 +17,9 @@ export async function run(): Promise<AtlasResult | void> {
       res.cloudURL = payload.createReport.url
     }
     report(res)
+    if (res.exitCode !== ExitCodes.Success) {
+      setFailed(`Atlas failed with code ${res.exitCode}: ${out}`)
+    }
     return res
   } catch (error) {
     setFailed((error as Error)?.message ?? error)

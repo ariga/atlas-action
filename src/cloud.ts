@@ -74,8 +74,8 @@ export async function reportToCloud(
         errMsg = `Invalid Token`
       }
     }
+    warning(`Received error: ${e}`)
     warning(`Failed reporting to Ariga Cloud: ${errMsg}`)
-    warning(`Raw error: ${e}`)
   }
 }
 

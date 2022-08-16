@@ -231,8 +231,8 @@ function reportToCloud(res) {
                     errMsg = `Invalid Token`;
                 }
             }
+            (0, core_1.warning)(`Received error: ${e}`);
             (0, core_1.warning)(`Failed reporting to Ariga Cloud: ${errMsg}`);
-            (0, core_1.warning)(`Raw error: ${e}`);
         }
     });
 }
@@ -315,11 +315,8 @@ function resolveGitBase(gitRoot) {
 }
 exports.resolveGitBase = resolveGitBase;
 function report(res) {
-    var _a;
-    if (!((_a = res.summary) === null || _a === void 0 ? void 0 : _a.Files)) {
-        return;
-    }
-    for (const file of res.summary.Files) {
+    var _a, _b, _c;
+    for (const file of (_b = (_a = res === null || res === void 0 ? void 0 : res.summary) === null || _a === void 0 ? void 0 : _a.Files) !== null && _b !== void 0 ? _b : []) {
         if (file.Error) {
             (0, core_1.error)(file.Error, {
                 file: file.Name,
@@ -328,10 +325,7 @@ function report(res) {
             });
             continue;
         }
-        if (!file.Reports) {
-            continue;
-        }
-        file.Reports.map(report => {
+        (_c = file === null || file === void 0 ? void 0 : file.Reports) === null || _c === void 0 ? void 0 : _c.map(report => {
             var _a;
             (_a = report.Diagnostics) === null || _a === void 0 ? void 0 : _a.map(diagnostic => {
                 (0, core_1.notice)(`${report.Text}: ${diagnostic.Text}`, {
@@ -342,8 +336,8 @@ function report(res) {
                 });
             });
         });
-        res.cloudURL && (0, core_1.notice)(`For full report visit: ${res.cloudURL}`);
     }
+    res.cloudURL && (0, core_1.notice)(`For full report visit: ${res.cloudURL}`);
 }
 exports.report = report;
 
@@ -373,17 +367,12 @@ const github_2 = __nccwpck_require__(5438);
 const cloud_1 = __nccwpck_require__(217);
 // Entry point for GitHub Action runner.
 function run() {
-    var _a, _b, _c, _d;
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const bin = yield (0, atlas_1.installAtlas)(cloud_1.LATEST_RELEASE);
             const res = yield (0, atlas_1.runAtlas)(bin);
             const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw;
-            if (res.exitCode !== atlas_1.ExitCodes.Success &&
-                ((_c = (_b = (_a = res.summary) === null || _a === void 0 ? void 0 : _a.Files) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) === 0) {
-                (0, core_1.setFailed)(`Atlas failed with code ${res.exitCode}: ${out}`);
-                return res;
-            }
             (0, core_1.info)(`\nAtlas output:\n${out}`);
             (0, core_1.info)(`Event type: ${github_2.context.eventName}`);
             const payload = yield (0, cloud_1.reportToCloud)(res);
@@ -391,10 +380,13 @@ function run() {
                 res.cloudURL = payload.createReport.url;
             }
             (0, github_1.report)(res);
+            if (res.exitCode !== atlas_1.ExitCodes.Success) {
+                (0, core_1.setFailed)(`Atlas failed with code ${res.exitCode}: ${out}`);
+            }
             return res;
         }
         catch (error) {
-            (0, core_1.setFailed)((_d = error === null || error === void 0 ? void 0 : error.message) !== null && _d !== void 0 ? _d : error);
+            (0, core_1.setFailed)((_a = error === null || error === void 0 ? void 0 : error.message) !== null && _a !== void 0 ? _a : error);
         }
     });
 }

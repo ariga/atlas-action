@@ -138,6 +138,12 @@ describe('report to cloud', () => {
     expect(spyOnWarning).toHaveBeenCalledTimes(2)
     expect(spyOnWarning).toHaveBeenNthCalledWith(
       1,
+      expect.stringContaining(
+        'Received error: Error: GraphQL Error (Code: 500)'
+      )
+    )
+    expect(spyOnWarning).toHaveBeenNthCalledWith(
+      2,
       'Failed reporting to Ariga Cloud: Internal server error'
     )
   })

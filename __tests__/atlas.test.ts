@@ -46,6 +46,7 @@ const originalENV = { ...process.env }
 
 describe('install', () => {
   let base: string
+
   beforeEach(async () => {
     base = await mkdtemp(`${tmpdir()}${path.sep}`)
     process.env = {
@@ -57,6 +58,7 @@ describe('install', () => {
       }
     }
   })
+
   afterEach(() => {
     rm(base, { recursive: true })
     process.env = { ...originalENV }
@@ -94,7 +96,7 @@ describe('install', () => {
 })
 
 describe('run with "latest" flag', () => {
-  let base: string
+  let base: string, spyOnSetFailed: jest.SpyInstance
 
   beforeEach(async () => {
     base = await mkdtemp(`${tmpdir()}${path.sep}`)
@@ -108,11 +110,13 @@ describe('run with "latest" flag', () => {
         'INPUT_REPORT-SCHEMA': 'false'
       }
     }
+    spyOnSetFailed = jest.spyOn(core, 'setFailed')
   })
 
   afterEach(async () => {
     await rm(base, { recursive: true })
     process.env = { ...originalENV }
+    spyOnSetFailed.mockReset()
   })
 
   test('successful no issues', async () => {
@@ -163,7 +167,7 @@ describe('run with "latest" flag', () => {
     expect(res.raw).toEqual(JSON.stringify(expected))
   })
 
-  test('successful with wrong sum file', async () => {
+  test('fail on wrong sum file', async () => {
     process.env.INPUT_DIR = path.join(
       '__tests__',
       'testdata',
@@ -207,6 +211,7 @@ describe('run with "latest" flag', () => {
     }
     expect(res.summary).toEqual(expected)
     expect(res.raw).toEqual(JSON.stringify(expected))
+    expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
   })
 
   test('successful with diagnostics', async () => {
@@ -321,6 +326,7 @@ describe('run with "latest" flag', () => {
         Error: 'executing statement: "DROP TABLE tbl;": no such table: tbl'
       }
     ])
+    expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -464,7 +470,7 @@ describe('report to GitHub', () => {
     )
   })
 
-  test('atlas known error', async () => {
+  test('fail on atlas known error', async () => {
     process.env.INPUT_DIR = path.join(
       '__tests__',
       'testdata',
@@ -482,6 +488,7 @@ describe('report to GitHub', () => {
         title: 'Error in Migrations file'
       }
     )
+    expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
   })
 
   test('atlas unknown error - no report', async () => {

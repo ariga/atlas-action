@@ -43,10 +43,7 @@ export async function resolveGitBase(gitRoot: string): Promise<string> {
 }
 
 export function report(res: AtlasResult): void {
-  if (!res.summary?.Files) {
-    return
-  }
-  for (const file of res.summary.Files) {
+  for (const file of res?.summary?.Files ?? []) {
     if (file.Error) {
       error(file.Error, {
         file: file.Name,
@@ -55,10 +52,7 @@ export function report(res: AtlasResult): void {
       })
       continue
     }
-    if (!file.Reports) {
-      continue
-    }
-    file.Reports.map(report => {
+    file?.Reports?.map(report => {
       report.Diagnostics?.map(diagnostic => {
         notice(`${report.Text}: ${diagnostic.Text}`, {
           // Atm we don't take into account the line number.
@@ -68,6 +62,6 @@ export function report(res: AtlasResult): void {
         })
       })
     })
-    res.cloudURL && notice(`For full report visit: ${res.cloudURL}`)
   }
+  res.cloudURL && notice(`For full report visit: ${res.cloudURL}`)
 }
