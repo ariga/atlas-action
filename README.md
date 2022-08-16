@@ -18,6 +18,8 @@ This action supports analyzing migration directories in formats
 accepted by different schema migration tools: 
 * [Atlas](https://atlasgo.io)
 * [golang-migrate](https://github.com/golang-migrate/migrate)
+* [goose](https://github.com/pressly/goose)
+* [dbmate](https://github.com/amacneil/dbmate)
 
 ### Usage
 
@@ -56,7 +58,8 @@ jobs:
       - uses: ariga/atlas-action@master
         with:
           dir: path/to/migrations
-          dev-db: mysql://root:pass@localhost:3307/test
+          dir-format: golang-migrate
+          dev-url: mysql://root:pass@localhost:3307/test
 ```
 
 ### Configuration
@@ -70,7 +73,7 @@ Sets the directory that contains the migration scripts to analyze.
 #### `dir-format`
 
 Sets the format of the migration directory. Options: `atlas` (default),
-`golang-migrate`. Coming soon: `goose`, `flyway`, `liquibase`, `dbmate`. 
+`golang-migrate`, `goose` or `dbmate`. Coming soon: `flyway`, `liquibase`. 
 
 #### `dev-url`
 
