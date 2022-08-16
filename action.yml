@@ -29,9 +29,9 @@ inputs:
   ariga-token:
     description: 'Token for sending report to Ariga cloud (should be passed as a secret)'
     required: false
-  report-schema:
-    description: 'Report SQL Schema to cloud'
-    default: 'false'
+  schema-insights:
+    description: 'Enable reporting of schema insights (requires ariga-token)'
+    default: 'true'
     required: false
 runs:
   using: 'node16'

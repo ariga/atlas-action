@@ -68,14 +68,14 @@ export async function runAtlas(bin: string): Promise<AtlasResult> {
   const devURL = getInput('dev-url')
   const runLatest = Number(getInput('latest'))
   const dirFormat = getInput('dir-format')
-  const reportSchema = getInput('report-schema')
+  const schemaInsights = getInput('schema-insights')
   const gitRoot = path.resolve(await getWorkingDirectory())
   info(`Migrations Directory: ${dir}`)
   info(`Dev Database: ${devURL}`)
   info(`Git Root: ${gitRoot}`)
   info(`Latest Param: ${runLatest}`)
   info(`Dir Format: ${dirFormat}`)
-  info(`Report Schema: ${reportSchema}`)
+  info(`Schema Insights: ${schemaInsights}`)
 
   const args = [
     'migrate',
@@ -107,7 +107,7 @@ export async function runAtlas(bin: string): Promise<AtlasResult> {
   if (res.stdout && res.stdout.length > 0) {
     try {
       a.summary = JSON.parse(res.stdout)
-      if (reportSchema == 'true') {
+      if (schemaInsights == 'true') {
         return a
       }
       if (a.summary?.Schema) {

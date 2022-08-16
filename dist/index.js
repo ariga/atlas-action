@@ -60,14 +60,14 @@ function runAtlas(bin) {
         const devURL = (0, core_1.getInput)('dev-url');
         const runLatest = Number((0, core_1.getInput)('latest'));
         const dirFormat = (0, core_1.getInput)('dir-format');
-        const reportSchema = (0, core_1.getInput)('report-schema');
+        const schemaInsights = (0, core_1.getInput)('schema-insights');
         const gitRoot = path_1.default.resolve(yield (0, github_1.getWorkingDirectory)());
         (0, core_1.info)(`Migrations Directory: ${dir}`);
         (0, core_1.info)(`Dev Database: ${devURL}`);
         (0, core_1.info)(`Git Root: ${gitRoot}`);
         (0, core_1.info)(`Latest Param: ${runLatest}`);
         (0, core_1.info)(`Dir Format: ${dirFormat}`);
-        (0, core_1.info)(`Report Schema: ${reportSchema}`);
+        (0, core_1.info)(`Schema Insights: ${schemaInsights}`);
         const args = [
             'migrate',
             'lint',
@@ -99,7 +99,7 @@ function runAtlas(bin) {
         if (res.stdout && res.stdout.length > 0) {
             try {
                 a.summary = JSON.parse(res.stdout);
-                if (reportSchema == 'true') {
+                if (schemaInsights == 'true') {
                     return a;
                 }
                 if ((_a = a.summary) === null || _a === void 0 ? void 0 : _a.Schema) {

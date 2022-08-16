@@ -107,7 +107,7 @@ describe('run with "latest" flag', () => {
         'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         INPUT_LATEST: '1',
         ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_REPORT-SCHEMA': 'false'
+        'INPUT_SCHEMA-INSIGHTS': 'false'
       }
     }
     spyOnSetFailed = jest.spyOn(core, 'setFailed')
@@ -351,7 +351,7 @@ describe('run with git base', () => {
         GITHUB_WORKSPACE: gitRepo,
         INPUT_DIR: migrationsDir,
         ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_REPORT-SCHEMA': 'false'
+        'INPUT_SCHEMA-INSIGHTS': 'false'
       }
     }
     const git: SimpleGit = simpleGit(gitRepo, {
@@ -433,7 +433,7 @@ describe('report to GitHub', () => {
         INPUT_LATEST: '1',
         'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_REPORT-SCHEMA': 'false'
+        'INPUT_SCHEMA-INSIGHTS': 'false'
       }
     }
     spyOnNotice = jest.spyOn(core, 'notice')
@@ -524,7 +524,7 @@ describe('all reports', () => {
         'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
         'INPUT_ARIGA-TOKEN': `mysecrettoken`,
         ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_REPORT-SCHEMA': 'false',
+        'INPUT_SCHEMA-INSIGHTS': 'false',
         GITHUB_REPOSITORY: 'someProject/someRepo',
         GITHUB_REF_NAME: 'test',
         GITHUB_SHA: '71d0bfc1'
@@ -607,6 +607,8 @@ describe('all reports', () => {
     expect(actualRequestBody).toEqual({
       query: mutation,
       variables: {
+        branch: 'test',
+        commit: '71d0bfc1',
         envName: 'CI',
         projectName:
           'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
@@ -632,7 +634,7 @@ describe('all reports', () => {
       'testdata',
       'sqlite-with-diagnostics'
     )
-    process.env['INPUT_REPORT-SCHEMA'] = 'true'
+    process.env['INPUT_SCHEMA-INSIGHTS'] = 'true'
     const scope = gqlInterceptor.reply(http.HttpCodes.OK, {
       data: {
         createReport: {
@@ -650,6 +652,8 @@ describe('all reports', () => {
     expect(actualRequestBody).toEqual({
       query: mutation,
       variables: {
+        branch: 'test',
+        commit: '71d0bfc1',
         envName: 'CI',
         projectName:
           'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
