@@ -525,7 +525,9 @@ describe('all reports', () => {
         'INPUT_ARIGA-TOKEN': `mysecrettoken`,
         ATLASCI_USER_AGENT: 'test-atlasci-action',
         'INPUT_REPORT-SCHEMA': 'false',
-        GITHUB_REPOSITORY: 'someProject/someRepo'
+        GITHUB_REPOSITORY: 'someProject/someRepo',
+        GITHUB_REF_NAME: 'test',
+        GITHUB_SHA: '71d0bfc1'
       }
     }
     spyOnNotice = jest.spyOn(core, 'notice')
