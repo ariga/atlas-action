@@ -26,7 +26,8 @@ Add `.github/workflows/atlas-ci.yaml` to your repo with the following contents:
 ```yaml
 name: Atlas CI 
 on:
-  # Run whenever code is changed in the master.
+  # Run whenever code is changed in the master branch, 
+  # change this to your root branch.
   push:
     branches:
       - master
@@ -37,7 +38,7 @@ on:
 jobs:
   ent:
     services:
-      # Spin up a mysql:8 container to be used as the dev-database for analysis. 
+      # Spin up a mysql:8.0.29 container to be used as the dev-database for analysis. 
       # If you use a different database, change the image configuration and update
       # the `dev-url` configuration below. 
       mysql:
