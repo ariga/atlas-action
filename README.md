@@ -38,6 +38,8 @@ jobs:
   ent:
     services:
       # Spin up a mysql:8 container to be used as the dev-database for analysis. 
+      # If you use a different database, change the image configuration and update
+      # the `dev-url` configuration below. 
       mysql:
         image: mysql:8.0.29
         env:
@@ -48,10 +50,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3.0.1
+        with:
+          fetch-depth: 0 # Mandatory unless "latest" is set below.
       - uses: ariga/atlas-action@master
         with:
           dir: path/to/migrations
-          dev-db: mysql://root:pass@localhost:3306/test
+          dev-db: mysql://root:pass@localhost:3307/test
 ```
 
 ### Configuration
@@ -62,7 +66,12 @@ Configure the action by passing input parameters in the `with:` block.
 
 Sets the directory that contains the migration scripts to analyze. 
 
-#### `dev-db`
+#### `dir-format`
+
+Sets the format of the migration directory. Options: `atlas` (default),
+`golang-migrate`. Coming soon: `goose`, `flyway`, `liquibase`, `dbmate`. 
+
+#### `dev-url`
 
 The URL of the dev-database to use for analysis. 
 
@@ -75,4 +84,18 @@ Use the `latest` mode to decide which files to analyze. By default,
 Atlas will use `git-base` to analyze any files that are present in the
 diff between the base branch and the current. 
 
+Unless this option is set, the base branch (`master`/`main`/etc) must
+be checked out locally or you will see an error such as:
+```
+Atlas failed with code 1: Error: git diff: exit status 128
+```
+
 The full list of input options can be found in [action.yml](action.yml).
+
+### Legal
+
+The source code for this GitHub Action is released under the Apache 2.0
+License, see [LICENSE](LICENSE).
+
+This action downloads a binary version of [https://atlasgo.io](Atlas) which
+is distributed under the [Ariga EULA](https://ariga.io/legal/atlas/eula).
