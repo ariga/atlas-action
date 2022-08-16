@@ -24,7 +24,8 @@ import {
   getDownloadURL,
   LATEST_RELEASE,
   mutation,
-  S3_FOLDER
+  S3_FOLDER,
+  Status
 } from '../src/cloud'
 import { Variables } from 'graphql-request/src/types'
 
@@ -614,7 +615,7 @@ describe('all reports', () => {
           projectName:
             'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
           url: 'https://github.com/ariga/atlasci-action/pull/1',
-          status: 'successful',
+          status: Status.Success,
           payload: expect.anything()
         }
       },
@@ -661,7 +662,7 @@ describe('all reports', () => {
           projectName:
             'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
           url: 'https://github.com/ariga/atlasci-action/pull/1',
-          status: 'successful',
+          status: Status.Success,
           payload: expect.anything()
         }
       },

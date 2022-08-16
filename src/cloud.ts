@@ -33,12 +33,17 @@ type CreateReportInput = {
   input: {
     payload: string
     envName: string
-    commit?: string
+    commit: string
     projectName: string
-    branch?: string
-    url: string | undefined
+    branch: string
+    url: string
     status: string
   }
+}
+
+export enum Status {
+  Success = 'SUCCESSFUL',
+  Failure = 'FAILED'
 }
 
 function getMutationVariables(res: AtlasResult): CreateReportInput {
@@ -52,10 +57,11 @@ function getMutationVariables(res: AtlasResult): CreateReportInput {
     input: {
       envName: 'CI',
       projectName: `${repository}-${migrationDir}`,
-      branch: sourceBranch,
-      commit: commitID,
-      url: github?.context?.payload?.pull_request?.html_url,
-      status: res.exitCode === ExitCodes.Success ? 'successful' : 'failed',
+      branch: sourceBranch ?? 'unknown',
+      commit: commitID ?? 'unknown',
+      url: github?.context?.payload?.pull_request?.html_url ?? 'unknown',
+      status:
+        res.exitCode === ExitCodes.Success ? Status.Success : Status.Failure,
       payload: res.raw
     }
   }
@@ -69,7 +75,7 @@ export async function reportToCloud(
     warning(`Skipping report to cloud missing ariga-token input`)
     return
   }
-  info(`Reporting to cloud`)
+  info(`Reporting to cloud: ${getCloudURL()}`)
   setSecret(token)
   try {
     return await request<CreateReportPayload>(

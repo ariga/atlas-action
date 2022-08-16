@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals'
 import { AtlasResult, ExitCodes, getMigrationDir } from '../src/atlas'
-import { getCloudURL, mutation, reportToCloud } from '../src/cloud'
+import { getCloudURL, mutation, reportToCloud, Status } from '../src/cloud'
 import * as http from '@actions/http-client'
 import * as github from '@actions/github'
 import nock from 'nock'
@@ -99,7 +99,7 @@ describe('report to cloud', () => {
           envName: 'CI',
           payload: '[{"Name":"test","Text":"test"}]',
           projectName: `${process.env.GITHUB_REPOSITORY}-${getMigrationDir()}`,
-          status: 'successful',
+          status: Status.Success,
           url: 'https://github.com/ariga/atlasci-action/pull/1'
         }
       },
