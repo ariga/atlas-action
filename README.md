@@ -8,7 +8,7 @@ of migration directories and generates insights and diagnostics on the selected 
 
 * Ensure the migration history can be replayed from any point at time.
 * Protect from unexpected history changes when concurrent migrations are written to the migration directory by 
-  multiple team members. Read more about the consistency checks in the section below.
+  multiple team members.
 * Detect whether destructive or irreversible changes have been made or whether they are dependent on tables'  
   contents and can cause a migration failure.
 
