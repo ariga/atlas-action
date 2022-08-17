@@ -36,8 +36,6 @@ type CreateTestENVOutput = Promise<{
   env: ProcessEnv
 }>
 
-// type CreateTestENVInput = Record<string, string>
-
 type CreateTestENVInput = {
   override?: Record<string, string>
   eventName?: GithubEventName
