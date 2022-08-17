@@ -10,7 +10,10 @@ jobs:
   sanity:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "$GITHUB_CONTEXT"
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJSON(github) }}
+        run: echo "$GITHUB_CONTEXT"
       - uses: actions/checkout@v3.0.2
         with:
           fetch-depth: 0
