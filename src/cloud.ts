@@ -47,12 +47,19 @@ export enum Status {
 }
 
 function getMutationVariables(res: AtlasResult): CreateReportInput {
-  const {
-    GITHUB_REPOSITORY: repository,
-    GITHUB_SHA: commitID,
-    GITHUB_REF_NAME: sourceBranch
-  } = process.env
+  const { GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID } = process.env
+  // GITHUB_HEAD_REF is set only on pull requests
+  // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
+  const sourceBranch =
+    process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME
   const migrationDir = getMigrationDir().replace('file://', '')
+  info(
+    `Run metadata: ${JSON.stringify(
+      { repository, commitID, sourceBranch, migrationDir },
+      null,
+      2
+    )}`
+  )
   return {
     input: {
       envName: 'CI',
