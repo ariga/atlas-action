@@ -14,7 +14,6 @@ import {
   stat
 } from 'fs/promises'
 import * as core from '@actions/core'
-import * as github from '@actions/github'
 import nock from 'nock'
 import * as http from '@actions/http-client'
 import { AtlasResult, ExitCodes, installAtlas } from '../src/atlas'
@@ -479,7 +478,6 @@ describe('report to GitHub', () => {
 })
 
 describe('all reports', () => {
-  const originalContext = { ...github.context }
   let actualRequestBody: { [key: string]: string & Variables },
     gqlInterceptor: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
@@ -500,17 +498,6 @@ describe('all reports', () => {
     spyOnNotice = jest.spyOn(core, 'notice')
     spyOnError = jest.spyOn(core, 'error')
     spyOnWarning = jest.spyOn(core, 'warning')
-    // Mock GitHub Context
-    Object.defineProperty(github, 'context', {
-      value: {
-        eventName: 'pull_request',
-        payload: {
-          pull_request: {
-            html_url: 'https://github.com/ariga/atlasci-action/pull/1'
-          }
-        }
-      }
-    })
     const url = process.env['INPUT_ARIGA-URL'] as string
     gqlInterceptor = nock(url)
       .post('/api/query', function (body) {
@@ -529,9 +516,6 @@ describe('all reports', () => {
     spyOnError.mockReset()
     spyOnWarning.mockReset()
     await cleanupFn()
-    Object.defineProperty(github, 'context', {
-      value: originalContext
-    })
     nock.cleanAll()
     actualRequestBody = {}
   })

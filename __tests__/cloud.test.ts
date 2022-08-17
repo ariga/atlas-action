@@ -2,7 +2,6 @@ import { expect } from '@jest/globals'
 import { AtlasResult, ExitCodes, getMigrationDir } from '../src/atlas'
 import { getCloudURL, mutation, reportToCloud, Status } from '../src/cloud'
 import * as http from '@actions/http-client'
-import * as github from '@actions/github'
 import nock from 'nock'
 import * as core from '@actions/core'
 import * as gql from 'graphql-request'
@@ -15,20 +14,7 @@ describe('report to cloud', () => {
     gqlInterceptor: nock.Interceptor,
     cleanupFn: () => Promise<void>
 
-  const originalContext = { ...github.context }
-
   beforeEach(async () => {
-    // Mock GitHub Context
-    Object.defineProperty(github, 'context', {
-      value: {
-        eventName: 'pull_request',
-        payload: {
-          pull_request: {
-            html_url: 'https://github.com/ariga/atlasci-action/pull/1'
-          }
-        }
-      }
-    })
     spyOnWarning = jest.spyOn(core, 'warning')
     const { env, cleanup } = await createTestENV({
       GITHUB_REPOSITORY: 'someProject/someRepo',
@@ -51,9 +37,6 @@ describe('report to cloud', () => {
 
   afterEach(async () => {
     await cleanupFn()
-    Object.defineProperty(github, 'context', {
-      value: originalContext
-    })
     spyOnWarning.mockReset()
     nock.cleanAll()
   })

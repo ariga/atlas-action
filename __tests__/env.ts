@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
+import * as github from '@actions/github'
 
 interface ProcessEnv {
   [key: string]: string | undefined
@@ -26,9 +27,27 @@ const gitENV = {
   GITHUB_HEAD_REF: 'test-pr-trigger'
 }
 
+// The GitHub Context as passed by the action.
+// https://docs.github.com/en/actions/learn-github-actions/contexts#github-context
+const originalContext = { ...github.context }
+
 export async function createTestENV(
   override?: Record<string, string>
 ): Promise<{ cleanup: () => Promise<void>; env: ProcessEnv }> {
+  // Mock GitHub Context
+  Object.defineProperty(github, 'context', {
+    value: {
+      eventName: 'pull_request',
+      payload: {
+        repository: {
+          default_branch: 'master'
+        },
+        pull_request: {
+          html_url: 'https://github.com/ariga/atlasci-action/pull/1'
+        }
+      }
+    }
+  })
   const base = await mkdtemp(`${tmpdir()}${path.sep}`)
   return {
     env: {
@@ -43,6 +62,9 @@ export async function createTestENV(
       // Remove the temporary directory
       await rm(base, { recursive: true })
       process.env = { ...originalENV }
+      Object.defineProperty(github, 'context', {
+        value: originalContext
+      })
     }
   }
 }
