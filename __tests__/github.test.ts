@@ -40,6 +40,7 @@ describe('resolve git base', () => {
     Object.defineProperty(github, 'context', {
       value: originalContext
     })
+    process.env.GITHUB_BASE_REF = ''
     const remote = `https://github.com/actions/javascript-action.git`
     await simpleGit().clone(remote, base)
     await expect(resolveGitBase(base)).resolves.toBe('main')
