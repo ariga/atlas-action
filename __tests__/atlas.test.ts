@@ -108,7 +108,8 @@ describe('run with "latest" flag', () => {
         'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         INPUT_LATEST: '1',
         ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false'
+        'INPUT_SCHEMA-INSIGHTS': 'false',
+        'INPUT_DIR-FORMAT': 'atlas'
       }
     }
     spyOnSetFailed = jest.spyOn(core, 'setFailed')
@@ -321,13 +322,10 @@ describe('run with "latest" flag', () => {
     process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Failure)
-    expect(res.summary?.Files).toEqual([
-      {
-        Name: '1_initial.down.sql',
-        Error: 'executing statement: "DROP TABLE tbl;": no such table: tbl'
-      }
-    ])
     expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
+    expect(spyOnSetFailed).toHaveBeenCalledWith(
+      'Atlas failed with code 1: Error: unknown dir format "incorrect"\n'
+    )
   })
 })
 
@@ -352,7 +350,8 @@ describe('run with git base', () => {
         GITHUB_WORKSPACE: gitRepo,
         INPUT_DIR: migrationsDir,
         ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false'
+        'INPUT_SCHEMA-INSIGHTS': 'false',
+        'INPUT_DIR-FORMAT': 'atlas'
       }
     }
     const git: SimpleGit = simpleGit(gitRepo, {
@@ -434,7 +433,8 @@ describe('report to GitHub', () => {
         INPUT_LATEST: '1',
         'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
         ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false'
+        'INPUT_SCHEMA-INSIGHTS': 'false',
+        'INPUT_DIR-FORMAT': 'atlas'
       }
     }
     spyOnNotice = jest.spyOn(core, 'notice')
@@ -528,7 +528,8 @@ describe('all reports', () => {
         'INPUT_SCHEMA-INSIGHTS': 'false',
         GITHUB_REPOSITORY: 'someProject/someRepo',
         GITHUB_REF_NAME: 'test',
-        GITHUB_SHA: '71d0bfc1'
+        GITHUB_SHA: '71d0bfc1',
+        'INPUT_DIR-FORMAT': 'atlas'
       }
     }
     spyOnNotice = jest.spyOn(core, 'notice')
