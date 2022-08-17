@@ -2,6 +2,8 @@ import { mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
 import * as github from '@actions/github'
+const yaml = require('js-yaml')
+import * as fs from 'fs'
 
 interface ProcessEnv {
   [key: string]: string | undefined
@@ -16,7 +18,8 @@ const defaultENV = {
   'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
   INPUT_LATEST: '0',
   'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
-  'INPUT_SCHEMA-INSIGHTS': 'true'
+  'INPUT_SCHEMA-INSIGHTS': 'true',
+  'INPUT_ATLAS-VERSION': defaultVersion()
 }
 
 // These are mocks for the GitHub context variables.
@@ -91,4 +94,10 @@ export async function createTestENV(
       })
     }
   }
+}
+
+function defaultVersion(): string {
+  let action = fs.readFileSync('./action.yml')
+  let data = yaml.load(action)
+  return data.inputs['atlas-version'].default
 }

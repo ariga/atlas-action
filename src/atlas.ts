@@ -3,7 +3,7 @@ import { downloadTool } from '@actions/tool-cache'
 import { exec, getExecOutput } from '@actions/exec'
 import { getWorkingDirectory, resolveGitBase } from './github'
 import { exists } from '@actions/io/lib/io-util'
-import { getDownloadURL, LATEST_RELEASE } from './cloud'
+import { getDownloadURL } from './cloud'
 import path from 'path'
 
 // Remove Atlas update messages.
@@ -46,9 +46,7 @@ interface Diagnostic {
   Text: string
 }
 
-export async function installAtlas(
-  version: string = LATEST_RELEASE
-): Promise<string> {
+export async function installAtlas(version: string): Promise<string> {
   const downloadURL = getDownloadURL(version).toString()
   info(`Downloading atlas, version: ${version}`)
   // Setting user-agent for downloadTool is currently not supported.

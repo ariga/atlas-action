@@ -1,7 +1,11 @@
-name: 'atlasCI'
-description: 'Atlas CI validation'
+name: 'Atlas'
+description: 'Lint schema migration directories with Atlas'
 author: 'Ariga'
 inputs:
+  atlas-version:
+    description: 'Which version of Atlas CLI to install'
+    required: false
+    default: 'v0.6.1'
   dir:
     description: 'select migration directory relative to working directory'
     default: "migrations"

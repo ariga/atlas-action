@@ -10,7 +10,6 @@ const LINUX_ARCH = 'linux-amd64'
 const APPLE_ARCH = 'darwin-amd64'
 export const BASE_ADDRESS = 'https://release.ariga.io'
 export const S3_FOLDER = 'atlas'
-export const LATEST_RELEASE = 'latest'
 export const ARCHITECTURE = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH
 
 export const mutation = gql`
