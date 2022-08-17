@@ -1,22 +1,32 @@
 import { resolveGitBase } from '../src/github'
-import { mkdtemp, rm } from 'fs/promises'
-import { tmpdir } from 'os'
 import { simpleGit } from 'simple-git'
 import { expect } from '@jest/globals'
-import path from 'path'
+import { createTestENV, GithubEventName } from './env'
+import * as github from '@actions/github'
 
 jest.setTimeout(30000)
 process.env.ATLASCI_USER_AGENT = 'test-atlasci-action'
 
 describe('resolve git base', () => {
-  let base: string
+  let cleanupFn: () => Promise<void>, base: string
+
   beforeEach(async () => {
-    // Remove base ref since GitHub action sets it.
-    process.env.GITHUB_BASE_REF = ''
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
+    const { cleanup, env } = await createTestENV({
+      override: {
+        // Remove base ref since GitHub action sets it.
+        GITHUB_BASE_REF: ''
+      }
+    })
+    process.env = env
+    if (!env.RUNNER_TEMP) {
+      throw new Error('RUNNER_TEMP is not defined')
+    }
+    base = env.RUNNER_TEMP
+    cleanupFn = cleanup
   })
-  afterEach(() => {
-    rm(base, { recursive: true })
+
+  afterEach(async () => {
+    await cleanupFn()
     process.env.GITHUB_BASE_REF = 'master'
   })
 
@@ -27,6 +37,8 @@ describe('resolve git base', () => {
   })
 
   test('branch mode - base is main', async () => {
+    Object.defineProperty(github, 'context', { value: {} })
+    process.env.GITHUB_BASE_REF = ''
     const remote = `https://github.com/actions/javascript-action.git`
     await simpleGit().clone(remote, base)
     await expect(resolveGitBase(base)).resolves.toBe('main')
@@ -34,6 +46,12 @@ describe('resolve git base', () => {
 
   test('pull request mode', async () => {
     process.env.GITHUB_BASE_REF = 'master'
+    await expect(resolveGitBase(base)).resolves.toBe('master')
+  })
+
+  test('base from context', async () => {
+    await createTestENV({ eventName: GithubEventName.Push })
+    process.env.GITHUB_BASE_REF = ''
     await expect(resolveGitBase(base)).resolves.toBe('master')
   })
 })

@@ -14,7 +14,6 @@ import {
   stat
 } from 'fs/promises'
 import * as core from '@actions/core'
-import * as github from '@actions/github'
 import nock from 'nock'
 import * as http from '@actions/http-client'
 import { AtlasResult, ExitCodes, installAtlas } from '../src/atlas'
@@ -28,7 +27,7 @@ import {
   Status
 } from '../src/cloud'
 import { Variables } from 'graphql-request/src/types'
-import { createTestENV } from './env'
+import { createTestENV, GithubEventName } from './env'
 
 jest.mock('../src/cloud', () => {
   const actual = jest.requireActual('../src/cloud')
@@ -93,8 +92,10 @@ describe('run with "latest" flag', () => {
 
   beforeEach(async () => {
     const { env, cleanup } = await createTestENV({
-      INPUT_LATEST: '1',
-      'INPUT_SCHEMA-INSIGHTS': 'false'
+      override: {
+        INPUT_LATEST: '1',
+        'INPUT_SCHEMA-INSIGHTS': 'false'
+      }
     })
     process.env = env
     cleanupFn = cleanup
@@ -294,13 +295,16 @@ describe('run with "latest" flag', () => {
     process.env['INPUT_LATEST'] = '4'
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Success)
-    expect(res.summary?.Files).toHaveLength(2)
-    expect(res.summary?.Files[0].Name).toEqual('1_initial.up.sql')
-    expect(res.summary?.Files[0].Text).toContain('CREATE TABLE tbl')
-    expect(res.summary?.Files[0].Error).toBeFalsy()
-    expect(res.summary?.Files[1].Name).toEqual('2_second_migration.up.sql')
-    expect(res.summary?.Files[1].Text).toContain('CREATE TABLE tbl_2')
-    expect(res.summary?.Files[1].Error).toBeFalsy()
+    expect(res.summary?.Files).toEqual([
+      {
+        Name: '1_initial.up.sql',
+        Text: 'CREATE TABLE tbl\n(\n    col INT\n);'
+      },
+      {
+        Name: '2_second_migration.up.sql',
+        Text: 'CREATE TABLE tbl_2 (col INT);'
+      }
+    ])
     expect(res.summary?.Schema).toBeNull()
   })
 
@@ -317,7 +321,7 @@ describe('run with "latest" flag', () => {
   })
 })
 
-describe('run with git base', () => {
+describe('run with mock repo', () => {
   let gitRepo: string, cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
@@ -327,11 +331,13 @@ describe('run with git base', () => {
     const migrationsDir = path.join(gitRepo, 'migrations')
     await mkdir(migrationsDir)
     const { env, cleanup } = await createTestENV({
-      GITHUB_BASE_REF: baseBranch,
-      INPUT_LATEST: '0',
-      GITHUB_WORKSPACE: gitRepo,
-      INPUT_DIR: migrationsDir,
-      'INPUT_SCHEMA-INSIGHTS': 'false'
+      override: {
+        GITHUB_BASE_REF: baseBranch,
+        INPUT_LATEST: '0',
+        GITHUB_WORKSPACE: gitRepo,
+        INPUT_DIR: migrationsDir,
+        'INPUT_SCHEMA-INSIGHTS': 'false'
+      }
     })
     process.env = env
     cleanupFn = cleanup
@@ -406,8 +412,10 @@ describe('report to GitHub', () => {
 
   beforeEach(async () => {
     const { env, cleanup } = await createTestENV({
-      INPUT_LATEST: '1',
-      'INPUT_SCHEMA-INSIGHTS': 'false'
+      override: {
+        INPUT_LATEST: '1',
+        'INPUT_SCHEMA-INSIGHTS': 'false'
+      }
     })
     process.env = env
     cleanupFn = cleanup
@@ -478,8 +486,7 @@ describe('report to GitHub', () => {
   })
 })
 
-describe('all reports', () => {
-  const originalContext = { ...github.context }
+describe('all reports with pull request', () => {
   let actualRequestBody: { [key: string]: string & Variables },
     gqlInterceptor: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
@@ -489,28 +496,19 @@ describe('all reports', () => {
 
   beforeEach(async () => {
     const { env, cleanup } = await createTestENV({
-      INPUT_LATEST: '1',
-      'INPUT_ARIGA-TOKEN': `mysecrettoken`,
-      'INPUT_SCHEMA-INSIGHTS': 'false',
-      GITHUB_REPOSITORY: 'someProject/someRepo',
-      GITHUB_SHA: '71d0bfc1'
+      override: {
+        INPUT_LATEST: '1',
+        'INPUT_ARIGA-TOKEN': `mysecrettoken`,
+        'INPUT_SCHEMA-INSIGHTS': 'false',
+        GITHUB_REPOSITORY: 'someProject/someRepo',
+        GITHUB_SHA: '71d0bfc1'
+      }
     })
     process.env = env
     cleanupFn = cleanup
     spyOnNotice = jest.spyOn(core, 'notice')
     spyOnError = jest.spyOn(core, 'error')
     spyOnWarning = jest.spyOn(core, 'warning')
-    // Mock GitHub Context
-    Object.defineProperty(github, 'context', {
-      value: {
-        eventName: 'pull_request',
-        payload: {
-          pull_request: {
-            html_url: 'https://github.com/ariga/atlasci-action/pull/1'
-          }
-        }
-      }
-    })
     const url = process.env['INPUT_ARIGA-URL'] as string
     gqlInterceptor = nock(url)
       .post('/api/query', function (body) {
@@ -529,9 +527,6 @@ describe('all reports', () => {
     spyOnError.mockReset()
     spyOnWarning.mockReset()
     await cleanupFn()
-    Object.defineProperty(github, 'context', {
-      value: originalContext
-    })
     nock.cleanAll()
     actualRequestBody = {}
   })
@@ -579,7 +574,7 @@ describe('all reports', () => {
           envName: 'CI',
           projectName:
             'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
-          url: 'https://github.com/ariga/atlasci-action/pull/1',
+          url: 'https://github.com/ariga/atlas-action/pull/1',
           status: Status.Success,
           payload: expect.anything()
         }
@@ -626,7 +621,105 @@ describe('all reports', () => {
           envName: 'CI',
           projectName:
             'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
-          url: 'https://github.com/ariga/atlasci-action/pull/1',
+          url: 'https://github.com/ariga/atlas-action/pull/1',
+          status: Status.Success,
+          payload: expect.anything()
+        }
+      },
+      operationName: 'CreateReportInput'
+    })
+    const payloadParsed = JSON.parse(actualRequestBody.variables.input.payload)
+    expect(payloadParsed).toEqual({
+      Env: res.summary?.Env,
+      Steps: res.summary?.Steps,
+      Schema: {
+        Current:
+          'table "tbl2" {\n  schema = schema.main\n  column "col" {\n    null = false\n    type = int\n  }\n}\nschema "main" {\n}\n',
+        Desired: 'schema "main" {\n}\n'
+      },
+      Files: res.summary?.Files
+    })
+  })
+})
+
+describe('all reports with push (branch)', () => {
+  let actualRequestBody: { [key: string]: string & Variables },
+    gqlInterceptor: nock.Interceptor,
+    spyOnNotice: jest.SpyInstance,
+    spyOnError: jest.SpyInstance,
+    spyOnWarning: jest.SpyInstance,
+    cleanupFn: () => Promise<void>
+
+  beforeEach(async () => {
+    const { env, cleanup } = await createTestENV({
+      override: {
+        INPUT_LATEST: '1',
+        'INPUT_ARIGA-TOKEN': `mysecrettoken`,
+        'INPUT_SCHEMA-INSIGHTS': 'false',
+        GITHUB_REPOSITORY: 'someProject/someRepo',
+        GITHUB_SHA: '71d0bfc1'
+      },
+      eventName: GithubEventName.Push
+    })
+    process.env = env
+    cleanupFn = cleanup
+    spyOnNotice = jest.spyOn(core, 'notice')
+    spyOnError = jest.spyOn(core, 'error')
+    spyOnWarning = jest.spyOn(core, 'warning')
+    const url = process.env['INPUT_ARIGA-URL'] as string
+    gqlInterceptor = nock(url)
+      .post('/api/query', function (body) {
+        actualRequestBody = body
+        return body
+      })
+      .matchHeader(
+        'Authorization',
+        `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
+      )
+      .matchHeader('User-Agent', process.env.ATLASCI_USER_AGENT as string)
+  })
+
+  afterEach(async () => {
+    spyOnNotice.mockReset()
+    spyOnError.mockReset()
+    spyOnWarning.mockReset()
+    await cleanupFn()
+    nock.cleanAll()
+    actualRequestBody = {}
+  })
+
+  test('successfully with schema', async () => {
+    const cloudURL = 'https://ariga.cloud.test/ci-runs/8589934593'
+    process.env.INPUT_DIR = path.join(
+      '__tests__',
+      'testdata',
+      'sqlite-with-diagnostics'
+    )
+    process.env['INPUT_SCHEMA-INSIGHTS'] = 'true'
+    const scope = gqlInterceptor.reply(http.HttpCodes.OK, {
+      data: {
+        createReport: {
+          runID: '8589934593',
+          url: cloudURL
+        }
+      }
+    })
+    const res = (await run()) as AtlasResult
+    expect(res.exitCode).toBe(ExitCodes.Success)
+    expect(scope.isDone()).toBeTruthy()
+    expect(spyOnNotice).toHaveBeenCalledTimes(2)
+    expect(spyOnWarning).toHaveBeenCalledTimes(0)
+    expect(spyOnError).toHaveBeenCalledTimes(0)
+    expect(actualRequestBody).toEqual({
+      query: mutation,
+      variables: {
+        input: {
+          branch: 'test-pr-trigger',
+          commit: '71d0bfc1',
+          envName: 'CI',
+          projectName:
+            'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
+          url: 'https://github.com/ariga/atlas-action',
           status: Status.Success,
           payload: expect.anything()
         }

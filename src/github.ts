@@ -3,6 +3,7 @@ import { existsSync } from 'fs'
 import { stat } from 'fs/promises'
 import { simpleGit } from 'simple-git'
 import { AtlasResult } from './atlas'
+import * as github from '@actions/github'
 
 export async function getWorkingDirectory(): Promise<string> {
   /**
@@ -24,6 +25,9 @@ export async function getWorkingDirectory(): Promise<string> {
 export async function resolveGitBase(gitRoot: string): Promise<string> {
   if (process.env.GITHUB_BASE_REF) {
     return process.env.GITHUB_BASE_REF
+  }
+  if (github?.context?.payload?.repository?.default_branch) {
+    return github.context.payload.repository.default_branch
   }
   const git = simpleGit(gitRoot)
   const origin = await git.remote(['show', 'origin'])
