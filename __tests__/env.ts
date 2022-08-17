@@ -1,4 +1,4 @@
-import { mkdtemp } from 'fs/promises'
+import { mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
 
@@ -6,7 +6,7 @@ interface ProcessEnv {
   [key: string]: string | undefined
 }
 
-export const originalENV = { ...process.env }
+const originalENV = { ...process.env }
 
 // These are the default environment variables that are set by the action (see action.yml)
 // https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#example-specifying-inputs
@@ -28,14 +28,21 @@ const gitENV = {
 
 export async function createTestENV(
   override?: Record<string, string>
-): Promise<ProcessEnv> {
+): Promise<{ cleanup: () => Promise<void>; env: ProcessEnv }> {
   const base = await mkdtemp(`${tmpdir()}${path.sep}`)
   return {
-    ...process.env,
-    // The path to a temporary directory on the runner (must be defined)
-    RUNNER_TEMP: base,
-    ...defaultENV,
-    ...gitENV,
-    ...override
+    env: {
+      ...process.env,
+      // The path to a temporary directory on the runner (must be defined)
+      RUNNER_TEMP: base,
+      ...defaultENV,
+      ...gitENV,
+      ...override
+    },
+    cleanup: async () => {
+      // Remove the temporary directory
+      await rm(base, { recursive: true })
+      process.env = { ...originalENV }
+    }
   }
 }

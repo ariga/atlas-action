@@ -28,7 +28,7 @@ import {
   Status
 } from '../src/cloud'
 import { Variables } from 'graphql-request/src/types'
-import { createTestENV, originalENV } from './env'
+import { createTestENV } from './env'
 
 jest.mock('../src/cloud', () => {
   const actual = jest.requireActual('../src/cloud')
@@ -45,15 +45,16 @@ jest.mock('../src/cloud', () => {
 jest.setTimeout(30000)
 
 describe('install', () => {
+  let cleanupFn: () => Promise<void>
+
   beforeEach(async () => {
-    process.env = await createTestENV()
+    const { env, cleanup } = await createTestENV()
+    process.env = env
+    cleanupFn = cleanup
   })
 
   afterEach(async () => {
-    if (process.env.RUNNER_TEMP) {
-      await rm(process.env.RUNNER_TEMP, { recursive: true })
-    }
-    process.env = { ...originalENV }
+    await cleanupFn()
     nock.cleanAll()
   })
 
@@ -88,22 +89,21 @@ describe('install', () => {
 })
 
 describe('run with "latest" flag', () => {
-  let spyOnSetFailed: jest.SpyInstance
+  let spyOnSetFailed: jest.SpyInstance, cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    process.env = await createTestENV({
+    const { env, cleanup } = await createTestENV({
       INPUT_LATEST: '1',
       'INPUT_SCHEMA-INSIGHTS': 'false'
     })
+    process.env = env
+    cleanupFn = cleanup
     spyOnSetFailed = jest.spyOn(core, 'setFailed')
   })
 
   afterEach(async () => {
-    if (process.env.RUNNER_TEMP) {
-      await rm(process.env.RUNNER_TEMP, { recursive: true })
-    }
-    process.env = { ...originalENV }
     spyOnSetFailed.mockReset()
+    await cleanupFn()
   })
 
   test('successful no issues', async () => {
@@ -318,7 +318,7 @@ describe('run with "latest" flag', () => {
 })
 
 describe('run with git base', () => {
-  let gitRepo: string
+  let gitRepo: string, cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
     const changesBranch = 'changes'
@@ -326,13 +326,15 @@ describe('run with git base', () => {
     gitRepo = await mkdtemp(`${tmpdir()}${path.sep}`)
     const migrationsDir = path.join(gitRepo, 'migrations')
     await mkdir(migrationsDir)
-    process.env = await createTestENV({
+    const { env, cleanup } = await createTestENV({
       GITHUB_BASE_REF: baseBranch,
       INPUT_LATEST: '0',
       GITHUB_WORKSPACE: gitRepo,
       INPUT_DIR: migrationsDir,
       'INPUT_SCHEMA-INSIGHTS': 'false'
     })
+    process.env = env
+    cleanupFn = cleanup
     const git: SimpleGit = simpleGit(gitRepo, {
       config: [
         'user.name=zeevmoney',
@@ -374,10 +376,7 @@ describe('run with git base', () => {
 
   afterEach(async () => {
     await rm(gitRepo, { recursive: true })
-    if (process.env.RUNNER_TEMP) {
-      await rm(process.env.RUNNER_TEMP, { recursive: true })
-    }
-    process.env = { ...originalENV }
+    await cleanupFn()
   })
 
   test('successful', async () => {
@@ -402,26 +401,26 @@ describe('run with git base', () => {
 describe('report to GitHub', () => {
   let spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
-    spyOnSetFailed: jest.SpyInstance
+    spyOnSetFailed: jest.SpyInstance,
+    cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    process.env = await createTestENV({
+    const { env, cleanup } = await createTestENV({
       INPUT_LATEST: '1',
       'INPUT_SCHEMA-INSIGHTS': 'false'
     })
+    process.env = env
+    cleanupFn = cleanup
     spyOnNotice = jest.spyOn(core, 'notice')
     spyOnError = jest.spyOn(core, 'error')
     spyOnSetFailed = jest.spyOn(core, 'setFailed')
   })
 
   afterEach(async () => {
-    process.env = { ...originalENV }
-    if (process.env.RUNNER_TEMP) {
-      await rm(process.env.RUNNER_TEMP, { recursive: true })
-    }
     spyOnNotice.mockReset()
     spyOnError.mockReset()
     spyOnSetFailed.mockReset()
+    await cleanupFn()
   })
 
   test('regular', async () => {
@@ -485,16 +484,19 @@ describe('all reports', () => {
     gqlInterceptor: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
-    spyOnWarning: jest.SpyInstance
+    spyOnWarning: jest.SpyInstance,
+    cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    process.env = await createTestENV({
+    const { env, cleanup } = await createTestENV({
       INPUT_LATEST: '1',
       'INPUT_ARIGA-TOKEN': `mysecrettoken`,
       'INPUT_SCHEMA-INSIGHTS': 'false',
       GITHUB_REPOSITORY: 'someProject/someRepo',
       GITHUB_SHA: '71d0bfc1'
     })
+    process.env = env
+    cleanupFn = cleanup
     spyOnNotice = jest.spyOn(core, 'notice')
     spyOnError = jest.spyOn(core, 'error')
     spyOnWarning = jest.spyOn(core, 'warning')
@@ -526,10 +528,7 @@ describe('all reports', () => {
     spyOnNotice.mockReset()
     spyOnError.mockReset()
     spyOnWarning.mockReset()
-    if (process.env.RUNNER_TEMP) {
-      await rm(process.env.RUNNER_TEMP, { recursive: true })
-    }
-    process.env = { ...originalENV }
+    await cleanupFn()
     Object.defineProperty(github, 'context', {
       value: originalContext
     })

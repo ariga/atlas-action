@@ -6,14 +6,15 @@ import * as github from '@actions/github'
 import nock from 'nock'
 import * as core from '@actions/core'
 import * as gql from 'graphql-request'
-import { createTestENV, originalENV } from './env'
-import { rm } from 'fs/promises'
+import { createTestENV } from './env'
 
 jest.setTimeout(30000)
 
 describe('report to cloud', () => {
-  let spyOnWarning: jest.SpyInstance
-  let gqlInterceptor: nock.Interceptor
+  let spyOnWarning: jest.SpyInstance,
+    gqlInterceptor: nock.Interceptor,
+    cleanupFn: () => Promise<void>
+
   const originalContext = { ...github.context }
 
   beforeEach(async () => {
@@ -29,7 +30,7 @@ describe('report to cloud', () => {
       }
     })
     spyOnWarning = jest.spyOn(core, 'warning')
-    process.env = await createTestENV({
+    const { env, cleanup } = await createTestENV({
       GITHUB_REPOSITORY: 'someProject/someRepo',
       GITHUB_SHA: '71d0bfc1',
       INPUT_DIR: 'migrations',
@@ -37,6 +38,8 @@ describe('report to cloud', () => {
       'INPUT_ARIGA-TOKEN': `mysecrettoken`,
       ATLASCI_USER_AGENT: 'test-atlasci-action'
     })
+    process.env = env
+    cleanupFn = cleanup
     gqlInterceptor = nock(process.env['INPUT_ARIGA-URL'] as string)
       .post('/api/query')
       .matchHeader(
@@ -47,14 +50,11 @@ describe('report to cloud', () => {
   })
 
   afterEach(async () => {
+    await cleanupFn()
     Object.defineProperty(github, 'context', {
       value: originalContext
     })
     spyOnWarning.mockReset()
-    if (process.env.RUNNER_TEMP) {
-      await rm(process.env.RUNNER_TEMP, { recursive: true })
-    }
-    process.env = { ...originalENV }
     nock.cleanAll()
   })
 
