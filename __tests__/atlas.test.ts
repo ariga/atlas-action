@@ -21,13 +21,13 @@ import {
   ARCHITECTURE,
   BASE_ADDRESS,
   getDownloadURL,
-  LATEST_RELEASE,
   mutation,
   S3_FOLDER,
   Status
 } from '../src/cloud'
 import { Variables } from 'graphql-request/src/types'
 import { createTestENV, GithubEventName } from './env'
+import { getInput } from '@actions/core'
 
 jest.mock('../src/cloud', () => {
   const actual = jest.requireActual('../src/cloud')
@@ -45,10 +45,12 @@ jest.setTimeout(30000)
 
 describe('install', () => {
   let cleanupFn: () => Promise<void>
+  let version: string
 
   beforeEach(async () => {
     const { env, cleanup } = await createTestENV()
     process.env = env
+    version = getInput('atlas-version')
     cleanupFn = cleanup
   })
 
@@ -58,7 +60,7 @@ describe('install', () => {
   })
 
   test('install the latest version of atlas', async () => {
-    const bin = await installAtlas(LATEST_RELEASE)
+    const bin = await installAtlas(version)
     await expect(stat(bin)).resolves.toBeTruthy()
   })
 
@@ -71,16 +73,16 @@ describe('install', () => {
   })
 
   test('append test query params', async () => {
-    const url = getDownloadURL(LATEST_RELEASE)
+    const url = getDownloadURL(version)
     expect(url.toString()).toEqual(
-      `https://release.ariga.io/atlas/atlas-${ARCHITECTURE}-latest?test=1`
+      `https://release.ariga.io/atlas/atlas-${ARCHITECTURE}-${version}?test=1`
     )
     const content = 'OK'
     const scope = nock(`${url.protocol}//${url.host}`)
       .get(`${url.pathname}${url.search}`)
       .matchHeader('user-agent', 'actions/tool-cache')
       .reply(200, content)
-    const bin = await installAtlas('latest')
+    const bin = await installAtlas(version)
     expect(scope.isDone()).toBeTruthy()
     await expect(stat(bin)).resolves.toBeTruthy()
     await expect(readFile(bin)).resolves.toEqual(Buffer.from(content))

@@ -35,7 +35,7 @@ var ExitCodes;
     ExitCodes[ExitCodes["Failure"] = 1] = "Failure";
     ExitCodes[ExitCodes["Error"] = 2] = "Error";
 })(ExitCodes = exports.ExitCodes || (exports.ExitCodes = {}));
-function installAtlas(version = cloud_1.LATEST_RELEASE) {
+function installAtlas(version) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const downloadURL = (0, cloud_1.getDownloadURL)(version).toString();
@@ -175,7 +175,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.Status = exports.mutation = exports.ARCHITECTURE = exports.LATEST_RELEASE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
+exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.Status = exports.mutation = exports.ARCHITECTURE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
 const github = __importStar(__nccwpck_require__(5438));
 const core_1 = __nccwpck_require__(2186);
 const atlas_1 = __nccwpck_require__(1236);
@@ -187,7 +187,6 @@ const LINUX_ARCH = 'linux-amd64';
 const APPLE_ARCH = 'darwin-amd64';
 exports.BASE_ADDRESS = 'https://release.ariga.io';
 exports.S3_FOLDER = 'atlas';
-exports.LATEST_RELEASE = 'latest';
 exports.ARCHITECTURE = os_1.default.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH;
 exports.mutation = (0, graphql_request_1.gql) `
   mutation CreateReportInput($input: CreateReportInput!) {
@@ -410,7 +409,7 @@ function run() {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const bin = yield (0, atlas_1.installAtlas)(cloud_1.LATEST_RELEASE);
+            const bin = yield (0, atlas_1.installAtlas)((0, core_1.getInput)('atlas-version'));
             const res = yield (0, atlas_1.runAtlas)(bin);
             const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw;
             (0, core_1.info)(`\nAtlas output:\n${out}`);
