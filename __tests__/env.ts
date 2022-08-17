@@ -29,7 +29,7 @@ const gitENV = {
 
 // The GitHub Context as passed by the action.
 // https://docs.github.com/en/actions/learn-github-actions/contexts#github-context
-const originalContext = { ...github.context }
+export const originalContext = { ...github.context }
 
 type CreateTestENVOutput = Promise<{
   cleanup: () => Promise<void>

@@ -410,7 +410,6 @@ function run() {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            console.log(JSON.stringify(github_2.context, null, 2));
             const bin = yield (0, atlas_1.installAtlas)(cloud_1.LATEST_RELEASE);
             const res = yield (0, atlas_1.runAtlas)(bin);
             const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw;

@@ -7,7 +7,6 @@ import { LATEST_RELEASE, reportToCloud } from './cloud'
 // Entry point for GitHub Action runner.
 export async function run(): Promise<AtlasResult | void> {
   try {
-    console.log(JSON.stringify(context, null, 2))
     const bin = await installAtlas(LATEST_RELEASE)
     const res = await runAtlas(bin)
     const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw
