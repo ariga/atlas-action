@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v3.0.1
         with:
           fetch-depth: 0 # Mandatory unless "latest" is set below.
-      - uses: ariga/atlas-action@master
+      - uses: ariga/atlas-action@v0
         with:
           dir: path/to/migrations
           dir-format: golang-migrate
