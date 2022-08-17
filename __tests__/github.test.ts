@@ -2,6 +2,7 @@ import { resolveGitBase } from '../src/github'
 import { simpleGit } from 'simple-git'
 import { expect } from '@jest/globals'
 import { createTestENV, GithubEventName } from './env'
+import * as github from '@actions/github'
 
 jest.setTimeout(30000)
 process.env.ATLASCI_USER_AGENT = 'test-atlasci-action'
@@ -36,7 +37,7 @@ describe('resolve git base', () => {
   })
 
   test('branch mode - base is main', async () => {
-    await cleanupFn()
+    Object.defineProperty(github, 'context', {})
     process.env.GITHUB_BASE_REF = ''
     const remote = `https://github.com/actions/javascript-action.git`
     await simpleGit().clone(remote, base)
