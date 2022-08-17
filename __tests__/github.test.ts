@@ -37,7 +37,7 @@ describe('resolve git base', () => {
   })
 
   test('branch mode - base is main', async () => {
-    Object.defineProperty(github, 'context', {})
+    Object.defineProperty(github, 'context', { value: {} })
     process.env.GITHUB_BASE_REF = ''
     const remote = `https://github.com/actions/javascript-action.git`
     await simpleGit().clone(remote, base)
