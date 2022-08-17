@@ -130,7 +130,7 @@ function getMigrationDir() {
     return dir;
 }
 exports.getMigrationDir = getMigrationDir;
-
+//# sourceMappingURL=atlas.js.map
 
 /***/ }),
 
@@ -175,7 +175,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.mutation = exports.ARCHITECTURE = exports.LATEST_RELEASE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
+exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.Status = exports.mutation = exports.ARCHITECTURE = exports.LATEST_RELEASE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
 const github = __importStar(__nccwpck_require__(5438));
 const core_1 = __nccwpck_require__(2186);
 const atlas_1 = __nccwpck_require__(1236);
@@ -197,18 +197,29 @@ exports.mutation = (0, graphql_request_1.gql) `
     }
   }
 `;
+var Status;
+(function (Status) {
+    Status["Success"] = "SUCCESSFUL";
+    Status["Failure"] = "FAILED";
+})(Status = exports.Status || (exports.Status = {}));
 function getMutationVariables(res) {
-    var _a, _b, _c;
-    const { GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID, GITHUB_REF_NAME: sourceBranch } = process.env;
+    var _a, _b, _c, _d;
+    const { GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID } = process.env;
+    // GITHUB_HEAD_REF is set only on pull requests
+    // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
+    const sourceBranch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
     const migrationDir = (0, atlas_1.getMigrationDir)().replace('file://', '');
+    (0, core_1.info)(`Run metadata: ${JSON.stringify({ repository, commitID, sourceBranch, migrationDir }, null, 2)}`);
     return {
-        envName: 'CI',
-        projectName: `${repository}-${migrationDir}`,
-        branch: sourceBranch,
-        commit: commitID,
-        url: (_c = (_b = (_a = github === null || github === void 0 ? void 0 : github.context) === null || _a === void 0 ? void 0 : _a.payload) === null || _b === void 0 ? void 0 : _b.pull_request) === null || _c === void 0 ? void 0 : _c.html_url,
-        status: res.exitCode === atlas_1.ExitCodes.Success ? 'successful' : 'failed',
-        payload: res.raw
+        input: {
+            envName: 'CI',
+            projectName: `${repository}-${migrationDir}`,
+            branch: sourceBranch !== null && sourceBranch !== void 0 ? sourceBranch : 'unknown',
+            commit: commitID !== null && commitID !== void 0 ? commitID : 'unknown',
+            url: (_d = (_c = (_b = (_a = github === null || github === void 0 ? void 0 : github.context) === null || _a === void 0 ? void 0 : _a.payload) === null || _b === void 0 ? void 0 : _b.pull_request) === null || _c === void 0 ? void 0 : _c.html_url) !== null && _d !== void 0 ? _d : 'unknown',
+            status: res.exitCode === atlas_1.ExitCodes.Success ? Status.Success : Status.Failure,
+            payload: res.raw
+        }
     };
 }
 function reportToCloud(res) {
@@ -218,7 +229,7 @@ function reportToCloud(res) {
             (0, core_1.warning)(`Skipping report to cloud missing ariga-token input`);
             return;
         }
-        (0, core_1.info)(`Reporting to cloud`);
+        (0, core_1.info)(`Reporting to cloud: ${getCloudURL()}`);
         (0, core_1.setSecret)(token);
         try {
             return yield (0, graphql_request_1.request)(getCloudURL(), exports.mutation, getMutationVariables(res), getHeaders(token));
@@ -248,7 +259,7 @@ function getDownloadURL(version) {
     return new URL(`${exports.BASE_ADDRESS}/${exports.S3_FOLDER}/atlas-${exports.ARCHITECTURE}-${version}`);
 }
 exports.getDownloadURL = getDownloadURL;
-
+//# sourceMappingURL=cloud.js.map
 
 /***/ }),
 
@@ -340,7 +351,7 @@ function report(res) {
     res.cloudURL && (0, core_1.notice)(`For full report visit: ${res.cloudURL}`);
 }
 exports.report = report;
-
+//# sourceMappingURL=github.js.map
 
 /***/ }),
 
@@ -392,7 +403,7 @@ function run() {
 }
 exports.run = run;
 run();
-
+//# sourceMappingURL=main.js.map
 
 /***/ }),
 

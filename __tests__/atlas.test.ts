@@ -24,9 +24,11 @@ import {
   getDownloadURL,
   LATEST_RELEASE,
   mutation,
-  S3_FOLDER
+  S3_FOLDER,
+  Status
 } from '../src/cloud'
 import { Variables } from 'graphql-request/src/types'
+import { createTestENV } from './env'
 
 jest.mock('../src/cloud', () => {
   const actual = jest.requireActual('../src/cloud')
@@ -40,28 +42,19 @@ jest.mock('../src/cloud', () => {
     )
   }
 })
-
 jest.setTimeout(30000)
-const originalENV = { ...process.env }
 
 describe('install', () => {
-  let base: string
+  let cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...{
-        // The path to a temporary directory on the runner (must be defined)
-        RUNNER_TEMP: base,
-        ATLASCI_USER_AGENT: 'test-atlasci-action'
-      }
-    }
+    const { env, cleanup } = await createTestENV()
+    process.env = env
+    cleanupFn = cleanup
   })
 
-  afterEach(() => {
-    rm(base, { recursive: true })
-    process.env = { ...originalENV }
+  afterEach(async () => {
+    await cleanupFn()
     nock.cleanAll()
   })
 
@@ -96,31 +89,28 @@ describe('install', () => {
 })
 
 describe('run with "latest" flag', () => {
-  let base: string, spyOnSetFailed: jest.SpyInstance
+  let spyOnSetFailed: jest.SpyInstance, cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...{
-        RUNNER_TEMP: base,
-        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        INPUT_LATEST: '1',
-        ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false'
-      }
-    }
+    const { env, cleanup } = await createTestENV({
+      INPUT_LATEST: '1',
+      'INPUT_SCHEMA-INSIGHTS': 'false'
+    })
+    process.env = env
+    cleanupFn = cleanup
     spyOnSetFailed = jest.spyOn(core, 'setFailed')
   })
 
   afterEach(async () => {
-    await rm(base, { recursive: true })
-    process.env = { ...originalENV }
     spyOnSetFailed.mockReset()
+    await cleanupFn()
   })
 
   test('successful no issues', async () => {
-    const migrationsDir = path.join(base, 'migrations')
+    if (!process.env.RUNNER_TEMP) {
+      throw new Error('RUNNER_TEMP is not set')
+    }
+    const migrationsDir = path.join(process.env.RUNNER_TEMP, 'migrations')
     await mkdir(migrationsDir)
     process.env.INPUT_DIR = migrationsDir
     const res = (await run()) as AtlasResult
@@ -320,19 +310,15 @@ describe('run with "latest" flag', () => {
     process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Failure)
-    expect(res.summary?.Files).toEqual([
-      {
-        Name: '1_initial.down.sql',
-        Error: 'executing statement: "DROP TABLE tbl;": no such table: tbl'
-      }
-    ])
     expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
+    expect(spyOnSetFailed).toHaveBeenCalledWith(
+      'Atlas failed with code 1: Error: unknown dir format "incorrect"\n'
+    )
   })
 })
 
 describe('run with git base', () => {
-  let gitRepo: string
-  let base: string
+  let gitRepo: string, cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
     const changesBranch = 'changes'
@@ -340,20 +326,15 @@ describe('run with git base', () => {
     gitRepo = await mkdtemp(`${tmpdir()}${path.sep}`)
     const migrationsDir = path.join(gitRepo, 'migrations')
     await mkdir(migrationsDir)
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...{
-        RUNNER_TEMP: base,
-        GITHUB_BASE_REF: baseBranch,
-        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        INPUT_LATEST: '0',
-        GITHUB_WORKSPACE: gitRepo,
-        INPUT_DIR: migrationsDir,
-        ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false'
-      }
-    }
+    const { env, cleanup } = await createTestENV({
+      GITHUB_BASE_REF: baseBranch,
+      INPUT_LATEST: '0',
+      GITHUB_WORKSPACE: gitRepo,
+      INPUT_DIR: migrationsDir,
+      'INPUT_SCHEMA-INSIGHTS': 'false'
+    })
+    process.env = env
+    cleanupFn = cleanup
     const git: SimpleGit = simpleGit(gitRepo, {
       config: [
         'user.name=zeevmoney',
@@ -395,8 +376,7 @@ describe('run with git base', () => {
 
   afterEach(async () => {
     await rm(gitRepo, { recursive: true })
-    await rm(base, { recursive: true })
-    process.env = { ...originalENV }
+    await cleanupFn()
   })
 
   test('successful', async () => {
@@ -419,34 +399,28 @@ describe('run with git base', () => {
 })
 
 describe('report to GitHub', () => {
-  let base: string
   let spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
-    spyOnSetFailed: jest.SpyInstance
+    spyOnSetFailed: jest.SpyInstance,
+    cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...{
-        RUNNER_TEMP: base,
-        INPUT_LATEST: '1',
-        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false'
-      }
-    }
+    const { env, cleanup } = await createTestENV({
+      INPUT_LATEST: '1',
+      'INPUT_SCHEMA-INSIGHTS': 'false'
+    })
+    process.env = env
+    cleanupFn = cleanup
     spyOnNotice = jest.spyOn(core, 'notice')
     spyOnError = jest.spyOn(core, 'error')
     spyOnSetFailed = jest.spyOn(core, 'setFailed')
   })
 
   afterEach(async () => {
-    process.env = { ...originalENV }
-    await rm(base, { recursive: true })
     spyOnNotice.mockReset()
     spyOnError.mockReset()
     spyOnSetFailed.mockReset()
+    await cleanupFn()
   })
 
   test('regular', async () => {
@@ -506,30 +480,23 @@ describe('report to GitHub', () => {
 
 describe('all reports', () => {
   const originalContext = { ...github.context }
-  let base: string,
-    actualRequestBody: { [key: string]: string & Variables },
+  let actualRequestBody: { [key: string]: string & Variables },
     gqlInterceptor: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
-    spyOnWarning: jest.SpyInstance
+    spyOnWarning: jest.SpyInstance,
+    cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...{
-        RUNNER_TEMP: base,
-        INPUT_LATEST: '1',
-        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
-        'INPUT_ARIGA-TOKEN': `mysecrettoken`,
-        ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false',
-        GITHUB_REPOSITORY: 'someProject/someRepo',
-        GITHUB_REF_NAME: 'test',
-        GITHUB_SHA: '71d0bfc1'
-      }
-    }
+    const { env, cleanup } = await createTestENV({
+      INPUT_LATEST: '1',
+      'INPUT_ARIGA-TOKEN': `mysecrettoken`,
+      'INPUT_SCHEMA-INSIGHTS': 'false',
+      GITHUB_REPOSITORY: 'someProject/someRepo',
+      GITHUB_SHA: '71d0bfc1'
+    })
+    process.env = env
+    cleanupFn = cleanup
     spyOnNotice = jest.spyOn(core, 'notice')
     spyOnError = jest.spyOn(core, 'error')
     spyOnWarning = jest.spyOn(core, 'warning')
@@ -558,11 +525,10 @@ describe('all reports', () => {
   })
 
   afterEach(async () => {
-    await rm(base, { recursive: true })
     spyOnNotice.mockReset()
     spyOnError.mockReset()
     spyOnWarning.mockReset()
-    process.env = { ...originalENV }
+    await cleanupFn()
     Object.defineProperty(github, 'context', {
       value: originalContext
     })
@@ -607,18 +573,20 @@ describe('all reports', () => {
     expect(actualRequestBody).toEqual({
       query: mutation,
       variables: {
-        branch: 'test',
-        commit: '71d0bfc1',
-        envName: 'CI',
-        projectName:
-          'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
-        url: 'https://github.com/ariga/atlasci-action/pull/1',
-        status: 'successful',
-        payload: expect.anything()
+        input: {
+          branch: 'test-pr-trigger',
+          commit: '71d0bfc1',
+          envName: 'CI',
+          projectName:
+            'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
+          url: 'https://github.com/ariga/atlasci-action/pull/1',
+          status: Status.Success,
+          payload: expect.anything()
+        }
       },
       operationName: 'CreateReportInput'
     })
-    const payloadParsed = JSON.parse(actualRequestBody.variables.payload)
+    const payloadParsed = JSON.parse(actualRequestBody.variables.input.payload)
     expect(payloadParsed).toEqual({
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,
@@ -652,18 +620,20 @@ describe('all reports', () => {
     expect(actualRequestBody).toEqual({
       query: mutation,
       variables: {
-        branch: 'test',
-        commit: '71d0bfc1',
-        envName: 'CI',
-        projectName:
-          'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
-        url: 'https://github.com/ariga/atlasci-action/pull/1',
-        status: 'successful',
-        payload: expect.anything()
+        input: {
+          branch: 'test-pr-trigger',
+          commit: '71d0bfc1',
+          envName: 'CI',
+          projectName:
+            'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
+          url: 'https://github.com/ariga/atlasci-action/pull/1',
+          status: Status.Success,
+          payload: expect.anything()
+        }
       },
       operationName: 'CreateReportInput'
     })
-    const payloadParsed = JSON.parse(actualRequestBody.variables.payload)
+    const payloadParsed = JSON.parse(actualRequestBody.variables.input.payload)
     expect(payloadParsed).toEqual({
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,

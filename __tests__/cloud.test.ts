@@ -1,19 +1,21 @@
 import { expect } from '@jest/globals'
 import { AtlasResult, ExitCodes, getMigrationDir } from '../src/atlas'
-import { getCloudURL, mutation, reportToCloud } from '../src/cloud'
+import { getCloudURL, mutation, reportToCloud, Status } from '../src/cloud'
 import * as http from '@actions/http-client'
 import * as github from '@actions/github'
 import nock from 'nock'
 import * as core from '@actions/core'
 import * as gql from 'graphql-request'
+import { createTestENV } from './env'
 
 jest.setTimeout(30000)
 
 describe('report to cloud', () => {
-  let spyOnWarning: jest.SpyInstance
-  let gqlInterceptor: nock.Interceptor
+  let spyOnWarning: jest.SpyInstance,
+    gqlInterceptor: nock.Interceptor,
+    cleanupFn: () => Promise<void>
+
   const originalContext = { ...github.context }
-  const originalENV = { ...process.env }
 
   beforeEach(async () => {
     // Mock GitHub Context
@@ -28,18 +30,16 @@ describe('report to cloud', () => {
       }
     })
     spyOnWarning = jest.spyOn(core, 'warning')
-    process.env = {
-      ...process.env,
-      ...{
-        GITHUB_REF_NAME: 'test',
-        GITHUB_REPOSITORY: 'someProject/someRepo',
-        GITHUB_SHA: '71d0bfc1',
-        INPUT_DIR: 'migrations',
-        'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
-        'INPUT_ARIGA-TOKEN': `mysecrettoken`,
-        ATLASCI_USER_AGENT: 'test-atlasci-action'
-      }
-    }
+    const { env, cleanup } = await createTestENV({
+      GITHUB_REPOSITORY: 'someProject/someRepo',
+      GITHUB_SHA: '71d0bfc1',
+      INPUT_DIR: 'migrations',
+      'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
+      'INPUT_ARIGA-TOKEN': `mysecrettoken`,
+      ATLASCI_USER_AGENT: 'test-atlasci-action'
+    })
+    process.env = env
+    cleanupFn = cleanup
     gqlInterceptor = nock(process.env['INPUT_ARIGA-URL'] as string)
       .post('/api/query')
       .matchHeader(
@@ -50,11 +50,12 @@ describe('report to cloud', () => {
   })
 
   afterEach(async () => {
+    await cleanupFn()
     Object.defineProperty(github, 'context', {
       value: originalContext
     })
     spyOnWarning.mockReset()
-    process.env = { ...originalENV }
+    nock.cleanAll()
   })
 
   test('correct cloud url', async () => {
@@ -93,13 +94,15 @@ describe('report to cloud', () => {
       'https://ci.ariga.cloud/api/query',
       mutation,
       {
-        branch: process.env.GITHUB_REF_NAME,
-        commit: process.env.GITHUB_SHA,
-        envName: 'CI',
-        payload: '[{"Name":"test","Text":"test"}]',
-        projectName: `${process.env.GITHUB_REPOSITORY}-${getMigrationDir()}`,
-        status: 'successful',
-        url: 'https://github.com/ariga/atlasci-action/pull/1'
+        input: {
+          branch: process.env.GITHUB_HEAD_REF,
+          commit: process.env.GITHUB_SHA,
+          envName: 'CI',
+          payload: '[{"Name":"test","Text":"test"}]',
+          projectName: `${process.env.GITHUB_REPOSITORY}-${getMigrationDir()}`,
+          status: Status.Success,
+          url: 'https://github.com/ariga/atlasci-action/pull/1'
+        }
       },
       {
         Authorization: 'Bearer mysecrettoken',

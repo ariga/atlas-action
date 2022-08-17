@@ -29,23 +29,48 @@ interface CreateReportPayload {
   }
 }
 
-function getMutationVariables(res: AtlasResult): {
-  [p: string]: string | number | undefined
-} {
-  const {
-    GITHUB_REPOSITORY: repository,
-    GITHUB_SHA: commitID,
-    GITHUB_REF_NAME: sourceBranch
-  } = process.env
+type CreateReportInput = {
+  input: {
+    payload: string
+    envName: string
+    commit: string
+    projectName: string
+    branch: string
+    url: string
+    status: string
+  }
+}
+
+export enum Status {
+  Success = 'SUCCESSFUL',
+  Failure = 'FAILED'
+}
+
+function getMutationVariables(res: AtlasResult): CreateReportInput {
+  const { GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID } = process.env
+  // GITHUB_HEAD_REF is set only on pull requests
+  // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
+  const sourceBranch =
+    process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME
   const migrationDir = getMigrationDir().replace('file://', '')
+  info(
+    `Run metadata: ${JSON.stringify(
+      { repository, commitID, sourceBranch, migrationDir },
+      null,
+      2
+    )}`
+  )
   return {
-    envName: 'CI',
-    projectName: `${repository}-${migrationDir}`,
-    branch: sourceBranch,
-    commit: commitID,
-    url: github?.context?.payload?.pull_request?.html_url,
-    status: res.exitCode === ExitCodes.Success ? 'successful' : 'failed',
-    payload: res.raw
+    input: {
+      envName: 'CI',
+      projectName: `${repository}-${migrationDir}`,
+      branch: sourceBranch ?? 'unknown',
+      commit: commitID ?? 'unknown',
+      url: github?.context?.payload?.pull_request?.html_url ?? 'unknown',
+      status:
+        res.exitCode === ExitCodes.Success ? Status.Success : Status.Failure,
+      payload: res.raw
+    }
   }
 }
 
@@ -57,7 +82,7 @@ export async function reportToCloud(
     warning(`Skipping report to cloud missing ariga-token input`)
     return
   }
-  info(`Reporting to cloud`)
+  info(`Reporting to cloud: ${getCloudURL()}`)
   setSecret(token)
   try {
     return await request<CreateReportPayload>(
