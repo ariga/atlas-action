@@ -99,7 +99,7 @@ describe('report to cloud', () => {
           commit: process.env.GITHUB_SHA,
           envName: 'CI',
           payload: '[{"Name":"test","Text":"test"}]',
-          projectName: `${process.env.GITHUB_REPOSITORY}-${getMigrationDir()}`,
+          projectName: `${process.env.GITHUB_REPOSITORY}/${getMigrationDir()}`,
           status: Status.Success,
           url: 'https://github.com/ariga/atlasci-action/pull/1'
         }

@@ -63,7 +63,7 @@ function getMutationVariables(res: AtlasResult): CreateReportInput {
   return {
     input: {
       envName: 'CI',
-      projectName: `${repository}-${migrationDir}`,
+      projectName: `${repository}/${migrationDir}`,
       branch: sourceBranch ?? 'unknown',
       commit: commitID ?? 'unknown',
       url: github?.context?.payload?.pull_request?.html_url ?? 'unknown',
