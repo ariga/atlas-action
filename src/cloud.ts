@@ -105,7 +105,8 @@ export async function reportToCloud(
 }
 
 export function getCloudURL(): string {
-  return new url.URL('/api/query', getInput(`ariga-url`)).toString()
+  const ariga = getInput(`ariga-url`) ?? 'https://ci.ariga.cloud'
+  return new url.URL('/api/query', ariga).toString()
 }
 
 function getHeaders(token: string): { [p: string]: string } {
