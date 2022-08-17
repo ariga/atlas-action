@@ -562,7 +562,7 @@ describe('all reports', () => {
           commit: '71d0bfc1',
           envName: 'CI',
           projectName:
-            'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
+            'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
           url: 'https://github.com/ariga/atlasci-action/pull/1',
           status: Status.Success,
           payload: expect.anything()
@@ -609,7 +609,7 @@ describe('all reports', () => {
           commit: '71d0bfc1',
           envName: 'CI',
           projectName:
-            'someProject/someRepo-__tests__/testdata/sqlite-with-diagnostics',
+            'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
           url: 'https://github.com/ariga/atlasci-action/pull/1',
           status: Status.Success,
           payload: expect.anything()

@@ -63,7 +63,7 @@ function getMutationVariables(res: AtlasResult): CreateReportInput {
   return {
     input: {
       envName: 'CI',
-      projectName: `${repository}-${migrationDir}`,
+      projectName: `${repository}/${migrationDir}`,
       branch: sourceBranch ?? 'unknown',
       commit: commitID ?? 'unknown',
       url: github?.context?.payload?.pull_request?.html_url ?? 'unknown',
@@ -105,7 +105,8 @@ export async function reportToCloud(
 }
 
 export function getCloudURL(): string {
-  return new url.URL('/api/query', getInput(`ariga-url`)).toString()
+  const ariga = getInput(`ariga-url`) ?? 'https://ci.ariga.cloud'
+  return new url.URL('/api/query', ariga).toString()
 }
 
 function getHeaders(token: string): { [p: string]: string } {

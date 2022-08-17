@@ -213,7 +213,7 @@ function getMutationVariables(res) {
     return {
         input: {
             envName: 'CI',
-            projectName: `${repository}-${migrationDir}`,
+            projectName: `${repository}/${migrationDir}`,
             branch: sourceBranch !== null && sourceBranch !== void 0 ? sourceBranch : 'unknown',
             commit: commitID !== null && commitID !== void 0 ? commitID : 'unknown',
             url: (_d = (_c = (_b = (_a = github === null || github === void 0 ? void 0 : github.context) === null || _a === void 0 ? void 0 : _a.payload) === null || _b === void 0 ? void 0 : _b.pull_request) === null || _c === void 0 ? void 0 : _c.html_url) !== null && _d !== void 0 ? _d : 'unknown',
@@ -249,7 +249,9 @@ function reportToCloud(res) {
 }
 exports.reportToCloud = reportToCloud;
 function getCloudURL() {
-    return new url.URL('/api/query', (0, core_1.getInput)(`ariga-url`)).toString();
+    var _a;
+    const ariga = (_a = (0, core_1.getInput)(`ariga-url`)) !== null && _a !== void 0 ? _a : 'https://ci.ariga.cloud';
+    return new url.URL('/api/query', ariga).toString();
 }
 exports.getCloudURL = getCloudURL;
 function getHeaders(token) {
