@@ -28,6 +28,7 @@ import {
   Status
 } from '../src/cloud'
 import { Variables } from 'graphql-request/src/types'
+import { createTestENV, defaultEnv, originalENV } from './env'
 
 jest.mock('../src/cloud', () => {
   const actual = jest.requireActual('../src/cloud')
@@ -41,9 +42,7 @@ jest.mock('../src/cloud', () => {
     )
   }
 })
-
 jest.setTimeout(30000)
-const originalENV = { ...process.env }
 
 describe('install', () => {
   let base: string
@@ -52,10 +51,10 @@ describe('install', () => {
     base = await mkdtemp(`${tmpdir()}${path.sep}`)
     process.env = {
       ...process.env,
+      ...defaultEnv,
       ...{
         // The path to a temporary directory on the runner (must be defined)
-        RUNNER_TEMP: base,
-        ATLASCI_USER_AGENT: 'test-atlasci-action'
+        RUNNER_TEMP: base
       }
     }
   })
@@ -101,17 +100,12 @@ describe('run with "latest" flag', () => {
 
   beforeEach(async () => {
     base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...{
-        RUNNER_TEMP: base,
-        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        INPUT_LATEST: '1',
-        ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false',
-        'INPUT_DIR-FORMAT': 'atlas'
-      }
-    }
+    process.env = createTestENV({
+      RUNNER_TEMP: base,
+      INPUT_LATEST: '1',
+      'INPUT_SCHEMA-INSIGHTS': 'false'
+    })
+
     spyOnSetFailed = jest.spyOn(core, 'setFailed')
   })
 
@@ -340,20 +334,14 @@ describe('run with git base', () => {
     const migrationsDir = path.join(gitRepo, 'migrations')
     await mkdir(migrationsDir)
     base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...{
-        RUNNER_TEMP: base,
-        GITHUB_BASE_REF: baseBranch,
-        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        INPUT_LATEST: '0',
-        GITHUB_WORKSPACE: gitRepo,
-        INPUT_DIR: migrationsDir,
-        ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false',
-        'INPUT_DIR-FORMAT': 'atlas'
-      }
-    }
+    process.env = createTestENV({
+      RUNNER_TEMP: base,
+      GITHUB_BASE_REF: baseBranch,
+      INPUT_LATEST: '0',
+      GITHUB_WORKSPACE: gitRepo,
+      INPUT_DIR: migrationsDir,
+      'INPUT_SCHEMA-INSIGHTS': 'false'
+    })
     const git: SimpleGit = simpleGit(gitRepo, {
       config: [
         'user.name=zeevmoney',
@@ -426,17 +414,11 @@ describe('report to GitHub', () => {
 
   beforeEach(async () => {
     base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...{
-        RUNNER_TEMP: base,
-        INPUT_LATEST: '1',
-        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false',
-        'INPUT_DIR-FORMAT': 'atlas'
-      }
-    }
+    process.env = createTestENV({
+      RUNNER_TEMP: base,
+      INPUT_LATEST: '1',
+      'INPUT_SCHEMA-INSIGHTS': 'false'
+    })
     spyOnNotice = jest.spyOn(core, 'notice')
     spyOnError = jest.spyOn(core, 'error')
     spyOnSetFailed = jest.spyOn(core, 'setFailed')
@@ -516,22 +498,16 @@ describe('all reports', () => {
 
   beforeEach(async () => {
     base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...{
-        RUNNER_TEMP: base,
-        INPUT_LATEST: '1',
-        'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
-        'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
-        'INPUT_ARIGA-TOKEN': `mysecrettoken`,
-        ATLASCI_USER_AGENT: 'test-atlasci-action',
-        'INPUT_SCHEMA-INSIGHTS': 'false',
-        GITHUB_REPOSITORY: 'someProject/someRepo',
-        GITHUB_REF_NAME: 'test',
-        GITHUB_SHA: '71d0bfc1',
-        'INPUT_DIR-FORMAT': 'atlas'
-      }
-    }
+    process.env = createTestENV({
+      RUNNER_TEMP: base,
+      INPUT_LATEST: '1',
+      'INPUT_ARIGA-TOKEN': `mysecrettoken`,
+      'INPUT_SCHEMA-INSIGHTS': 'false',
+      GITHUB_REPOSITORY: 'someProject/someRepo',
+      GITHUB_REF_NAME: 'test',
+      GITHUB_HEAD_REF: 'test',
+      GITHUB_SHA: '71d0bfc1'
+    })
     spyOnNotice = jest.spyOn(core, 'notice')
     spyOnError = jest.spyOn(core, 'error')
     spyOnWarning = jest.spyOn(core, 'warning')
