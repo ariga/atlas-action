@@ -30,6 +30,7 @@ describe('report to cloud', () => {
     spyOnWarning = jest.spyOn(core, 'warning')
     process.env = createTestENV({
       GITHUB_REF_NAME: 'test',
+      GITHUB_HEAD_REF: 'test',
       GITHUB_REPOSITORY: 'someProject/someRepo',
       GITHUB_SHA: '71d0bfc1',
       INPUT_DIR: 'migrations',
