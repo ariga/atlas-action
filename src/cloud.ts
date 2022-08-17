@@ -66,7 +66,10 @@ function getMutationVariables(res: AtlasResult): CreateReportInput {
       projectName: `${repository}/${migrationDir}`,
       branch: sourceBranch ?? 'unknown',
       commit: commitID ?? 'unknown',
-      url: github?.context?.payload?.pull_request?.html_url ?? 'unknown',
+      url:
+        github?.context?.payload?.pull_request?.html_url ??
+        github?.context?.payload?.repository?.html_url ??
+        'unknown',
       status:
         res.exitCode === ExitCodes.Success ? Status.Success : Status.Failure,
       payload: res.raw

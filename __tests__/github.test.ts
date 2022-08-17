@@ -4,6 +4,7 @@ import { tmpdir } from 'os'
 import { simpleGit } from 'simple-git'
 import { expect } from '@jest/globals'
 import path from 'path'
+import { createTestENV, GithubEventName } from './env'
 
 jest.setTimeout(30000)
 process.env.ATLASCI_USER_AGENT = 'test-atlasci-action'
@@ -34,6 +35,12 @@ describe('resolve git base', () => {
 
   test('pull request mode', async () => {
     process.env.GITHUB_BASE_REF = 'master'
+    await expect(resolveGitBase(base)).resolves.toBe('master')
+  })
+
+  test('base from context', async () => {
+    await createTestENV({ eventName: GithubEventName.Push })
+    process.env.GITHUB_BASE_REF = ''
     await expect(resolveGitBase(base)).resolves.toBe('master')
   })
 })

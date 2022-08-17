@@ -17,12 +17,14 @@ describe('report to cloud', () => {
   beforeEach(async () => {
     spyOnWarning = jest.spyOn(core, 'warning')
     const { env, cleanup } = await createTestENV({
-      GITHUB_REPOSITORY: 'someProject/someRepo',
-      GITHUB_SHA: '71d0bfc1',
-      INPUT_DIR: 'migrations',
-      'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
-      'INPUT_ARIGA-TOKEN': `mysecrettoken`,
-      ATLASCI_USER_AGENT: 'test-atlasci-action'
+      override: {
+        GITHUB_REPOSITORY: 'someProject/someRepo',
+        GITHUB_SHA: '71d0bfc1',
+        INPUT_DIR: 'migrations',
+        'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
+        'INPUT_ARIGA-TOKEN': `mysecrettoken`,
+        ATLASCI_USER_AGENT: 'test-atlasci-action'
+      }
     })
     process.env = env
     cleanupFn = cleanup
@@ -84,7 +86,7 @@ describe('report to cloud', () => {
           payload: '[{"Name":"test","Text":"test"}]',
           projectName: `${process.env.GITHUB_REPOSITORY}/${getMigrationDir()}`,
           status: Status.Success,
-          url: 'https://github.com/ariga/atlasci-action/pull/1'
+          url: 'https://github.com/ariga/atlas-action/pull/1'
         }
       },
       {

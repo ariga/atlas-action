@@ -31,23 +31,49 @@ const gitENV = {
 // https://docs.github.com/en/actions/learn-github-actions/contexts#github-context
 const originalContext = { ...github.context }
 
-export async function createTestENV(
+type CreateTestENVOutput = Promise<{
+  cleanup: () => Promise<void>
+  env: ProcessEnv
+}>
+
+// type CreateTestENVInput = Record<string, string>
+
+type CreateTestENVInput = {
   override?: Record<string, string>
-): Promise<{ cleanup: () => Promise<void>; env: ProcessEnv }> {
-  // Mock GitHub Context
-  Object.defineProperty(github, 'context', {
+  eventName?: GithubEventName
+}
+
+export enum GithubEventName {
+  PullRequest = 'pull_request',
+  Push = 'push'
+}
+
+export async function createTestENV(
+  input?: CreateTestENVInput
+): CreateTestENVOutput {
+  const eventName = input?.eventName ?? GithubEventName.PullRequest
+  const contextMock = {
     value: {
       eventName: 'pull_request',
       payload: {
         repository: {
-          default_branch: 'master'
-        },
-        pull_request: {
-          html_url: 'https://github.com/ariga/atlasci-action/pull/1'
+          default_branch: 'master',
+          html_url: 'https://github.com/ariga/atlas-action'
         }
       }
     }
-  })
+  }
+  if (eventName === GithubEventName.PullRequest) {
+    contextMock.value.payload = {
+      ...contextMock.value.payload,
+      ...{
+        pull_request: {
+          html_url: 'https://github.com/ariga/atlas-action/pull/1'
+        }
+      }
+    }
+  }
+  Object.defineProperty(github, 'context', contextMock)
   const base = await mkdtemp(`${tmpdir()}${path.sep}`)
   return {
     env: {
@@ -56,7 +82,7 @@ export async function createTestENV(
       RUNNER_TEMP: base,
       ...defaultENV,
       ...gitENV,
-      ...override
+      ...input?.override
     },
     cleanup: async () => {
       // Remove the temporary directory

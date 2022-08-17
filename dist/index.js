@@ -203,7 +203,7 @@ var Status;
     Status["Failure"] = "FAILED";
 })(Status = exports.Status || (exports.Status = {}));
 function getMutationVariables(res) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const { GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID } = process.env;
     // GITHUB_HEAD_REF is set only on pull requests
     // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
@@ -216,7 +216,7 @@ function getMutationVariables(res) {
             projectName: `${repository}/${migrationDir}`,
             branch: sourceBranch !== null && sourceBranch !== void 0 ? sourceBranch : 'unknown',
             commit: commitID !== null && commitID !== void 0 ? commitID : 'unknown',
-            url: (_d = (_c = (_b = (_a = github === null || github === void 0 ? void 0 : github.context) === null || _a === void 0 ? void 0 : _a.payload) === null || _b === void 0 ? void 0 : _b.pull_request) === null || _c === void 0 ? void 0 : _c.html_url) !== null && _d !== void 0 ? _d : 'unknown',
+            url: (_h = (_d = (_c = (_b = (_a = github === null || github === void 0 ? void 0 : github.context) === null || _a === void 0 ? void 0 : _a.payload) === null || _b === void 0 ? void 0 : _b.pull_request) === null || _c === void 0 ? void 0 : _c.html_url) !== null && _d !== void 0 ? _d : (_g = (_f = (_e = github === null || github === void 0 ? void 0 : github.context) === null || _e === void 0 ? void 0 : _e.payload) === null || _f === void 0 ? void 0 : _f.repository) === null || _g === void 0 ? void 0 : _g.html_url) !== null && _h !== void 0 ? _h : 'unknown',
             status: res.exitCode === atlas_1.ExitCodes.Success ? Status.Success : Status.Failure,
             payload: res.raw
         }
@@ -270,6 +270,29 @@ exports.getDownloadURL = getDownloadURL;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -285,6 +308,7 @@ const core_1 = __nccwpck_require__(2186);
 const fs_1 = __nccwpck_require__(7147);
 const promises_1 = __nccwpck_require__(3292);
 const simple_git_1 = __nccwpck_require__(9103);
+const github = __importStar(__nccwpck_require__(5438));
 function getWorkingDirectory() {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
@@ -304,10 +328,13 @@ function getWorkingDirectory() {
 }
 exports.getWorkingDirectory = getWorkingDirectory;
 function resolveGitBase(gitRoot) {
-    var _a;
+    var _a, _b, _c, _d;
     return __awaiter(this, void 0, void 0, function* () {
         if (process.env.GITHUB_BASE_REF) {
             return process.env.GITHUB_BASE_REF;
+        }
+        if ((_c = (_b = (_a = github === null || github === void 0 ? void 0 : github.context) === null || _a === void 0 ? void 0 : _a.payload) === null || _b === void 0 ? void 0 : _b.repository) === null || _c === void 0 ? void 0 : _c.default_branch) {
+            return github.context.payload.repository.default_branch;
         }
         const git = (0, simple_git_1.simpleGit)(gitRoot);
         const origin = yield git.remote(['show', 'origin']);
@@ -319,7 +346,7 @@ function resolveGitBase(gitRoot) {
         if (!matches || matches.length === 0) {
             throw new Error(`Could not find HEAD branch in remote origin`);
         }
-        const baseBranch = (_a = matches[0]) === null || _a === void 0 ? void 0 : _a[1];
+        const baseBranch = (_d = matches[0]) === null || _d === void 0 ? void 0 : _d[1];
         if (!baseBranch) {
             throw new Error(`Could not find HEAD branch in remote origin`);
         }
