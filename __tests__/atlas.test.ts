@@ -28,7 +28,7 @@ import {
   Status
 } from '../src/cloud'
 import { Variables } from 'graphql-request/src/types'
-import { createTestENV, defaultEnv, originalENV } from './env'
+import { createTestENV, originalENV } from './env'
 
 jest.mock('../src/cloud', () => {
   const actual = jest.requireActual('../src/cloud')
@@ -45,22 +45,14 @@ jest.mock('../src/cloud', () => {
 jest.setTimeout(30000)
 
 describe('install', () => {
-  let base: string
-
   beforeEach(async () => {
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = {
-      ...process.env,
-      ...defaultEnv,
-      ...{
-        // The path to a temporary directory on the runner (must be defined)
-        RUNNER_TEMP: base
-      }
-    }
+    process.env = await createTestENV()
   })
 
-  afterEach(() => {
-    rm(base, { recursive: true })
+  afterEach(async () => {
+    if (process.env.RUNNER_TEMP) {
+      await rm(process.env.RUNNER_TEMP, { recursive: true })
+    }
     process.env = { ...originalENV }
     nock.cleanAll()
   })
@@ -96,27 +88,29 @@ describe('install', () => {
 })
 
 describe('run with "latest" flag', () => {
-  let base: string, spyOnSetFailed: jest.SpyInstance
+  let spyOnSetFailed: jest.SpyInstance
 
   beforeEach(async () => {
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = createTestENV({
-      RUNNER_TEMP: base,
+    process.env = await createTestENV({
       INPUT_LATEST: '1',
       'INPUT_SCHEMA-INSIGHTS': 'false'
     })
-
     spyOnSetFailed = jest.spyOn(core, 'setFailed')
   })
 
   afterEach(async () => {
-    await rm(base, { recursive: true })
+    if (process.env.RUNNER_TEMP) {
+      await rm(process.env.RUNNER_TEMP, { recursive: true })
+    }
     process.env = { ...originalENV }
     spyOnSetFailed.mockReset()
   })
 
   test('successful no issues', async () => {
-    const migrationsDir = path.join(base, 'migrations')
+    if (!process.env.RUNNER_TEMP) {
+      throw new Error('RUNNER_TEMP is not set')
+    }
+    const migrationsDir = path.join(process.env.RUNNER_TEMP, 'migrations')
     await mkdir(migrationsDir)
     process.env.INPUT_DIR = migrationsDir
     const res = (await run()) as AtlasResult
@@ -325,7 +319,6 @@ describe('run with "latest" flag', () => {
 
 describe('run with git base', () => {
   let gitRepo: string
-  let base: string
 
   beforeEach(async () => {
     const changesBranch = 'changes'
@@ -333,9 +326,7 @@ describe('run with git base', () => {
     gitRepo = await mkdtemp(`${tmpdir()}${path.sep}`)
     const migrationsDir = path.join(gitRepo, 'migrations')
     await mkdir(migrationsDir)
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = createTestENV({
-      RUNNER_TEMP: base,
+    process.env = await createTestENV({
       GITHUB_BASE_REF: baseBranch,
       INPUT_LATEST: '0',
       GITHUB_WORKSPACE: gitRepo,
@@ -383,7 +374,9 @@ describe('run with git base', () => {
 
   afterEach(async () => {
     await rm(gitRepo, { recursive: true })
-    await rm(base, { recursive: true })
+    if (process.env.RUNNER_TEMP) {
+      await rm(process.env.RUNNER_TEMP, { recursive: true })
+    }
     process.env = { ...originalENV }
   })
 
@@ -407,15 +400,12 @@ describe('run with git base', () => {
 })
 
 describe('report to GitHub', () => {
-  let base: string
   let spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
     spyOnSetFailed: jest.SpyInstance
 
   beforeEach(async () => {
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = createTestENV({
-      RUNNER_TEMP: base,
+    process.env = await createTestENV({
       INPUT_LATEST: '1',
       'INPUT_SCHEMA-INSIGHTS': 'false'
     })
@@ -426,7 +416,9 @@ describe('report to GitHub', () => {
 
   afterEach(async () => {
     process.env = { ...originalENV }
-    await rm(base, { recursive: true })
+    if (process.env.RUNNER_TEMP) {
+      await rm(process.env.RUNNER_TEMP, { recursive: true })
+    }
     spyOnNotice.mockReset()
     spyOnError.mockReset()
     spyOnSetFailed.mockReset()
@@ -489,23 +481,18 @@ describe('report to GitHub', () => {
 
 describe('all reports', () => {
   const originalContext = { ...github.context }
-  let base: string,
-    actualRequestBody: { [key: string]: string & Variables },
+  let actualRequestBody: { [key: string]: string & Variables },
     gqlInterceptor: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
     spyOnWarning: jest.SpyInstance
 
   beforeEach(async () => {
-    base = await mkdtemp(`${tmpdir()}${path.sep}`)
-    process.env = createTestENV({
-      RUNNER_TEMP: base,
+    process.env = await createTestENV({
       INPUT_LATEST: '1',
       'INPUT_ARIGA-TOKEN': `mysecrettoken`,
       'INPUT_SCHEMA-INSIGHTS': 'false',
       GITHUB_REPOSITORY: 'someProject/someRepo',
-      GITHUB_REF_NAME: 'test',
-      GITHUB_HEAD_REF: 'test',
       GITHUB_SHA: '71d0bfc1'
     })
     spyOnNotice = jest.spyOn(core, 'notice')
@@ -536,10 +523,12 @@ describe('all reports', () => {
   })
 
   afterEach(async () => {
-    await rm(base, { recursive: true })
     spyOnNotice.mockReset()
     spyOnError.mockReset()
     spyOnWarning.mockReset()
+    if (process.env.RUNNER_TEMP) {
+      await rm(process.env.RUNNER_TEMP, { recursive: true })
+    }
     process.env = { ...originalENV }
     Object.defineProperty(github, 'context', {
       value: originalContext
@@ -586,7 +575,7 @@ describe('all reports', () => {
       query: mutation,
       variables: {
         input: {
-          branch: 'test',
+          branch: 'test-pr-trigger',
           commit: '71d0bfc1',
           envName: 'CI',
           projectName:
@@ -633,7 +622,7 @@ describe('all reports', () => {
       query: mutation,
       variables: {
         input: {
-          branch: 'test',
+          branch: 'test-pr-trigger',
           commit: '71d0bfc1',
           envName: 'CI',
           projectName:

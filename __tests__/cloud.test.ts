@@ -7,6 +7,7 @@ import nock from 'nock'
 import * as core from '@actions/core'
 import * as gql from 'graphql-request'
 import { createTestENV, originalENV } from './env'
+import { rm } from 'fs/promises'
 
 jest.setTimeout(30000)
 
@@ -28,9 +29,7 @@ describe('report to cloud', () => {
       }
     })
     spyOnWarning = jest.spyOn(core, 'warning')
-    process.env = createTestENV({
-      GITHUB_REF_NAME: 'test',
-      GITHUB_HEAD_REF: 'test',
+    process.env = await createTestENV({
       GITHUB_REPOSITORY: 'someProject/someRepo',
       GITHUB_SHA: '71d0bfc1',
       INPUT_DIR: 'migrations',
@@ -52,6 +51,9 @@ describe('report to cloud', () => {
       value: originalContext
     })
     spyOnWarning.mockReset()
+    if (process.env.RUNNER_TEMP) {
+      await rm(process.env.RUNNER_TEMP, { recursive: true })
+    }
     process.env = { ...originalENV }
     nock.cleanAll()
   })
@@ -93,7 +95,7 @@ describe('report to cloud', () => {
       mutation,
       {
         input: {
-          branch: process.env.GITHUB_REF_NAME,
+          branch: process.env.GITHUB_HEAD_REF,
           commit: process.env.GITHUB_SHA,
           envName: 'CI',
           payload: '[{"Name":"test","Text":"test"}]',
