@@ -22,10 +22,6 @@ inputs:
     description: 'path to the repository working directory'
     default: '.'
     required: false
-  ariga-url:
-    description: 'The URL of ariga cloud server.'
-    default: 'https://ci.ariga.cloud/'
-    required: false
   ariga-token:
     description: 'Token for sending report to Ariga cloud (should be passed as a secret)'
     required: false
