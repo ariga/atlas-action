@@ -49,7 +49,7 @@ jobs:
           MYSQL_ROOT_PASSWORD: pass
           MYSQL_DATABASE: test
         ports:
-          - "3307:3306"
+          - "3306:3306"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3.0.1
@@ -59,7 +59,7 @@ jobs:
         with:
           dir: path/to/migrations
           dir-format: golang-migrate
-          dev-url: mysql://root:pass@localhost:3307/test
+          dev-url: mysql://root:pass@localhost:3306/test
 ```
 
 ### Configuration
