@@ -5,7 +5,7 @@ inputs:
   atlas-version:
     description: 'Which version of Atlas CLI to install'
     required: false
-    default: 'v0.6.1'
+    default: 'v0.6.2'
   dir:
     description: 'select migration directory relative to working directory'
     default: "migrations"
