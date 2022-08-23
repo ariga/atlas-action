@@ -372,11 +372,12 @@ describe('report to GitHub', () => {
     expect(spyOnNotice).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenCalledWith(
-      'Data dependent changes detected in file 20220823075011_uniq_name.sql: Adding a unique index \"uniq_name\" on table \"users\" might fail in case column \"name\" contains duplicate entries',
+      'Data dependent changes detected in file 20220823075011_uniq_name.sql: Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
       {
         file: '20220823075011_uniq_name.sql',
         startLine: 0,
-        title: 'Data dependent changes detected in file 20220823075011_uniq_name.sql'
+        title:
+          'Data dependent changes detected in file 20220823075011_uniq_name.sql'
       }
     )
   })
@@ -483,11 +484,12 @@ describe('all reports with pull request', () => {
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenNthCalledWith(
       1,
-      'Data dependent changes detected in file 20220823075011_uniq_name.sql: Adding a unique index \"uniq_name\" on table \"users\" might fail in case column \"name\" contains duplicate entries',
+      'Data dependent changes detected in file 20220823075011_uniq_name.sql: Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
       {
         file: '20220823075011_uniq_name.sql',
         startLine: 0,
-        title: 'Data dependent changes detected in file 20220823075011_uniq_name.sql'
+        title:
+          'Data dependent changes detected in file 20220823075011_uniq_name.sql'
       }
     )
     expect(spyOnNotice).toHaveBeenNthCalledWith(
@@ -562,8 +564,10 @@ describe('all reports with pull request', () => {
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,
       Schema: {
-        Current: "table \"users\" {\n  schema = schema.main\n  column \"id\" {\n    null = false\n    type = int\n  }\n  column \"name\" {\n    null = false\n    type = varchar\n  }\n}\nschema \"main\" {\n}\n",
-        Desired: "table \"users\" {\n  schema = schema.main\n  column \"id\" {\n    null = false\n    type = int\n  }\n  column \"name\" {\n    null = false\n    type = varchar\n  }\n  index \"uniq_name\" {\n    unique  = true\n    columns = [column.name]\n  }\n}\nschema \"main\" {\n}\n"
+        Current:
+          'table "users" {\n  schema = schema.main\n  column "id" {\n    null = false\n    type = int\n  }\n  column "name" {\n    null = false\n    type = varchar\n  }\n}\nschema "main" {\n}\n',
+        Desired:
+          'table "users" {\n  schema = schema.main\n  column "id" {\n    null = false\n    type = int\n  }\n  column "name" {\n    null = false\n    type = varchar\n  }\n  index "uniq_name" {\n    unique  = true\n    columns = [column.name]\n  }\n}\nschema "main" {\n}\n'
       },
       Files: res.summary?.Files
     })
@@ -659,8 +663,10 @@ describe('all reports with push (branch)', () => {
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,
       Schema: {
-        Current: "table \"users\" {\n  schema = schema.main\n  column \"id\" {\n    null = false\n    type = int\n  }\n  column \"name\" {\n    null = false\n    type = varchar\n  }\n}\nschema \"main\" {\n}\n",
-        Desired: "table \"users\" {\n  schema = schema.main\n  column \"id\" {\n    null = false\n    type = int\n  }\n  column \"name\" {\n    null = false\n    type = varchar\n  }\n  index \"uniq_name\" {\n    unique  = true\n    columns = [column.name]\n  }\n}\nschema \"main\" {\n}\n"
+        Current:
+          'table "users" {\n  schema = schema.main\n  column "id" {\n    null = false\n    type = int\n  }\n  column "name" {\n    null = false\n    type = varchar\n  }\n}\nschema "main" {\n}\n',
+        Desired:
+          'table "users" {\n  schema = schema.main\n  column "id" {\n    null = false\n    type = int\n  }\n  column "name" {\n    null = false\n    type = varchar\n  }\n  index "uniq_name" {\n    unique  = true\n    columns = [column.name]\n  }\n}\nschema "main" {\n}\n'
       },
       Files: res.summary?.Files
     })
