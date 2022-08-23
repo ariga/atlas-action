@@ -216,79 +216,6 @@ describe('run with "latest" flag', () => {
 
     const res = (await run()) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
-    const expected = {
-      Env: {
-        Driver: 'sqlite3',
-        URL: {
-          Scheme: 'sqlite',
-          Opaque: '',
-          User: null,
-          Host: 'test',
-          Path: '',
-          RawPath: '',
-          ForceQuery: false,
-          RawQuery: 'mode=memory&cache=shared&_fk=1',
-          Fragment: '',
-          RawFragment: '',
-          DSN: 'file:test?mode=memory&cache=shared&_fk=1',
-          Schema: 'main'
-        },
-        Dir: '__tests__/testdata/sqlite-with-diagnostics'
-      },
-      Steps: [
-        {
-          Name: 'Migration Integrity Check',
-          Text: 'File atlas.sum is valid'
-        },
-        {
-          Name: 'Detect New Migration Files',
-          Text: 'Found 1 new migration files (from 3 total)'
-        },
-        {
-          Name: 'Replay Migration Files',
-          Text: 'Loaded 1 changes on dev database'
-        },
-        {
-          Name: 'Analyze 20220619130911_second.sql',
-          Text: '1 reports were found in analysis',
-          Result: {
-            Name: '20220619130911_second.sql',
-            Text: '-- DROP "tbl2" table\nDROP TABLE tbl2;\n',
-            Reports: [
-              {
-                Text: 'Destructive changes detected in file 20220619130911_second.sql',
-                Diagnostics: [
-                  {
-                    Pos: 21,
-                    Text: 'Dropping table "tbl2"'
-                  }
-                ]
-              }
-            ]
-          }
-        }
-      ],
-      Schema: null,
-      Files: [
-        {
-          Name: '20220619130911_second.sql',
-          Text: '-- DROP "tbl2" table\nDROP TABLE tbl2;\n',
-          Reports: [
-            {
-              Text: 'Destructive changes detected in file 20220619130911_second.sql',
-              Diagnostics: [
-                {
-                  Pos: 21,
-                  Text: 'Dropping table "tbl2"'
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-    expect(res.summary).toEqual(expected)
-    expect(res.raw).toEqual(JSON.stringify(expected))
   })
 
   test('successful run with golang migrate format', async () => {
@@ -389,7 +316,7 @@ describe('run with mock repo', () => {
 
   test('successful', async () => {
     const res = (await run()) as AtlasResult
-    expect(res.exitCode).toBe(ExitCodes.Success)
+    expect(res.exitCode).toBe(ExitCodes.Failure)
     expect(res.summary?.Files).toHaveLength(1)
     expect(res.summary?.Files[0].Name).toBe('20220728131023.sql')
     expect(res.summary?.Files[0].Text).toBe(
@@ -445,11 +372,11 @@ describe('report to GitHub', () => {
     expect(spyOnNotice).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenCalledWith(
-      'Destructive changes detected in file 20220619130911_second.sql: Dropping table "tbl2"',
+      'Data dependent changes detected in file 20220823075011_uniq_name.sql: Adding a unique index \"uniq_name\" on table \"users\" might fail in case column \"name\" contains duplicate entries',
       {
-        file: '20220619130911_second.sql',
+        file: '20220823075011_uniq_name.sql',
         startLine: 0,
-        title: 'Destructive changes detected in file 20220619130911_second.sql'
+        title: 'Data dependent changes detected in file 20220823075011_uniq_name.sql'
       }
     )
   })
@@ -556,11 +483,11 @@ describe('all reports with pull request', () => {
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenNthCalledWith(
       1,
-      'Destructive changes detected in file 20220619130911_second.sql: Dropping table "tbl2"',
+      'Data dependent changes detected in file 20220823075011_uniq_name.sql: Adding a unique index \"uniq_name\" on table \"users\" might fail in case column \"name\" contains duplicate entries',
       {
-        file: '20220619130911_second.sql',
+        file: '20220823075011_uniq_name.sql',
         startLine: 0,
-        title: 'Destructive changes detected in file 20220619130911_second.sql'
+        title: 'Data dependent changes detected in file 20220823075011_uniq_name.sql'
       }
     )
     expect(spyOnNotice).toHaveBeenNthCalledWith(
@@ -635,9 +562,8 @@ describe('all reports with pull request', () => {
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,
       Schema: {
-        Current:
-          'table "tbl2" {\n  schema = schema.main\n  column "col" {\n    null = false\n    type = int\n  }\n}\nschema "main" {\n}\n',
-        Desired: 'schema "main" {\n}\n'
+        Current: "table \"users\" {\n  schema = schema.main\n  column \"id\" {\n    null = false\n    type = int\n  }\n  column \"name\" {\n    null = false\n    type = varchar\n  }\n}\nschema \"main\" {\n}\n",
+        Desired: "table \"users\" {\n  schema = schema.main\n  column \"id\" {\n    null = false\n    type = int\n  }\n  column \"name\" {\n    null = false\n    type = varchar\n  }\n  index \"uniq_name\" {\n    unique  = true\n    columns = [column.name]\n  }\n}\nschema \"main\" {\n}\n"
       },
       Files: res.summary?.Files
     })
@@ -733,9 +659,8 @@ describe('all reports with push (branch)', () => {
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,
       Schema: {
-        Current:
-          'table "tbl2" {\n  schema = schema.main\n  column "col" {\n    null = false\n    type = int\n  }\n}\nschema "main" {\n}\n',
-        Desired: 'schema "main" {\n}\n'
+        Current: "table \"users\" {\n  schema = schema.main\n  column \"id\" {\n    null = false\n    type = int\n  }\n  column \"name\" {\n    null = false\n    type = varchar\n  }\n}\nschema \"main\" {\n}\n",
+        Desired: "table \"users\" {\n  schema = schema.main\n  column \"id\" {\n    null = false\n    type = int\n  }\n  column \"name\" {\n    null = false\n    type = varchar\n  }\n  index \"uniq_name\" {\n    unique  = true\n    columns = [column.name]\n  }\n}\nschema \"main\" {\n}\n"
       },
       Files: res.summary?.Files
     })
