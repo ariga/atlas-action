@@ -18,7 +18,7 @@ export async function run(): Promise<AtlasResult | void> {
     }
     report(res)
     if (res.exitCode !== ExitCodes.Success) {
-      setFailed(`Atlas failed with code ${res.exitCode}: ${out}`)
+      setFailed(`Atlas failed with code ${res.exitCode}`)
     }
     return res
   } catch (error) {
