@@ -107,8 +107,11 @@ export async function reportToCloud(
 }
 
 export function getCloudURL(): string {
-  const ariga = getInput(`ariga-url`) ?? 'https://ci.ariga.cloud'
-  return new url.URL('/api/query', ariga).toString()
+  const au = getInput(`ariga-url`)
+  return new url.URL(
+    '/api/query',
+    au === '' ? 'https://ci.ariga.cloud' : au
+  ).toString()
 }
 
 function getHeaders(token: string): { [p: string]: string } {
@@ -119,7 +122,12 @@ function getHeaders(token: string): { [p: string]: string } {
 }
 
 export function getDownloadURL(version: string): URL {
-  return new URL(
+  const url = new URL(
     `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}`
   )
+  const origin = new URL(getCloudURL()).origin
+  if (origin !== 'https://ci.ariga.cloud') {
+    url.searchParams.set('test', '1')
+  }
+  return url
 }
