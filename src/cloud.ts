@@ -119,8 +119,12 @@ function getHeaders(token: string): { [p: string]: string } {
 }
 
 export function getDownloadURL(version: string): URL {
-  const qp = getCloudURL() === 'https://ci.ariga.cloud' ? '' : '?test=1'
-  return new URL(
-    `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}` + qp
+  const url = new URL(
+    `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}`
   )
+  const origin = new URL(getCloudURL()).origin
+  if (origin !== 'https://ci.ariga.cloud') {
+    url.searchParams.set('test', '1')
+  }
+  return url
 }

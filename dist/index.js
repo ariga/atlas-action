@@ -257,7 +257,12 @@ function getHeaders(token) {
     return Object.assign({ Authorization: `Bearer ${token}` }, (0, atlas_1.getUserAgent)());
 }
 function getDownloadURL(version) {
-    return new URL(`${exports.BASE_ADDRESS}/${exports.S3_FOLDER}/atlas-${exports.ARCHITECTURE}-${version}`);
+    const url = new URL(`${exports.BASE_ADDRESS}/${exports.S3_FOLDER}/atlas-${exports.ARCHITECTURE}-${version}`);
+    const origin = new URL(getCloudURL()).origin;
+    if (origin !== 'https://ci.ariga.cloud') {
+        url.searchParams.set('test', '1');
+    }
+    return url;
 }
 exports.getDownloadURL = getDownloadURL;
 //# sourceMappingURL=cloud.js.map
