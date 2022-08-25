@@ -257,7 +257,8 @@ function getHeaders(token) {
     return Object.assign({ Authorization: `Bearer ${token}` }, (0, atlas_1.getUserAgent)());
 }
 function getDownloadURL(version) {
-    return new URL(`${exports.BASE_ADDRESS}/${exports.S3_FOLDER}/atlas-${exports.ARCHITECTURE}-${version}`);
+    const qp = getCloudURL() === 'https://ci.ariga.cloud' ? '' : '?test=1';
+    return new URL(`${exports.BASE_ADDRESS}/${exports.S3_FOLDER}/atlas-${exports.ARCHITECTURE}-${version}` + qp);
 }
 exports.getDownloadURL = getDownloadURL;
 //# sourceMappingURL=cloud.js.map
