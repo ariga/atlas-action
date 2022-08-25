@@ -248,9 +248,8 @@ function reportToCloud(res) {
 }
 exports.reportToCloud = reportToCloud;
 function getCloudURL() {
-    var _a;
-    const ariga = (_a = (0, core_1.getInput)(`ariga-url`)) !== null && _a !== void 0 ? _a : 'https://ci.ariga.cloud';
-    return new url.URL('/api/query', ariga).toString();
+    const au = (0, core_1.getInput)(`ariga-url`);
+    return new url.URL('/api/query', au === '' ? 'https://ci.ariga.cloud' : au).toString();
 }
 exports.getCloudURL = getCloudURL;
 function getHeaders(token) {
