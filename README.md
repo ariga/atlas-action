@@ -50,6 +50,12 @@ jobs:
           MYSQL_DATABASE: test
         ports:
           - "3306:3306"
+        options: >-
+          --health-cmd "mysqladmin ping -ppass"
+          --health-interval 10s
+          --health-start-period 10s
+          --health-timeout 5s
+          --health-retries 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3.0.1
