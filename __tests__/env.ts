@@ -4,6 +4,7 @@ import path from 'path'
 import * as github from '@actions/github'
 const yaml = require('js-yaml')
 import * as fs from 'fs'
+import { summary } from '@actions/core'
 
 interface ProcessEnv {
   [key: string]: string | undefined
@@ -17,7 +18,7 @@ const defaultENV = {
   'INPUT_DIR-FORMAT': 'atlas',
   'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
   INPUT_LATEST: '0',
-  'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
+  'INPUT_ARIGA-URL': `https://ci.ariga.test`,
   'INPUT_SCHEMA-INSIGHTS': 'true',
   'INPUT_ATLAS-VERSION': defaultVersion()
 }
@@ -76,11 +77,14 @@ export async function createTestENV(
   }
   Object.defineProperty(github, 'context', contextMock)
   const base = await mkdtemp(`${tmpdir()}${path.sep}`)
+  const summaryFile = `${tmpdir()}/summary.txt`
+  fs.closeSync(fs.openSync(summaryFile, 'w'))
   return {
     env: {
       ...process.env,
       // The path to a temporary directory on the runner (must be defined)
       RUNNER_TEMP: base,
+      GITHUB_STEP_SUMMARY: summaryFile,
       ...defaultENV,
       ...gitENV,
       ...input?.override

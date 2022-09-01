@@ -324,7 +324,7 @@ describe('run with mock repo', () => {
     )
     expect(res.summary?.Files[0].Reports).toHaveLength(1)
     expect(res.summary?.Files[0].Reports?.[0].Text).toBe(
-      'Destructive changes detected in file 20220728131023.sql'
+      'destructive change detected'
     )
     expect(res.summary?.Files[0].Reports?.[0].Diagnostics?.[0].Text).toBe(
       `Dropping table "tbl"`
@@ -372,12 +372,11 @@ describe('report to GitHub', () => {
     expect(spyOnNotice).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenCalledWith(
-      'Data dependent changes detected in file 20220823075011_uniq_name.sql: Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
+      'data dependent change detected: Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
       {
         file: '20220823075011_uniq_name.sql',
         startLine: 0,
-        title:
-          'Data dependent changes detected in file 20220823075011_uniq_name.sql'
+        title: 'data dependent change detected'
       }
     )
   })
@@ -484,12 +483,11 @@ describe('all reports with pull request', () => {
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenNthCalledWith(
       1,
-      'Data dependent changes detected in file 20220823075011_uniq_name.sql: Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
+      'data dependent change detected: Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
       {
         file: '20220823075011_uniq_name.sql',
         startLine: 0,
-        title:
-          'Data dependent changes detected in file 20220823075011_uniq_name.sql'
+        title: 'data dependent change detected'
       }
     )
     expect(spyOnNotice).toHaveBeenNthCalledWith(

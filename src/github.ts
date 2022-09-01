@@ -1,8 +1,8 @@
-import { error, getInput, notice } from '@actions/core'
+import { error, getInput, notice, summary } from '@actions/core'
 import { existsSync } from 'fs'
 import { stat } from 'fs/promises'
 import { simpleGit } from 'simple-git'
-import { AtlasResult } from './atlas'
+import { AtlasResult, Summary } from './atlas'
 import * as github from '@actions/github'
 
 export async function getWorkingDirectory(): Promise<string> {
@@ -68,4 +68,42 @@ export function report(res: AtlasResult): void {
     })
   }
   res.cloudURL && notice(`For full report visit: ${res.cloudURL}`)
+}
+
+export function summarize(s: Summary): void {
+  summary.addHeading('Atlas Lint Report')
+  summary.addEOL()
+  const steps = s?.Steps || []
+  interface cell {
+    data: string
+    header: boolean
+  }
+  type row = (cell | string)[]
+  const rows: row[] = [
+    [
+      { header: true, data: 'status' },
+      { header: true, data: 'Step' },
+      { header: true, data: 'Results' }
+    ]
+  ]
+  for (const step of steps) {
+    const reports = step.Result?.Reports || []
+    let emoj = '🟢'
+    if (reports.length && !step.Error) {
+      emoj = '🟡'
+    }
+    if (step.Error) {
+      emoj = '🔴'
+    }
+    const diags: string[] = []
+    for (const report of step.Result?.Reports || []) {
+      for (const diag of report.Diagnostics || []) {
+        diags.push(
+          `${diag.Text} (<a href="https://atlasgo.io/lint/analyzers#${diag.Code}">${diag.Code}</a>)`
+        )
+      }
+    }
+    rows.push([emoj, step.Name, step.Text, diags.join('\n\n')])
+  }
+  summary.addTable(rows)
 }

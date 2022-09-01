@@ -22,10 +22,23 @@ export interface AtlasResult {
   summary?: Summary
 }
 
+export interface Result {
+  Name: string
+  Text: string
+  Reports: Report[] | null
+}
+
+export interface Step {
+  Name: string
+  Text: string
+  Error: string
+  Result: Result | null
+}
+
 export interface Summary {
   Files: FileReport[]
   Env: unknown
-  Steps: unknown
+  Steps: Step[] | null
   Schema: unknown | null
 }
 
@@ -44,6 +57,7 @@ interface Report {
 interface Diagnostic {
   Pos: number
   Text: string
+  Code: string
 }
 
 export async function installAtlas(version: string): Promise<string> {

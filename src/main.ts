@@ -1,6 +1,6 @@
 import { AtlasResult, ExitCodes, installAtlas, runAtlas } from './atlas'
-import { getInput, info, setFailed } from '@actions/core'
-import { report } from './github'
+import { getInput, info, setFailed, summary } from '@actions/core'
+import { report, summarize } from './github'
 import { context } from '@actions/github'
 import { reportToCloud } from './cloud'
 
@@ -17,6 +17,10 @@ export async function run(): Promise<AtlasResult | void> {
       res.cloudURL = payload.createReport.url
     }
     report(res)
+    if (res.summary) {
+      summarize(res.summary)
+      await summary.write()
+    }
     if (res.exitCode !== ExitCodes.Success) {
       setFailed(`Atlas failed with code ${res.exitCode}: ${out}`)
     }

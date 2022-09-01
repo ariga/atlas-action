@@ -306,7 +306,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.report = exports.resolveGitBase = exports.getWorkingDirectory = void 0;
+exports.summarize = exports.report = exports.resolveGitBase = exports.getWorkingDirectory = void 0;
 const core_1 = __nccwpck_require__(2186);
 const fs_1 = __nccwpck_require__(7147);
 const promises_1 = __nccwpck_require__(3292);
@@ -383,6 +383,38 @@ function report(res) {
     res.cloudURL && (0, core_1.notice)(`For full report visit: ${res.cloudURL}`);
 }
 exports.report = report;
+function summarize(s) {
+    var _a, _b;
+    core_1.summary.addHeading('Atlas Lint Report');
+    core_1.summary.addEOL();
+    const steps = (s === null || s === void 0 ? void 0 : s.Steps) || [];
+    const rows = [
+        [
+            { header: true, data: 'status' },
+            { header: true, data: 'Step' },
+            { header: true, data: 'Results' }
+        ]
+    ];
+    for (const step of steps) {
+        const reports = ((_a = step.Result) === null || _a === void 0 ? void 0 : _a.Reports) || [];
+        let emoj = '🟢';
+        if (reports.length && !step.Error) {
+            emoj = '🟡';
+        }
+        if (step.Error) {
+            emoj = '🔴';
+        }
+        const diags = [];
+        for (const report of ((_b = step.Result) === null || _b === void 0 ? void 0 : _b.Reports) || []) {
+            for (const diag of report.Diagnostics || []) {
+                diags.push(`${diag.Text} (<a href="https://atlasgo.io/lint/analyzers#${diag.Code}">${diag.Code}</a>)`);
+            }
+        }
+        rows.push([emoj, step.Name, step.Text, diags.join('\n\n')]);
+    }
+    core_1.summary.addTable(rows);
+}
+exports.summarize = summarize;
 //# sourceMappingURL=github.js.map
 
 /***/ }),
@@ -423,6 +455,10 @@ function run() {
                 res.cloudURL = payload.createReport.url;
             }
             (0, github_1.report)(res);
+            if (res.summary) {
+                (0, github_1.summarize)(res.summary);
+                yield core_1.summary.write();
+            }
             if (res.exitCode !== atlas_1.ExitCodes.Success) {
                 (0, core_1.setFailed)(`Atlas failed with code ${res.exitCode}: ${out}`);
             }

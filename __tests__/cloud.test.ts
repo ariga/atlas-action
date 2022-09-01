@@ -55,7 +55,7 @@ describe('report to cloud', () => {
       summary: {
         Files: [{ Name: 'test', Text: 'test' }],
         Env: {},
-        Steps: {},
+        Steps: null,
         Schema: null
       }
     }
@@ -103,7 +103,7 @@ describe('report to cloud', () => {
       summary: {
         Files: [{ Name: 'test', Text: 'test' }],
         Env: {},
-        Steps: {},
+        Steps: null,
         Schema: null
       }
     }
@@ -143,7 +143,7 @@ describe('report to cloud', () => {
       summary: {
         Files: [{ Name: 'test', Text: 'test' }],
         Env: {},
-        Steps: {},
+        Steps: [],
         Schema: null
       }
     }
@@ -170,7 +170,7 @@ describe('report to cloud', () => {
       summary: {
         Files: [{ Name: 'test', Text: 'test' }],
         Env: {},
-        Steps: {},
+        Steps: [],
         Schema: null
       }
     }
