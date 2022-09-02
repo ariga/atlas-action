@@ -33,4 +33,13 @@ describe('summary', () => {
     const expected = await fs.readFile(path.join(dir, 'base.expected.txt'))
     expect(s).toEqual(expected.toString())
   })
+
+  test('err', async () => {
+    const f = await fs.readFile(path.join(dir, 'error.txt'))
+    const sum: Summary = JSON.parse(f.toString())
+    summarize(sum)
+    const s = summary.stringify()
+    const expected = await fs.readFile(path.join(dir, 'error.expected.txt'))
+    expect(s).toEqual(expected.toString())
+  })
 })

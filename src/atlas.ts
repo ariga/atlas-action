@@ -26,6 +26,7 @@ export interface Result {
   Name: string
   Text: string
   Reports: Report[] | null
+  Error: string
 }
 
 export interface Step {

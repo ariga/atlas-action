@@ -81,9 +81,9 @@ export function summarize(s: Summary): void {
   type row = (cell | string)[]
   const rows: row[] = [
     [
-      { header: true, data: 'status' },
+      { header: true, data: 'Status' },
       { header: true, data: 'Step' },
-      { header: true, data: 'Results' }
+      { header: true, data: 'Result' }
     ]
   ]
   for (const step of steps) {
@@ -92,7 +92,7 @@ export function summarize(s: Summary): void {
     if (reports.length && !step.Error) {
       emoj = '🟡'
     }
-    if (step.Error) {
+    if (step.Error || step.Result?.Error) {
       emoj = '🔴'
     }
     const diags: string[] = []
