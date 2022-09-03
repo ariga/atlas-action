@@ -372,7 +372,7 @@ describe('report to GitHub', () => {
     expect(spyOnNotice).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenCalledWith(
-      'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
+      'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries (MF101)\n\nDetails: https://atlasgo.io/lint/analyzers#MF101',
       {
         file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
         startLine: 1,
@@ -482,7 +482,7 @@ describe('all reports with pull request', () => {
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenNthCalledWith(
       1,
-      'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
+      'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries (MF101)\n\nDetails: https://atlasgo.io/lint/analyzers#MF101',
       {
         file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
         startLine: 1,
