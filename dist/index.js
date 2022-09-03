@@ -311,7 +311,9 @@ const core_1 = __nccwpck_require__(2186);
 const fs_1 = __nccwpck_require__(7147);
 const promises_1 = __nccwpck_require__(3292);
 const simple_git_1 = __nccwpck_require__(9103);
+const atlas_1 = __nccwpck_require__(1236);
 const github = __importStar(__nccwpck_require__(5438));
+const path = __importStar(__nccwpck_require__(1017));
 function getWorkingDirectory() {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
@@ -360,11 +362,12 @@ exports.resolveGitBase = resolveGitBase;
 function report(res) {
     var _a, _b, _c;
     for (const file of (_b = (_a = res === null || res === void 0 ? void 0 : res.summary) === null || _a === void 0 ? void 0 : _a.Files) !== null && _b !== void 0 ? _b : []) {
+        const fp = path.join((0, atlas_1.getMigrationDir)(), file.Name);
         if (file.Error) {
             (0, core_1.error)(file.Error, {
-                file: file.Name,
+                file: fp,
                 title: `Error in Migrations file`,
-                startLine: 0
+                startLine: 1 // temporarily
             });
             continue;
         }
@@ -372,9 +375,8 @@ function report(res) {
             var _a;
             (_a = report.Diagnostics) === null || _a === void 0 ? void 0 : _a.map(diagnostic => {
                 (0, core_1.notice)(`${report.Text}: ${diagnostic.Text}`, {
-                    // Atm we don't take into account the line number.
-                    startLine: 0,
-                    file: file.Name,
+                    startLine: 1,
+                    file: fp,
                     title: report.Text
                 });
             });

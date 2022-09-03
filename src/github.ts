@@ -2,8 +2,9 @@ import { error, getInput, notice, summary } from '@actions/core'
 import { existsSync } from 'fs'
 import { stat } from 'fs/promises'
 import { simpleGit } from 'simple-git'
-import { AtlasResult, Summary } from './atlas'
+import { AtlasResult, getMigrationDir, Summary } from './atlas'
 import * as github from '@actions/github'
+import * as path from 'path'
 
 export async function getWorkingDirectory(): Promise<string> {
   /**
@@ -48,20 +49,20 @@ export async function resolveGitBase(gitRoot: string): Promise<string> {
 
 export function report(res: AtlasResult): void {
   for (const file of res?.summary?.Files ?? []) {
+    const fp = path.join(getMigrationDir(), file.Name)
     if (file.Error) {
       error(file.Error, {
-        file: file.Name,
+        file: fp,
         title: `Error in Migrations file`,
-        startLine: 0
+        startLine: 1 // temporarily
       })
       continue
     }
     file?.Reports?.map(report => {
       report.Diagnostics?.map(diagnostic => {
         notice(`${report.Text}: ${diagnostic.Text}`, {
-          // Atm we don't take into account the line number.
-          startLine: 0,
-          file: file.Name,
+          startLine: 1,
+          file: fp,
           title: report.Text
         })
       })
