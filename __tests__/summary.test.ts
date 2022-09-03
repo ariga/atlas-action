@@ -37,8 +37,6 @@ describe('summary', () => {
   }
 
   test('base', testcase('base'))
-
   test('err', testcase('error'))
-
   test('checksum', testcase('checksum'))
 })
