@@ -1,0 +1,3 @@
+<h1>Atlas Lint Report</h1>
+
+<table><tr><th>Status</th><th>Step</th><th>Result</th></tr><tr><td>🟢</td><td>Migration Integrity Check</td><td>File atlas.sum is valid</td><td></tr><tr><td>🟢</td><td>Detect New Migration Files</td><td>Found 1 new migration files (from 4 total)</td><td></tr><tr><td>🟢</td><td>Replay Migration Files</td><td>Loaded 1 changes on dev database</td><td></tr><tr><td>🔴</td><td>Analyze 20220819081116_drop_orders_total.up.sql</td><td>1 reports were found in analysis</td><td>Dropping non-virtual column "total" (<a href="https://atlasgo.io/lint/analyzers#DS103">DS103</a>)</td></tr></table>

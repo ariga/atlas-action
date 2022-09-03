@@ -384,15 +384,15 @@ function report(res) {
 }
 exports.report = report;
 function summarize(s) {
-    var _a, _b;
+    var _a, _b, _c;
     core_1.summary.addHeading('Atlas Lint Report');
     core_1.summary.addEOL();
     const steps = (s === null || s === void 0 ? void 0 : s.Steps) || [];
     const rows = [
         [
-            { header: true, data: 'status' },
+            { header: true, data: 'Status' },
             { header: true, data: 'Step' },
-            { header: true, data: 'Results' }
+            { header: true, data: 'Result' }
         ]
     ];
     for (const step of steps) {
@@ -401,11 +401,11 @@ function summarize(s) {
         if (reports.length && !step.Error) {
             emoj = '🟡';
         }
-        if (step.Error) {
+        if (step.Error || ((_b = step.Result) === null || _b === void 0 ? void 0 : _b.Error)) {
             emoj = '🔴';
         }
         const diags = [];
-        for (const report of ((_b = step.Result) === null || _b === void 0 ? void 0 : _b.Reports) || []) {
+        for (const report of ((_c = step.Result) === null || _c === void 0 ? void 0 : _c.Reports) || []) {
             for (const diag of report.Diagnostics || []) {
                 diags.push(`${diag.Text} (<a href="https://atlasgo.io/lint/analyzers#${diag.Code}">${diag.Code}</a>)`);
             }
