@@ -50,17 +50,20 @@ export async function resolveGitBase(gitRoot: string): Promise<string> {
 export function report(res: AtlasResult): void {
   for (const file of res?.summary?.Files ?? []) {
     const fp = path.join(getMigrationDir(), file.Name)
+    let annotate = notice
     if (file.Error) {
-      error(file.Error, {
-        file: fp,
-        title: `Error in Migrations file`,
-        startLine: 1 // temporarily
-      })
+      annotate = error
+      if (!file.Reports?.length) {
+        error(file.Error, {
+          file: fp,
+          startLine: 1 // temporarily
+        })
+      }
       continue
     }
     file?.Reports?.map(report => {
       report.Diagnostics?.map(diagnostic => {
-        notice(`${report.Text}: ${diagnostic.Text}`, {
+        annotate(`${diagnostic.Text}`, {
           startLine: 1,
           file: fp,
           title: report.Text

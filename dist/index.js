@@ -360,21 +360,24 @@ function resolveGitBase(gitRoot) {
 }
 exports.resolveGitBase = resolveGitBase;
 function report(res) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     for (const file of (_b = (_a = res === null || res === void 0 ? void 0 : res.summary) === null || _a === void 0 ? void 0 : _a.Files) !== null && _b !== void 0 ? _b : []) {
         const fp = path.join((0, atlas_1.getMigrationDir)(), file.Name);
+        let annotate = core_1.notice;
         if (file.Error) {
-            (0, core_1.error)(file.Error, {
-                file: fp,
-                title: `Error in Migrations file`,
-                startLine: 1 // temporarily
-            });
+            annotate = core_1.error;
+            if (!((_c = file.Reports) === null || _c === void 0 ? void 0 : _c.length)) {
+                (0, core_1.error)(file.Error, {
+                    file: fp,
+                    startLine: 1 // temporarily
+                });
+            }
             continue;
         }
-        (_c = file === null || file === void 0 ? void 0 : file.Reports) === null || _c === void 0 ? void 0 : _c.map(report => {
+        (_d = file === null || file === void 0 ? void 0 : file.Reports) === null || _d === void 0 ? void 0 : _d.map(report => {
             var _a;
             (_a = report.Diagnostics) === null || _a === void 0 ? void 0 : _a.map(diagnostic => {
-                (0, core_1.notice)(`${report.Text}: ${diagnostic.Text}`, {
+                annotate(`${diagnostic.Text}`, {
                     startLine: 1,
                     file: fp,
                     title: report.Text
