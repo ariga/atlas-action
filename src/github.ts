@@ -63,7 +63,11 @@ export function report(res: AtlasResult): void {
     }
     file?.Reports?.map(report => {
       report.Diagnostics?.map(diagnostic => {
-        annotate(`${diagnostic.Text}`, {
+        let msg = diagnostic.Text
+        if (diagnostic.Code) {
+          msg = `${msg} (${diagnostic.Code})\n\nDetails: https://atlasgo.io/lint/analyzers#${diagnostic.Code}`
+        }
+        annotate(msg, {
           startLine: 1,
           file: fp,
           title: report.Text
