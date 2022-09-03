@@ -397,7 +397,8 @@ function summarize(s) {
         [
             { header: true, data: 'Status' },
             { header: true, data: 'Step' },
-            { header: true, data: 'Result' }
+            { header: true, data: 'Result' },
+            { header: true, data: 'Diagnostics' }
         ]
     ];
     for (const step of steps) {

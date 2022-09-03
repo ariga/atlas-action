@@ -87,7 +87,8 @@ export function summarize(s: Summary): void {
     [
       { header: true, data: 'Status' },
       { header: true, data: 'Step' },
-      { header: true, data: 'Result' }
+      { header: true, data: 'Result' },
+      { header: true, data: 'Diagnostics' }
     ]
   ]
   for (const step of steps) {
