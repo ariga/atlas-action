@@ -372,10 +372,10 @@ describe('report to GitHub', () => {
     expect(spyOnNotice).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenCalledWith(
-      'data dependent change detected: Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
+      'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
       {
-        file: '20220823075011_uniq_name.sql',
-        startLine: 0,
+        file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
+        startLine: 1,
         title: 'data dependent change detected'
       }
     )
@@ -394,9 +394,8 @@ describe('report to GitHub', () => {
     expect(spyOnError).toHaveBeenCalledWith(
       'executing statement: near "BAD": syntax error',
       {
-        file: '20220318104614_initial.sql',
-        startLine: 0,
-        title: 'Error in Migrations file'
+        file: '__tests__/testdata/sqlite-broken-file/20220318104614_initial.sql',
+        startLine: 1
       }
     )
     expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
@@ -483,10 +482,10 @@ describe('all reports with pull request', () => {
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenNthCalledWith(
       1,
-      'data dependent change detected: Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
+      'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries',
       {
-        file: '20220823075011_uniq_name.sql',
-        startLine: 0,
+        file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
+        startLine: 1,
         title: 'data dependent change detected'
       }
     )

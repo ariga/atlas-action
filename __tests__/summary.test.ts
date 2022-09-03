@@ -25,21 +25,18 @@ describe('summary', () => {
     await summary.clear()
   })
 
-  test('base', async () => {
-    const f = await fs.readFile(path.join(dir, 'base.txt'))
-    const sum: Summary = JSON.parse(f.toString())
-    summarize(sum)
-    const s = summary.stringify()
-    const expected = await fs.readFile(path.join(dir, 'base.expected.txt'))
-    expect(s).toEqual(expected.toString())
-  })
+  const testcase = (name: string) => {
+    return async () => {
+      const f = await fs.readFile(path.join(dir, `${name}.txt`))
+      const sum: Summary = JSON.parse(f.toString())
+      summarize(sum)
+      const s = summary.stringify()
+      const expected = await fs.readFile(path.join(dir, `${name}.expected.txt`))
+      expect(s).toEqual(expected.toString())
+    }
+  }
 
-  test('err', async () => {
-    const f = await fs.readFile(path.join(dir, 'error.txt'))
-    const sum: Summary = JSON.parse(f.toString())
-    summarize(sum)
-    const s = summary.stringify()
-    const expected = await fs.readFile(path.join(dir, 'error.expected.txt'))
-    expect(s).toEqual(expected.toString())
-  })
+  test('base', testcase('base'))
+  test('err', testcase('error'))
+  test('checksum', testcase('checksum'))
 })
