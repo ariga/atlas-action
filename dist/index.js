@@ -377,7 +377,11 @@ function report(res) {
         (_d = file === null || file === void 0 ? void 0 : file.Reports) === null || _d === void 0 ? void 0 : _d.map(report => {
             var _a;
             (_a = report.Diagnostics) === null || _a === void 0 ? void 0 : _a.map(diagnostic => {
-                annotate(`${diagnostic.Text}`, {
+                let msg = diagnostic.Text;
+                if (diagnostic.Code) {
+                    msg = `${msg} (${diagnostic.Code})\n\nDetails: https://atlasgo.io/lint/analyzers#${diagnostic.Code}`;
+                }
+                annotate(msg, {
                     startLine: 1,
                     file: fp,
                     title: report.Text
