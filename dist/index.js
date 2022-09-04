@@ -424,7 +424,7 @@ function summarize(s, cloudURL) {
     }
     core_1.summary.addTable(rows);
     if (cloudURL) {
-        core_1.summary.addLink("Full Report", cloudURL);
+        core_1.summary.addLink('Full Report', cloudURL);
     }
 }
 exports.summarize = summarize;
