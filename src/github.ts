@@ -78,7 +78,7 @@ export function report(res: AtlasResult): void {
   res.cloudURL && notice(`For full report visit: ${res.cloudURL}`)
 }
 
-export function summarize(s: Summary): void {
+export function summarize(s: Summary, cloudURL?: string): void {
   summary.addHeading('Atlas Lint Report')
   summary.addEOL()
   const steps = s?.Steps || []
@@ -115,4 +115,7 @@ export function summarize(s: Summary): void {
     rows.push([emoj, step.Name, step.Text, diags.join('\n\n')])
   }
   summary.addTable(rows)
+  if (cloudURL) {
+    summary.addLink('Full Report', cloudURL)
+  }
 }
