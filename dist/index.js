@@ -359,22 +359,22 @@ function resolveGitBase(gitRoot) {
     });
 }
 exports.resolveGitBase = resolveGitBase;
-function report(res) {
-    var _a, _b, _c, _d;
-    for (const file of (_b = (_a = res === null || res === void 0 ? void 0 : res.summary) === null || _a === void 0 ? void 0 : _a.Files) !== null && _b !== void 0 ? _b : []) {
+function report(s, cloudURL) {
+    var _a, _b, _c;
+    for (const file of (_a = s === null || s === void 0 ? void 0 : s.Files) !== null && _a !== void 0 ? _a : []) {
         const fp = path.join((0, atlas_1.getMigrationDir)(), file.Name);
         let annotate = core_1.notice;
         if (file.Error) {
             annotate = core_1.error;
-            if (!((_c = file.Reports) === null || _c === void 0 ? void 0 : _c.length)) {
+            if (!((_b = file.Reports) === null || _b === void 0 ? void 0 : _b.length)) {
                 (0, core_1.error)(file.Error, {
                     file: fp,
                     startLine: 1 // temporarily
                 });
+                continue;
             }
-            continue;
         }
-        (_d = file === null || file === void 0 ? void 0 : file.Reports) === null || _d === void 0 ? void 0 : _d.map(report => {
+        (_c = file === null || file === void 0 ? void 0 : file.Reports) === null || _c === void 0 ? void 0 : _c.map(report => {
             var _a;
             (_a = report.Diagnostics) === null || _a === void 0 ? void 0 : _a.map(diagnostic => {
                 let msg = diagnostic.Text;
@@ -389,7 +389,9 @@ function report(res) {
             });
         });
     }
-    res.cloudURL && (0, core_1.notice)(`For full report visit: ${res.cloudURL}`);
+    if (cloudURL) {
+        (0, core_1.notice)(`For full report visit: ${cloudURL}`);
+    }
 }
 exports.report = report;
 function summarize(s, cloudURL) {
@@ -467,7 +469,7 @@ function run() {
             if (payload) {
                 res.cloudURL = payload.createReport.url;
             }
-            (0, github_1.report)(res);
+            (0, github_1.report)(res.summary, res.cloudURL);
             if (res.summary) {
                 (0, github_1.summarize)(res.summary);
                 yield core_1.summary.write();

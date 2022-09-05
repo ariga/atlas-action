@@ -16,7 +16,7 @@ export async function run(): Promise<AtlasResult | void> {
     if (payload) {
       res.cloudURL = payload.createReport.url
     }
-    report(res)
+    report(res.summary, res.cloudURL)
     if (res.summary) {
       summarize(res.summary)
       await summary.write()

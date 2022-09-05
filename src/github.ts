@@ -2,7 +2,7 @@ import { error, getInput, notice, summary } from '@actions/core'
 import { existsSync } from 'fs'
 import { stat } from 'fs/promises'
 import { simpleGit } from 'simple-git'
-import { AtlasResult, getMigrationDir, Summary } from './atlas'
+import { getMigrationDir, Summary } from './atlas'
 import * as github from '@actions/github'
 import * as path from 'path'
 
@@ -47,8 +47,8 @@ export async function resolveGitBase(gitRoot: string): Promise<string> {
   return baseBranch
 }
 
-export function report(res: AtlasResult): void {
-  for (const file of res?.summary?.Files ?? []) {
+export function report(s?: Summary, cloudURL?: string): void {
+  for (const file of s?.Files ?? []) {
     const fp = path.join(getMigrationDir(), file.Name)
     let annotate = notice
     if (file.Error) {
@@ -58,8 +58,8 @@ export function report(res: AtlasResult): void {
           file: fp,
           startLine: 1 // temporarily
         })
+        continue
       }
-      continue
     }
     file?.Reports?.map(report => {
       report.Diagnostics?.map(diagnostic => {
@@ -75,7 +75,9 @@ export function report(res: AtlasResult): void {
       })
     })
   }
-  res.cloudURL && notice(`For full report visit: ${res.cloudURL}`)
+  if (cloudURL) {
+    notice(`For full report visit: ${cloudURL}`)
+  }
 }
 
 export function summarize(s: Summary, cloudURL?: string): void {
