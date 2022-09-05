@@ -25,11 +25,11 @@ describe('summary', () => {
     await summary.clear()
   })
 
-  const testcase = (name: string) => {
+  const testcase = (name: string, cloudURL?: string) => {
     return async () => {
       const f = await fs.readFile(path.join(dir, `${name}.txt`))
       const sum: Summary = JSON.parse(f.toString())
-      summarize(sum)
+      summarize(sum, cloudURL)
       const s = summary.stringify()
       const expected = await fs.readFile(path.join(dir, `${name}.expected.txt`))
       expect(s).toEqual(expected.toString())
@@ -39,4 +39,5 @@ describe('summary', () => {
   test('base', testcase('base'))
   test('err', testcase('error'))
   test('checksum', testcase('checksum'))
+  test('cloudURL', testcase('cloudurl', 'https://tenant.ariga.cloud/ci/123'))
 })

@@ -392,7 +392,7 @@ function report(res) {
     res.cloudURL && (0, core_1.notice)(`For full report visit: ${res.cloudURL}`);
 }
 exports.report = report;
-function summarize(s) {
+function summarize(s, cloudURL) {
     var _a, _b, _c;
     core_1.summary.addHeading('Atlas Lint Report');
     core_1.summary.addEOL();
@@ -423,6 +423,9 @@ function summarize(s) {
         rows.push([emoj, step.Name, step.Text, diags.join('\n\n')]);
     }
     core_1.summary.addTable(rows);
+    if (cloudURL) {
+        core_1.summary.addLink('Full Report', cloudURL);
+    }
 }
 exports.summarize = summarize;
 //# sourceMappingURL=github.js.map
