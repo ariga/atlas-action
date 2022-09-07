@@ -99,12 +99,12 @@ export function summarize(s: Summary, cloudURL?: string): void {
   ]
   for (const step of steps) {
     const reports = step.Result?.Reports || []
-    let emoj = '🟢'
+    let status = 'success'
     if (reports.length && !step.Error) {
-      emoj = '🟡'
+      status = 'warning'
     }
     if (step.Error || step.Result?.Error) {
-      emoj = '🔴'
+      status = 'error'
     }
     const diags: string[] = []
     for (const report of step.Result?.Reports || []) {
@@ -114,10 +114,14 @@ export function summarize(s: Summary, cloudURL?: string): void {
         )
       }
     }
-    rows.push([emoj, step.Name, step.Text, diags.join('\n\n')])
+    rows.push([icon(status), step.Name, step.Text, diags.join('\n\n')])
   }
   summary.addTable(rows)
   if (cloudURL) {
     summary.addLink('Full Report', cloudURL)
   }
+}
+
+function icon(n: string): string {
+  return `<div align="center"><img src="https://release.ariga.io/images/assets/${n}.svg" /></div>`
 }
