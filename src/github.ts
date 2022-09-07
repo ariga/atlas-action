@@ -123,5 +123,5 @@ export function summarize(s: Summary, cloudURL?: string): void {
 }
 
 function icon(n: string): string {
-  return `<img src="https://release.ariga.io/images/assets/${n}.svg" />`
+  return `<div align="center"><img src="https://release.ariga.io/images/assets/${n}.svg" /></div>`
 }

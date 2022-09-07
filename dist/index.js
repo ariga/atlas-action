@@ -431,7 +431,7 @@ function summarize(s, cloudURL) {
 }
 exports.summarize = summarize;
 function icon(n) {
-    return `<img src="https://release.ariga.io/images/assets/${n}.svg" />`;
+    return `<div align="center"><img src="https://release.ariga.io/images/assets/${n}.svg" /></div>`;
 }
 //# sourceMappingURL=github.js.map
 
