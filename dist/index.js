@@ -404,12 +404,12 @@ function summarize(s, cloudURL) {
     ];
     for (const step of steps) {
         const reports = ((_a = step.Result) === null || _a === void 0 ? void 0 : _a.Reports) || [];
-        let emoj = '🟢';
+        let status = 'success';
         if (reports.length && !step.Error) {
-            emoj = '🟡';
+            status = 'warning';
         }
         if (step.Error || ((_b = step.Result) === null || _b === void 0 ? void 0 : _b.Error)) {
-            emoj = '🔴';
+            status = 'error';
         }
         const diags = [];
         for (const report of ((_c = step.Result) === null || _c === void 0 ? void 0 : _c.Reports) || []) {
@@ -417,7 +417,7 @@ function summarize(s, cloudURL) {
                 diags.push(`${diag.Text} (<a href="https://atlasgo.io/lint/analyzers#${diag.Code}">${diag.Code}</a>)`);
             }
         }
-        rows.push([emoj, step.Name, step.Text, diags.join('\n\n')]);
+        rows.push([icon(status), step.Name, step.Text, diags.join('\n\n')]);
     }
     core_1.summary.addTable(rows);
     if (cloudURL) {
@@ -425,6 +425,9 @@ function summarize(s, cloudURL) {
     }
 }
 exports.summarize = summarize;
+function icon(n) {
+    return `<div align="center"><img src="https://release.ariga.io/images/assets/${n}.svg" /></div>`;
+}
 //# sourceMappingURL=github.js.map
 
 /***/ }),
@@ -446,7 +449,7 @@ function OptionsFromEnv(env) {
         schemaInsights: true,
         arigaToken: input('ariga-token'),
         arigaURL: input('ariga-url'),
-        latest: 0,
+        latest: 0
     };
     if (input('latest').length) {
         const i = parseInt(input('latest'), 10);
