@@ -53,37 +53,33 @@ function installAtlas(version) {
     });
 }
 exports.installAtlas = installAtlas;
-function runAtlas(bin) {
+function runAtlas(bin, opts) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
-        const dir = getMigrationDir();
-        const devURL = (0, core_1.getInput)('dev-url');
-        const runLatest = Number((0, core_1.getInput)('latest'));
-        const dirFormat = (0, core_1.getInput)('dir-format');
-        const schemaInsights = (0, core_1.getInput)('schema-insights');
+        const dir = getMigrationDir(opts.dir);
         const gitRoot = path_1.default.resolve(yield (0, github_1.getWorkingDirectory)());
         (0, core_1.info)(`Migrations Directory: ${dir}`);
-        (0, core_1.info)(`Dev Database: ${devURL}`);
+        (0, core_1.info)(`Dev Database: ${opts.devUrl}`);
         (0, core_1.info)(`Git Root: ${gitRoot}`);
-        (0, core_1.info)(`Latest Param: ${runLatest}`);
-        (0, core_1.info)(`Dir Format: ${dirFormat}`);
-        (0, core_1.info)(`Schema Insights: ${schemaInsights}`);
+        (0, core_1.info)(`Latest Param: ${opts.latest}`);
+        (0, core_1.info)(`Dir Format: ${opts.dirFormat}`);
+        (0, core_1.info)(`Schema Insights: ${opts.schemaInsights}`);
         const args = [
             'migrate',
             'lint',
             '--dir',
             `file://${dir}`,
             '--dev-url',
-            devURL,
+            opts.devUrl,
             '--git-dir',
             gitRoot,
             '--log',
             '{{ json . }}',
             '--dir-format',
-            dirFormat
+            opts.dirFormat
         ];
-        if (!isNaN(runLatest) && runLatest > 0) {
-            args.push('--latest', runLatest.toString());
+        if (opts.latest > 0) {
+            args.push('--latest', opts.latest.toString());
         }
         else {
             args.push('--git-base', `origin/${yield (0, github_1.resolveGitBase)(gitRoot)}`);
@@ -99,7 +95,7 @@ function runAtlas(bin) {
         if (res.stdout && res.stdout.length > 0) {
             try {
                 a.summary = JSON.parse(res.stdout);
-                if (schemaInsights == 'true') {
+                if (opts.schemaInsights) {
                     return a;
                 }
                 if ((_a = a.summary) === null || _a === void 0 ? void 0 : _a.Schema) {
@@ -122,8 +118,7 @@ function getUserAgent() {
     };
 }
 exports.getUserAgent = getUserAgent;
-function getMigrationDir() {
-    const dir = (0, core_1.getInput)('dir');
+function getMigrationDir(dir) {
     if (!dir || !(0, io_util_1.exists)(dir)) {
         throw new Error(`Migration directory ${dir} doesn't exist`);
     }
@@ -201,13 +196,13 @@ var Status;
     Status["Success"] = "SUCCESSFUL";
     Status["Failure"] = "FAILED";
 })(Status = exports.Status || (exports.Status = {}));
-function getMutationVariables(res) {
+function getMutationVariables(opts, res) {
     var _a, _b, _c, _d, _e, _f, _g, _h;
     const { GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID } = process.env;
     // GITHUB_HEAD_REF is set only on pull requests
     // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
     const sourceBranch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
-    const migrationDir = (0, atlas_1.getMigrationDir)().replace('file://', '');
+    const migrationDir = (0, atlas_1.getMigrationDir)(opts.dir).replace('file://', '');
     (0, core_1.info)(`Run metadata: ${JSON.stringify({ repository, commitID, sourceBranch, migrationDir }, null, 2)}`);
     return {
         input: {
@@ -221,7 +216,7 @@ function getMutationVariables(res) {
         }
     };
 }
-function reportToCloud(res) {
+function reportToCloud(opts, res) {
     return __awaiter(this, void 0, void 0, function* () {
         const token = (0, core_1.getInput)('ariga-token');
         if (!token) {
@@ -231,7 +226,7 @@ function reportToCloud(res) {
         (0, core_1.info)(`Reporting to cloud: ${getCloudURL()}`);
         (0, core_1.setSecret)(token);
         try {
-            return yield (0, graphql_request_1.request)(getCloudURL(), exports.mutation, getMutationVariables(res), getHeaders(token));
+            return yield (0, graphql_request_1.request)(getCloudURL(), exports.mutation, getMutationVariables(opts, res), getHeaders(token));
         }
         catch (e) {
             let errMsg = e;
@@ -359,10 +354,10 @@ function resolveGitBase(gitRoot) {
     });
 }
 exports.resolveGitBase = resolveGitBase;
-function report(s, cloudURL) {
+function report(opts, s, cloudURL) {
     var _a, _b, _c;
     for (const file of (_a = s === null || s === void 0 ? void 0 : s.Files) !== null && _a !== void 0 ? _a : []) {
-        const fp = path.join((0, atlas_1.getMigrationDir)(), file.Name);
+        const fp = path.join((0, atlas_1.getMigrationDir)(opts.dir), file.Name);
         let annotate = core_1.notice;
         if (file.Error) {
             annotate = core_1.error;
@@ -437,6 +432,48 @@ function icon(n) {
 
 /***/ }),
 
+/***/ 1044:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.OptionsFromEnv = void 0;
+function OptionsFromEnv(env) {
+    const input = (name) => env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || '';
+    const opts = {
+        atlasVersion: input('atlas-version'),
+        dir: input('dir'),
+        dirFormat: input('dir-format'),
+        devUrl: input('dev-url'),
+        schemaInsights: true,
+        arigaToken: input('ariga-token'),
+        arigaURL: input('ariga-url'),
+        latest: 0
+    };
+    if (input('latest').length) {
+        const i = parseInt(input('latest'), 10);
+        if (isNaN(i)) {
+            throw new Error('expected "latest" to be a number');
+        }
+        opts.latest = i;
+    }
+    if (input('schema-insights') == 'false') {
+        opts.schemaInsights = false;
+    }
+    if (input('ariga-token')) {
+        opts.arigaToken = input('ariga-token');
+    }
+    if (input('ariga-url')) {
+        opts.arigaToken = input('ariga-url');
+    }
+    return opts;
+}
+exports.OptionsFromEnv = OptionsFromEnv;
+//# sourceMappingURL=input.js.map
+
+/***/ }),
+
 /***/ 9536:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -458,21 +495,22 @@ const core_1 = __nccwpck_require__(2186);
 const github_1 = __nccwpck_require__(5865);
 const github_2 = __nccwpck_require__(5438);
 const cloud_1 = __nccwpck_require__(217);
+const input_1 = __nccwpck_require__(1044);
 // Entry point for GitHub Action runner.
-function run() {
+function run(opts) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const bin = yield (0, atlas_1.installAtlas)((0, core_1.getInput)('atlas-version'));
-            const res = yield (0, atlas_1.runAtlas)(bin);
+            const bin = yield (0, atlas_1.installAtlas)(opts.atlasVersion);
+            const res = yield (0, atlas_1.runAtlas)(bin, opts);
             const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw;
             (0, core_1.info)(`\nAtlas output:\n${out}`);
             (0, core_1.info)(`Event type: ${github_2.context.eventName}`);
-            const payload = yield (0, cloud_1.reportToCloud)(res);
+            const payload = yield (0, cloud_1.reportToCloud)(opts, res);
             if (payload) {
                 res.cloudURL = payload.createReport.url;
             }
-            (0, github_1.report)(res.summary, res.cloudURL);
+            (0, github_1.report)(opts, res.summary, res.cloudURL);
             if (res.summary) {
                 (0, github_1.summarize)(res.summary);
                 yield core_1.summary.write();
@@ -488,7 +526,8 @@ function run() {
     });
 }
 exports.run = run;
-run();
+const opts = (0, input_1.OptionsFromEnv)(process.env);
+run(opts);
 //# sourceMappingURL=main.js.map
 
 /***/ }),

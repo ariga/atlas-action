@@ -1,7 +1,7 @@
 import { resolveGitBase } from '../src/github'
 import { simpleGit } from 'simple-git'
 import { expect } from '@jest/globals'
-import { createTestENV, GithubEventName } from './env'
+import { createTestEnv, GithubEventName } from './env'
 import * as github from '@actions/github'
 
 jest.setTimeout(30000)
@@ -11,7 +11,7 @@ describe('resolve git base', () => {
   let cleanupFn: () => Promise<void>, base: string
 
   beforeEach(async () => {
-    const { cleanup, env } = await createTestENV({
+    const { cleanup, env } = await createTestEnv({
       override: {
         // Remove base ref since GitHub action sets it.
         GITHUB_BASE_REF: ''
@@ -50,7 +50,7 @@ describe('resolve git base', () => {
   })
 
   test('base from context', async () => {
-    await createTestENV({ eventName: GithubEventName.Push })
+    await createTestEnv({ eventName: GithubEventName.Push })
     process.env.GITHUB_BASE_REF = ''
     await expect(resolveGitBase(base)).resolves.toBe('master')
   })

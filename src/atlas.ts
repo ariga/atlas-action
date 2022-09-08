@@ -1,10 +1,11 @@
-import { getInput, info, warning } from '@actions/core'
+import { info, warning } from '@actions/core'
 import { downloadTool } from '@actions/tool-cache'
 import { exec, getExecOutput } from '@actions/exec'
 import { getWorkingDirectory, resolveGitBase } from './github'
 import { exists } from '@actions/io/lib/io-util'
 import { getDownloadURL } from './cloud'
 import path from 'path'
+import { Options } from './input'
 
 // Remove Atlas update messages.
 process.env.ATLAS_NO_UPDATE_NOTIFIER = '1'
@@ -76,19 +77,19 @@ export async function installAtlas(version: string): Promise<string> {
   return bin
 }
 
-export async function runAtlas(bin: string): Promise<AtlasResult> {
-  const dir = getMigrationDir()
-  const devURL = getInput('dev-url')
-  const runLatest = Number(getInput('latest'))
-  const dirFormat = getInput('dir-format')
-  const schemaInsights = getInput('schema-insights')
+export async function runAtlas(
+  bin: string,
+  opts: Options
+): Promise<AtlasResult> {
+  const dir = getMigrationDir(opts.dir)
+
   const gitRoot = path.resolve(await getWorkingDirectory())
   info(`Migrations Directory: ${dir}`)
-  info(`Dev Database: ${devURL}`)
+  info(`Dev Database: ${opts.devUrl}`)
   info(`Git Root: ${gitRoot}`)
-  info(`Latest Param: ${runLatest}`)
-  info(`Dir Format: ${dirFormat}`)
-  info(`Schema Insights: ${schemaInsights}`)
+  info(`Latest Param: ${opts.latest}`)
+  info(`Dir Format: ${opts.dirFormat}`)
+  info(`Schema Insights: ${opts.schemaInsights}`)
 
   const args = [
     'migrate',
@@ -96,16 +97,16 @@ export async function runAtlas(bin: string): Promise<AtlasResult> {
     '--dir',
     `file://${dir}`,
     '--dev-url',
-    devURL,
+    opts.devUrl,
     '--git-dir',
     gitRoot,
     '--log',
     '{{ json . }}',
     '--dir-format',
-    dirFormat
+    opts.dirFormat
   ]
-  if (!isNaN(runLatest) && runLatest > 0) {
-    args.push('--latest', runLatest.toString())
+  if (opts.latest > 0) {
+    args.push('--latest', opts.latest.toString())
   } else {
     args.push('--git-base', `origin/${await resolveGitBase(gitRoot)}`)
   }
@@ -120,7 +121,7 @@ export async function runAtlas(bin: string): Promise<AtlasResult> {
   if (res.stdout && res.stdout.length > 0) {
     try {
       a.summary = JSON.parse(res.stdout)
-      if (schemaInsights == 'true') {
+      if (opts.schemaInsights) {
         return a
       }
       if (a.summary?.Schema) {
@@ -140,8 +141,7 @@ export function getUserAgent(): { 'User-Agent': string } {
   }
 }
 
-export function getMigrationDir(): string {
-  const dir = getInput('dir')
+export function getMigrationDir(dir: string): string {
   if (!dir || !exists(dir)) {
     throw new Error(`Migration directory ${dir} doesn't exist`)
   }

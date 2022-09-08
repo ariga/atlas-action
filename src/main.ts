@@ -1,22 +1,23 @@
 import { AtlasResult, ExitCodes, installAtlas, runAtlas } from './atlas'
-import { getInput, info, setFailed, summary } from '@actions/core'
+import { info, setFailed, summary } from '@actions/core'
 import { report, summarize } from './github'
 import { context } from '@actions/github'
 import { reportToCloud } from './cloud'
+import { Options, OptionsFromEnv } from './input'
 
 // Entry point for GitHub Action runner.
-export async function run(): Promise<AtlasResult | void> {
+export async function run(opts: Options): Promise<AtlasResult | void> {
   try {
-    const bin = await installAtlas(getInput('atlas-version'))
-    const res = await runAtlas(bin)
+    const bin = await installAtlas(opts.atlasVersion)
+    const res = await runAtlas(bin, opts)
     const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw
     info(`\nAtlas output:\n${out}`)
     info(`Event type: ${context.eventName}`)
-    const payload = await reportToCloud(res)
+    const payload = await reportToCloud(opts, res)
     if (payload) {
       res.cloudURL = payload.createReport.url
     }
-    report(res.summary, res.cloudURL)
+    report(opts, res.summary, res.cloudURL)
     if (res.summary) {
       summarize(res.summary)
       await summary.write()
@@ -30,4 +31,5 @@ export async function run(): Promise<AtlasResult | void> {
   }
 }
 
-run()
+const opts: Options = OptionsFromEnv(process.env)
+run(opts)

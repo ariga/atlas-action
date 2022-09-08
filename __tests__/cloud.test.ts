@@ -5,7 +5,8 @@ import * as http from '@actions/http-client'
 import nock from 'nock'
 import * as core from '@actions/core'
 import * as gql from 'graphql-request'
-import { createTestENV } from './env'
+import { createTestEnv } from './env'
+import { OptionsFromEnv, Options } from '../src/input'
 
 jest.setTimeout(30000)
 
@@ -16,7 +17,7 @@ describe('report to cloud', () => {
 
   beforeEach(async () => {
     spyOnWarning = jest.spyOn(core, 'warning')
-    const { env, cleanup } = await createTestENV({
+    const { env, cleanup } = await createTestEnv({
       override: {
         GITHUB_REPOSITORY: 'someProject/someRepo',
         GITHUB_SHA: '71d0bfc1',
@@ -68,8 +69,8 @@ describe('report to cloud', () => {
       }
     })
     const spyOnRequest = jest.spyOn(gql, 'request')
-
-    const payload = await reportToCloud(res)
+    let opts: Options = OptionsFromEnv(process.env)
+    const payload = await reportToCloud(opts, res)
     expect(payload).toBeTruthy()
     expect(payload?.createReport.url).toEqual(cloudURL)
     expect(payload?.createReport.runID).toEqual('8589934593')
@@ -84,7 +85,9 @@ describe('report to cloud', () => {
           commit: process.env.GITHUB_SHA,
           envName: 'CI',
           payload: '[{"Name":"test","Text":"test"}]',
-          projectName: `${process.env.GITHUB_REPOSITORY}/${getMigrationDir()}`,
+          projectName: `${process.env.GITHUB_REPOSITORY}/${getMigrationDir(
+            opts.dir
+          )}`,
           status: Status.Success,
           url: 'https://github.com/ariga/atlas-action/pull/1'
         }
@@ -114,7 +117,8 @@ describe('report to cloud', () => {
 
     const spyOnRequest = jest.spyOn(gql, 'request')
 
-    await reportToCloud(res)
+    let opts: Options = OptionsFromEnv(process.env)
+    const payload = await reportToCloud(opts, res)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
     expect(spyOnRequest).toHaveBeenCalledWith(
@@ -153,7 +157,8 @@ describe('report to cloud', () => {
     )
     const spyOnRequest = jest.spyOn(gql, 'request')
 
-    await reportToCloud(res)
+    let opts: Options = OptionsFromEnv(process.env)
+    const payload = await reportToCloud(opts, res)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
     expect(spyOnWarning).toHaveBeenCalledTimes(2)
@@ -175,7 +180,8 @@ describe('report to cloud', () => {
       }
     }
     const spyOnRequest = jest.spyOn(gql, 'request')
-    await reportToCloud(res)
+    let opts: Options = OptionsFromEnv(process.env)
+    const payload = await reportToCloud(opts, res)
     expect(spyOnRequest).not.toHaveBeenCalled()
     expect(spyOnWarning).toHaveBeenCalledTimes(1)
     expect(spyOnWarning).toHaveBeenCalledWith(

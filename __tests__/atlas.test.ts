@@ -26,8 +26,9 @@ import {
   Status
 } from '../src/cloud'
 import { Variables } from 'graphql-request/src/types'
-import { createTestENV, GithubEventName } from './env'
+import { createTestEnv, GithubEventName } from './env'
 import { getInput } from '@actions/core'
+import { OptionsFromEnv } from '../src/input'
 
 jest.mock('../src/cloud', () => {
   const actual = jest.requireActual('../src/cloud')
@@ -48,7 +49,7 @@ describe('install', () => {
   let version: string
 
   beforeEach(async () => {
-    const { env, cleanup } = await createTestENV()
+    const { env, cleanup } = await createTestEnv()
     process.env = env
     version = getInput('atlas-version')
     cleanupFn = cleanup
@@ -93,7 +94,7 @@ describe('run with "latest" flag', () => {
   let spyOnSetFailed: jest.SpyInstance, cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    const { env, cleanup } = await createTestENV({
+    const { env, cleanup } = await createTestEnv({
       override: {
         INPUT_LATEST: '1',
         'INPUT_SCHEMA-INSIGHTS': 'false'
@@ -116,7 +117,8 @@ describe('run with "latest" flag', () => {
     const migrationsDir = path.join(process.env.RUNNER_TEMP, 'migrations')
     await mkdir(migrationsDir)
     process.env.INPUT_DIR = migrationsDir
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(res.summary?.Files).toBeUndefined()
     expect(res.summary?.Schema).toBeNull()
@@ -166,7 +168,8 @@ describe('run with "latest" flag', () => {
       'testdata',
       'sqlite-wrong-sum'
     )
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Failure)
     const expected = {
       Env: {
@@ -214,7 +217,8 @@ describe('run with "latest" flag', () => {
       'sqlite-with-diagnostics'
     )
 
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
   })
 
@@ -222,7 +226,8 @@ describe('run with "latest" flag', () => {
     process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
     process.env['INPUT_DIR-FORMAT'] = 'golang-migrate'
     process.env['INPUT_LATEST'] = '4'
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Success)
     expect(res.summary?.Files).toEqual([
       {
@@ -241,7 +246,8 @@ describe('run with "latest" flag', () => {
     // Actions creates an environment variables for inputs (in action.yaml), syntax: INPUT_<VARIABLE-NAME>.
     process.env['INPUT_DIR-FORMAT'] = 'incorrect'
     process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'golang-migrate')
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toEqual(ExitCodes.Failure)
     expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
     expect(spyOnSetFailed).toHaveBeenCalledWith(
@@ -259,7 +265,7 @@ describe('run with mock repo', () => {
     gitRepo = await mkdtemp(`${tmpdir()}${path.sep}`)
     const migrationsDir = path.join(gitRepo, 'migrations')
     await mkdir(migrationsDir)
-    const { env, cleanup } = await createTestENV({
+    const { env, cleanup } = await createTestEnv({
       override: {
         GITHUB_BASE_REF: baseBranch,
         INPUT_LATEST: '0',
@@ -315,7 +321,8 @@ describe('run with mock repo', () => {
   })
 
   test('successful', async () => {
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Failure)
     expect(res.summary?.Files).toHaveLength(1)
     expect(res.summary?.Files[0].Name).toBe('20220728131023.sql')
@@ -340,7 +347,7 @@ describe('report to GitHub', () => {
     cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    const { env, cleanup } = await createTestENV({
+    const { env, cleanup } = await createTestEnv({
       override: {
         INPUT_LATEST: '1',
         'INPUT_SCHEMA-INSIGHTS': 'false'
@@ -367,7 +374,8 @@ describe('report to GitHub', () => {
       'testdata',
       'sqlite-with-diagnostics'
     )
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(spyOnNotice).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledTimes(0)
@@ -387,7 +395,8 @@ describe('report to GitHub', () => {
       'testdata',
       'sqlite-broken-file'
     )
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Failure)
     expect(spyOnNotice).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(1)
@@ -403,7 +412,8 @@ describe('report to GitHub', () => {
 
   test('atlas unknown error - no report', async () => {
     process.env.INPUT_DIR = path.join('__tests__', 'testdata', 'nothing-here')
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Failure)
     expect(spyOnNotice).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(0)
@@ -423,7 +433,7 @@ describe('all reports with pull request', () => {
     cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    const { env, cleanup } = await createTestENV({
+    const { env, cleanup } = await createTestEnv({
       override: {
         INPUT_LATEST: '1',
         'INPUT_ARIGA-TOKEN': `mysecrettoken`,
@@ -474,7 +484,8 @@ describe('all reports with pull request', () => {
         }
       }
     })
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
@@ -534,7 +545,8 @@ describe('all reports with pull request', () => {
         }
       }
     })
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
@@ -580,7 +592,7 @@ describe('all reports with push (branch)', () => {
     cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
-    const { env, cleanup } = await createTestENV({
+    const { env, cleanup } = await createTestEnv({
       override: {
         INPUT_LATEST: '1',
         'INPUT_ARIGA-TOKEN': `mysecrettoken`,
@@ -633,7 +645,8 @@ describe('all reports with push (branch)', () => {
         }
       }
     })
-    const res = (await run()) as AtlasResult
+    let opts = OptionsFromEnv(process.env)
+    const res = (await run(opts)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
