@@ -331,7 +331,7 @@ describe('run with mock repo', () => {
     )
     expect(res.summary?.Files[0].Reports).toHaveLength(1)
     expect(res.summary?.Files[0].Reports?.[0].Text).toBe(
-      'destructive change detected'
+      'destructive changes detected'
     )
     expect(res.summary?.Files[0].Reports?.[0].Diagnostics?.[0].Text).toBe(
       `Dropping table "tbl"`
@@ -384,7 +384,7 @@ describe('report to GitHub', () => {
       {
         file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
         startLine: 1,
-        title: 'data dependent change detected'
+        title: 'data dependent changes detected'
       }
     )
   })
@@ -497,7 +497,7 @@ describe('all reports with pull request', () => {
       {
         file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
         startLine: 1,
-        title: 'data dependent change detected'
+        title: 'data dependent changes detected'
       }
     )
     expect(spyOnNotice).toHaveBeenNthCalledWith(
