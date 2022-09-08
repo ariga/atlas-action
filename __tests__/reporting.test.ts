@@ -6,7 +6,6 @@ import { report, summarize } from '../src/github'
 import { expect } from '@jest/globals'
 import * as core from '@actions/core'
 import { Options, OptionsFromEnv } from '../src/input'
-import { reportToCloud } from '../src/cloud'
 
 const dir = path.join('__tests__', 'testdata', 'runs')
 

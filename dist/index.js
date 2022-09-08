@@ -441,7 +441,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OptionsFromEnv = void 0;
 function OptionsFromEnv(env) {
     const input = (name) => (env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || '');
-    let opts = {
+    const opts = {
         atlasVersion: input('atlas-version'),
         dir: input('dir'),
         dirFormat: input('dir-format'),

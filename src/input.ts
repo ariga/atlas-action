@@ -11,10 +11,10 @@ export type Options = {
   schemaInsights: boolean
 }
 
-export function OptionsFromEnv(env: Dict<String>): Options {
-  const input = (name: string) =>
-    (env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || '') as string
-  let opts: Options = {
+export function OptionsFromEnv(env: Dict<string>): Options {
+  const input = (name: string): string =>
+    env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || ''
+  const opts: Options = {
     atlasVersion: input('atlas-version'),
     dir: input('dir'),
     dirFormat: input('dir-format'),
