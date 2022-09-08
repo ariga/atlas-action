@@ -5,6 +5,7 @@ import { simpleGit } from 'simple-git'
 import { getMigrationDir, Summary } from './atlas'
 import * as github from '@actions/github'
 import * as path from 'path'
+import { Options } from './input'
 
 export async function getWorkingDirectory(): Promise<string> {
   /**
@@ -47,9 +48,9 @@ export async function resolveGitBase(gitRoot: string): Promise<string> {
   return baseBranch
 }
 
-export function report(s?: Summary, cloudURL?: string): void {
+export function report(opts: Options, s?: Summary, cloudURL?: string): void {
   for (const file of s?.Files ?? []) {
-    const fp = path.join(getMigrationDir(), file.Name)
+    const fp = path.join(getMigrationDir(opts.dir), file.Name)
     let annotate = notice
     if (file.Error) {
       annotate = error

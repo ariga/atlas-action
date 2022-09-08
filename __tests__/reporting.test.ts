@@ -5,6 +5,8 @@ import { Summary } from '../src/atlas'
 import { report, summarize } from '../src/github'
 import { expect } from '@jest/globals'
 import * as core from '@actions/core'
+import { Options, OptionsFromEnv } from '../src/input'
+import { reportToCloud } from '../src/cloud'
 
 const dir = path.join('__tests__', 'testdata', 'runs')
 
@@ -60,7 +62,8 @@ describe('annotations', () => {
 
   test('destructive', async () => {
     const sum = await loadRun('destructive')
-    report(sum)
+    let opts: Options = OptionsFromEnv(process.env)
+    report(opts, sum)
     expect(spyErr).toHaveBeenCalledWith(
       `Dropping table "orders" (DS102)
 
