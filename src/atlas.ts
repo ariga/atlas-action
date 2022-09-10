@@ -37,9 +37,13 @@ export interface Step {
   Result: Result | null
 }
 
+export interface Env {
+  Driver: string
+  Dir: string
+}
 export interface Summary {
   Files: FileReport[]
-  Env: unknown
+  Env: Env
   Steps: Step[] | null
   Schema: unknown | null
 }
@@ -77,39 +81,49 @@ export async function installAtlas(version: string): Promise<string> {
   return bin
 }
 
+export async function atlasArgs(opts: Options): Promise<string[]> {
+
+  const args = [
+      'migrate',
+      'lint',
+    '--log',
+    '{{ json . }}',
+  ]
+  if (opts.projectEnv) {
+    args.push('--env', opts.projectEnv)
+  }
+  if (opts.dir) {
+    args.push('--dir', `file://${opts.dir}`)
+  }
+  if (opts.devUrl) {
+    args.push('--dev-url', opts.devUrl)
+  }
+  if (opts.dirFormat) {
+    args.push(
+        '--dir-format',
+        opts.dirFormat
+    )
+  }
+  if (opts.latest && opts.latest > 0) {
+    args.push('--latest', opts.latest.toString())
+  }
+  if(!opts.projectEnv) {
+    const gitRoot = path.resolve(await getWorkingDirectory())
+    if (gitRoot) {
+      args.push('--git-dir', gitRoot)
+    }
+    if(!opts.latest) {
+      args.push('--git-base', `origin/${await resolveGitBase(gitRoot)}`)
+    }
+  }
+  return args
+}
+
 export async function runAtlas(
   bin: string,
   opts: Options
 ): Promise<AtlasResult> {
-  const dir = getMigrationDir(opts.dir)
-
-  const gitRoot = path.resolve(await getWorkingDirectory())
-  info(`Migrations Directory: ${dir}`)
-  info(`Dev Database: ${opts.devUrl}`)
-  info(`Git Root: ${gitRoot}`)
-  info(`Latest Param: ${opts.latest}`)
-  info(`Dir Format: ${opts.dirFormat}`)
-  info(`Schema Insights: ${opts.schemaInsights}`)
-
-  const args = [
-    'migrate',
-    'lint',
-    '--dir',
-    `file://${dir}`,
-    '--dev-url',
-    opts.devUrl,
-    '--git-dir',
-    gitRoot,
-    '--log',
-    '{{ json . }}',
-    '--dir-format',
-    opts.dirFormat
-  ]
-  if (opts.latest > 0) {
-    args.push('--latest', opts.latest.toString())
-  } else {
-    args.push('--git-base', `origin/${await resolveGitBase(gitRoot)}`)
-  }
+  const args = await atlasArgs(opts)
   const res = await getExecOutput(bin, args, {
     failOnStdErr: false,
     ignoreReturnCode: true
@@ -139,11 +153,4 @@ export function getUserAgent(): { 'User-Agent': string } {
   return {
     'User-Agent': process.env.ATLASCI_USER_AGENT ?? 'AtlasCI-Action'
   }
-}
-
-export function getMigrationDir(dir: string): string {
-  if (!dir || !exists(dir)) {
-    throw new Error(`Migration directory ${dir} doesn't exist`)
-  }
-  return dir
 }

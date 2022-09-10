@@ -8,19 +8,15 @@ inputs:
     default: 'v0.7.0'
   dir:
     description: 'select migration directory relative to working directory'
-    default: "migrations"
     required: false
   dir-format:
     description: 'Dir format for migration files ("atlas", "golang-migrate", "goose", "flyway", "liquibase", "dbmate")'
-    default: 'atlas'
     required: false
   dev-url:
     description: 'select development db URL using atlas URL format'
-    default: "sqlite://test?mode=memory&cache=shared&_fk=1"
     required: false
   latest:
     description: 'run analysis on the latest N migration files'
-    default: '0'
     required: false
   working-directory:
     description: 'path to the repository working directory'
@@ -32,6 +28,9 @@ inputs:
   schema-insights:
     description: 'Enable reporting of schema insights (requires ariga-token)'
     default: 'true'
+    required: false
+  project-env:
+    description: "The env from the atlas.hcl project file to use"
     required: false
 runs:
   using: 'node16'

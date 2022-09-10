@@ -1,6 +1,6 @@
 import * as github from '@actions/github'
 import { getInput, info, setSecret, warning } from '@actions/core'
-import { AtlasResult, ExitCodes, getMigrationDir, getUserAgent } from './atlas'
+import { AtlasResult, ExitCodes, getUserAgent } from './atlas'
 import * as url from 'url'
 import { ClientError, gql, request } from 'graphql-request'
 import * as http from '@actions/http-client'
@@ -55,7 +55,7 @@ function getMutationVariables(
   // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
   const sourceBranch =
     process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME
-  const migrationDir = getMigrationDir(opts.dir).replace('file://', '')
+  const migrationDir = res.summary?.Env.Dir.replace('file://', '')
   info(
     `Run metadata: ${JSON.stringify(
       { repository, commitID, sourceBranch, migrationDir },
