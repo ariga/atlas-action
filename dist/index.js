@@ -54,12 +54,7 @@ function installAtlas(version) {
 exports.installAtlas = installAtlas;
 function atlasArgs(opts) {
     return __awaiter(this, void 0, void 0, function* () {
-        const args = [
-            'migrate',
-            'lint',
-            '--log',
-            '{{ json . }}',
-        ];
+        const args = ['migrate', 'lint', '--log', '{{ json . }}'];
         if (opts.projectEnv) {
             args.push('--env', opts.projectEnv);
         }
@@ -359,7 +354,7 @@ function report(opts, s, cloudURL) {
     const dir = (_a = s === null || s === void 0 ? void 0 : s.Env) === null || _a === void 0 ? void 0 : _a.Dir;
     for (const file of (_b = s === null || s === void 0 ? void 0 : s.Files) !== null && _b !== void 0 ? _b : []) {
         if (!dir) {
-            throw new Error("run summary must contain migration dir");
+            throw new Error('run summary must contain migration dir');
         }
         const fp = path.join(dir, file.Name);
         let annotate = core_1.notice;
@@ -447,7 +442,7 @@ function OptionsFromEnv(env) {
     const input = (name) => env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || '';
     const opts = {
         atlasVersion: input('atlas-version'),
-        schemaInsights: true,
+        schemaInsights: true
     };
     if (input('dir')) {
         opts.dir = input('dir');
