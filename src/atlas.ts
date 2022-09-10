@@ -82,13 +82,7 @@ export async function installAtlas(version: string): Promise<string> {
 }
 
 export async function atlasArgs(opts: Options): Promise<string[]> {
-
-  const args = [
-      'migrate',
-      'lint',
-    '--log',
-    '{{ json . }}',
-  ]
+  const args = ['migrate', 'lint', '--log', '{{ json . }}']
   if (opts.projectEnv) {
     args.push('--env', opts.projectEnv)
   }
@@ -99,20 +93,17 @@ export async function atlasArgs(opts: Options): Promise<string[]> {
     args.push('--dev-url', opts.devUrl)
   }
   if (opts.dirFormat) {
-    args.push(
-        '--dir-format',
-        opts.dirFormat
-    )
+    args.push('--dir-format', opts.dirFormat)
   }
   if (opts.latest && opts.latest > 0) {
     args.push('--latest', opts.latest.toString())
   }
-  if(!opts.projectEnv) {
+  if (!opts.projectEnv) {
     const gitRoot = path.resolve(await getWorkingDirectory())
     if (gitRoot) {
       args.push('--git-dir', gitRoot)
     }
-    if(!opts.latest) {
+    if (!opts.latest) {
       args.push('--git-base', `origin/${await resolveGitBase(gitRoot)}`)
     }
   }

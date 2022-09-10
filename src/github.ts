@@ -2,7 +2,7 @@ import { error, getInput, notice, summary } from '@actions/core'
 import { existsSync } from 'fs'
 import { stat } from 'fs/promises'
 import { simpleGit } from 'simple-git'
-import {  Summary } from './atlas'
+import { Summary } from './atlas'
 import * as github from '@actions/github'
 import * as path from 'path'
 import { Options } from './input'
@@ -52,7 +52,7 @@ export function report(opts: Options, s?: Summary, cloudURL?: string): void {
   const dir = s?.Env?.Dir
   for (const file of s?.Files ?? []) {
     if (!dir) {
-      throw new Error("run summary must contain migration dir")
+      throw new Error('run summary must contain migration dir')
     }
     const fp = path.join(dir, file.Name)
     let annotate = notice

@@ -15,7 +15,6 @@ const originalEnv = { ...process.env }
 // https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#example-specifying-inputs
 export const defaultEnv = {
   'INPUT_SCHEMA-INSIGHTS': 'true',
-  'INPUT_WORKING-DIRECTORY': ".",
   'INPUT_ATLAS-VERSION': defaultVersion()
 }
 
@@ -23,9 +22,8 @@ export const testDefaults = {
   INPUT_DIR: 'migrations',
   'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
   INPUT_LATEST: '0',
-  'INPUT_ARIGA-URL': `https://ci.ariga.test`,
+  'INPUT_ARIGA-URL': `https://ci.ariga.test`
 }
-
 
 // These are mocks for the GitHub context variables.
 // https://docs.github.com/en/actions/learn-github-actions/environment-variables

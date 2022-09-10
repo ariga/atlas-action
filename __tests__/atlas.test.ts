@@ -140,7 +140,7 @@ describe('run with "latest" flag', () => {
           Schema: 'main'
         },
         // This value is random and changes on every run.
-        Dir: res.summary?.Env.Dir,
+        Dir: res.summary?.Env.Dir
       },
       Steps: [
         {

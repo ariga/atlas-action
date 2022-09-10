@@ -20,7 +20,6 @@ inputs:
     required: false
   working-directory:
     description: 'path to the repository working directory'
-    default: '.'
     required: false
   ariga-token:
     description: 'Token for sending report to Ariga cloud (should be passed as a secret)'
