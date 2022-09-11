@@ -57,7 +57,7 @@ describe('report to cloud', () => {
         Files: [{ Name: 'test', Text: 'test' }],
         Env: {
           Driver: 'MySQL',
-          Dir: 'migrations/'
+          Dir: 'migrations'
         },
         Steps: null,
         Schema: null
