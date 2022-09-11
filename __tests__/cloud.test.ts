@@ -7,6 +7,7 @@ import * as core from '@actions/core'
 import * as gql from 'graphql-request'
 import { createTestEnv } from './env'
 import { OptionsFromEnv, Options } from '../src/input'
+import path from 'path'
 
 jest.setTimeout(30000)
 
@@ -79,6 +80,7 @@ describe('report to cloud', () => {
     expect(payload?.createReport.runID).toEqual('8589934593')
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
+
     expect(spyOnRequest).toBeCalledWith(
       'https://ci.ariga.cloud/api/query',
       mutation,
@@ -88,7 +90,10 @@ describe('report to cloud', () => {
           commit: process.env.GITHUB_SHA,
           envName: 'CI',
           payload: '[{"Name":"test","Text":"test"}]',
-          projectName: path.join(`${process.env.GITHUB_REPOSITORY},${res.summary?.Env.Dir}),
+          projectName: path.join(
+            process.env.GITHUB_REPOSITORY ?? '',
+            res.summary?.Env?.Dir ?? ''
+          ),
           status: Status.Success,
           url: 'https://github.com/ariga/atlas-action/pull/1'
         }
