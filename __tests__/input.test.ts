@@ -5,7 +5,7 @@ import { atlasArgs } from '../src/atlas'
 
 describe('input', () => {
   test('defaults', () => {
-    let options = OptionsFromEnv(defaultEnv)
+    const options = OptionsFromEnv(defaultEnv)
     let expected: Options = {
       atlasVersion: defaultVersion(),
       schemaInsights: true
@@ -41,7 +41,7 @@ describe('input', () => {
 
 describe('atlas args', () => {
   test('without env', async () => {
-    let opts = OptionsFromEnv({
+    const opts = OptionsFromEnv({
       ...defaultEnv,
       INPUT_DIR: 'dir',
       'INPUT_DIR-FORMAT': 'atlas',

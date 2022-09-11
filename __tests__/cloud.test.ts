@@ -88,7 +88,7 @@ describe('report to cloud', () => {
           commit: process.env.GITHUB_SHA,
           envName: 'CI',
           payload: '[{"Name":"test","Text":"test"}]',
-          projectName: `${process.env.GITHUB_REPOSITORY}/${res.summary?.Env.Dir}`,
+          projectName: path.join(`${process.env.GITHUB_REPOSITORY},${res.summary?.Env.Dir}),
           status: Status.Success,
           url: 'https://github.com/ariga/atlas-action/pull/1'
         }
@@ -152,7 +152,7 @@ describe('report to cloud', () => {
         Files: [{ Name: 'test', Text: 'test' }],
         Env: {
           Driver: 'MySQL',
-          Dir: 'migrations/'
+          Dir: 'migrations'
         },
         Steps: [],
         Schema: null
@@ -183,7 +183,7 @@ describe('report to cloud', () => {
         Files: [{ Name: 'test', Text: 'test' }],
         Env: {
           Driver: 'MySQL',
-          Dir: 'migrations/'
+          Dir: 'migrations'
         },
         Steps: [],
         Schema: null
