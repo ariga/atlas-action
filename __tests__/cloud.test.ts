@@ -1,5 +1,5 @@
 import { expect } from '@jest/globals'
-import { AtlasResult, ExitCodes, getMigrationDir } from '../src/atlas'
+import { AtlasResult, ExitCodes } from '../src/atlas'
 import { getCloudURL, mutation, reportToCloud, Status } from '../src/cloud'
 import * as http from '@actions/http-client'
 import nock from 'nock'
@@ -7,6 +7,7 @@ import * as core from '@actions/core'
 import * as gql from 'graphql-request'
 import { createTestEnv } from './env'
 import { OptionsFromEnv, Options } from '../src/input'
+import path from 'path'
 
 jest.setTimeout(30000)
 
@@ -55,7 +56,10 @@ describe('report to cloud', () => {
       raw: '[{"Name":"test","Text":"test"}]',
       summary: {
         Files: [{ Name: 'test', Text: 'test' }],
-        Env: {},
+        Env: {
+          Driver: 'MySQL',
+          Dir: 'migrations'
+        },
         Steps: null,
         Schema: null
       }
@@ -76,6 +80,7 @@ describe('report to cloud', () => {
     expect(payload?.createReport.runID).toEqual('8589934593')
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
+
     expect(spyOnRequest).toBeCalledWith(
       'https://ci.ariga.cloud/api/query',
       mutation,
@@ -85,9 +90,10 @@ describe('report to cloud', () => {
           commit: process.env.GITHUB_SHA,
           envName: 'CI',
           payload: '[{"Name":"test","Text":"test"}]',
-          projectName: `${process.env.GITHUB_REPOSITORY}/${getMigrationDir(
-            opts.dir
-          )}`,
+          projectName: path.join(
+            process.env.GITHUB_REPOSITORY ?? '',
+            res.summary?.Env?.Dir ?? ''
+          ),
           status: Status.Success,
           url: 'https://github.com/ariga/atlas-action/pull/1'
         }
@@ -105,7 +111,10 @@ describe('report to cloud', () => {
       raw: '[{"Name":"test","Text":"test"}]',
       summary: {
         Files: [{ Name: 'test', Text: 'test' }],
-        Env: {},
+        Env: {
+          Driver: 'MySQL',
+          Dir: 'migrations'
+        },
         Steps: null,
         Schema: null
       }
@@ -146,7 +155,10 @@ describe('report to cloud', () => {
       raw: '[{"Name":"test","Text":"test"}]',
       summary: {
         Files: [{ Name: 'test', Text: 'test' }],
-        Env: {},
+        Env: {
+          Driver: 'MySQL',
+          Dir: 'migrations'
+        },
         Steps: [],
         Schema: null
       }
@@ -174,7 +186,10 @@ describe('report to cloud', () => {
       raw: '[{"Name":"test","Text":"test"}]',
       summary: {
         Files: [{ Name: 'test', Text: 'test' }],
-        Env: {},
+        Env: {
+          Driver: 'MySQL',
+          Dir: 'migrations'
+        },
         Steps: [],
         Schema: null
       }

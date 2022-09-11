@@ -16,6 +16,9 @@ jobs:
       - name: init migrations folder
         run: mkdir -p migrations
       - uses: ./
+        with:
+          dev-url: sqlite://test?mode=memory&cache=shared&_fk=1
+          dir: migrations
   code:
     runs-on: ubuntu-latest
     steps:

@@ -2,12 +2,13 @@ import Dict = NodeJS.Dict
 
 export type Options = {
   atlasVersion: string
-  dir: string
-  dirFormat: string
-  devUrl: string
-  latest: number
+  dir?: string
+  dirFormat?: string
+  devUrl?: string
+  latest?: number
   arigaToken?: string
   arigaURL?: string
+  projectEnv?: string
   schemaInsights: boolean
 }
 
@@ -16,15 +17,24 @@ export function OptionsFromEnv(env: Dict<string>): Options {
     env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || ''
   const opts: Options = {
     atlasVersion: input('atlas-version'),
-    dir: input('dir'),
-    dirFormat: input('dir-format'),
-    devUrl: input('dev-url'),
-    schemaInsights: true,
-    arigaToken: input('ariga-token'),
-    arigaURL: input('ariga-url'),
-    latest: 0
+    schemaInsights: true
   }
-  if (input('latest').length) {
+  if (input('dir')) {
+    opts.dir = input('dir')
+  }
+  if (input('dir-format')) {
+    opts.dirFormat = input('dir-format')
+  }
+  if (input('dev-url')) {
+    opts.devUrl = input('dev-url')
+  }
+  if (input('ariga-token')) {
+    opts.arigaToken = input('ariga-token')
+  }
+  if (input('ariga-url')) {
+    opts.arigaURL = input('ariga-url')
+  }
+  if (input('latest')) {
     const i = parseInt(input('latest'), 10)
     if (isNaN(i)) {
       throw new Error('expected "latest" to be a number')
@@ -38,7 +48,10 @@ export function OptionsFromEnv(env: Dict<string>): Options {
     opts.arigaToken = input('ariga-token')
   }
   if (input('ariga-url')) {
-    opts.arigaToken = input('ariga-url')
+    opts.arigaURL = input('ariga-url')
+  }
+  if (input('project-env')) {
+    opts.projectEnv = input('project-env')
   }
   return opts
 }

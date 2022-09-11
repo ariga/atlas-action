@@ -4,7 +4,6 @@ import path from 'path'
 import * as github from '@actions/github'
 const yaml = require('js-yaml')
 import * as fs from 'fs'
-import { summary } from '@actions/core'
 
 interface ProcessEnv {
   [key: string]: string | undefined
@@ -14,14 +13,16 @@ const originalEnv = { ...process.env }
 
 // These are the default environment variables that are set by the action (see action.yml)
 // https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#example-specifying-inputs
-const defaultEnv = {
-  'INPUT_DIR-FORMAT': 'atlas',
+export const defaultEnv = {
+  'INPUT_SCHEMA-INSIGHTS': 'true',
+  'INPUT_ATLAS-VERSION': defaultVersion()
+}
+
+export const testDefaults = {
   INPUT_DIR: 'migrations',
   'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
   INPUT_LATEST: '0',
-  'INPUT_ARIGA-URL': `https://ci.ariga.test`,
-  'INPUT_SCHEMA-INSIGHTS': 'true',
-  'INPUT_ATLAS-VERSION': defaultVersion()
+  'INPUT_ARIGA-URL': `https://ci.ariga.test`
 }
 
 // These are mocks for the GitHub context variables.
@@ -86,6 +87,7 @@ export async function createTestEnv(
       // The path to a temporary directory on the runner (must be defined)
       RUNNER_TEMP: base,
       GITHUB_STEP_SUMMARY: summaryFile,
+      ...testDefaults,
       ...defaultEnv,
       ...gitEnv,
       ...input?.override
