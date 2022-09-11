@@ -1,7 +1,10 @@
-import { Options, OptionsFromEnv } from '../src/input'
+import { Options, OptionsFromEnv, PullReqFromContext } from '../src/input'
 import { expect } from '@jest/globals'
-import { createTestEnv, defaultEnv, defaultVersion } from './env'
+import { defaultEnv, defaultVersion } from './env'
 import { atlasArgs } from '../src/atlas'
+import { Context } from '@actions/github/lib/context'
+import * as fs from 'fs/promises'
+import path from 'path'
 
 describe('input', () => {
   test('defaults', () => {
@@ -60,5 +63,22 @@ describe('atlas args', () => {
     })
     let args = await atlasArgs(opts)
     expect(args.join(' ')).toEqual('migrate lint --log {{ json . }} --env test')
+  })
+})
+
+describe('ctx', () => {
+  test('empty', function () {
+    const pr = PullReqFromContext(new Context())
+    expect(pr).toBeUndefined()
+  })
+  test('pr', async function () {
+    const ctx = path.join('__tests__', 'testdata', 'pr-context.json')
+    const data = JSON.parse((await fs.readFile(ctx)).toString())
+    const pr = PullReqFromContext(data)
+    expect(pr).toEqual({
+      issue_number: 30,
+      owner: 'ariga',
+      repo: 'atlas-action'
+    })
   })
 })

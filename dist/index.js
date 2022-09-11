@@ -296,14 +296,22 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __asyncValues = (this && this.__asyncValues) || function (o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.summarize = exports.report = exports.resolveGitBase = exports.getWorkingDirectory = void 0;
+exports.comment = exports.summarize = exports.report = exports.resolveGitBase = exports.getWorkingDirectory = void 0;
 const core_1 = __nccwpck_require__(2186);
 const fs_1 = __nccwpck_require__(7147);
 const promises_1 = __nccwpck_require__(3292);
 const simple_git_1 = __nccwpck_require__(9103);
 const github = __importStar(__nccwpck_require__(5438));
 const path = __importStar(__nccwpck_require__(1017));
+const commentSig = 'Reviewed by <a href="https://atlasgo.io/integrations/github-actions">atlas-action</a>';
 function getWorkingDirectory() {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
@@ -427,6 +435,62 @@ exports.summarize = summarize;
 function icon(n) {
     return `<div align="center"><img src="https://release.ariga.io/images/assets/${n}.svg" /></div>`;
 }
+function comment(token, pr, body) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const found = yield findComment(token, pr);
+        const payload = yield upsertComment(token, pr, found, body);
+        return {
+            id: payload === null || payload === void 0 ? void 0 : payload.id,
+            body: payload === null || payload === void 0 ? void 0 : payload.body
+        };
+    });
+}
+exports.comment = comment;
+function upsertComment(token, pr, comment, body) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const octokit = github.getOctokit(token);
+        body += `\n\n${commentSig}`;
+        if (!(comment === null || comment === void 0 ? void 0 : comment.id)) {
+            const payload = yield octokit.rest.issues.createComment(Object.assign(Object.assign({}, pr), { body }));
+            return {
+                id: payload.data.id
+            };
+        }
+        const payload = yield octokit.rest.issues.updateComment(Object.assign(Object.assign({ comment_id: comment.id }, pr), { body }));
+        return {
+            id: payload.data.id,
+            body: payload.data.body
+        };
+    });
+}
+function findComment(token, pr) {
+    var e_1, _a;
+    var _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        const octokit = github.getOctokit(token);
+        try {
+            for (var _c = __asyncValues(octokit.paginate.iterator(octokit.rest.issues.listComments, {
+                owner: pr.owner,
+                repo: pr.repo,
+                issue_number: pr.issue_number
+            })), _d; _d = yield _c.next(), !_d.done;) {
+                const { data: comments } = _d.value;
+                for (const comm of comments) {
+                    if ((_b = comm.body) === null || _b === void 0 ? void 0 : _b.includes('Reviewed by atlas-action')) {
+                        return comm;
+                    }
+                }
+            }
+        }
+        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+        finally {
+            try {
+                if (_d && !_d.done && (_a = _c.return)) yield _a.call(_c);
+            }
+            finally { if (e_1) throw e_1.error; }
+        }
+    });
+}
 //# sourceMappingURL=github.js.map
 
 /***/ }),
@@ -437,7 +501,25 @@ function icon(n) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.OptionsFromEnv = void 0;
+exports.OptionsFromEnv = exports.PullReqFromContext = void 0;
+function PullReqFromContext(ctx) {
+    var _a;
+    if (ctx.eventName != 'pull_request') {
+        return;
+    }
+    if (!ctx.payload.repository) {
+        throw new Error('expected repository details to be present');
+    }
+    if (!((_a = ctx.payload.pull_request) === null || _a === void 0 ? void 0 : _a.number)) {
+        throw new Error('expected pr number to be present');
+    }
+    return {
+        repo: ctx.payload.repository.name,
+        owner: ctx.payload.repository.owner.login,
+        issue_number: ctx.payload.pull_request.number
+    };
+}
+exports.PullReqFromContext = PullReqFromContext;
 function OptionsFromEnv(env) {
     const input = (name) => env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || '';
     const opts = {
@@ -478,6 +560,9 @@ function OptionsFromEnv(env) {
     if (input('project-env')) {
         opts.projectEnv = input('project-env');
     }
+    if (input('token')) {
+        opts.token = input('token');
+    }
     return opts;
 }
 exports.OptionsFromEnv = OptionsFromEnv;
@@ -508,22 +593,26 @@ const github_2 = __nccwpck_require__(5438);
 const cloud_1 = __nccwpck_require__(217);
 const input_1 = __nccwpck_require__(1044);
 // Entry point for GitHub Action runner.
-function run(opts) {
+function run(input) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const bin = yield (0, atlas_1.installAtlas)(opts.atlasVersion);
-            const res = yield (0, atlas_1.runAtlas)(bin, opts);
+            const bin = yield (0, atlas_1.installAtlas)(input.opts.atlasVersion);
+            const res = yield (0, atlas_1.runAtlas)(bin, input.opts);
             const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw;
             (0, core_1.info)(`\nAtlas output:\n${out}`);
             (0, core_1.info)(`Event type: ${github_2.context.eventName}`);
-            const payload = yield (0, cloud_1.reportToCloud)(opts, res);
+            const payload = yield (0, cloud_1.reportToCloud)(input.opts, res);
             if (payload) {
                 res.cloudURL = payload.createReport.url;
             }
-            (0, github_1.report)(opts, res.summary, res.cloudURL);
+            (0, github_1.report)(input.opts, res.summary, res.cloudURL);
             if (res.summary) {
                 (0, github_1.summarize)(res.summary);
+                const body = commentBody(res.cloudURL);
+                if (input.opts.token && input.pr) {
+                    yield (0, github_1.comment)(input.opts.token, input.pr, body);
+                }
                 yield core_1.summary.write();
             }
             if (res.exitCode !== atlas_1.ExitCodes.Success) {
@@ -537,8 +626,18 @@ function run(opts) {
     });
 }
 exports.run = run;
-const opts = (0, input_1.OptionsFromEnv)(process.env);
-run(opts);
+function commentBody(cloudURL) {
+    let s = core_1.summary.stringify();
+    if (cloudURL) {
+        s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`;
+    }
+    s += '<hr/>';
+    return s;
+}
+run({
+    opts: (0, input_1.OptionsFromEnv)(process.env),
+    pr: (0, input_1.PullReqFromContext)(github_2.context)
+});
 //# sourceMappingURL=main.js.map
 
 /***/ }),

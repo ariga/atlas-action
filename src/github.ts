@@ -5,7 +5,10 @@ import { simpleGit } from 'simple-git'
 import { Summary } from './atlas'
 import * as github from '@actions/github'
 import * as path from 'path'
-import { Options } from './input'
+import { Options, PullRequest } from './input'
+
+const commentSig =
+  'Reviewed by <a href="https://atlasgo.io/integrations/github-actions">atlas-action</a>'
 
 export async function getWorkingDirectory(): Promise<string> {
   /**
@@ -89,10 +92,12 @@ export function summarize(s: Summary, cloudURL?: string): void {
   summary.addHeading('Atlas Lint Report')
   summary.addEOL()
   const steps = s?.Steps || []
+
   interface cell {
     data: string
     header: boolean
   }
+
   type row = (cell | string)[]
   const rows: row[] = [
     [
@@ -129,4 +134,71 @@ export function summarize(s: Summary, cloudURL?: string): void {
 
 function icon(n: string): string {
   return `<div align="center"><img src="https://release.ariga.io/images/assets/${n}.svg" /></div>`
+}
+
+interface Comment {
+  id?: number
+  body?: string
+}
+
+export async function comment(
+  token: string,
+  pr: PullRequest,
+  body: string
+): Promise<Comment | undefined> {
+  const found = await findComment(token, pr)
+  const payload = await upsertComment(token, pr, found, body)
+  return {
+    id: payload?.id,
+    body: payload?.body
+  }
+}
+
+async function upsertComment(
+  token: string,
+  pr: PullRequest,
+  comment: Comment | undefined,
+  body: string
+): Promise<Comment | undefined> {
+  const octokit = github.getOctokit(token)
+  body += `\n\n${commentSig}`
+  if (!comment?.id) {
+    const payload = await octokit.rest.issues.createComment({
+      ...pr,
+      body
+    })
+    return {
+      id: payload.data.id
+    }
+  }
+  const payload = await octokit.rest.issues.updateComment({
+    comment_id: comment.id,
+    ...pr,
+    body
+  })
+  return {
+    id: payload.data.id,
+    body: payload.data.body
+  }
+}
+
+async function findComment(
+  token: string,
+  pr: PullRequest
+): Promise<Comment | undefined> {
+  const octokit = github.getOctokit(token)
+  for await (const { data: comments } of octokit.paginate.iterator(
+    octokit.rest.issues.listComments,
+    {
+      owner: pr.owner,
+      repo: pr.repo,
+      issue_number: pr.issue_number
+    }
+  )) {
+    for (const comm of comments) {
+      if (comm.body?.includes('Reviewed by atlas-action')) {
+        return comm
+      }
+    }
+  }
 }
