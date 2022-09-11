@@ -55,7 +55,7 @@ function getMutationVariables(
   // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
   const sourceBranch =
     process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME
-  const migrationDir = res.summary?.Env.Dir.replace('file://', '')
+  const migrationDir = res.summary?.Env.Dir.replace('file://', '') || ''
   info(
     `Run metadata: ${JSON.stringify(
       { repository, commitID, sourceBranch, migrationDir },

@@ -198,7 +198,7 @@ function getMutationVariables(opts, res) {
     // GITHUB_HEAD_REF is set only on pull requests
     // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
     const sourceBranch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
-    const migrationDir = (_a = res.summary) === null || _a === void 0 ? void 0 : _a.Env.Dir.replace('file://', '');
+    const migrationDir = ((_a = res.summary) === null || _a === void 0 ? void 0 : _a.Env.Dir.replace('file://', '')) || '';
     (0, core_1.info)(`Run metadata: ${JSON.stringify({ repository, commitID, sourceBranch, migrationDir }, null, 2)}`);
     return {
         input: {
