@@ -590,7 +590,7 @@ const github_1 = __nccwpck_require__(5865);
 const github_2 = __nccwpck_require__(5438);
 const cloud_1 = __nccwpck_require__(217);
 const input_1 = __nccwpck_require__(1044);
-const { Octokit } = __nccwpck_require__(5375);
+const rest_1 = __nccwpck_require__(5375);
 const commentFooter = 'Migrations automatically reviewed by <a href="https://atlasgo.io/integrations/github-actions">Atlas</a>';
 // Entry point for GitHub Action runner.
 function run(input) {
@@ -611,7 +611,7 @@ function run(input) {
                 (0, github_1.summarize)(res.summary);
                 const body = commentBody(res.cloudURL);
                 if (input.opts.token && input.pr) {
-                    const client = new Octokit({ auth: input.opts.token });
+                    const client = new rest_1.Octokit({ auth: input.opts.token });
                     yield (0, github_1.comment)(client, input.pr, body);
                 }
                 yield core_1.summary.write();

@@ -4,7 +4,7 @@ import { comment, report, summarize } from './github'
 import { context } from '@actions/github'
 import { reportToCloud } from './cloud'
 import { OptionsFromEnv, PullReqFromContext, RunInput } from './input'
-const { Octokit } = require('@octokit/rest')
+import { Octokit } from '@octokit/rest'
 
 const commentFooter =
   'Migrations automatically reviewed by <a href="https://atlasgo.io/integrations/github-actions">Atlas</a>'
