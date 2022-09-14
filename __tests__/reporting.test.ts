@@ -76,6 +76,10 @@ Details: https://atlasgo.io/lint/analyzers#DS102`,
   })
 })
 
+describe('comment', () => {
+  test('basic', async () => {})
+})
+
 async function loadRun(name: string): Promise<Summary> {
   const f = await fs.readFile(path.join(dir, `${name}.txt`))
   return JSON.parse(f.toString())

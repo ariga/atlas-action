@@ -4,6 +4,10 @@ import { comment, report, summarize } from './github'
 import { context } from '@actions/github'
 import { reportToCloud } from './cloud'
 import { OptionsFromEnv, PullReqFromContext, RunInput } from './input'
+const { Octokit } = require('@octokit/rest')
+
+const commentFooter =
+  'Migrations automatically reviewed by <a href="https://atlasgo.io/integrations/github-actions">Atlas</a>'
 
 // Entry point for GitHub Action runner.
 export async function run(input: RunInput): Promise<AtlasResult | void> {
@@ -22,7 +26,8 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
       summarize(res.summary)
       const body = commentBody(res.cloudURL)
       if (input.opts.token && input.pr) {
-        await comment(input.opts.token, input.pr, body)
+        const client = new Octokit({ auth: input.opts.token })
+        await comment(client, input.pr, body)
       }
       await summary.write()
     }
@@ -40,7 +45,7 @@ function commentBody(cloudURL?: string): string {
   if (cloudURL) {
     s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`
   }
-  s += '<hr/>'
+  s += '<hr/>' + commentFooter
   return s
 }
 
