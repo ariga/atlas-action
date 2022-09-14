@@ -68,7 +68,8 @@ describe('atlas args', () => {
 
 describe('ctx', () => {
   test('empty', function () {
-    const pr = PullReqFromContext(new Context())
+    // @ts-ignore (context gets populated when running in an action)
+    const pr = PullReqFromContext({})
     expect(pr).toBeUndefined()
   })
   test('pr', async function () {
