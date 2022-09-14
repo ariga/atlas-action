@@ -1,4 +1,5 @@
 import Dict = NodeJS.Dict
+import { Context } from '@actions/github/lib/context'
 
 export type Options = {
   atlasVersion: string
@@ -10,6 +11,37 @@ export type Options = {
   arigaURL?: string
   projectEnv?: string
   schemaInsights: boolean
+  token?: string
+}
+
+export interface PullRequest {
+  // The repository name.
+  repo: string
+  // The repository org.
+  owner: string
+  issue_number: number
+}
+
+export function PullReqFromContext(ctx: Context): PullRequest | undefined {
+  if (ctx.eventName != 'pull_request') {
+    return
+  }
+  if (!ctx.payload.repository) {
+    throw new Error('expected repository details to be present')
+  }
+  if (!ctx.payload.pull_request?.number) {
+    throw new Error('expected pr number to be present')
+  }
+  return {
+    repo: ctx.payload.repository.name,
+    owner: ctx.payload.repository.owner.login,
+    issue_number: ctx.payload.pull_request.number
+  }
+}
+
+export type RunInput = {
+  opts: Options
+  pr: PullRequest | undefined
 }
 
 export function OptionsFromEnv(env: Dict<string>): Options {
@@ -52,6 +84,9 @@ export function OptionsFromEnv(env: Dict<string>): Options {
   }
   if (input('project-env')) {
     opts.projectEnv = input('project-env')
+  }
+  if (input('token')) {
+    opts.token = input('token')
   }
   return opts
 }

@@ -31,6 +31,9 @@ inputs:
   project-env:
     description: "The env from the atlas.hcl project file to use"
     required: false
+  token:
+    description: "GitHub token passed to the action"
+    default: ${{ github.token }}
 runs:
   using: 'node16'
   main: 'dist/index.js'
