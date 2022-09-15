@@ -18,7 +18,7 @@ jobs:
       - uses: ./
         with:
           dev-url: sqlite://test?mode=memory&cache=shared&_fk=1
-          dir: __tests__/testdata/bad-sql
+          dir: migrations
   code:
     runs-on: ubuntu-latest
     steps:

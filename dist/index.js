@@ -415,10 +415,12 @@ function summarize(s, cloudURL) {
         if (reports.length && !step.Error) {
             status = 'warning';
         }
-        if (step.Error || ((_b = step.Result) === null || _b === void 0 ? void 0 : _b.Error)) {
-            status = 'error';
-        }
         const diags = [];
+        const err = step.Error || ((_b = step.Result) === null || _b === void 0 ? void 0 : _b.Error);
+        if (err) {
+            status = 'error';
+            diags.push(err);
+        }
         for (const report of ((_c = step.Result) === null || _c === void 0 ? void 0 : _c.Reports) || []) {
             for (const diag of report.Diagnostics || []) {
                 diags.push(`${diag.Text} (<a href="https://atlasgo.io/lint/analyzers#${diag.Code}">${diag.Code}</a>)`);

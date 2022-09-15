@@ -113,10 +113,12 @@ export function summarize(s: Summary, cloudURL?: string): void {
     if (reports.length && !step.Error) {
       status = 'warning'
     }
-    if (step.Error || step.Result?.Error) {
-      status = 'error'
-    }
     const diags: string[] = []
+    const err = step.Error || step.Result?.Error
+    if (err) {
+      status = 'error'
+      diags.push(err)
+    }
     for (const report of step.Result?.Reports || []) {
       for (const diag of report.Diagnostics || []) {
         diags.push(
