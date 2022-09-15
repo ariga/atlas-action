@@ -17,8 +17,8 @@ jobs:
         run: mkdir -p migrations
       - uses: ./
         with:
-          dev-url: sqlcite://test?mode=memory&cache=shared&_fk=1
-          dir: migrations
+          dev-url: sqlite://test?mode=memory&cache=shared&_fk=1
+          dir: __tests__/testdata/bad-sql
   code:
     runs-on: ubuntu-latest
     steps:
