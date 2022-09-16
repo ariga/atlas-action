@@ -41,6 +41,7 @@ describe('summary', () => {
 
   test('base', testcase('base'))
   test('err', testcase('error'))
+  test('sqlerr', testcase('sqlerr'))
   test('checksum', testcase('checksum'))
   test('cloudURL', testcase('cloudurl', 'https://tenant.ariga.cloud/ci/123'))
 })
