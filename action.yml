@@ -1,5 +1,5 @@
-name: 'Atlas'
-description: 'Lint schema migration directories with Atlas'
+name: 'atlas-action'
+description: 'CI for database schema changes with Atlas'
 author: 'Ariga'
 inputs:
   atlas-version:
