@@ -1,6 +1,7 @@
 name: 'atlas-ci-action'
 description: 'CI for database schema changes with Atlas'
-icon: database
+branding:
+  icon: database
 author: 'Ariga'
 inputs:
   atlas-version:
