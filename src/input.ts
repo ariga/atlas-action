@@ -12,6 +12,7 @@ export type Options = {
   projectEnv?: string
   schemaInsights: boolean
   token?: string
+  skipCheckForUpdate?: boolean
 }
 
 export interface PullRequest {
@@ -87,6 +88,9 @@ export function OptionsFromEnv(env: Dict<string>): Options {
   }
   if (input('token')) {
     opts.token = input('token')
+  }
+  if (input('skip-check-for-update') == 'true') {
+    opts.skipCheckForUpdate = true
   }
   return opts
 }

@@ -135,11 +135,11 @@ describe('run with "latest" flag', () => {
           Host: 'test',
           Path: '',
           RawPath: '',
+          OmitHost: false,
           ForceQuery: false,
           RawQuery: 'mode=memory&cache=shared&_fk=1',
           Fragment: '',
           RawFragment: '',
-          DSN: 'file:test?mode=memory&cache=shared&_fk=1',
           Schema: 'main'
         },
         // This value is random and changes on every run.
@@ -187,11 +187,11 @@ describe('run with "latest" flag', () => {
           Host: 'test',
           Path: '',
           RawPath: '',
+          OmitHost: false,
           ForceQuery: false,
           RawQuery: 'mode=memory&cache=shared&_fk=1',
           Fragment: '',
           RawFragment: '',
-          DSN: 'file:test?mode=memory&cache=shared&_fk=1',
           Schema: 'main'
         },
         Dir: '__tests__/testdata/sqlite-wrong-sum'
