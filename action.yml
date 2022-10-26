@@ -37,7 +37,7 @@ inputs:
     description: "GitHub token passed to the action"
     default: ${{ github.token }}
   skip-check-for-update:
-    description: 'Set true to skip check for update functionality'
+    description: 'Set true to skip check for update'
     default: false
 runs:
   using: 'node16'
