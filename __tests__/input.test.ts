@@ -2,7 +2,6 @@ import { Options, OptionsFromEnv, PullReqFromContext } from '../src/input'
 import { expect } from '@jest/globals'
 import { defaultEnv, defaultVersion } from './env'
 import { atlasArgs } from '../src/atlas'
-import { Context } from '@actions/github/lib/context'
 import * as fs from 'fs/promises'
 import path from 'path'
 
@@ -25,7 +24,8 @@ describe('input', () => {
       'INPUT_ARIGA-TOKEN': 'ariga-token',
       'INPUT_ARIGA-URL': 'ariga-url',
       INPUT_LATEST: '3',
-      'INPUT_PROJECT-ENV': 'env'
+      'INPUT_PROJECT-ENV': 'env',
+      'INPUT_SKIP-CHECK-FOR-UPDATE': 'true'
     })
     let expected: Options = {
       atlasVersion: 'v0.1.2',
@@ -36,7 +36,8 @@ describe('input', () => {
       arigaToken: 'ariga-token',
       arigaURL: 'ariga-url',
       latest: 3,
-      projectEnv: 'env'
+      projectEnv: 'env',
+      skipCheckForUpdate: true
     }
     expect(options).toEqual(expected)
   })

@@ -563,6 +563,9 @@ function OptionsFromEnv(env) {
     if (input('token')) {
         opts.token = input('token');
     }
+    if (input('skip-check-for-update') == 'true') {
+        opts.skipCheckForUpdate = true;
+    }
     return opts;
 }
 exports.OptionsFromEnv = OptionsFromEnv;
@@ -593,11 +596,27 @@ const github_2 = __nccwpck_require__(5438);
 const cloud_1 = __nccwpck_require__(217);
 const input_1 = __nccwpck_require__(1044);
 const rest_1 = __nccwpck_require__(5375);
+const vercheck_1 = __nccwpck_require__(3495);
 const commentFooter = 'Migrations automatically reviewed by <a href="https://atlasgo.io/integrations/github-actions">Atlas</a>';
 // Entry point for GitHub Action runner.
 function run(input) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
+        const ref = process.env.GITHUB_ACTION_REF;
+        if (!input.opts.skipCheckForUpdate && (ref === null || ref === void 0 ? void 0 : ref.startsWith('v'))) {
+            try {
+                const v = yield (0, vercheck_1.vercheck)(ref);
+                if (v.Version) {
+                    (0, core_1.info)(`Update available for atlas-action: ${JSON.stringify(v)}`);
+                }
+                if (v.Advisory) {
+                    (0, core_1.warning)(`Security advisory from atlas-action: ${v.Advisory}`);
+                }
+            }
+            catch (err) {
+                console.warn(err);
+            }
+        }
         try {
             const bin = yield (0, atlas_1.installAtlas)(input.opts.atlasVersion);
             const res = yield (0, atlas_1.runAtlas)(bin, input.opts);
@@ -642,6 +661,49 @@ run({
     pr: (0, input_1.PullReqFromContext)(github_2.context)
 });
 //# sourceMappingURL=main.js.map
+
+/***/ }),
+
+/***/ 3495:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.vercheck = void 0;
+const http_client_1 = __nccwpck_require__(6255);
+function vercheck(cur) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const c = new http_client_1.HttpClient('atlas-action');
+        const resp = yield c.get(`https://vercheck.ariga.io/atlas-action/${cur}`);
+        if (resp.message.statusCode != 200) {
+            throw new Error(`vercheck failed: ${resp.message.statusMessage}`);
+        }
+        const payload = yield resp.readBody();
+        const parsed = JSON.parse(payload);
+        const output = {};
+        if (parsed.latest != null) {
+            output.Version = parsed.latest.Version;
+            output.Link = parsed.latest.Link;
+            output.Summary = parsed.latest.Summary;
+        }
+        if (parsed.advisory != null) {
+            output.Advisory = parsed.advisory.Text;
+        }
+        return output;
+    });
+}
+exports.vercheck = vercheck;
+//# sourceMappingURL=vercheck.js.map
 
 /***/ }),
 
