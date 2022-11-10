@@ -404,7 +404,7 @@ describe('report to GitHub', () => {
       'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries (MF101)\n\nDetails: https://atlasgo.io/lint/analyzers#MF101',
       {
         file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
-        startLine: 1,
+        startLine: 2,
         title: 'data dependent changes detected'
       }
     )
@@ -526,7 +526,7 @@ describe('all reports with pull request', () => {
       'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries (MF101)\n\nDetails: https://atlasgo.io/lint/analyzers#MF101',
       {
         file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
-        startLine: 1,
+        startLine: 2,
         title: 'data dependent changes detected'
       }
     )

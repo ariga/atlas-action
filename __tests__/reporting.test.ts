@@ -70,7 +70,7 @@ describe('annotations', () => {
 
 Details: https://atlasgo.io/lint/analyzers#DS102`,
       {
-        startLine: 1,
+        startLine: 2,
         file: 'migrations/20220905074317.up.sql',
         title: 'destructive change detected'
       }
