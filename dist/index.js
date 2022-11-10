@@ -384,7 +384,7 @@ function report(opts, s, cloudURL) {
                     msg = `${msg} (${diagnostic.Code})\n\nDetails: https://atlasgo.io/lint/analyzers#${diagnostic.Code}`;
                 }
                 annotate(msg, {
-                    startLine: 1,
+                    startLine: line(file.Text, diagnostic.Pos),
                     file: fp,
                     title: report.Text
                 });
@@ -490,6 +490,10 @@ function findComment(client, pr) {
             finally { if (e_1) throw e_1.error; }
         }
     });
+}
+function line(s, pos) {
+    const c = s.substring(0, pos).split('\n');
+    return c ? c.length : 1;
 }
 //# sourceMappingURL=github.js.map
 
