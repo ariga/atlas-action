@@ -398,7 +398,7 @@ describe('report to GitHub', () => {
     }
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
-    expect(spyOnNotice).toHaveBeenCalledTimes(3)
+    expect(spyOnNotice).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenCalledWith(
       'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries (MF101)\n\nDetails: https://atlasgo.io/lint/analyzers#MF101',
@@ -422,7 +422,7 @@ describe('report to GitHub', () => {
     }
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Failure)
-    expect(spyOnNotice).toHaveBeenCalledTimes(2)
+    expect(spyOnNotice).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledWith(
       'executing statement: near "BAD": syntax error',
@@ -442,7 +442,7 @@ describe('report to GitHub', () => {
     }
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Failure)
-    expect(spyOnNotice).toHaveBeenCalledTimes(2)
+    expect(spyOnNotice).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
     expect(spyOnSetFailed).toHaveBeenCalledWith(
@@ -454,6 +454,7 @@ describe('report to GitHub', () => {
 describe('all reports with pull request', () => {
   let actualRequestBody: { [key: string]: string & Variables },
     gqlInterceptor: nock.Interceptor,
+    gqlInterceptor2: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
     spyOnWarning: jest.SpyInstance,
@@ -478,6 +479,15 @@ describe('all reports with pull request', () => {
     gqlInterceptor = nock(url)
       .post('/api/query', function (body) {
         actualRequestBody = body
+        return body
+      })
+      .matchHeader(
+        'Authorization',
+        `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
+      )
+      .matchHeader('User-Agent', process.env.ATLASCI_USER_AGENT as string)
+    gqlInterceptor2 = nock(url)
+      .post('/api/query', function (body) {
         return body
       })
       .matchHeader(
@@ -511,6 +521,17 @@ describe('all reports with pull request', () => {
         }
       }
     })
+    const scope2 = gqlInterceptor2.reply(http.HttpCodes.OK, {
+      data: {
+        node: {
+          cloudReports: [
+            {
+              text: 'some text'
+            }
+          ]
+        }
+      }
+    })
     const input: RunInput = {
       opts: OptionsFromEnv(process.env),
       pr: undefined
@@ -518,8 +539,9 @@ describe('all reports with pull request', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
-    expect(spyOnNotice).toHaveBeenCalledTimes(4)
-    expect(spyOnWarning).toHaveBeenCalledTimes(2)
+    expect(scope2.isDone()).toBeTruthy()
+    expect(spyOnNotice).toHaveBeenCalledTimes(2)
+    expect(spyOnWarning).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenNthCalledWith(
       1,
@@ -575,6 +597,17 @@ describe('all reports with pull request', () => {
         }
       }
     })
+    const scope2 = gqlInterceptor2.reply(http.HttpCodes.OK, {
+      data: {
+        node: {
+          cloudReports: [
+            {
+              text: 'some text'
+            }
+          ]
+        }
+      }
+    })
     const input: RunInput = {
       opts: OptionsFromEnv(process.env),
       pr: undefined
@@ -582,8 +615,8 @@ describe('all reports with pull request', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
-    expect(spyOnNotice).toHaveBeenCalledTimes(4)
-    expect(spyOnWarning).toHaveBeenCalledTimes(2)
+    expect(spyOnNotice).toHaveBeenCalledTimes(2)
+    expect(spyOnWarning).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(actualRequestBody).toEqual({
       query: mutation,
@@ -619,6 +652,7 @@ describe('all reports with pull request', () => {
 describe('all reports with push (branch)', () => {
   let actualRequestBody: { [key: string]: string & Variables },
     gqlInterceptor: nock.Interceptor,
+    gqlInterceptor2: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
     spyOnWarning: jest.SpyInstance,
@@ -644,6 +678,15 @@ describe('all reports with push (branch)', () => {
     gqlInterceptor = nock(url)
       .post('/api/query', function (body) {
         actualRequestBody = body
+        return body
+      })
+      .matchHeader(
+        'Authorization',
+        `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
+      )
+      .matchHeader('User-Agent', process.env.ATLASCI_USER_AGENT as string)
+    gqlInterceptor2 = nock(url)
+      .post('/api/query', function (body) {
         return body
       })
       .matchHeader(
@@ -678,6 +721,17 @@ describe('all reports with push (branch)', () => {
         }
       }
     })
+    const scope2 = gqlInterceptor2.reply(http.HttpCodes.OK, {
+      data: {
+        node: {
+          cloudReports: [
+            {
+              text: 'some text'
+            }
+          ]
+        }
+      }
+    })
     const input: RunInput = {
       opts: OptionsFromEnv(process.env),
       pr: undefined
@@ -685,8 +739,8 @@ describe('all reports with push (branch)', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
-    expect(spyOnNotice).toHaveBeenCalledTimes(4)
-    expect(spyOnWarning).toHaveBeenCalledTimes(2)
+    expect(spyOnNotice).toHaveBeenCalledTimes(2)
+    expect(spyOnWarning).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(actualRequestBody).toEqual({
       query: mutation,

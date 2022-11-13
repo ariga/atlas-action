@@ -1,11 +1,11 @@
 import * as github from '@actions/github'
-import {getInput, info, setSecret, warning, notice} from '@actions/core'
-import {AtlasResult, ExitCodes, getUserAgent} from './atlas'
+import { getInput, info, setSecret, warning } from '@actions/core'
+import { AtlasResult, ExitCodes, getUserAgent } from './atlas'
 import * as url from 'url'
-import {ClientError, gql, request} from 'graphql-request'
+import { ClientError, gql, request } from 'graphql-request'
 import * as http from '@actions/http-client'
 import os from 'os'
-import {Options} from './input'
+import { Options } from './input'
 
 const LINUX_ARCH = 'linux-amd64'
 const APPLE_ARCH = 'darwin-amd64'
@@ -14,176 +14,182 @@ export const S3_FOLDER = 'atlas'
 export const ARCHITECTURE = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH
 
 export const mutation = gql`
-    mutation CreateReportInput($input: CreateReportInput!) {
-        createReport(input: $input) {
-            runID
-            url
-        }
+  mutation CreateReportInput($input: CreateReportInput!) {
+    createReport(input: $input) {
+      runID
+      url
     }
+  }
 `
 
 export const query = gql`
-    query Run($id: ID!) {
-        node(id: $id){
-        ...on Run{
-            cloudReports {
-                text
-            }
+  query Run($id: ID!) {
+    node(id: $id) {
+      ... on Run {
+        cloudReports {
+          text
+          diagnostics {
+            text
+            code
+            pos
+          }
         }
+      }
     }
-    }
+  }
 `
 
 interface CreateReportPayload {
-    createReport: {
-        runID: string
-        url: string
-    }
+  createReport: {
+    runID: string
+    url: string
+  }
 }
 
 type CreateReportInput = {
-    input: {
-        payload: string
-        envName: string
-        commit: string
-        projectName: string
-        branch: string
-        url: string
-        status: string
-    }
+  input: {
+    payload: string
+    envName: string
+    commit: string
+    projectName: string
+    branch: string
+    url: string
+    status: string
+  }
 }
 
 export interface Run {
-    cloudReports:{
-        text:string
+  node: {
+    cloudReports: {
+      text: string
+      diagnostics: {
+        text: string
+        code: string
+        pos: number
+      }[]
     }[]
+  }
 }
 
-
 export enum Status {
-    Success = 'SUCCESSFUL',
-    Failure = 'FAILED'
+  Success = 'SUCCESSFUL',
+  Failure = 'FAILED'
 }
 
 function getMutationVariables(
-    opts: Options,
-    res: AtlasResult
+  opts: Options,
+  res: AtlasResult
 ): CreateReportInput {
-    const {GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID} = process.env
-    // GITHUB_HEAD_REF is set only on pull requests
-    // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
-    const sourceBranch =
-        process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME
-    const migrationDir = res.summary?.Env.Dir.replace('file://', '') || ''
-    info(
-        `Run metadata: ${JSON.stringify(
-            {repository, commitID, sourceBranch, migrationDir},
-            null,
-            2
-        )}`
-    )
-    return {
-        input: {
-            envName: 'CI',
-            projectName: `${repository}/${migrationDir}`,
-            branch: sourceBranch ?? 'unknown',
-            commit: commitID ?? 'unknown',
-            url:
-                github?.context?.payload?.pull_request?.html_url ??
-                github?.context?.payload?.repository?.html_url ??
-                'unknown',
-            status:
-                res.exitCode === ExitCodes.Success ? Status.Success : Status.Failure,
-            payload: res.raw
-        }
+  const { GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID } = process.env
+  // GITHUB_HEAD_REF is set only on pull requests
+  // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
+  const sourceBranch =
+    process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME
+  const migrationDir = res.summary?.Env.Dir.replace('file://', '') || ''
+  info(
+    `Run metadata: ${JSON.stringify(
+      { repository, commitID, sourceBranch, migrationDir },
+      null,
+      2
+    )}`
+  )
+  return {
+    input: {
+      envName: 'CI',
+      projectName: `${repository}/${migrationDir}`,
+      branch: sourceBranch ?? 'unknown',
+      commit: commitID ?? 'unknown',
+      url:
+        github?.context?.payload?.pull_request?.html_url ??
+        github?.context?.payload?.repository?.html_url ??
+        'unknown',
+      status:
+        res.exitCode === ExitCodes.Success ? Status.Success : Status.Failure,
+      payload: res.raw
     }
+  }
 }
 
 export async function reportToCloud(
-    opts: Options,
-    res: AtlasResult
+  opts: Options,
+  res: AtlasResult
 ): Promise<CreateReportPayload | void> {
-    const token = getInput('ariga-token')
-    if (!token) {
-        warning(`Skipping report to cloud missing ariga-token input`)
-        return
+  const token = getInput('ariga-token')
+  if (!token) {
+    warning(`Skipping report to cloud missing ariga-token input`)
+    return
+  }
+  info(`Reporting to cloud: ${getCloudURL()}`)
+  setSecret(token)
+  try {
+    return await request<CreateReportPayload>(
+      getCloudURL(),
+      mutation,
+      getMutationVariables(opts, res),
+      getHeaders(token)
+    )
+  } catch (e) {
+    let errMsg = e
+    if (e instanceof ClientError) {
+      errMsg = e.response.error
+      if (e.response.status === http.HttpCodes.Unauthorized) {
+        errMsg = `Invalid Token`
+      }
     }
-    info(`Reporting to cloud: ${getCloudURL()}`)
-    setSecret(token)
-    try {
-        return await request<CreateReportPayload>(
-            getCloudURL(),
-            mutation,
-            getMutationVariables(opts, res),
-            getHeaders(token)
-        )
-    } catch (e) {
-        let errMsg = e
-        if (e instanceof ClientError) {
-            errMsg = e.response.error
-            if (e.response.status === http.HttpCodes.Unauthorized) {
-                errMsg = `Invalid Token`
-            }
-        }
-        warning(`Received error: ${e}`)
-        warning(`Failed reporting to Ariga Cloud: ${errMsg}`)
-    }
+    warning(`Received error: ${e}`)
+    warning(`Failed reporting to Ariga Cloud: ${errMsg}`)
+  }
 }
 
-export async function cloudReports(
-    runID: string,
-): Promise<Run | undefined> {
-    notice(`Fetching cloud reports for runID: ${runID}`)
-    const token = getInput('ariga-token')
-    if (!token) {
-        warning(`Skipping report to cloud missing ariga-token input`)
+export async function cloudReports(runID: string): Promise<Run | undefined> {
+  console.log(`Fetching cloud reports for runID: ${runID}`)
+  const token = getInput('ariga-token')
+  if (!token) {
+    warning(`Skipping report to cloud missing ariga-token input`)
+  }
+  setSecret(token)
+  try {
+    return await request<Run, { id: string }>(
+      getCloudURL(),
+      query,
+      { id: runID },
+      getHeaders(token)
+    )
+  } catch (e) {
+    let errMsg = e
+    if (e instanceof ClientError) {
+      errMsg = e.response.error
+      if (e.response.status === http.HttpCodes.Unauthorized) {
+        errMsg = `Invalid Token`
+      }
     }
-    info(`Reporting to cloud: ${getCloudURL()}`)
-    setSecret(token)
-    try {
-        return await request<Run, string>(
-            getCloudURL(),
-            query,
-            runID,
-            getHeaders(token)
-        )
-    } catch (e) {
-        let errMsg = e
-        if (e instanceof ClientError) {
-            errMsg = e.response.error
-            if (e.response.status === http.HttpCodes.Unauthorized) {
-                errMsg = `Invalid Token`
-            }
-        }
-        warning(`Received error: ${e}`)
-        warning(`Failed reporting to Ariga Cloud: ${errMsg}`)
-    }
-    notice(`Finished fetching cloud reports for runID: ${runID}`)
+    warning(`Received error in fetching cloud reports: ${e}`)
+    warning(`Failed fetching from ariga cloud: ${errMsg}`)
+  }
 }
-
 
 export function getCloudURL(): string {
-    const au = getInput(`ariga-url`)
-    return new url.URL(
-        '/api/query',
-        au === '' ? 'https://ci.ariga.cloud' : au
-    ).toString()
+  const au = getInput(`ariga-url`)
+  return new url.URL(
+    '/api/query',
+    au === '' ? 'https://ci.ariga.cloud' : au
+  ).toString()
 }
 
 function getHeaders(token: string): { [p: string]: string } {
-    return {
-        Authorization: `Bearer ${token}`,
-        ...getUserAgent()
-    }
+  return {
+    Authorization: `Bearer ${token}`,
+    ...getUserAgent()
+  }
 }
 
 export function getDownloadURL(version: string): URL {
-    const url = new URL(
-        `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}`
-    )
-    const origin = new URL(getCloudURL()).origin
-    if (origin !== 'https://ci.ariga.cloud') {
-        url.searchParams.set('test', '1')
-    }
-    return url
+  const url = new URL(
+    `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}`
+  )
+  const origin = new URL(getCloudURL()).origin
+  if (origin !== 'https://ci.ariga.cloud') {
+    url.searchParams.set('test', '1')
+  }
+  return url
 }
