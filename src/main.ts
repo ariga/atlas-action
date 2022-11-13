@@ -37,7 +37,7 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
     if (payload) {
       res.cloudURL = payload.createReport.url
     }
-    // const clouds = await cloudReports(payload?.createReport?.runID!)
+    const clouds = await cloudReports(payload?.createReport?.runID!)
     // console.info(`Cloud reports: ${JSON.stringify(clouds)}`)
 
     report(input.opts, res.summary, res.cloudURL)

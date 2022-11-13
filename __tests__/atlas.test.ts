@@ -398,7 +398,7 @@ describe('report to GitHub', () => {
     }
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
-    expect(spyOnNotice).toHaveBeenCalledTimes(1)
+    expect(spyOnNotice).toHaveBeenCalledTimes(3)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenCalledWith(
       'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries (MF101)\n\nDetails: https://atlasgo.io/lint/analyzers#MF101',
@@ -422,7 +422,7 @@ describe('report to GitHub', () => {
     }
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Failure)
-    expect(spyOnNotice).toHaveBeenCalledTimes(0)
+    expect(spyOnNotice).toHaveBeenCalledTimes(2)
     expect(spyOnError).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledWith(
       'executing statement: near "BAD": syntax error',
@@ -442,7 +442,7 @@ describe('report to GitHub', () => {
     }
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Failure)
-    expect(spyOnNotice).toHaveBeenCalledTimes(0)
+    expect(spyOnNotice).toHaveBeenCalledTimes(2)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
     expect(spyOnSetFailed).toHaveBeenCalledWith(
@@ -518,8 +518,8 @@ describe('all reports with pull request', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
-    expect(spyOnNotice).toHaveBeenCalledTimes(2)
-    expect(spyOnWarning).toHaveBeenCalledTimes(0)
+    expect(spyOnNotice).toHaveBeenCalledTimes(4)
+    expect(spyOnWarning).toHaveBeenCalledTimes(2)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenNthCalledWith(
       1,
@@ -582,8 +582,8 @@ describe('all reports with pull request', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
-    expect(spyOnNotice).toHaveBeenCalledTimes(2)
-    expect(spyOnWarning).toHaveBeenCalledTimes(0)
+    expect(spyOnNotice).toHaveBeenCalledTimes(4)
+    expect(spyOnWarning).toHaveBeenCalledTimes(2)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(actualRequestBody).toEqual({
       query: mutation,
@@ -685,8 +685,8 @@ describe('all reports with push (branch)', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
-    expect(spyOnNotice).toHaveBeenCalledTimes(2)
-    expect(spyOnWarning).toHaveBeenCalledTimes(0)
+    expect(spyOnNotice).toHaveBeenCalledTimes(4)
+    expect(spyOnWarning).toHaveBeenCalledTimes(2)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(actualRequestBody).toEqual({
       query: mutation,
