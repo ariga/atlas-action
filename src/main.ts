@@ -37,12 +37,12 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
     if (payload) {
       res.cloudURL = payload.createReport.url
     }
-    const clouds = await cloudReports(payload?.createReport?.runID!)
-    console.info(`Cloud reports: ${JSON.stringify(clouds)}`)
+    // const clouds = await cloudReports(payload?.createReport?.runID!)
+    // console.info(`Cloud reports: ${JSON.stringify(clouds)}`)
 
     report(input.opts, res.summary, res.cloudURL)
     if (res.summary) {
-      summarize(res.summary, clouds)
+      summarize(res.summary, undefined)
       const body = commentBody(res.cloudURL)
       if (input.opts.token && input.pr) {
         const client = new Octokit({ auth: input.opts.token })

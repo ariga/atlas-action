@@ -1,6 +1,15 @@
 """Maps a Bytes GraphQL scalar to a byte type."""
 scalar Bytes
 
+"""
+An object with an ID.
+Follows the [Relay Global Object Identification Specification](https://relay.dev/graphql/objectidentification.htm)
+"""
+interface Node {
+    """The id of the object."""
+    id: ID!
+}
+
 """Input type of CreateReport"""
 input CreateReportInput {
     """The Environment of the report."""
@@ -34,6 +43,11 @@ type Mutation {
 
 type Query {
     _dummy: String
+    """Fetches an object given its ID."""
+    node(
+        """ID of the object."""
+        id: ID!
+    ): Node
 }
 
 """RunStatus is enum for the field status"""
@@ -42,3 +56,41 @@ enum RunStatus {
     FAILED
     UNKNOWN
 }
+
+type Run implements Node {
+    id: ID!
+    cloudReports: [SQLCheckReport]!
+}
+
+"""
+SQLCheckReport describes an analysis report with an optional specific diagnostic.
+"""
+type SQLCheckReport {
+    """
+    Report text.
+    """
+    text: String!
+    """
+    List of SQLCheckDiagnostic.
+    """
+    diagnostics: [SQLCheckDiagnostic]!
+}
+
+"""
+SQLCheckDiagnostic is a text associated with a specific position of a statement in a file.
+"""
+type SQLCheckDiagnostic {
+    """
+    Diagnostic position.
+    """
+    pos: Int!
+    """
+    Diagnostic text.
+    """
+    text: String!
+    """
+    Diagnostic code.
+    """
+    code: String!
+}
+

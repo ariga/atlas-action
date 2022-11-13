@@ -23,20 +23,14 @@ export const mutation = gql`
 `
 
 export const query = gql`
-    query cloudReports($runID: String!) {
-        runs(where:{id:$runID}){
-            edges{
-                node{
-                    cloudReports{
-                        text
-                        diagnostics{
-                            code
-                            text
-                        }
-                    }
-                }
+    query Run($id: ID!) {
+        node(id: $id){
+        ...on Run{
+            cloudReports {
+                text
             }
         }
+    }
     }
 `
 
@@ -59,20 +53,10 @@ type CreateReportInput = {
     }
 }
 
-export interface CloudReportsPayload {
-    runs: {
-        edges: {
-            node: {
-                cloudReports: {
-                    text: string
-                    diagnostics: {
-                        text: string
-                        code: string
-                    }[]
-                }[]
-            }
-        }
-    }
+export interface Run {
+    cloudReports:{
+        text:string
+    }[]
 }
 
 
@@ -129,7 +113,7 @@ export async function reportToCloud(
     try {
         return await request<CreateReportPayload>(
             getCloudURL(),
-            query,
+            mutation,
             getMutationVariables(opts, res),
             getHeaders(token)
         )
@@ -148,7 +132,7 @@ export async function reportToCloud(
 
 export async function cloudReports(
     runID: string,
-): Promise<CloudReportsPayload | undefined> {
+): Promise<Run | undefined> {
     notice(`Fetching cloud reports for runID: ${runID}`)
     const token = getInput('ariga-token')
     if (!token) {
@@ -157,9 +141,9 @@ export async function cloudReports(
     info(`Reporting to cloud: ${getCloudURL()}`)
     setSecret(token)
     try {
-        return await request<CloudReportsPayload, string>(
+        return await request<Run, string>(
             getCloudURL(),
-            mutation,
+            query,
             runID,
             getHeaders(token)
         )
