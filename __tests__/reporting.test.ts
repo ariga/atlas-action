@@ -32,7 +32,7 @@ describe('summary', () => {
   const testcase = (name: string, cloudURL?: string) => {
     return async () => {
       const sum = await loadRun(name)
-      summarize(sum, cloudURL)
+      summarize(sum, undefined, cloudURL)
       const s = summary.stringify()
       const expected = await fs.readFile(path.join(dir, `${name}.expected.txt`))
       expect(s).toEqual(expected.toString())
