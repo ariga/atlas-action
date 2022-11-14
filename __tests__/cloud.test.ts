@@ -1,6 +1,13 @@
 import { expect } from '@jest/globals'
 import { AtlasResult, ExitCodes } from '../src/atlas'
-import {cloudReports, getCloudURL, mutation, query, reportToCloud, Status} from '../src/cloud'
+import {
+  cloudReports,
+  getCloudURL,
+  mutation,
+  query,
+  reportToCloud,
+  Status
+} from '../src/cloud'
 import * as http from '@actions/http-client'
 import nock from 'nock'
 import * as core from '@actions/core'
@@ -207,8 +214,8 @@ describe('report to cloud', () => {
 
 describe('cloud reports', () => {
   let spyOnWarning: jest.SpyInstance,
-      gqlInterceptor: nock.Interceptor,
-      cleanupFn: () => Promise<void>
+    gqlInterceptor: nock.Interceptor,
+    cleanupFn: () => Promise<void>
 
   beforeEach(async () => {
     spyOnWarning = jest.spyOn(core, 'warning')
@@ -225,12 +232,12 @@ describe('cloud reports', () => {
     process.env = env
     cleanupFn = cleanup
     gqlInterceptor = nock(process.env['INPUT_ARIGA-URL'] as string)
-        .post('/api/query')
-        .matchHeader(
-            'Authorization',
-            `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
-        )
-        .matchHeader('User-Agent', process.env.ATLASCI_USER_AGENT as string)
+      .post('/api/query')
+      .matchHeader(
+        'Authorization',
+        `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
+      )
+      .matchHeader('User-Agent', process.env.ATLASCI_USER_AGENT as string)
   })
 
   afterEach(async () => {
@@ -245,37 +252,37 @@ describe('cloud reports', () => {
         node: {
           cloudReports: [
             {
-              text: "Cloud reports",
+              text: 'Cloud reports',
               diagnostics: [
                 {
-                  text: "diag",
+                  text: 'diag'
                 }
-              ],
+              ]
             }
           ]
         }
       }
     })
     const spyOnRequest = jest.spyOn(gql, 'request')
-    const reports = await cloudReports("8589934593")
+    const reports = await cloudReports('8589934593')
     expect(reports).toBeTruthy()
     expect(reports?.node.cloudReports.length).toEqual(1)
-    expect(reports?.node.cloudReports[0].text).toEqual("Cloud reports")
+    expect(reports?.node.cloudReports[0].text).toEqual('Cloud reports')
     expect(reports?.node.cloudReports[0].diagnostics.length).toEqual(1)
-    expect(reports?.node.cloudReports[0].diagnostics[0].text).toEqual("diag")
+    expect(reports?.node.cloudReports[0].diagnostics[0].text).toEqual('diag')
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
 
     expect(spyOnRequest).toBeCalledWith(
-        'https://ci.ariga.cloud/api/query',
-        query,
-        {
-            id: "8589934593",
-        },
-        {
-          Authorization: 'Bearer mysecrettoken',
-          'User-Agent': 'test-atlasci-action'
-        }
+      'https://ci.ariga.cloud/api/query',
+      query,
+      {
+        id: '8589934593'
+      },
+      {
+        Authorization: 'Bearer mysecrettoken',
+        'User-Agent': 'test-atlasci-action'
+      }
     )
   })
 })
