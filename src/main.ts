@@ -64,7 +64,7 @@ function commentBody(cloudURL?: string): string {
   if (cloudURL) {
     s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`
   } else {
-    s += `To get access to more safety checks, <a href="https://auth.ariga.cloud/login">sign up to Ariga Cloud</a>`
+    s += `To get access to more safety checks, <a href="https://auth.ariga.cloud/login">sign up for Ariga Cloud</a>`
   }
   s += '<hr/>' + commentFooter
   return s

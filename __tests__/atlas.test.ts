@@ -404,7 +404,7 @@ describe('report to GitHub', () => {
       'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries (MF101)\n\nDetails: https://atlasgo.io/lint/analyzers#MF101',
       {
         file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
-        startLine: 1,
+        startLine: 2,
         title: 'data dependent changes detected'
       }
     )
@@ -454,7 +454,7 @@ describe('report to GitHub', () => {
 describe('all reports with pull request', () => {
   let actualRequestBody: { [key: string]: string & Variables },
     gqlInterceptor: nock.Interceptor,
-    gqlInterceptor2: nock.Interceptor,
+    cloudReportsQueryInterceptor: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
     spyOnWarning: jest.SpyInstance,
@@ -486,7 +486,7 @@ describe('all reports with pull request', () => {
         `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
       )
       .matchHeader('User-Agent', process.env.ATLASCI_USER_AGENT as string)
-    gqlInterceptor2 = nock(url)
+    cloudReportsQueryInterceptor = nock(url)
       .post('/api/query', function (body) {
         return body
       })
@@ -521,17 +521,20 @@ describe('all reports with pull request', () => {
         }
       }
     })
-    const scope2 = gqlInterceptor2.reply(http.HttpCodes.OK, {
-      data: {
-        node: {
-          cloudReports: [
-            {
-              text: 'text'
-            }
-          ]
+    const cloudQueryScope = cloudReportsQueryInterceptor.reply(
+      http.HttpCodes.OK,
+      {
+        data: {
+          node: {
+            cloudReports: [
+              {
+                text: 'text'
+              }
+            ]
+          }
         }
       }
-    })
+    )
     const input: RunInput = {
       opts: OptionsFromEnv(process.env),
       pr: undefined
@@ -539,7 +542,7 @@ describe('all reports with pull request', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
-    expect(scope2.isDone()).toBeTruthy()
+    expect(cloudQueryScope.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
     expect(spyOnWarning).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(0)
@@ -548,7 +551,7 @@ describe('all reports with pull request', () => {
       'Adding a unique index "uniq_name" on table "users" might fail in case column "name" contains duplicate entries (MF101)\n\nDetails: https://atlasgo.io/lint/analyzers#MF101',
       {
         file: '__tests__/testdata/sqlite-with-diagnostics/20220823075011_uniq_name.sql',
-        startLine: 1,
+        startLine: 2,
         title: 'data dependent changes detected'
       }
     )
@@ -597,17 +600,20 @@ describe('all reports with pull request', () => {
         }
       }
     })
-    const scope2 = gqlInterceptor2.reply(http.HttpCodes.OK, {
-      data: {
-        node: {
-          cloudReports: [
-            {
-              text: 'text'
-            }
-          ]
+    const cloudQueryScope = cloudReportsQueryInterceptor.reply(
+      http.HttpCodes.OK,
+      {
+        data: {
+          node: {
+            cloudReports: [
+              {
+                text: 'text'
+              }
+            ]
+          }
         }
       }
-    })
+    )
     const input: RunInput = {
       opts: OptionsFromEnv(process.env),
       pr: undefined
@@ -615,7 +621,7 @@ describe('all reports with pull request', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
-    expect(scope2.isDone()).toBeTruthy()
+    expect(cloudQueryScope.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
     expect(spyOnWarning).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(0)
@@ -653,7 +659,7 @@ describe('all reports with pull request', () => {
 describe('all reports with push (branch)', () => {
   let actualRequestBody: { [key: string]: string & Variables },
     gqlInterceptor: nock.Interceptor,
-    gqlInterceptor2: nock.Interceptor,
+    cloudReportsQueryInterceptor: nock.Interceptor,
     spyOnNotice: jest.SpyInstance,
     spyOnError: jest.SpyInstance,
     spyOnWarning: jest.SpyInstance,
@@ -686,7 +692,7 @@ describe('all reports with push (branch)', () => {
         `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
       )
       .matchHeader('User-Agent', process.env.ATLASCI_USER_AGENT as string)
-    gqlInterceptor2 = nock(url)
+    cloudReportsQueryInterceptor = nock(url)
       .post('/api/query', function (body) {
         return body
       })
@@ -722,17 +728,20 @@ describe('all reports with push (branch)', () => {
         }
       }
     })
-    const scope2 = gqlInterceptor2.reply(http.HttpCodes.OK, {
-      data: {
-        node: {
-          cloudReports: [
-            {
-              text: 'some text'
-            }
-          ]
+    const cloudQueryScope = cloudReportsQueryInterceptor.reply(
+      http.HttpCodes.OK,
+      {
+        data: {
+          node: {
+            cloudReports: [
+              {
+                text: 'some text'
+              }
+            ]
+          }
         }
       }
-    })
+    )
     const input: RunInput = {
       opts: OptionsFromEnv(process.env),
       pr: undefined
@@ -740,6 +749,7 @@ describe('all reports with push (branch)', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
+    expect(cloudQueryScope.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
     expect(spyOnWarning).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(0)

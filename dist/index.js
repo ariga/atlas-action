@@ -424,7 +424,7 @@ function report(opts, s, cloudURL) {
                     msg = `${msg} (${diagnostic.Code})\n\nDetails: https://atlasgo.io/lint/analyzers#${diagnostic.Code}`;
                 }
                 annotate(msg, {
-                    startLine: 1,
+                    startLine: line(file.Text, diagnostic.Pos),
                     file: fp,
                     title: report.Text
                 });
@@ -477,7 +477,7 @@ function summarize(s, c, cloudURL) {
             }
             rows.push([
                 icon('special-warning-icon'),
-                'analyze database schema',
+                'Analyze Database Schema',
                 c.node.cloudReports.length.toString() +
                     ' reports were found in analysis',
                 diags.join('\n\n')
@@ -546,6 +546,10 @@ function findComment(client, pr) {
             finally { if (e_1) throw e_1.error; }
         }
     });
+}
+function line(s, pos) {
+    const c = s.substring(0, pos).split('\n');
+    return c ? c.length : 1;
 }
 //# sourceMappingURL=github.js.map
 
@@ -714,7 +718,7 @@ function commentBody(cloudURL) {
         s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`;
     }
     else {
-        s += `To get access to more safety checks, <a href="https://auth.ariga.cloud/login">sign up to Ariga Cloud</a>`;
+        s += `To get access to more safety checks, <a href="https://auth.ariga.cloud/login">sign up for Ariga Cloud</a>`;
     }
     s += '<hr/>' + commentFooter;
     return s;

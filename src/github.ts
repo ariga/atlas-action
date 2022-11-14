@@ -77,7 +77,7 @@ export function report(opts: Options, s?: Summary, cloudURL?: string): void {
           msg = `${msg} (${diagnostic.Code})\n\nDetails: https://atlasgo.io/lint/analyzers#${diagnostic.Code}`
         }
         annotate(msg, {
-          startLine: 1,
+          startLine: line(file.Text, diagnostic.Pos),
           file: fp,
           title: report.Text
         })
@@ -144,7 +144,7 @@ export function summarize(
       }
       rows.push([
         icon('special-warning-icon'),
-        'analyze database schema',
+        'Analyze Database Schema',
         c.node.cloudReports.length.toString() +
           ' reports were found in analysis',
         diags.join('\n\n')
@@ -224,4 +224,9 @@ async function findComment(
       }
     }
   }
+}
+
+function line(s: string, pos: number): number {
+  const c = s.substring(0, pos).split('\n')
+  return c ? c.length : 1
 }
