@@ -2,7 +2,7 @@ import { AtlasResult, ExitCodes, installAtlas, runAtlas } from './atlas'
 import { info, warning, setFailed, summary } from '@actions/core'
 import { comment, report, summarize } from './github'
 import { context } from '@actions/github'
-import { reportToCloud, cloudReports, Run } from './cloud'
+import { reportToCloud, cloudReports, CloudReportsPayload } from './cloud'
 import { OptionsFromEnv, PullReqFromContext, RunInput } from './input'
 import { Octokit } from '@octokit/rest'
 import { vercheck } from './vercheck'
@@ -12,7 +12,6 @@ const commentFooter =
 
 // Entry point for GitHub Action runner.
 export async function run(input: RunInput): Promise<AtlasResult | void> {
-  info('Starting Atlas GitHub Action')
   const ref = process.env.GITHUB_ACTION_REF
   if (!input.opts.skipCheckForUpdate && ref?.startsWith('v')) {
     try {
@@ -37,13 +36,13 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
     if (payload) {
       res.cloudURL = payload.createReport.url
     }
-    let clouds: Run | undefined
+    let reports: CloudReportsPayload | undefined
     if (payload?.createReport?.runID) {
-      clouds = await cloudReports(payload?.createReport?.runID)
+      reports = await cloudReports(payload.createReport.runID)
     }
     report(input.opts, res.summary, res.cloudURL)
     if (res.summary) {
-      summarize(res.summary, clouds)
+      summarize(res.summary, reports)
       const body = commentBody(res.cloudURL)
       if (input.opts.token && input.pr) {
         const client = new Octokit({ auth: input.opts.token })

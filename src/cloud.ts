@@ -23,7 +23,7 @@ export const mutation = gql`
 `
 
 export const query = gql`
-  query Run($id: ID!) {
+  query cloudReports($id: ID!) {
     node(id: $id) {
       ... on Run {
         cloudReports {
@@ -58,7 +58,7 @@ type CreateReportInput = {
   }
 }
 
-export interface Run {
+export interface CloudReportsPayload {
   node: {
     cloudReports: {
       text: string
@@ -141,15 +141,16 @@ export async function reportToCloud(
   }
 }
 
-export async function cloudReports(runID: string): Promise<Run | undefined> {
-  console.log(`Fetching cloud reports for runID: ${runID}`)
+export async function cloudReports(
+  runID: string
+): Promise<CloudReportsPayload | undefined> {
   const token = getInput('ariga-token')
   if (!token) {
-    warning(`Skipping report to cloud missing ariga-token input`)
+    warning(`Skipping cloud reports missing ariga-token input`)
   }
   setSecret(token)
   try {
-    return await request<Run, { id: string }>(
+    return await request<CloudReportsPayload, { id: string }>(
       getCloudURL(),
       query,
       { id: runID },
@@ -163,8 +164,8 @@ export async function cloudReports(runID: string): Promise<Run | undefined> {
         errMsg = `Invalid Token`
       }
     }
-    warning(`Received error in fetching cloud reports: ${e}`)
-    warning(`Failed fetching from ariga cloud: ${errMsg}`)
+    warning(`Received error: ${e}`)
+    warning(`Failed fetching from Ariga cloud: ${errMsg}`)
   }
 }
 

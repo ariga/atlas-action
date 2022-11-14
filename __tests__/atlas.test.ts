@@ -526,7 +526,7 @@ describe('all reports with pull request', () => {
         node: {
           cloudReports: [
             {
-              text: 'some text'
+              text: 'text'
             }
           ]
         }
@@ -602,7 +602,7 @@ describe('all reports with pull request', () => {
         node: {
           cloudReports: [
             {
-              text: 'some text'
+              text: 'text'
             }
           ]
         }
@@ -615,6 +615,7 @@ describe('all reports with pull request', () => {
     const res = (await run(input)) as AtlasResult
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
+    expect(scope2.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
     expect(spyOnWarning).toHaveBeenCalledTimes(0)
     expect(spyOnError).toHaveBeenCalledTimes(0)

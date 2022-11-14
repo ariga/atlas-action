@@ -188,7 +188,7 @@ exports.mutation = (0, graphql_request_1.gql) `
   }
 `;
 exports.query = (0, graphql_request_1.gql) `
-  query Run($id: ID!) {
+  query cloudReports($id: ID!) {
     node(id: $id) {
       ... on Run {
         cloudReports {
@@ -256,10 +256,9 @@ function reportToCloud(opts, res) {
 exports.reportToCloud = reportToCloud;
 function cloudReports(runID) {
     return __awaiter(this, void 0, void 0, function* () {
-        console.log(`Fetching cloud reports for runID: ${runID}`);
         const token = (0, core_1.getInput)('ariga-token');
         if (!token) {
-            (0, core_1.warning)(`Skipping report to cloud missing ariga-token input`);
+            (0, core_1.warning)(`Skipping cloud reports missing ariga-token input`);
         }
         (0, core_1.setSecret)(token);
         try {
@@ -273,8 +272,8 @@ function cloudReports(runID) {
                     errMsg = `Invalid Token`;
                 }
             }
-            (0, core_1.warning)(`Received error in fetching cloud reports: ${e}`);
-            (0, core_1.warning)(`Failed fetching from ariga cloud: ${errMsg}`);
+            (0, core_1.warning)(`Received error: ${e}`);
+            (0, core_1.warning)(`Failed fetching from Ariga cloud: ${errMsg}`);
         }
     });
 }
@@ -437,7 +436,7 @@ function report(opts, s, cloudURL) {
     }
 }
 exports.report = report;
-function summarize(s, r, cloudURL) {
+function summarize(s, c, cloudURL) {
     var _a, _b, _c;
     core_1.summary.addHeading('Atlas Lint Report');
     core_1.summary.addEOL();
@@ -469,8 +468,8 @@ function summarize(s, r, cloudURL) {
         }
         rows.push([icon(status), step.Name, step.Text, diags.join('\n\n')]);
     }
-    if (r) {
-        for (const cloudReport of r.node.cloudReports || []) {
+    if (c) {
+        for (const cloudReport of c.node.cloudReports || []) {
             const diags = [];
             diags.push(cloudReport.text + '\n');
             for (const diag of cloudReport.diagnostics || []) {
@@ -479,7 +478,8 @@ function summarize(s, r, cloudURL) {
             rows.push([
                 icon('special-warning-icon'),
                 'analyze database schema',
-                r.node.cloudReports.length.toString() + ' reports were found in analysis',
+                c.node.cloudReports.length.toString() +
+                    ' reports were found in analysis',
                 diags.join('\n\n')
             ]);
         }
@@ -656,9 +656,8 @@ const vercheck_1 = __nccwpck_require__(3495);
 const commentFooter = 'Migrations automatically reviewed by <a href="https://atlasgo.io/integrations/github-actions">Atlas</a>';
 // Entry point for GitHub Action runner.
 function run(input) {
-    var _a, _b, _c;
+    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
-        (0, core_1.info)('Starting Atlas GitHub Action');
         const ref = process.env.GITHUB_ACTION_REF;
         if (!input.opts.skipCheckForUpdate && (ref === null || ref === void 0 ? void 0 : ref.startsWith('v'))) {
             try {
@@ -684,13 +683,13 @@ function run(input) {
             if (payload) {
                 res.cloudURL = payload.createReport.url;
             }
-            let clouds;
+            let reports;
             if ((_a = payload === null || payload === void 0 ? void 0 : payload.createReport) === null || _a === void 0 ? void 0 : _a.runID) {
-                clouds = yield (0, cloud_1.cloudReports)((_b = payload === null || payload === void 0 ? void 0 : payload.createReport) === null || _b === void 0 ? void 0 : _b.runID);
+                reports = yield (0, cloud_1.cloudReports)(payload.createReport.runID);
             }
             (0, github_1.report)(input.opts, res.summary, res.cloudURL);
             if (res.summary) {
-                (0, github_1.summarize)(res.summary, clouds);
+                (0, github_1.summarize)(res.summary, reports);
                 const body = commentBody(res.cloudURL);
                 if (input.opts.token && input.pr) {
                     const client = new rest_1.Octokit({ auth: input.opts.token });
@@ -704,7 +703,7 @@ function run(input) {
             return res;
         }
         catch (error) {
-            (0, core_1.setFailed)((_c = error === null || error === void 0 ? void 0 : error.message) !== null && _c !== void 0 ? _c : error);
+            (0, core_1.setFailed)((_b = error === null || error === void 0 ? void 0 : error.message) !== null && _b !== void 0 ? _b : error);
         }
     });
 }
