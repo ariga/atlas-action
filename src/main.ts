@@ -38,7 +38,7 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
     }
     report(input.opts, res.summary, res.cloudURL)
     if (res.summary) {
-      summarize(res.summary)
+      summarize(res.summary, payload?.createReport.cloudReports)
       const body = commentBody(res.cloudURL)
       if (input.opts.token && input.pr) {
         const client = new Octokit({ auth: input.opts.token })
@@ -59,6 +59,8 @@ function commentBody(cloudURL?: string): string {
   let s = summary.stringify()
   if (cloudURL) {
     s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`
+  } else {
+    s += `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`
   }
   s += '<hr/>' + commentFooter
   return s
