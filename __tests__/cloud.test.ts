@@ -68,7 +68,17 @@ describe('report to cloud', () => {
       data: {
         createReport: {
           runID: '8589934593',
-          url: cloudURL
+          url: cloudURL,
+          cloudReports: [
+            {
+              text: 'Cloud reports',
+              diagnostics: [
+                {
+                  text: 'diag'
+                }
+              ]
+            }
+          ]
         }
       }
     })
@@ -78,6 +88,10 @@ describe('report to cloud', () => {
     expect(payload).toBeTruthy()
     expect(payload?.createReport.url).toEqual(cloudURL)
     expect(payload?.createReport.runID).toEqual('8589934593')
+    expect(payload?.createReport.cloudReports.length).toEqual(1)
+    expect(payload?.createReport.cloudReports[0].text).toEqual('Cloud reports')
+    expect(payload?.createReport.cloudReports[0].diagnostics.length).toEqual(1)
+    expect(payload?.createReport.cloudReports[0].diagnostics[0].text).toEqual('diag')
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
 

@@ -7,6 +7,7 @@ import { expect } from '@jest/globals'
 import * as core from '@actions/core'
 import { Options, OptionsFromEnv } from '../src/input'
 import { Octokit } from '@octokit/rest'
+import {CloudReports} from "../src/cloud";
 
 const dir = path.join('__tests__', 'testdata', 'runs')
 
@@ -29,21 +30,46 @@ describe('summary', () => {
     await summary.clear()
   })
 
-  const testcase = (name: string, cloudURL?: string) => {
+  const testcase = (
+      name: string,
+      cloudReports?: CloudReports,
+      cloudURL?: string
+  ) => {
     return async () => {
       const sum = await loadRun(name)
-      summarize(sum, undefined, cloudURL)
+      summarize(sum, cloudReports, cloudURL)
       const s = summary.stringify()
       const expected = await fs.readFile(path.join(dir, `${name}.expected.txt`))
       expect(s).toEqual(expected.toString())
     }
   }
 
+  const reports = [
+    {
+      text: 'Cloud reports',
+      diagnostics: [
+        {
+          text: 'diag1',
+          code: 'code1',
+          pos: 0
+        },
+        {
+          text: 'diag2',
+          code: 'code2',
+          pos: 0
+        }
+      ]
+    }
+  ]
   test('base', testcase('base'))
   test('err', testcase('error'))
   test('sqlerr', testcase('sqlerr'))
   test('checksum', testcase('checksum'))
-  test('cloudURL', testcase('cloudurl', 'https://tenant.ariga.cloud/ci/123'))
+  test('cloudURL', testcase('cloudurl', undefined, 'https://tenant.ariga.cloud/ci/123'))
+  test(
+      'cloudReports',
+      testcase('cloudreports', reports, 'https://tenant.ariga.cloud/ci/123')
+  )
 })
 
 describe('annotations', () => {
