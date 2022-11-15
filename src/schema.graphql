@@ -1,15 +1,6 @@
 """Maps a Bytes GraphQL scalar to a byte type."""
 scalar Bytes
 
-"""
-An object with an ID.
-Follows the [Relay Global Object Identification Specification](https://relay.dev/graphql/objectidentification.htm)
-"""
-interface Node {
-    """The id of the object."""
-    id: ID!
-}
-
 """Input type of CreateReport"""
 input CreateReportInput {
     """The Environment of the report."""
@@ -35,6 +26,8 @@ type CreateReportPayload {
     runID: ID!
     """The URL for the report."""
     url: String!
+    """List of cloud Reports."""
+    cloudReports: [SQLCheckReport]!
 }
 
 type Mutation {
@@ -43,11 +36,6 @@ type Mutation {
 
 type Query {
     _dummy: String
-    """Fetches an object given its ID."""
-    node(
-        """ID of the object."""
-        id: ID!
-    ): Node
 }
 
 """RunStatus is enum for the field status"""
@@ -55,11 +43,6 @@ enum RunStatus {
     SUCCESSFUL
     FAILED
     UNKNOWN
-}
-
-type Run implements Node {
-    id: ID!
-    cloudReports: [SQLCheckReport]!
 }
 
 """
@@ -93,4 +76,3 @@ type SQLCheckDiagnostic {
     """
     code: String!
 }
-

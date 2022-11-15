@@ -18,21 +18,12 @@ export const mutation = gql`
     createReport(input: $input) {
       runID
       url
-    }
-  }
-`
-
-export const query = gql`
-  query cloudReports($id: ID!) {
-    node(id: $id) {
-      ... on Run {
-        cloudReports {
+      cloudReports {
+        text
+        diagnostics {
           text
-          diagnostics {
-            text
-            code
-            pos
-          }
+          code
+          pos
         }
       }
     }
@@ -43,6 +34,14 @@ interface CreateReportPayload {
   createReport: {
     runID: string
     url: string
+    cloudReports: {
+      text: string
+      diagnostics: {
+        text: string
+        code: string
+        pos: number
+      }[]
+    }[]
   }
 }
 
@@ -58,18 +57,14 @@ type CreateReportInput = {
   }
 }
 
-export interface CloudReportsPayload {
-  node: {
-    cloudReports: {
-      text: string
-      diagnostics: {
-        text: string
-        code: string
-        pos: number
-      }[]
-    }[]
-  }
-}
+export type CloudReports = {
+  text: string
+  diagnostics: {
+    text: string
+    code: string
+    pos: number
+  }[]
+}[]
 
 export enum Status {
   Success = 'SUCCESSFUL',
@@ -138,34 +133,6 @@ export async function reportToCloud(
     }
     warning(`Received error: ${e}`)
     warning(`Failed reporting to Ariga Cloud: ${errMsg}`)
-  }
-}
-
-export async function cloudReports(
-  runID: string
-): Promise<CloudReportsPayload | undefined> {
-  const token = getInput('ariga-token')
-  if (!token) {
-    warning(`Skipping cloud reports missing ariga-token input`)
-  }
-  setSecret(token)
-  try {
-    return await request<CloudReportsPayload, { id: string }>(
-      getCloudURL(),
-      query,
-      { id: runID },
-      getHeaders(token)
-    )
-  } catch (e) {
-    let errMsg = e
-    if (e instanceof ClientError) {
-      errMsg = e.response.error
-      if (e.response.status === http.HttpCodes.Unauthorized) {
-        errMsg = `Invalid Token`
-      }
-    }
-    warning(`Received error: ${e}`)
-    warning(`Failed fetching from Ariga cloud: ${errMsg}`)
   }
 }
 

@@ -166,7 +166,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getDownloadURL = exports.getCloudURL = exports.cloudReports = exports.reportToCloud = exports.Status = exports.query = exports.mutation = exports.ARCHITECTURE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
+exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.Status = exports.mutation = exports.ARCHITECTURE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
 const github = __importStar(__nccwpck_require__(5438));
 const core_1 = __nccwpck_require__(2186);
 const atlas_1 = __nccwpck_require__(1236);
@@ -184,20 +184,12 @@ exports.mutation = (0, graphql_request_1.gql) `
     createReport(input: $input) {
       runID
       url
-    }
-  }
-`;
-exports.query = (0, graphql_request_1.gql) `
-  query cloudReports($id: ID!) {
-    node(id: $id) {
-      ... on Run {
-        cloudReports {
+      cloudReports {
+        text
+        diagnostics {
           text
-          diagnostics {
-            text
-            code
-            pos
-          }
+          code
+          pos
         }
       }
     }
@@ -254,30 +246,6 @@ function reportToCloud(opts, res) {
     });
 }
 exports.reportToCloud = reportToCloud;
-function cloudReports(runID) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const token = (0, core_1.getInput)('ariga-token');
-        if (!token) {
-            (0, core_1.warning)(`Skipping cloud reports missing ariga-token input`);
-        }
-        (0, core_1.setSecret)(token);
-        try {
-            return yield (0, graphql_request_1.request)(getCloudURL(), exports.query, { id: runID }, getHeaders(token));
-        }
-        catch (e) {
-            let errMsg = e;
-            if (e instanceof graphql_request_1.ClientError) {
-                errMsg = e.response.error;
-                if (e.response.status === http.HttpCodes.Unauthorized) {
-                    errMsg = `Invalid Token`;
-                }
-            }
-            (0, core_1.warning)(`Received error: ${e}`);
-            (0, core_1.warning)(`Failed fetching from Ariga cloud: ${errMsg}`);
-        }
-    });
-}
-exports.cloudReports = cloudReports;
 function getCloudURL() {
     const au = (0, core_1.getInput)(`ariga-url`);
     return new url.URL('/api/query', au === '' ? 'https://ci.ariga.cloud' : au).toString();
@@ -436,7 +404,7 @@ function report(opts, s, cloudURL) {
     }
 }
 exports.report = report;
-function summarize(s, c, cloudURL) {
+function summarize(s, cloudReports, cloudURL) {
     var _a, _b, _c;
     core_1.summary.addHeading('Atlas Lint Report');
     core_1.summary.addEOL();
@@ -468,8 +436,8 @@ function summarize(s, c, cloudURL) {
         }
         rows.push([icon(status), step.Name, step.Text, diags.join('\n\n')]);
     }
-    if (c) {
-        for (const cloudReport of c.node.cloudReports || []) {
+    if (cloudReports) {
+        for (const cloudReport of cloudReports || []) {
             const diags = [];
             diags.push(cloudReport.text + '\n');
             for (const diag of cloudReport.diagnostics || []) {
@@ -478,8 +446,7 @@ function summarize(s, c, cloudURL) {
             rows.push([
                 icon('special-warning-icon'),
                 'Analyze Database Schema',
-                c.node.cloudReports.length.toString() +
-                    ' reports were found in analysis',
+                cloudReports.length.toString() + ' reports were found in analysis',
                 diags.join('\n\n')
             ]);
         }
@@ -660,7 +627,7 @@ const vercheck_1 = __nccwpck_require__(3495);
 const commentFooter = 'Migrations automatically reviewed by <a href="https://atlasgo.io/integrations/github-actions">Atlas</a>';
 // Entry point for GitHub Action runner.
 function run(input) {
-    var _a, _b;
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const ref = process.env.GITHUB_ACTION_REF;
         if (!input.opts.skipCheckForUpdate && (ref === null || ref === void 0 ? void 0 : ref.startsWith('v'))) {
@@ -687,13 +654,9 @@ function run(input) {
             if (payload) {
                 res.cloudURL = payload.createReport.url;
             }
-            let reports;
-            if ((_a = payload === null || payload === void 0 ? void 0 : payload.createReport) === null || _a === void 0 ? void 0 : _a.runID) {
-                reports = yield (0, cloud_1.cloudReports)(payload.createReport.runID);
-            }
             (0, github_1.report)(input.opts, res.summary, res.cloudURL);
             if (res.summary) {
-                (0, github_1.summarize)(res.summary, reports);
+                (0, github_1.summarize)(res.summary, payload === null || payload === void 0 ? void 0 : payload.createReport.cloudReports);
                 const body = commentBody(res.cloudURL);
                 if (input.opts.token && input.pr) {
                     const client = new rest_1.Octokit({ auth: input.opts.token });
@@ -707,7 +670,7 @@ function run(input) {
             return res;
         }
         catch (error) {
-            (0, core_1.setFailed)((_b = error === null || error === void 0 ? void 0 : error.message) !== null && _b !== void 0 ? _b : error);
+            (0, core_1.setFailed)((_a = error === null || error === void 0 ? void 0 : error.message) !== null && _a !== void 0 ? _a : error);
         }
     });
 }
@@ -718,7 +681,7 @@ function commentBody(cloudURL) {
         s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`;
     }
     else {
-        s += `To get access to more safety checks, <a href="https://auth.ariga.cloud/login">sign up for Ariga Cloud</a>`;
+        s += `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`;
     }
     s += '<hr/>' + commentFooter;
     return s;

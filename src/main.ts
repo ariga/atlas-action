@@ -2,7 +2,7 @@ import { AtlasResult, ExitCodes, installAtlas, runAtlas } from './atlas'
 import { info, warning, setFailed, summary } from '@actions/core'
 import { comment, report, summarize } from './github'
 import { context } from '@actions/github'
-import { reportToCloud, cloudReports, CloudReportsPayload } from './cloud'
+import { reportToCloud } from './cloud'
 import { OptionsFromEnv, PullReqFromContext, RunInput } from './input'
 import { Octokit } from '@octokit/rest'
 import { vercheck } from './vercheck'
@@ -36,13 +36,9 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
     if (payload) {
       res.cloudURL = payload.createReport.url
     }
-    let reports: CloudReportsPayload | undefined
-    if (payload?.createReport?.runID) {
-      reports = await cloudReports(payload.createReport.runID)
-    }
     report(input.opts, res.summary, res.cloudURL)
     if (res.summary) {
-      summarize(res.summary, reports)
+      summarize(res.summary, payload?.createReport.cloudReports)
       const body = commentBody(res.cloudURL)
       if (input.opts.token && input.pr) {
         const client = new Octokit({ auth: input.opts.token })
@@ -64,7 +60,7 @@ function commentBody(cloudURL?: string): string {
   if (cloudURL) {
     s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`
   } else {
-    s += `To get access to more safety checks, <a href="https://auth.ariga.cloud/login">sign up for Ariga Cloud</a>`
+    s += `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`
   }
   s += '<hr/>' + commentFooter
   return s
