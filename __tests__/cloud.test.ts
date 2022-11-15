@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals'
 import { AtlasResult, ExitCodes } from '../src/atlas'
-import { getCloudURL, mutation, reportToCloud, Status } from '../src/cloud'
+import { getCloudURL, mutation, reportToCloud } from '../src/cloud'
 import * as http from '@actions/http-client'
 import nock from 'nock'
 import * as core from '@actions/core'
@@ -8,6 +8,7 @@ import * as gql from 'graphql-request'
 import { createTestEnv } from './env'
 import { OptionsFromEnv, Options } from '../src/input'
 import path from 'path'
+import {RunStatus} from "../src/types/types";
 
 jest.setTimeout(30000)
 
@@ -76,8 +77,8 @@ describe('report to cloud', () => {
     let opts: Options = OptionsFromEnv(process.env)
     const payload = await reportToCloud(opts, res)
     expect(payload).toBeTruthy()
-    expect(payload?.createReport.url).toEqual(cloudURL)
-    expect(payload?.createReport.runID).toEqual('8589934593')
+    expect(payload?.url).toEqual(cloudURL)
+    expect(payload?.runID).toEqual('8589934593')
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
 
@@ -85,18 +86,16 @@ describe('report to cloud', () => {
       'https://ci.ariga.cloud/api/query',
       mutation,
       {
-        input: {
-          branch: process.env.GITHUB_HEAD_REF,
-          commit: process.env.GITHUB_SHA,
-          envName: 'CI',
-          payload: '[{"Name":"test","Text":"test"}]',
-          projectName: path.join(
+        branch: process.env.GITHUB_HEAD_REF,
+        commit: process.env.GITHUB_SHA,
+        envName: 'CI',
+        payload: '[{"Name":"test","Text":"test"}]',
+        projectName: path.join(
             process.env.GITHUB_REPOSITORY ?? '',
             res.summary?.Env?.Dir ?? ''
-          ),
-          status: Status.Success,
-          url: 'https://github.com/ariga/atlas-action/pull/1'
-        }
+        ),
+        status: RunStatus.Successful,
+        url: 'https://github.com/ariga/atlas-action/pull/1'
       },
       {
         Authorization: 'Bearer mysecrettoken',

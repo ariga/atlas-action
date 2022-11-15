@@ -34,7 +34,7 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
     info(`Event type: ${context.eventName}`)
     const payload = await reportToCloud(input.opts, res)
     if (payload) {
-      res.cloudURL = payload.createReport.url
+      res.cloudURL = payload.url
     }
     report(input.opts, res.summary, res.cloudURL)
     if (res.summary) {
