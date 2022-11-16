@@ -6,4 +6,3 @@
 diag1 (<a href="https://atlasgo.io/lint/analyzers#code1">code1</a>)
 
 diag2 (<a href="https://atlasgo.io/lint/analyzers#code2">code2</a>)</td></tr></table>
-<a href="https://tenant.ariga.cloud/ci/123">Full Report</a>
