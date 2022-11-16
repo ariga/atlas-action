@@ -101,6 +101,7 @@ export function summarize(
   interface cell {
     data: string
     header: boolean
+    colspan?: string
   }
 
   type row = (cell | string)[]
@@ -149,6 +150,12 @@ export function summarize(
         diags.join('\n\n')
       ])
     }
+  }
+  if (!cloudURL) {
+    rows.push([
+      { header: false, data: icon('special-warning-icon') },
+      { header: true, data: `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`, colspan: "3" },
+    ])
   }
   summary.addTable(rows)
   if (cloudURL) {

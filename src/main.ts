@@ -59,8 +59,6 @@ function commentBody(cloudURL?: string): string {
   let s = summary.stringify()
   if (cloudURL) {
     s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`
-  } else {
-    s += `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`
   }
   s += '<hr/>' + commentFooter
   return s
