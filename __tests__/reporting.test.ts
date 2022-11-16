@@ -6,8 +6,7 @@ import { report, summarize } from '../src/github'
 import { expect } from '@jest/globals'
 import * as core from '@actions/core'
 import { Options, OptionsFromEnv } from '../src/input'
-import { Octokit } from '@octokit/rest'
-import {CloudReports} from "../src/cloud";
+import { CloudReports } from '../src/cloud'
 
 const dir = path.join('__tests__', 'testdata', 'runs')
 
@@ -31,9 +30,9 @@ describe('summary', () => {
   })
 
   const testcase = (
-      name: string,
-      cloudReports?: CloudReports,
-      cloudURL?: string
+    name: string,
+    cloudReports?: CloudReports,
+    cloudURL?: string
   ) => {
     return async () => {
       const sum = await loadRun(name)
@@ -65,10 +64,13 @@ describe('summary', () => {
   test('err', testcase('error'))
   test('sqlerr', testcase('sqlerr'))
   test('checksum', testcase('checksum'))
-  test('cloudURL', testcase('cloudurl', undefined, 'https://tenant.ariga.cloud/ci/123'))
   test(
-      'cloudReports',
-      testcase('cloudreports', reports, 'https://tenant.ariga.cloud/ci/123')
+    'cloudURL',
+    testcase('cloudurl', undefined, 'https://tenant.ariga.cloud/ci/123')
+  )
+  test(
+    'cloudReports',
+    testcase('cloudreports', reports, 'https://tenant.ariga.cloud/ci/123')
   )
 })
 

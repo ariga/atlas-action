@@ -451,10 +451,17 @@ function summarize(s, cloudReports, cloudURL) {
             ]);
         }
     }
-    core_1.summary.addTable(rows);
-    if (cloudURL) {
-        core_1.summary.addLink('Full Report', cloudURL);
+    if (!cloudURL) {
+        rows.push([
+            { header: false, data: icon('special-warning-icon') },
+            {
+                header: false,
+                data: `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`,
+                colspan: '3'
+            }
+        ]);
     }
+    core_1.summary.addTable(rows);
 }
 exports.summarize = summarize;
 function icon(n) {
@@ -656,7 +663,7 @@ function run(input) {
             }
             (0, github_1.report)(input.opts, res.summary, res.cloudURL);
             if (res.summary) {
-                (0, github_1.summarize)(res.summary, payload === null || payload === void 0 ? void 0 : payload.createReport.cloudReports);
+                (0, github_1.summarize)(res.summary, payload === null || payload === void 0 ? void 0 : payload.createReport.cloudReports, payload === null || payload === void 0 ? void 0 : payload.createReport.url);
                 const body = commentBody(res.cloudURL);
                 if (input.opts.token && input.pr) {
                     const client = new rest_1.Octokit({ auth: input.opts.token });
@@ -679,9 +686,6 @@ function commentBody(cloudURL) {
     let s = core_1.summary.stringify();
     if (cloudURL) {
         s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`;
-    }
-    else {
-        s += `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`;
     }
     s += '<hr/>' + commentFooter;
     return s;

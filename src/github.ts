@@ -154,13 +154,14 @@ export function summarize(
   if (!cloudURL) {
     rows.push([
       { header: false, data: icon('special-warning-icon') },
-      { header: true, data: `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`, colspan: "3" },
+      {
+        header: false,
+        data: `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`,
+        colspan: '3'
+      }
     ])
   }
   summary.addTable(rows)
-  if (cloudURL) {
-    summary.addLink('Full Report', cloudURL)
-  }
 }
 
 function icon(n: string): string {
