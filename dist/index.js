@@ -456,7 +456,7 @@ function summarize(s, cloudReports, cloudURL) {
             { header: false, data: icon('special-warning-icon') },
             {
                 header: false,
-                data: `Connect your project to <a href="https://auth.ariga.cloud/login">Ariga Cloud</a> to get more safety checks`,
+                data: `Connect your project to <a href="https://auth.ariga.cloud/signup">Ariga Cloud</a> to get more safety checks`,
                 colspan: '3'
             }
         ]);
