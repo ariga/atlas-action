@@ -184,6 +184,14 @@ exports.mutation = (0, graphql_request_1.gql) `
     createReport(input: $input) {
       runID
       url
+      cloudReports {
+        text
+        diagnostics {
+          text
+          code
+          pos
+        }
+      }
     }
   }
 `;
@@ -396,7 +404,7 @@ function report(opts, s, cloudURL) {
     }
 }
 exports.report = report;
-function summarize(s, cloudURL) {
+function summarize(s, cloudReports, cloudURL) {
     var _a, _b, _c;
     core_1.summary.addHeading('Atlas Lint Report');
     core_1.summary.addEOL();
@@ -428,10 +436,32 @@ function summarize(s, cloudURL) {
         }
         rows.push([icon(status), step.Name, step.Text, diags.join('\n\n')]);
     }
-    core_1.summary.addTable(rows);
-    if (cloudURL) {
-        core_1.summary.addLink('Full Report', cloudURL);
+    if (cloudReports) {
+        for (const cloudReport of cloudReports || []) {
+            const diags = [];
+            diags.push(cloudReport.text + '\n');
+            for (const diag of cloudReport.diagnostics || []) {
+                diags.push(`${diag.text} (<a href="https://atlasgo.io/lint/analyzers#${diag.code}">${diag.code}</a>)`);
+            }
+            rows.push([
+                icon('special-warning-icon'),
+                'Analyze Database Schema',
+                cloudReports.length.toString() + ' reports were found in analysis',
+                diags.join('\n\n')
+            ]);
+        }
     }
+    if (!cloudURL) {
+        rows.push([
+            { header: false, data: icon('special-warning-icon') },
+            {
+                header: false,
+                data: `Connect your project to <a href="https://auth.ariga.cloud/signup">Ariga Cloud</a> to get more safety checks`,
+                colspan: '3'
+            }
+        ]);
+    }
+    core_1.summary.addTable(rows);
 }
 exports.summarize = summarize;
 function icon(n) {
@@ -633,7 +663,7 @@ function run(input) {
             }
             (0, github_1.report)(input.opts, res.summary, res.cloudURL);
             if (res.summary) {
-                (0, github_1.summarize)(res.summary);
+                (0, github_1.summarize)(res.summary, payload === null || payload === void 0 ? void 0 : payload.createReport.cloudReports, payload === null || payload === void 0 ? void 0 : payload.createReport.url);
                 const body = commentBody(res.cloudURL);
                 if (input.opts.token && input.pr) {
                     const client = new rest_1.Octokit({ auth: input.opts.token });

@@ -35,6 +35,8 @@ export type CreateReportInput = {
 /** Return type of CreateReport. */
 export type CreateReportPayload = {
   __typename?: 'CreateReportPayload';
+  /** List of cloud Reports. */
+  cloudReports: Array<Maybe<SqlCheckReport>>;
   /** The ID of the run. */
   runID: Scalars['ID'];
   /** The URL for the report. */
@@ -62,3 +64,23 @@ export enum RunStatus {
   Successful = 'SUCCESSFUL',
   Unknown = 'UNKNOWN'
 }
+
+/** SQLCheckDiagnostic is a text associated with a specific position of a statement in a file. */
+export type SqlCheckDiagnostic = {
+  __typename?: 'SQLCheckDiagnostic';
+  /** Diagnostic code. */
+  code: Scalars['String'];
+  /** Diagnostic position. */
+  pos: Scalars['Int'];
+  /** Diagnostic text. */
+  text: Scalars['String'];
+};
+
+/** SQLCheckReport describes an analysis report with an optional specific diagnostic. */
+export type SqlCheckReport = {
+  __typename?: 'SQLCheckReport';
+  /** List of SQLCheckDiagnostic. */
+  diagnostics: Array<Maybe<SqlCheckDiagnostic>>;
+  /** Report text. */
+  text: Scalars['String'];
+};

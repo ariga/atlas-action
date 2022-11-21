@@ -26,6 +26,8 @@ type CreateReportPayload {
     runID: ID!
     """The URL for the report."""
     url: String!
+    """List of cloud Reports."""
+    cloudReports: [SQLCheckReport]!
 }
 
 type Mutation {
@@ -41,4 +43,36 @@ enum RunStatus {
     SUCCESSFUL
     FAILED
     UNKNOWN
+}
+
+"""
+SQLCheckReport describes an analysis report with an optional specific diagnostic.
+"""
+type SQLCheckReport {
+    """
+    Report text.
+    """
+    text: String!
+    """
+    List of SQLCheckDiagnostic.
+    """
+    diagnostics: [SQLCheckDiagnostic]!
+}
+
+"""
+SQLCheckDiagnostic is a text associated with a specific position of a statement in a file.
+"""
+type SQLCheckDiagnostic {
+    """
+    Diagnostic position.
+    """
+    pos: Int!
+    """
+    Diagnostic text.
+    """
+    text: String!
+    """
+    Diagnostic code.
+    """
+    code: String!
 }

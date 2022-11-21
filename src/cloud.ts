@@ -19,10 +19,59 @@ export const mutation = gql`
     createReport(input: $input) {
       runID
       url
+      cloudReports {
+        text
+        diagnostics {
+          text
+          code
+          pos
+        }
+      }
     }
   }
 `
 
+
+interface CreateReportPayload {
+  createReport: {
+    runID: string
+    url: string
+    cloudReports: {
+      text: string
+      diagnostics: {
+        text: string
+        code: string
+        pos: number
+      }[]
+    }[]
+  }
+}
+
+type CreateReportInput = {
+  input: {
+    payload: string
+    envName: string
+    commit: string
+    projectName: string
+    branch: string
+    url: string
+    status: string
+  }
+}
+
+export type CloudReports = {
+  text: string
+  diagnostics: {
+    text: string
+    code: string
+    pos: number
+  }[]
+}[]
+
+export enum Status {
+  Success = 'SUCCESSFUL',
+  Failure = 'FAILED'
+}
 function getMutationVariables(
   opts: Options,
   res: AtlasResult

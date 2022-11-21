@@ -69,16 +69,41 @@ describe('report to cloud', () => {
       data: {
         createReport: {
           runID: '8589934593',
-          url: cloudURL
+          url: cloudURL,
+          cloudReports: [
+            {
+              text: 'Cloud reports',
+              diagnostics: [
+                {
+                  text: 'diag'
+                }
+              ]
+            }
+          ]
         }
       }
     })
     const spyOnRequest = jest.spyOn(gql, 'request')
     let opts: Options = OptionsFromEnv(process.env)
     const payload = await reportToCloud(opts, res)
+    const expected = {
+      createReport: {
+        runID: '8589934593',
+        url: cloudURL,
+        cloudReports: [
+          {
+            text: 'Cloud reports',
+            diagnostics: [
+              {
+                text: 'diag'
+              }
+            ]
+          }
+        ]
+      }
+    }
     expect(payload).toBeTruthy()
-    expect(payload?.url).toEqual(cloudURL)
-    expect(payload?.runID).toEqual('8589934593')
+    expect(payload).toEqual(expected)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
 
