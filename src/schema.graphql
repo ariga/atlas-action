@@ -1,6 +1,10 @@
 """Maps a Bytes GraphQL scalar to a byte type."""
 scalar Bytes
 
+type Mutation {
+    createReport(input: CreateReportInput!): CreateReportPayload!
+}
+
 """Input type of CreateReport"""
 input CreateReportInput {
     """The Environment of the report."""
@@ -28,14 +32,6 @@ type CreateReportPayload {
     url: String!
     """List of cloud Reports."""
     cloudReports: [SQLCheckReport]!
-}
-
-type Mutation {
-    createReport(input: CreateReportInput!): CreateReportPayload!
-}
-
-type Query {
-    _dummy: String
 }
 
 """RunStatus is enum for the field status"""

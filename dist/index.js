@@ -174,6 +174,7 @@ const url = __importStar(__nccwpck_require__(7310));
 const graphql_request_1 = __nccwpck_require__(2476);
 const http = __importStar(__nccwpck_require__(6255));
 const os_1 = __importDefault(__nccwpck_require__(2037));
+const types_1 = __nccwpck_require__(4405);
 const LINUX_ARCH = 'linux-amd64';
 const APPLE_ARCH = 'darwin-amd64';
 exports.BASE_ADDRESS = 'https://release.ariga.io';
@@ -215,7 +216,9 @@ function getMutationVariables(opts, res) {
             branch: sourceBranch !== null && sourceBranch !== void 0 ? sourceBranch : 'unknown',
             commit: commitID !== null && commitID !== void 0 ? commitID : 'unknown',
             url: (_j = (_e = (_d = (_c = (_b = github === null || github === void 0 ? void 0 : github.context) === null || _b === void 0 ? void 0 : _b.payload) === null || _c === void 0 ? void 0 : _c.pull_request) === null || _d === void 0 ? void 0 : _d.html_url) !== null && _e !== void 0 ? _e : (_h = (_g = (_f = github === null || github === void 0 ? void 0 : github.context) === null || _f === void 0 ? void 0 : _f.payload) === null || _g === void 0 ? void 0 : _g.repository) === null || _h === void 0 ? void 0 : _h.html_url) !== null && _j !== void 0 ? _j : 'unknown',
-            status: res.exitCode === atlas_1.ExitCodes.Success ? Status.Success : Status.Failure,
+            status: res.exitCode === atlas_1.ExitCodes.Success
+                ? types_1.RunStatus.Successful
+                : types_1.RunStatus.Failed,
             payload: res.raw
         }
     };
@@ -438,9 +441,15 @@ function summarize(s, cloudReports, cloudURL) {
     }
     if (cloudReports) {
         for (const cloudReport of cloudReports || []) {
+            if (!cloudReport) {
+                continue;
+            }
             const diags = [];
             diags.push(cloudReport.text + '\n');
             for (const diag of cloudReport.diagnostics || []) {
+                if (!diag) {
+                    continue;
+                }
                 diags.push(`${diag.text} (<a href="https://atlasgo.io/lint/analyzers#${diag.code}">${diag.code}</a>)`);
             }
             rows.push([
@@ -738,6 +747,24 @@ function vercheck(cur) {
 }
 exports.vercheck = vercheck;
 //# sourceMappingURL=vercheck.js.map
+
+/***/ }),
+
+/***/ 4405:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RunStatus = void 0;
+/** RunStatus is enum for the field status */
+var RunStatus;
+(function (RunStatus) {
+    RunStatus["Failed"] = "FAILED";
+    RunStatus["Successful"] = "SUCCESSFUL";
+    RunStatus["Unknown"] = "UNKNOWN";
+})(RunStatus = exports.RunStatus || (exports.RunStatus = {}));
+//# sourceMappingURL=types.js.map
 
 /***/ }),
 
@@ -14642,7 +14669,7 @@ function isNode(maybeNode) {
 }
 /** Name */
 
-let OperationTypeNode;
+var OperationTypeNode;
 exports.OperationTypeNode = OperationTypeNode;
 
 (function (OperationTypeNode) {
@@ -14954,13 +14981,7 @@ exports.DirectiveLocation = void 0;
 /**
  * The set of allowed directive location values.
  */
-let DirectiveLocation;
-/**
- * The enum type representing the directive location values.
- *
- * @deprecated Please use `DirectiveLocation`. Will be remove in v17.
- */
-
+var DirectiveLocation;
 exports.DirectiveLocation = DirectiveLocation;
 
 (function (DirectiveLocation) {
@@ -14984,6 +15005,11 @@ exports.DirectiveLocation = DirectiveLocation;
   DirectiveLocation['INPUT_OBJECT'] = 'INPUT_OBJECT';
   DirectiveLocation['INPUT_FIELD_DEFINITION'] = 'INPUT_FIELD_DEFINITION';
 })(DirectiveLocation || (exports.DirectiveLocation = DirectiveLocation = {}));
+/**
+ * The enum type representing the directive location values.
+ *
+ * @deprecated Please use `DirectiveLocation`. Will be remove in v17.
+ */
 
 
 /***/ }),
@@ -15002,13 +15028,7 @@ exports.Kind = void 0;
 /**
  * The set of allowed kind values for AST nodes.
  */
-let Kind;
-/**
- * The enum type representing the possible kind values of AST nodes.
- *
- * @deprecated Please use `Kind`. Will be remove in v17.
- */
-
+var Kind;
 exports.Kind = Kind;
 
 (function (Kind) {
@@ -15056,6 +15076,11 @@ exports.Kind = Kind;
   Kind['ENUM_TYPE_EXTENSION'] = 'EnumTypeExtension';
   Kind['INPUT_OBJECT_TYPE_EXTENSION'] = 'InputObjectTypeExtension';
 })(Kind || (exports.Kind = Kind = {}));
+/**
+ * The enum type representing the possible kind values of AST nodes.
+ *
+ * @deprecated Please use `Kind`. Will be remove in v17.
+ */
 
 
 /***/ }),
@@ -16218,12 +16243,13 @@ function parseType(source, options) {
  */
 
 class Parser {
-  constructor(source, options) {
+  constructor(source, options = {}) {
     const sourceObj = (0, _source.isSource)(source)
       ? source
       : new _source.Source(source);
     this._lexer = new _lexer.Lexer(sourceObj);
     this._options = options;
+    this._tokenCounter = 0;
   }
   /**
    * Converts a name lex token into a name parse node.
@@ -16558,18 +16584,12 @@ class Parser {
    */
 
   parseFragmentDefinition() {
-    var _this$_options;
-
     const start = this._lexer.token;
     this.expectKeyword('fragment'); // Legacy support for defining variables within fragments changes
     // the grammar of FragmentDefinition:
     //   - fragment FragmentName VariableDefinitions? on TypeCondition Directives? SelectionSet
 
-    if (
-      ((_this$_options = this._options) === null || _this$_options === void 0
-        ? void 0
-        : _this$_options.allowLegacyFragmentVariables) === true
-    ) {
+    if (this._options.allowLegacyFragmentVariables === true) {
       return this.node(start, {
         kind: _kinds.Kind.FRAGMENT_DEFINITION,
         name: this.parseFragmentName(),
@@ -16630,16 +16650,14 @@ class Parser {
         return this.parseObject(isConst);
 
       case _tokenKind.TokenKind.INT:
-        this._lexer.advance();
-
+        this.advanceLexer();
         return this.node(token, {
           kind: _kinds.Kind.INT,
           value: token.value,
         });
 
       case _tokenKind.TokenKind.FLOAT:
-        this._lexer.advance();
-
+        this.advanceLexer();
         return this.node(token, {
           kind: _kinds.Kind.FLOAT,
           value: token.value,
@@ -16650,7 +16668,7 @@ class Parser {
         return this.parseStringLiteral();
 
       case _tokenKind.TokenKind.NAME:
-        this._lexer.advance();
+        this.advanceLexer();
 
         switch (token.value) {
           case 'true':
@@ -16706,9 +16724,7 @@ class Parser {
 
   parseStringLiteral() {
     const token = this._lexer.token;
-
-    this._lexer.advance();
-
+    this.advanceLexer();
     return this.node(token, {
       kind: _kinds.Kind.STRING,
       value: token.value,
@@ -17499,13 +17515,7 @@ class Parser {
    */
 
   node(startToken, node) {
-    var _this$_options2;
-
-    if (
-      ((_this$_options2 = this._options) === null || _this$_options2 === void 0
-        ? void 0
-        : _this$_options2.noLocation) !== true
-    ) {
+    if (this._options.noLocation !== true) {
       node.loc = new _ast.Location(
         startToken,
         this._lexer.lastToken,
@@ -17531,8 +17541,7 @@ class Parser {
     const token = this._lexer.token;
 
     if (token.kind === kind) {
-      this._lexer.advance();
-
+      this.advanceLexer();
       return token;
     }
 
@@ -17551,8 +17560,7 @@ class Parser {
     const token = this._lexer.token;
 
     if (token.kind === kind) {
-      this._lexer.advance();
-
+      this.advanceLexer();
       return true;
     }
 
@@ -17567,7 +17575,7 @@ class Parser {
     const token = this._lexer.token;
 
     if (token.kind === _tokenKind.TokenKind.NAME && token.value === value) {
-      this._lexer.advance();
+      this.advanceLexer();
     } else {
       throw (0, _syntaxError.syntaxError)(
         this._lexer.source,
@@ -17585,8 +17593,7 @@ class Parser {
     const token = this._lexer.token;
 
     if (token.kind === _tokenKind.TokenKind.NAME && token.value === value) {
-      this._lexer.advance();
-
+      this.advanceLexer();
       return true;
     }
 
@@ -17672,6 +17679,24 @@ class Parser {
     } while (this.expectOptionalToken(delimiterKind));
 
     return nodes;
+  }
+
+  advanceLexer() {
+    const { maxTokens } = this._options;
+
+    const token = this._lexer.advance();
+
+    if (maxTokens !== undefined && token.kind !== _tokenKind.TokenKind.EOF) {
+      ++this._tokenCounter;
+
+      if (this._tokenCounter > maxTokens) {
+        throw (0, _syntaxError.syntaxError)(
+          this._lexer.source,
+          token.start,
+          `Document contains more that ${maxTokens} tokens. Parsing aborted.`,
+        );
+      }
+    }
   }
 }
 /**
@@ -18415,13 +18440,7 @@ exports.TokenKind = void 0;
  * An exported enum describing the different kinds of tokens that the
  * lexer emits.
  */
-let TokenKind;
-/**
- * The enum type representing the token kinds values.
- *
- * @deprecated Please use `TokenKind`. Will be remove in v17.
- */
-
+var TokenKind;
 exports.TokenKind = TokenKind;
 
 (function (TokenKind) {
@@ -18448,6 +18467,11 @@ exports.TokenKind = TokenKind;
   TokenKind['BLOCK_STRING'] = 'BlockString';
   TokenKind['COMMENT'] = 'Comment';
 })(TokenKind || (exports.TokenKind = TokenKind = {}));
+/**
+ * The enum type representing the token kinds values.
+ *
+ * @deprecated Please use `TokenKind`. Will be remove in v17.
+ */
 
 
 /***/ }),

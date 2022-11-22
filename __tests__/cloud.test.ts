@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals'
 import { AtlasResult, ExitCodes } from '../src/atlas'
-import { getCloudURL, mutation, reportToCloud, Status } from '../src/cloud'
+import { getCloudURL, mutation, reportToCloud } from '../src/cloud'
 import * as http from '@actions/http-client'
 import nock from 'nock'
 import * as core from '@actions/core'
@@ -8,6 +8,7 @@ import * as gql from 'graphql-request'
 import { createTestEnv } from './env'
 import { OptionsFromEnv, Options } from '../src/input'
 import path from 'path'
+import { RunStatus } from '../types/types'
 
 jest.setTimeout(30000)
 
@@ -119,7 +120,7 @@ describe('report to cloud', () => {
             process.env.GITHUB_REPOSITORY ?? '',
             res.summary?.Env?.Dir ?? ''
           ),
-          status: Status.Success,
+          status: RunStatus.Successful,
           url: 'https://github.com/ariga/atlas-action/pull/1'
         }
       },
