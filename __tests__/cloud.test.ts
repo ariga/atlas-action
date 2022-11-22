@@ -8,7 +8,7 @@ import * as gql from 'graphql-request'
 import { createTestEnv } from './env'
 import { OptionsFromEnv, Options } from '../src/input'
 import path from 'path'
-import {RunStatus} from "../src/types/types";
+import { RunStatus } from '../types/types'
 
 jest.setTimeout(30000)
 
@@ -116,8 +116,8 @@ describe('report to cloud', () => {
         envName: 'CI',
         payload: '[{"Name":"test","Text":"test"}]',
         projectName: path.join(
-            process.env.GITHUB_REPOSITORY ?? '',
-            res.summary?.Env?.Dir ?? ''
+          process.env.GITHUB_REPOSITORY ?? '',
+          res.summary?.Env?.Dir ?? ''
         ),
         status: RunStatus.Successful,
         url: 'https://github.com/ariga/atlas-action/pull/1'

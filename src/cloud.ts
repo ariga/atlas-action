@@ -6,7 +6,11 @@ import { ClientError, gql, request } from 'graphql-request'
 import * as http from '@actions/http-client'
 import os from 'os'
 import { Options } from './input'
-import {CreateReportInput, CreateReportPayload, RunStatus} from "./types/types";
+import {
+  CreateReportInput,
+  CreateReportPayload,
+  RunStatus
+} from '../types/types'
 
 const LINUX_ARCH = 'linux-amd64'
 const APPLE_ARCH = 'darwin-amd64'
@@ -30,43 +34,6 @@ export const mutation = gql`
     }
   }
 `
-
-
-interface CreateReportPayload {
-  createReport: {
-    runID: string
-    url: string
-    cloudReports: {
-      text: string
-      diagnostics: {
-        text: string
-        code: string
-        pos: number
-      }[]
-    }[]
-  }
-}
-
-type CreateReportInput = {
-  input: {
-    payload: string
-    envName: string
-    commit: string
-    projectName: string
-    branch: string
-    url: string
-    status: string
-  }
-}
-
-export type CloudReports = {
-  text: string
-  diagnostics: {
-    text: string
-    code: string
-    pos: number
-  }[]
-}[]
 
 export enum Status {
   Success = 'SUCCESSFUL',
@@ -95,11 +62,13 @@ function getMutationVariables(
     branch: sourceBranch ?? 'unknown',
     commit: commitID ?? 'unknown',
     url:
-        github?.context?.payload?.pull_request?.html_url ??
-        github?.context?.payload?.repository?.html_url ??
-        'unknown',
+      github?.context?.payload?.pull_request?.html_url ??
+      github?.context?.payload?.repository?.html_url ??
+      'unknown',
     status:
-        res.exitCode === ExitCodes.Success ? RunStatus.Successful : RunStatus.Failed,
+      res.exitCode === ExitCodes.Success
+        ? RunStatus.Successful
+        : RunStatus.Failed,
     payload: res.raw
   }
 }

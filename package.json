@@ -10,7 +10,7 @@
     "lint": "eslint src/**/*.ts",
     "package": "ncc build --source-map --license licenses.txt",
     "test": "jest",
-    "all": "npm run build && npm run format && npm run lint && npm test && npm run package",
+    "all": "npm run codegen && npm run build && npm run format && npm run lint && npm test && npm run package",
     "codegen": "graphql-codegen --config codegen.ts"
   },
   "repository": {
@@ -55,7 +55,6 @@
     "@actions/github": "^5.0.3",
     "@actions/io": "^1.1.2",
     "@actions/tool-cache": "^1.7.2",
-    "@graphql-codegen/typescript-resolvers": "^2.7.6",
     "@octokit/rest": "^19.0.4",
     "graphql": "^16.6.0",
     "graphql-request": "^4.3.0",

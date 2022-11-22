@@ -6,7 +6,7 @@ import { report, summarize } from '../src/github'
 import { expect } from '@jest/globals'
 import * as core from '@actions/core'
 import { Options, OptionsFromEnv } from '../src/input'
-import { CloudReports } from '../src/cloud'
+import { SqlCheckReport } from '../types/types'
 
 const dir = path.join('__tests__', 'testdata', 'runs')
 
@@ -31,7 +31,7 @@ describe('summary', () => {
 
   const testcase = (
     name: string,
-    cloudReports?: CloudReports,
+    cloudReports?: SqlCheckReport[],
     cloudURL?: string
   ) => {
     return async () => {
