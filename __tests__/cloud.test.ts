@@ -111,16 +111,18 @@ describe('report to cloud', () => {
       'https://ci.ariga.cloud/api/query',
       mutation,
       {
-        branch: process.env.GITHUB_HEAD_REF,
-        commit: process.env.GITHUB_SHA,
-        envName: 'CI',
-        payload: '[{"Name":"test","Text":"test"}]',
-        projectName: path.join(
-          process.env.GITHUB_REPOSITORY ?? '',
-          res.summary?.Env?.Dir ?? ''
-        ),
-        status: RunStatus.Successful,
-        url: 'https://github.com/ariga/atlas-action/pull/1'
+        input: {
+          branch: process.env.GITHUB_HEAD_REF,
+          commit: process.env.GITHUB_SHA,
+          envName: 'CI',
+          payload: '[{"Name":"test","Text":"test"}]',
+          projectName: path.join(
+            process.env.GITHUB_REPOSITORY ?? '',
+            res.summary?.Env?.Dir ?? ''
+          ),
+          status: RunStatus.Successful,
+          url: 'https://github.com/ariga/atlas-action/pull/1'
+        }
       },
       {
         Authorization: 'Bearer mysecrettoken',

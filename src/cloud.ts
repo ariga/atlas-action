@@ -6,11 +6,7 @@ import { ClientError, gql, request } from 'graphql-request'
 import * as http from '@actions/http-client'
 import os from 'os'
 import { Options } from './input'
-import {
-  CreateReportInput,
-  CreateReportPayload,
-  RunStatus
-} from '../types/types'
+import { Mutation, MutationCreateReportArgs, RunStatus } from '../types/types'
 
 const LINUX_ARCH = 'linux-amd64'
 const APPLE_ARCH = 'darwin-amd64'
@@ -42,7 +38,7 @@ export enum Status {
 function getMutationVariables(
   opts: Options,
   res: AtlasResult
-): CreateReportInput {
+): MutationCreateReportArgs {
   const { GITHUB_REPOSITORY: repository, GITHUB_SHA: commitID } = process.env
   // GITHUB_HEAD_REF is set only on pull requests
   // GITHUB_REF_NAME is the correct branch when running in a branch, on pull requests it's the PR number.
@@ -57,26 +53,28 @@ function getMutationVariables(
     )}`
   )
   return {
-    envName: 'CI',
-    projectName: `${repository}/${migrationDir}`,
-    branch: sourceBranch ?? 'unknown',
-    commit: commitID ?? 'unknown',
-    url:
-      github?.context?.payload?.pull_request?.html_url ??
-      github?.context?.payload?.repository?.html_url ??
-      'unknown',
-    status:
-      res.exitCode === ExitCodes.Success
-        ? RunStatus.Successful
-        : RunStatus.Failed,
-    payload: res.raw
+    input: {
+      envName: 'CI',
+      projectName: `${repository}/${migrationDir}`,
+      branch: sourceBranch ?? 'unknown',
+      commit: commitID ?? 'unknown',
+      url:
+        github?.context?.payload?.pull_request?.html_url ??
+        github?.context?.payload?.repository?.html_url ??
+        'unknown',
+      status:
+        res.exitCode === ExitCodes.Success
+          ? RunStatus.Successful
+          : RunStatus.Failed,
+      payload: res.raw
+    }
   }
 }
 
 export async function reportToCloud(
   opts: Options,
   res: AtlasResult
-): Promise<CreateReportPayload | void> {
+): Promise<Mutation | void> {
   const token = getInput('ariga-token')
   if (!token) {
     warning(`Skipping report to cloud missing ariga-token input`)
@@ -85,7 +83,7 @@ export async function reportToCloud(
   info(`Reporting to cloud: ${getCloudURL()}`)
   setSecret(token)
   try {
-    return await request<CreateReportPayload>(
+    return await request<Mutation>(
       getCloudURL(),
       mutation,
       getMutationVariables(opts, res),

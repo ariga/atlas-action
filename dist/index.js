@@ -210,15 +210,17 @@ function getMutationVariables(opts, res) {
     const migrationDir = ((_a = res.summary) === null || _a === void 0 ? void 0 : _a.Env.Dir.replace('file://', '')) || '';
     (0, core_1.info)(`Run metadata: ${JSON.stringify({ repository, commitID, sourceBranch, migrationDir }, null, 2)}`);
     return {
-        envName: 'CI',
-        projectName: `${repository}/${migrationDir}`,
-        branch: sourceBranch !== null && sourceBranch !== void 0 ? sourceBranch : 'unknown',
-        commit: commitID !== null && commitID !== void 0 ? commitID : 'unknown',
-        url: (_j = (_e = (_d = (_c = (_b = github === null || github === void 0 ? void 0 : github.context) === null || _b === void 0 ? void 0 : _b.payload) === null || _c === void 0 ? void 0 : _c.pull_request) === null || _d === void 0 ? void 0 : _d.html_url) !== null && _e !== void 0 ? _e : (_h = (_g = (_f = github === null || github === void 0 ? void 0 : github.context) === null || _f === void 0 ? void 0 : _f.payload) === null || _g === void 0 ? void 0 : _g.repository) === null || _h === void 0 ? void 0 : _h.html_url) !== null && _j !== void 0 ? _j : 'unknown',
-        status: res.exitCode === atlas_1.ExitCodes.Success
-            ? types_1.RunStatus.Successful
-            : types_1.RunStatus.Failed,
-        payload: res.raw
+        input: {
+            envName: 'CI',
+            projectName: `${repository}/${migrationDir}`,
+            branch: sourceBranch !== null && sourceBranch !== void 0 ? sourceBranch : 'unknown',
+            commit: commitID !== null && commitID !== void 0 ? commitID : 'unknown',
+            url: (_j = (_e = (_d = (_c = (_b = github === null || github === void 0 ? void 0 : github.context) === null || _b === void 0 ? void 0 : _b.payload) === null || _c === void 0 ? void 0 : _c.pull_request) === null || _d === void 0 ? void 0 : _d.html_url) !== null && _e !== void 0 ? _e : (_h = (_g = (_f = github === null || github === void 0 ? void 0 : github.context) === null || _f === void 0 ? void 0 : _f.payload) === null || _g === void 0 ? void 0 : _g.repository) === null || _h === void 0 ? void 0 : _h.html_url) !== null && _j !== void 0 ? _j : 'unknown',
+            status: res.exitCode === atlas_1.ExitCodes.Success
+                ? types_1.RunStatus.Successful
+                : types_1.RunStatus.Failed,
+            payload: res.raw
+        }
     };
 }
 function reportToCloud(opts, res) {
@@ -666,11 +668,11 @@ function run(input) {
             (0, core_1.info)(`Event type: ${github_2.context.eventName}`);
             const payload = yield (0, cloud_1.reportToCloud)(input.opts, res);
             if (payload) {
-                res.cloudURL = payload.url;
+                res.cloudURL = payload.createReport.url;
             }
             (0, github_1.report)(input.opts, res.summary, res.cloudURL);
             if (res.summary) {
-                (0, github_1.summarize)(res.summary, payload === null || payload === void 0 ? void 0 : payload.cloudReports, payload === null || payload === void 0 ? void 0 : payload.url);
+                (0, github_1.summarize)(res.summary, payload === null || payload === void 0 ? void 0 : payload.createReport.cloudReports, payload === null || payload === void 0 ? void 0 : payload.createReport.url);
                 const body = commentBody(res.cloudURL);
                 if (input.opts.token && input.pr) {
                     const client = new rest_1.Octokit({ auth: input.opts.token });

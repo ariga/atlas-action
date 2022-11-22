@@ -58,11 +58,6 @@ export type MutationCreateReportArgs = {
   input: CreateReportInput
 }
 
-export type Query = {
-  __typename?: 'Query'
-  _dummy?: Maybe<Scalars['String']>
-}
-
 /** RunStatus is enum for the field status */
 export enum RunStatus {
   Failed = 'FAILED',

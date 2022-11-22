@@ -505,8 +505,10 @@ describe('all reports with pull request', () => {
     )
     const scope = gqlInterceptor.reply(http.HttpCodes.OK, {
       data: {
-        runID: '8589934593',
-        url: cloudURL
+        createReport: {
+          runID: '8589934593',
+          url: cloudURL
+        }
       }
     })
     const input: RunInput = {
@@ -535,18 +537,20 @@ describe('all reports with pull request', () => {
     expect(actualRequestBody).toEqual({
       query: mutation,
       variables: {
-        branch: 'test-pr-trigger',
-        commit: '71d0bfc1',
-        envName: 'CI',
-        projectName:
-          'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
-        url: 'https://github.com/ariga/atlas-action/pull/1',
-        status: Status.Success,
-        payload: expect.anything()
+        input: {
+          branch: 'test-pr-trigger',
+          commit: '71d0bfc1',
+          envName: 'CI',
+          projectName:
+            'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
+          url: 'https://github.com/ariga/atlas-action/pull/1',
+          status: Status.Success,
+          payload: expect.anything()
+        }
       },
       operationName: 'CreateReportInput'
     })
-    const payloadParsed = JSON.parse(actualRequestBody.variables.payload)
+    const payloadParsed = JSON.parse(actualRequestBody.variables.input.payload)
     expect(payloadParsed).toEqual({
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,
@@ -565,8 +569,10 @@ describe('all reports with pull request', () => {
     process.env['INPUT_SCHEMA-INSIGHTS'] = 'true'
     const scope = gqlInterceptor.reply(http.HttpCodes.OK, {
       data: {
-        runID: '8589934593',
-        url: cloudURL
+        createReport: {
+          runID: '8589934593',
+          url: cloudURL
+        }
       }
     })
     const input: RunInput = {
@@ -582,18 +588,20 @@ describe('all reports with pull request', () => {
     expect(actualRequestBody).toEqual({
       query: mutation,
       variables: {
-        branch: 'test-pr-trigger',
-        commit: '71d0bfc1',
-        envName: 'CI',
-        projectName:
-          'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
-        url: 'https://github.com/ariga/atlas-action/pull/1',
-        status: Status.Success,
-        payload: expect.anything()
+        input: {
+          branch: 'test-pr-trigger',
+          commit: '71d0bfc1',
+          envName: 'CI',
+          projectName:
+            'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
+          url: 'https://github.com/ariga/atlas-action/pull/1',
+          status: Status.Success,
+          payload: expect.anything()
+        }
       },
       operationName: 'CreateReportInput'
     })
-    const payloadParsed = JSON.parse(actualRequestBody.variables.payload)
+    const payloadParsed = JSON.parse(actualRequestBody.variables.input.payload)
     expect(payloadParsed).toEqual({
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,
@@ -664,8 +672,10 @@ describe('all reports with push (branch)', () => {
     process.env['INPUT_SCHEMA-INSIGHTS'] = 'true'
     const scope = gqlInterceptor.reply(http.HttpCodes.OK, {
       data: {
-        runID: '8589934593',
-        url: cloudURL
+        createReport: {
+          runID: '8589934593',
+          url: cloudURL
+        }
       }
     })
     const input: RunInput = {
@@ -681,18 +691,20 @@ describe('all reports with push (branch)', () => {
     expect(actualRequestBody).toEqual({
       query: mutation,
       variables: {
-        branch: 'test-pr-trigger',
-        commit: '71d0bfc1',
-        envName: 'CI',
-        projectName:
-          'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
-        url: 'https://github.com/ariga/atlas-action',
-        status: Status.Success,
-        payload: expect.anything()
+        input: {
+          branch: 'test-pr-trigger',
+          commit: '71d0bfc1',
+          envName: 'CI',
+          projectName:
+            'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
+          url: 'https://github.com/ariga/atlas-action',
+          status: Status.Success,
+          payload: expect.anything()
+        }
       },
       operationName: 'CreateReportInput'
     })
-    const payloadParsed = JSON.parse(actualRequestBody.variables.payload)
+    const payloadParsed = JSON.parse(actualRequestBody.variables.input.payload)
     expect(payloadParsed).toEqual({
       Env: res.summary?.Env,
       Steps: res.summary?.Steps,
