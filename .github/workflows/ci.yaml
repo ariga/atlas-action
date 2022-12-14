@@ -8,17 +8,20 @@ on:
 
 jobs:
   sanity:
+    strategy:
+      matrix:
+        directory: [ migrations, migrations2 ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3.0.2
         with:
           fetch-depth: 0
       - name: init migrations folder
-        run: mkdir -p migrations
+        run: mkdir -p ${{ matrix.directory }}
       - uses: ./
         with:
           dev-url: sqlite://test?mode=memory&cache=shared&_fk=1
-          dir: migrations
+          dir: ${{ matrix.directory }}
   code:
     runs-on: ubuntu-latest
     steps:
