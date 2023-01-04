@@ -1,12 +1,13 @@
 import * as fs from 'fs/promises'
 import path from 'path'
+import * as core from '@actions/core'
 import { getInput, summary } from '@actions/core'
 import { Summary } from '../src/atlas'
 import { report, summarize } from '../src/github'
 import { expect } from '@jest/globals'
-import * as core from '@actions/core'
 import { Options, OptionsFromEnv } from '../src/input'
-import { SqlCheckReport } from '../types/types'
+import { CreateReportPayload, Mutation } from '../types/types'
+import { CloudReport } from '../src/cloud'
 
 const dir = path.join('__tests__', 'testdata', 'runs')
 
@@ -29,14 +30,10 @@ describe('summary', () => {
     await summary.clear()
   })
 
-  const testcase = (
-    name: string,
-    cloudReports?: SqlCheckReport[],
-    cloudURL?: string
-  ) => {
+  const testcase = (name: string, report?: CloudReport) => {
     return async () => {
       const sum = await loadRun(name)
-      summarize(sum, cloudReports, cloudURL)
+      summarize(sum, report)
       const s = summary.stringify()
       const expected = await fs.readFile(path.join(dir, `${name}.expected.txt`))
       expect(s).toEqual(expected.toString())
@@ -66,11 +63,24 @@ describe('summary', () => {
   test('checksum', testcase('checksum'))
   test(
     'cloudURL',
-    testcase('cloudurl', undefined, 'https://tenant.ariga.cloud/ci/123')
+    testcase('cloudurl', {
+      result: {
+        createReport: {
+          url: 'https://tenant.ariga.cloud/ci/123'
+        } as CreateReportPayload
+      } as Mutation
+    } as CloudReport)
   )
   test(
     'cloudReports',
-    testcase('cloudreports', reports, 'https://tenant.ariga.cloud/ci/123')
+    testcase('cloudreports', {
+      result: {
+        createReport: {
+          url: 'https://tenant.ariga.cloud/ci/123',
+          cloudReports: reports
+        } as CreateReportPayload
+      } as Mutation
+    } as CloudReport)
   )
 })
 

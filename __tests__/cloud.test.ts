@@ -103,7 +103,7 @@ describe('report to cloud', () => {
       }
     }
     expect(payload).toBeTruthy()
-    expect(payload).toEqual(expected)
+    expect(payload.result).toEqual(expected)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
 
@@ -203,6 +203,8 @@ describe('report to cloud', () => {
     expect(spyOnWarning).toHaveBeenCalledWith(
       'Failed reporting to Ariga Cloud: Invalid Token'
     )
+    expect(payload.prettyErr).toEqual('Invalid Token')
+    expect(payload.err).toBeDefined()
   })
 
   test('ignore when missing token', async () => {

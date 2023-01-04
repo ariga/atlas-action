@@ -7,7 +7,7 @@ import * as github from '@actions/github'
 import * as path from 'path'
 import { Options, PullRequest } from './input'
 import { Octokit } from '@octokit/rest'
-import { SqlCheckReport } from '../types/types'
+import { CloudReport } from './cloud'
 
 export async function getWorkingDirectory(): Promise<string> {
   /**
@@ -87,11 +87,7 @@ export function report(opts: Options, s?: Summary, cloudURL?: string): void {
   }
 }
 
-export function summarize(
-  s: Summary,
-  cloudReports?: (SqlCheckReport | null)[],
-  cloudURL?: string
-): void {
+export function summarize(s: Summary, report?: CloudReport): void {
   summary.addHeading('Atlas Lint Report')
   summary.addRaw(`Analyzed <strong>${s.Env.Dir}</strong><br><br>`)
   summary.addEOL()
@@ -133,30 +129,38 @@ export function summarize(
     }
     rows.push([icon(status), step.Name, step.Text, diags.join('\n\n')])
   }
-  if (cloudReports) {
-    for (const cloudReport of cloudReports || []) {
-      if (!cloudReport) {
+  const cloudReports = report?.result?.createReport.cloudReports || []
+  for (const cloudReport of cloudReports) {
+    if (!cloudReport) {
+      continue
+    }
+    const diags: string[] = []
+    diags.push(cloudReport.text + '\n')
+    for (const diag of cloudReport.diagnostics || []) {
+      if (!diag) {
         continue
       }
-      const diags: string[] = []
-      diags.push(cloudReport.text + '\n')
-      for (const diag of cloudReport.diagnostics || []) {
-        if (!diag) {
-          continue
-        }
-        diags.push(
-          `${diag.text} (<a href="https://atlasgo.io/lint/analyzers#${diag.code}">${diag.code}</a>)`
-        )
-      }
-      rows.push([
-        icon('special-warning-icon'),
-        'Analyze Database Schema',
-        cloudReports.length.toString() + ' reports were found in analysis',
-        diags.join('\n\n')
-      ])
+      diags.push(
+        `${diag.text} (<a href="https://atlasgo.io/lint/analyzers#${diag.code}">${diag.code}</a>)`
+      )
     }
+    rows.push([
+      icon('special-warning-icon'),
+      'Analyze Database Schema',
+      cloudReports.length.toString() + ' reports were found in analysis',
+      diags.join('\n\n')
+    ])
   }
-  if (!cloudURL) {
+  if (report?.prettyErr) {
+    rows.push([
+      { header: false, data: icon('error') },
+      {
+        header: false,
+        data: `Could not report to <a href="https://auth.ariga.cloud/signup">Ariga Cloud</a>: ${report.prettyErr}`,
+        colspan: '3'
+      }
+    ])
+  } else if (!report?.result?.createReport.url) {
     rows.push([
       { header: false, data: icon('special-warning-icon') },
       {
