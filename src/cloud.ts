@@ -71,19 +71,26 @@ function getMutationVariables(
   }
 }
 
+export type CloudReport = {
+  err?: Error
+  prettyErr?: string
+  result?: Mutation
+}
+
 export async function reportToCloud(
   opts: Options,
   res: AtlasResult
-): Promise<Mutation | void> {
+): Promise<CloudReport> {
   const token = getInput('ariga-token')
   if (!token) {
     warning(`Skipping report to cloud missing ariga-token input`)
-    return
+    return {} as CloudReport
   }
   info(`Reporting to cloud: ${getCloudURL()}`)
   setSecret(token)
+  const rep: CloudReport = {}
   try {
-    return await request<Mutation>(
+    rep.result = await request<Mutation>(
       getCloudURL(),
       mutation,
       getMutationVariables(opts, res),
@@ -99,7 +106,14 @@ export async function reportToCloud(
     }
     warning(`Received error: ${e}`)
     warning(`Failed reporting to Ariga Cloud: ${errMsg}`)
+    if (e instanceof Error) {
+      rep.err = e
+    } else {
+      rep.err = Error(`${e}`)
+    }
+    rep.prettyErr = `${errMsg}`
   }
+  return rep
 }
 
 export function getCloudURL(): string {

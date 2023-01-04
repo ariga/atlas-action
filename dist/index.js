@@ -228,12 +228,13 @@ function reportToCloud(opts, res) {
         const token = (0, core_1.getInput)('ariga-token');
         if (!token) {
             (0, core_1.warning)(`Skipping report to cloud missing ariga-token input`);
-            return;
+            return {};
         }
         (0, core_1.info)(`Reporting to cloud: ${getCloudURL()}`);
         (0, core_1.setSecret)(token);
+        const rep = {};
         try {
-            return yield (0, graphql_request_1.request)(getCloudURL(), exports.mutation, getMutationVariables(opts, res), getHeaders(token));
+            rep.result = yield (0, graphql_request_1.request)(getCloudURL(), exports.mutation, getMutationVariables(opts, res), getHeaders(token));
         }
         catch (e) {
             let errMsg = e;
@@ -245,7 +246,15 @@ function reportToCloud(opts, res) {
             }
             (0, core_1.warning)(`Received error: ${e}`);
             (0, core_1.warning)(`Failed reporting to Ariga Cloud: ${errMsg}`);
+            if (e instanceof Error) {
+                rep.err = e;
+            }
+            else {
+                rep.err = Error(`${e}`);
+            }
+            rep.prettyErr = `${errMsg}`;
         }
+        return rep;
     });
 }
 exports.reportToCloud = reportToCloud;
@@ -406,8 +415,8 @@ function report(opts, s, cloudURL) {
     }
 }
 exports.report = report;
-function summarize(s, cloudReports, cloudURL) {
-    var _a, _b, _c;
+function summarize(s, report) {
+    var _a, _b, _c, _d, _e;
     core_1.summary.addHeading('Atlas Lint Report');
     core_1.summary.addRaw(`Analyzed <strong>${s.Env.Dir}</strong><br><br>`);
     core_1.summary.addEOL();
@@ -439,28 +448,37 @@ function summarize(s, cloudReports, cloudURL) {
         }
         rows.push([icon(status), step.Name, step.Text, diags.join('\n\n')]);
     }
-    if (cloudReports) {
-        for (const cloudReport of cloudReports || []) {
-            if (!cloudReport) {
+    const cloudReports = ((_d = report === null || report === void 0 ? void 0 : report.result) === null || _d === void 0 ? void 0 : _d.createReport.cloudReports) || [];
+    for (const cloudReport of cloudReports) {
+        if (!cloudReport) {
+            continue;
+        }
+        const diags = [];
+        diags.push(cloudReport.text + '\n');
+        for (const diag of cloudReport.diagnostics || []) {
+            if (!diag) {
                 continue;
             }
-            const diags = [];
-            diags.push(cloudReport.text + '\n');
-            for (const diag of cloudReport.diagnostics || []) {
-                if (!diag) {
-                    continue;
-                }
-                diags.push(`${diag.text} (<a href="https://atlasgo.io/lint/analyzers#${diag.code}">${diag.code}</a>)`);
-            }
-            rows.push([
-                icon('special-warning-icon'),
-                'Analyze Database Schema',
-                cloudReports.length.toString() + ' reports were found in analysis',
-                diags.join('\n\n')
-            ]);
+            diags.push(`${diag.text} (<a href="https://atlasgo.io/lint/analyzers#${diag.code}">${diag.code}</a>)`);
         }
+        rows.push([
+            icon('special-warning-icon'),
+            'Analyze Database Schema',
+            cloudReports.length.toString() + ' reports were found in analysis',
+            diags.join('\n\n')
+        ]);
     }
-    if (!cloudURL) {
+    if (report === null || report === void 0 ? void 0 : report.prettyErr) {
+        rows.push([
+            { header: false, data: icon('error') },
+            {
+                header: false,
+                data: `Could not report to <a href="https://auth.ariga.cloud/signup">Ariga Cloud</a>: ${report.prettyErr}`,
+                colspan: '3'
+            }
+        ]);
+    }
+    else if (!((_e = report === null || report === void 0 ? void 0 : report.result) === null || _e === void 0 ? void 0 : _e.createReport.url)) {
         rows.push([
             { header: false, data: icon('special-warning-icon') },
             {
@@ -670,12 +688,12 @@ function run(input) {
             (0, core_1.info)(`\nAtlas output:\n${out}`);
             (0, core_1.info)(`Event type: ${github_2.context.eventName}`);
             const payload = yield (0, cloud_1.reportToCloud)(input.opts, res);
-            if (payload) {
-                res.cloudURL = payload.createReport.url;
+            if (payload.result) {
+                res.cloudURL = payload.result.createReport.url;
             }
             (0, github_1.report)(input.opts, res.summary, res.cloudURL);
             if (res.summary) {
-                (0, github_1.summarize)(res.summary, payload === null || payload === void 0 ? void 0 : payload.createReport.cloudReports, payload === null || payload === void 0 ? void 0 : payload.createReport.url);
+                (0, github_1.summarize)(res.summary, payload);
                 const body = commentBody(res.cloudURL);
                 if (input.opts.token && input.pr) {
                     const client = new rest_1.Octokit({ auth: input.opts.token });

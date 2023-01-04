@@ -1,5 +1,5 @@
 import { AtlasResult, ExitCodes, installAtlas, runAtlas } from './atlas'
-import { info, warning, setFailed, summary } from '@actions/core'
+import { info, setFailed, summary, warning } from '@actions/core'
 import { comment, report, summarize } from './github'
 import { context } from '@actions/github'
 import { reportToCloud } from './cloud'
@@ -33,16 +33,12 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
     info(`\nAtlas output:\n${out}`)
     info(`Event type: ${context.eventName}`)
     const payload = await reportToCloud(input.opts, res)
-    if (payload) {
-      res.cloudURL = payload.createReport.url
+    if (payload.result) {
+      res.cloudURL = payload.result.createReport.url
     }
     report(input.opts, res.summary, res.cloudURL)
     if (res.summary) {
-      summarize(
-        res.summary,
-        payload?.createReport.cloudReports,
-        payload?.createReport.url
-      )
+      summarize(res.summary, payload)
       const body = commentBody(res.cloudURL)
       if (input.opts.token && input.pr) {
         const client = new Octokit({ auth: input.opts.token })
