@@ -58,7 +58,7 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
 function commentBody(cloudURL?: string): string {
   let s = summary.stringify()
   if (cloudURL) {
-    s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`
+    s += `<a href="${cloudURL}">Full Report on Atlas Cloud</a>`
   }
   s += '<hr/>' + commentFooter
   return s

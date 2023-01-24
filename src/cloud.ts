@@ -105,7 +105,7 @@ export async function reportToCloud(
       }
     }
     warning(`Received error: ${e}`)
-    warning(`Failed reporting to Ariga Cloud: ${errMsg}`)
+    warning(`Failed reporting to Atlas Cloud: ${errMsg}`)
     if (e instanceof Error) {
       rep.err = e
     } else {

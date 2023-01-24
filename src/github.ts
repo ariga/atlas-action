@@ -156,7 +156,7 @@ export function summarize(s: Summary, report?: CloudReport): void {
       { header: false, data: icon('error') },
       {
         header: false,
-        data: `Could not report to <a href="https://auth.ariga.cloud/signup">Ariga Cloud</a>: ${report.prettyErr}`,
+        data: `Could not report to <a href="https://auth.ariga.cloud/signup">Atlas Cloud</a>: ${report.prettyErr}`,
         colspan: '3'
       }
     ])
@@ -165,7 +165,7 @@ export function summarize(s: Summary, report?: CloudReport): void {
       { header: false, data: icon('special-warning-icon') },
       {
         header: false,
-        data: `Connect your project to <a href="https://auth.ariga.cloud/signup">Ariga Cloud</a> to get more safety checks`,
+        data: `Connect your project to <a href="https://auth.ariga.cloud/signup">Atlas Cloud</a> to get more safety checks`,
         colspan: '3'
       }
     ])
