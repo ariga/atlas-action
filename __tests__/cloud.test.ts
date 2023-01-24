@@ -171,7 +171,7 @@ describe('report to cloud', () => {
     )
     expect(spyOnWarning).toHaveBeenNthCalledWith(
       2,
-      'Failed reporting to Ariga Cloud: Internal server error'
+      'Failed reporting to Atlas Cloud: Internal server error'
     )
   })
 
@@ -201,7 +201,7 @@ describe('report to cloud', () => {
     expect(spyOnRequest).toBeCalledTimes(1)
     expect(spyOnWarning).toHaveBeenCalledTimes(2)
     expect(spyOnWarning).toHaveBeenCalledWith(
-      'Failed reporting to Ariga Cloud: Invalid Token'
+      'Failed reporting to Atlas Cloud: Invalid Token'
     )
     expect(payload.prettyErr).toEqual('Invalid Token')
     expect(payload.err).toBeDefined()

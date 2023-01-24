@@ -245,7 +245,7 @@ function reportToCloud(opts, res) {
                 }
             }
             (0, core_1.warning)(`Received error: ${e}`);
-            (0, core_1.warning)(`Failed reporting to Ariga Cloud: ${errMsg}`);
+            (0, core_1.warning)(`Failed reporting to Atlas Cloud: ${errMsg}`);
             if (e instanceof Error) {
                 rep.err = e;
             }
@@ -473,7 +473,7 @@ function summarize(s, report) {
             { header: false, data: icon('error') },
             {
                 header: false,
-                data: `Could not report to <a href="https://auth.ariga.cloud/signup">Ariga Cloud</a>: ${report.prettyErr}`,
+                data: `Could not report to <a href="https://auth.ariga.cloud/signup">Atlas Cloud</a>: ${report.prettyErr}`,
                 colspan: '3'
             }
         ]);
@@ -483,7 +483,7 @@ function summarize(s, report) {
             { header: false, data: icon('special-warning-icon') },
             {
                 header: false,
-                data: `Connect your project to <a href="https://auth.ariga.cloud/signup">Ariga Cloud</a> to get more safety checks`,
+                data: `Connect your project to <a href="https://auth.ariga.cloud/signup">Atlas Cloud</a> to get more safety checks`,
                 colspan: '3'
             }
         ]);
@@ -715,7 +715,7 @@ exports.run = run;
 function commentBody(cloudURL) {
     let s = core_1.summary.stringify();
     if (cloudURL) {
-        s += `<a href="${cloudURL}">Full Report on Ariga Cloud</a>`;
+        s += `<a href="${cloudURL}">Full Report on Atlas Cloud</a>`;
     }
     s += '<hr/>' + commentFooter;
     return s;
