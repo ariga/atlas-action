@@ -14,7 +14,6 @@ import {
   stat
 } from 'fs/promises'
 import * as core from '@actions/core'
-import { getInput } from '@actions/core'
 import nock from 'nock'
 import * as http from '@actions/http-client'
 import { AtlasResult, ExitCodes, installAtlas } from '../src/atlas'
@@ -28,16 +27,16 @@ import {
 } from '../src/cloud'
 import { Variables } from 'graphql-request/src/types'
 import { createTestEnv, GithubEventName } from './env'
-import { OptionsFromEnv, RunInput } from '../src/input'
+import { Options, OptionsFromEnv, RunInput } from '../src/input'
 
 jest.mock('../src/cloud', () => {
   const actual = jest.requireActual('../src/cloud')
   return {
     ...actual,
     getDownloadURL: jest.fn(
-      (version: string) =>
+      (opts: Options) =>
         new URL(
-          `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}?test=1`
+          `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${opts.atlasVersion}?test=1`
         )
     )
   }
@@ -46,12 +45,13 @@ jest.setTimeout(30000)
 
 describe('install', () => {
   let cleanupFn: () => Promise<void>
-  let version: string
+
+  let opts: Options
 
   beforeEach(async () => {
     const { env, cleanup } = await createTestEnv()
     process.env = env
-    version = getInput('atlas-version')
+    opts = OptionsFromEnv(process.env)
     cleanupFn = cleanup
   })
 
@@ -61,29 +61,30 @@ describe('install', () => {
   })
 
   test('install the latest version of atlas', async () => {
-    const bin = await installAtlas(version)
+    const bin = await installAtlas(opts)
     await expect(stat(bin)).resolves.toBeTruthy()
   })
 
   test('installs specific version of atlas', async () => {
     const expectedVersion = 'v0.4.2'
-    const bin = await installAtlas(expectedVersion)
+    opts.atlasVersion = expectedVersion
+    const bin = await installAtlas(opts)
     await expect(stat(bin)).resolves.toBeTruthy()
     const output = await getExecOutput(`${bin}`, ['version'])
     expect(output.stdout.includes(expectedVersion)).toBeTruthy()
   })
 
   test('append test query params', async () => {
-    const url = getDownloadURL(version)
+    const url = getDownloadURL(opts)
     expect(url.toString()).toEqual(
-      `https://release.ariga.io/atlas/atlas-${ARCHITECTURE}-${version}?test=1`
+      `https://release.ariga.io/atlas/atlas-${ARCHITECTURE}-${opts.atlasVersion}?test=1`
     )
     const content = 'OK'
     const scope = nock(`${url.protocol}//${url.host}`)
       .get(`${url.pathname}${url.search}`)
       .matchHeader('user-agent', 'actions/tool-cache')
       .reply(200, content)
-    const bin = await installAtlas(version)
+    const bin = await installAtlas(opts)
     expect(scope.isDone()).toBeTruthy()
     await expect(stat(bin)).resolves.toBeTruthy()
     await expect(readFile(bin)).resolves.toEqual(Buffer.from(content))
@@ -463,7 +464,7 @@ describe('all reports with pull request', () => {
     const { env, cleanup } = await createTestEnv({
       override: {
         INPUT_LATEST: '1',
-        'INPUT_ARIGA-TOKEN': `mysecrettoken`,
+        'INPUT_CLOUD-TOKEN': `mysecrettoken`,
         'INPUT_SCHEMA-INSIGHTS': 'false',
         GITHUB_REPOSITORY: 'someProject/someRepo',
         GITHUB_SHA: '71d0bfc1'
@@ -474,7 +475,7 @@ describe('all reports with pull request', () => {
     spyOnNotice = jest.spyOn(core, 'notice')
     spyOnError = jest.spyOn(core, 'error')
     spyOnWarning = jest.spyOn(core, 'warning')
-    const url = process.env['INPUT_ARIGA-URL'] as string
+    const url = process.env['INPUT_CLOUD-URL'] as string
     gqlInterceptor = nock(url)
       .post('/api/query', function (body) {
         actualRequestBody = body
@@ -482,7 +483,7 @@ describe('all reports with pull request', () => {
       })
       .matchHeader(
         'Authorization',
-        `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
+        `Bearer ${process.env['INPUT_CLOUD-TOKEN']}`
       )
       .matchHeader('User-Agent', process.env.ATLASCI_USER_AGENT as string)
   })
@@ -497,7 +498,7 @@ describe('all reports with pull request', () => {
   })
 
   test('successfully', async () => {
-    const cloudURL = 'https://ariga.cloud.test/ci-runs/8589934593'
+    const cloudURL = 'https://ci.ariga.test/ci-runs/8589934593'
     process.env.INPUT_DIR = path.join(
       '__tests__',
       'testdata',
@@ -519,7 +520,7 @@ describe('all reports with pull request', () => {
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
-    expect(spyOnWarning).toHaveBeenCalledTimes(0)
+    expect(spyOnWarning).toHaveBeenCalledTimes(1) // for the old env var
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(spyOnNotice).toHaveBeenNthCalledWith(
       1,
@@ -532,7 +533,7 @@ describe('all reports with pull request', () => {
     )
     expect(spyOnNotice).toHaveBeenNthCalledWith(
       2,
-      'For full report visit: https://ariga.cloud.test/ci-runs/8589934593'
+      'For full report visit: https://ci.ariga.test/ci-runs/8589934593'
     )
     expect(actualRequestBody).toEqual({
       query: mutation,
@@ -560,7 +561,7 @@ describe('all reports with pull request', () => {
   })
 
   test('successfully with schema', async () => {
-    const cloudURL = 'https://ariga.cloud.test/ci-runs/8589934593'
+    const cloudURL = 'https://ci.ariga.test/ci-runs/8589934593'
     process.env.INPUT_DIR = path.join(
       '__tests__',
       'testdata',
@@ -583,7 +584,7 @@ describe('all reports with pull request', () => {
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
-    expect(spyOnWarning).toHaveBeenCalledTimes(0)
+    expect(spyOnWarning).toHaveBeenCalledTimes(1)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(actualRequestBody).toEqual({
       query: mutation,
@@ -686,7 +687,7 @@ describe('all reports with push (branch)', () => {
     expect(res.exitCode).toBe(ExitCodes.Success)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnNotice).toHaveBeenCalledTimes(2)
-    expect(spyOnWarning).toHaveBeenCalledTimes(0)
+    expect(spyOnWarning).toHaveBeenCalledTimes(2)
     expect(spyOnError).toHaveBeenCalledTimes(0)
     expect(actualRequestBody).toEqual({
       query: mutation,

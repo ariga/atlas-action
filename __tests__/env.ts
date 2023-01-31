@@ -22,7 +22,8 @@ export const testDefaults = {
   INPUT_DIR: 'migrations',
   'INPUT_DEV-URL': 'sqlite://test?mode=memory&cache=shared&_fk=1',
   INPUT_LATEST: '0',
-  'INPUT_ARIGA-URL': `https://ci.ariga.test`
+  'INPUT_ARIGA-URL': `https://ci.ariga.test`,
+  'INPUT_CLOUD-URL': `https://ci.ariga.test`
 }
 
 // These are mocks for the GitHub context variables.

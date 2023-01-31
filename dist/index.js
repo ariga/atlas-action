@@ -34,11 +34,11 @@ var ExitCodes;
     ExitCodes[ExitCodes["Failure"] = 1] = "Failure";
     ExitCodes[ExitCodes["Error"] = 2] = "Error";
 })(ExitCodes = exports.ExitCodes || (exports.ExitCodes = {}));
-function installAtlas(version) {
+function installAtlas(opts) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
-        const downloadURL = (0, cloud_1.getDownloadURL)(version).toString();
-        (0, core_1.info)(`Downloading atlas, version: ${version}`);
+        const downloadURL = (0, cloud_1.getDownloadURL)(opts).toString();
+        (0, core_1.info)(`Downloading atlas, version: ${opts.atlasVersion}`);
         // Setting user-agent for downloadTool is currently not supported.
         const bin = yield (0, tool_cache_1.downloadTool)(downloadURL);
         yield (0, exec_1.exec)(`chmod +x ${bin}`);
@@ -166,7 +166,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.Status = exports.mutation = exports.ARCHITECTURE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
+exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.Status = exports.mutation = exports.BASE_CLOUD_URL = exports.ARCHITECTURE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
 const github = __importStar(__nccwpck_require__(5438));
 const core_1 = __nccwpck_require__(2186);
 const atlas_1 = __nccwpck_require__(1236);
@@ -180,6 +180,7 @@ const APPLE_ARCH = 'darwin-amd64';
 exports.BASE_ADDRESS = 'https://release.ariga.io';
 exports.S3_FOLDER = 'atlas';
 exports.ARCHITECTURE = os_1.default.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH;
+exports.BASE_CLOUD_URL = 'https://ingress.atlasgo.cloud';
 exports.mutation = (0, graphql_request_1.gql) `
   mutation CreateReportInput($input: CreateReportInput!) {
     createReport(input: $input) {
@@ -225,16 +226,16 @@ function getMutationVariables(opts, res) {
 }
 function reportToCloud(opts, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        const token = (0, core_1.getInput)('ariga-token');
+        const token = opts.cloudToken;
         if (!token) {
-            (0, core_1.warning)(`Skipping report to cloud missing ariga-token input`);
+            (0, core_1.warning)(`Skipping report to cloud missing cloud-token input`);
             return {};
         }
-        (0, core_1.info)(`Reporting to cloud: ${getCloudURL()}`);
+        (0, core_1.info)(`Reporting to cloud: ${getCloudURL(opts)}`);
         (0, core_1.setSecret)(token);
         const rep = {};
         try {
-            rep.result = yield (0, graphql_request_1.request)(getCloudURL(), exports.mutation, getMutationVariables(opts, res), getHeaders(token));
+            rep.result = yield (0, graphql_request_1.request)(getCloudURL(opts), exports.mutation, getMutationVariables(opts, res), getHeaders(token));
         }
         catch (e) {
             let errMsg = e;
@@ -258,18 +259,21 @@ function reportToCloud(opts, res) {
     });
 }
 exports.reportToCloud = reportToCloud;
-function getCloudURL() {
-    const au = (0, core_1.getInput)(`ariga-url`);
-    return new url.URL('/api/query', au === '' ? 'https://ci.ariga.cloud' : au).toString();
+function getCloudURL(opts) {
+    let base = opts.cloudURL;
+    if (opts.cloudURL === '' || !opts.cloudURL) {
+        base = exports.BASE_CLOUD_URL;
+    }
+    return new url.URL('/api/query', base).toString();
 }
 exports.getCloudURL = getCloudURL;
 function getHeaders(token) {
     return Object.assign({ Authorization: `Bearer ${token}` }, (0, atlas_1.getUserAgent)());
 }
-function getDownloadURL(version) {
-    const url = new URL(`${exports.BASE_ADDRESS}/${exports.S3_FOLDER}/atlas-${exports.ARCHITECTURE}-${version}`);
-    const origin = new URL(getCloudURL()).origin;
-    if (origin !== 'https://ci.ariga.cloud') {
+function getDownloadURL(opts) {
+    const url = new URL(`${exports.BASE_ADDRESS}/${exports.S3_FOLDER}/atlas-${exports.ARCHITECTURE}-${opts.atlasVersion}`);
+    const origin = new URL(getCloudURL(opts)).origin;
+    if (origin !== exports.BASE_CLOUD_URL) {
         url.searchParams.set('test', '1');
     }
     return url;
@@ -560,12 +564,13 @@ function commentSig(dir) {
 /***/ }),
 
 /***/ 1044:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OptionsFromEnv = exports.PullReqFromContext = void 0;
+const core_1 = __nccwpck_require__(2186);
 function PullReqFromContext(ctx) {
     var _a;
     if (ctx.eventName != 'pull_request') {
@@ -600,10 +605,11 @@ function OptionsFromEnv(env) {
         opts.devUrl = input('dev-url');
     }
     if (input('ariga-token')) {
-        opts.arigaToken = input('ariga-token');
+        (0, core_1.warning)('ariga-token is deprecated, use cloud-token instead');
+        opts.cloudToken = input('ariga-token');
     }
-    if (input('ariga-url')) {
-        opts.arigaURL = input('ariga-url');
+    if (input('cloud-token')) {
+        opts.cloudToken = input('cloud-token');
     }
     if (input('latest')) {
         const i = parseInt(input('latest'), 10);
@@ -615,11 +621,12 @@ function OptionsFromEnv(env) {
     if (input('schema-insights') == 'false') {
         opts.schemaInsights = false;
     }
-    if (input('ariga-token')) {
-        opts.arigaToken = input('ariga-token');
-    }
     if (input('ariga-url')) {
-        opts.arigaURL = input('ariga-url');
+        (0, core_1.warning)('ariga-url is deprecated, use cloud-url instead');
+        opts.cloudURL = input('ariga-url');
+    }
+    if (input('cloud-url')) {
+        opts.cloudURL = input('cloud-url');
     }
     if (input('project-env')) {
         opts.projectEnv = input('project-env');
@@ -682,7 +689,7 @@ function run(input) {
             }
         }
         try {
-            const bin = yield (0, atlas_1.installAtlas)(input.opts.atlasVersion);
+            const bin = yield (0, atlas_1.installAtlas)(input.opts);
             const res = yield (0, atlas_1.runAtlas)(bin, input.opts);
             const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw;
             (0, core_1.info)(`\nAtlas output:\n${out}`);

@@ -27,7 +27,7 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
     }
   }
   try {
-    const bin = await installAtlas(input.opts.atlasVersion)
+    const bin = await installAtlas(input.opts)
     const res = await runAtlas(bin, input.opts)
     const out = res.summary ? JSON.stringify(res.summary, null, 2) : res.raw
     info(`\nAtlas output:\n${out}`)
