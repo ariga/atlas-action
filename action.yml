@@ -24,10 +24,13 @@ inputs:
     description: 'path to the repository working directory'
     required: false
   ariga-token:
-    description: 'Token for sending report to Ariga cloud (should be passed as a secret)'
+    description: 'Token for sending report to Atlas Cloud (should be passed as a secret). Deprecated.'
+    required: false
+  cloud-token:
+    description: 'Token for using Atlas Cloud (should be passed as a secret).'
     required: false
   schema-insights:
-    description: 'Enable reporting of schema insights (requires ariga-token)'
+    description: 'Enable reporting of schema insights (requires cloud-token)'
     default: 'true'
     required: false
   project-env:

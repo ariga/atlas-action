@@ -1,5 +1,6 @@
 import Dict = NodeJS.Dict
 import { Context } from '@actions/github/lib/context'
+import { warning } from '@actions/core'
 
 export type Options = {
   atlasVersion: string
@@ -7,8 +8,8 @@ export type Options = {
   dirFormat?: string
   devUrl?: string
   latest?: number
-  arigaToken?: string
-  arigaURL?: string
+  cloudToken?: string
+  cloudURL?: string
   projectEnv?: string
   schemaInsights: boolean
   token?: string
@@ -62,10 +63,11 @@ export function OptionsFromEnv(env: Dict<string>): Options {
     opts.devUrl = input('dev-url')
   }
   if (input('ariga-token')) {
-    opts.arigaToken = input('ariga-token')
+    warning('ariga-token is deprecated, use cloud-token instead')
+    opts.cloudToken = input('ariga-token')
   }
-  if (input('ariga-url')) {
-    opts.arigaURL = input('ariga-url')
+  if (input('cloud-token')) {
+    opts.cloudToken = input('cloud-token')
   }
   if (input('latest')) {
     const i = parseInt(input('latest'), 10)
@@ -77,11 +79,12 @@ export function OptionsFromEnv(env: Dict<string>): Options {
   if (input('schema-insights') == 'false') {
     opts.schemaInsights = false
   }
-  if (input('ariga-token')) {
-    opts.arigaToken = input('ariga-token')
-  }
   if (input('ariga-url')) {
-    opts.arigaURL = input('ariga-url')
+    warning('ariga-url is deprecated, use cloud-url instead')
+    opts.cloudURL = input('ariga-url')
+  }
+  if (input('cloud-url')) {
+    opts.cloudURL = input('cloud-url')
   }
   if (input('project-env')) {
     opts.projectEnv = input('project-env')

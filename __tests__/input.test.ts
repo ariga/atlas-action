@@ -33,8 +33,8 @@ describe('input', () => {
       dir: 'dir',
       dirFormat: 'atlas',
       devUrl: 'dev-url',
-      arigaToken: 'ariga-token',
-      arigaURL: 'ariga-url',
+      cloudToken: 'ariga-token',
+      cloudURL: 'ariga-url',
       latest: 3,
       projectEnv: 'env',
       skipCheckForUpdate: true

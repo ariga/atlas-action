@@ -1,5 +1,5 @@
 import * as github from '@actions/github'
-import { getInput, info, setSecret, warning } from '@actions/core'
+import { info, setSecret, warning } from '@actions/core'
 import { AtlasResult, ExitCodes, getUserAgent } from './atlas'
 import * as url from 'url'
 import { ClientError, gql, request } from 'graphql-request'
@@ -13,6 +13,7 @@ const APPLE_ARCH = 'darwin-amd64'
 export const BASE_ADDRESS = 'https://release.ariga.io'
 export const S3_FOLDER = 'atlas'
 export const ARCHITECTURE = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH
+export const BASE_CLOUD_URL = 'https://ingress.atlasgo.cloud'
 
 export const mutation = gql`
   mutation CreateReportInput($input: CreateReportInput!) {
@@ -81,17 +82,17 @@ export async function reportToCloud(
   opts: Options,
   res: AtlasResult
 ): Promise<CloudReport> {
-  const token = getInput('ariga-token')
+  const token = opts.cloudToken
   if (!token) {
-    warning(`Skipping report to cloud missing ariga-token input`)
+    warning(`Skipping report to cloud missing cloud-token input`)
     return {} as CloudReport
   }
-  info(`Reporting to cloud: ${getCloudURL()}`)
+  info(`Reporting to cloud: ${getCloudURL(opts)}`)
   setSecret(token)
   const rep: CloudReport = {}
   try {
     rep.result = await request<Mutation>(
-      getCloudURL(),
+      getCloudURL(opts),
       mutation,
       getMutationVariables(opts, res),
       getHeaders(token)
@@ -116,12 +117,12 @@ export async function reportToCloud(
   return rep
 }
 
-export function getCloudURL(): string {
-  const au = getInput(`ariga-url`)
-  return new url.URL(
-    '/api/query',
-    au === '' ? 'https://ci.ariga.cloud' : au
-  ).toString()
+export function getCloudURL(opts: Options): string {
+  let base = opts.cloudURL
+  if (opts.cloudURL === '' || !opts.cloudURL) {
+    base = BASE_CLOUD_URL
+  }
+  return new url.URL('/api/query', base).toString()
 }
 
 function getHeaders(token: string): { [p: string]: string } {
@@ -131,12 +132,12 @@ function getHeaders(token: string): { [p: string]: string } {
   }
 }
 
-export function getDownloadURL(version: string): URL {
+export function getDownloadURL(opts: Options): URL {
   const url = new URL(
-    `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${version}`
+    `${BASE_ADDRESS}/${S3_FOLDER}/atlas-${ARCHITECTURE}-${opts.atlasVersion}`
   )
-  const origin = new URL(getCloudURL()).origin
-  if (origin !== 'https://ci.ariga.cloud') {
+  const origin = new URL(getCloudURL(opts)).origin
+  if (origin !== BASE_CLOUD_URL) {
     url.searchParams.set('test', '1')
   }
   return url

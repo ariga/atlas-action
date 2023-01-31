@@ -65,9 +65,9 @@ interface Diagnostic {
   Code: string
 }
 
-export async function installAtlas(version: string): Promise<string> {
-  const downloadURL = getDownloadURL(version).toString()
-  info(`Downloading atlas, version: ${version}`)
+export async function installAtlas(opts: Options): Promise<string> {
+  const downloadURL = getDownloadURL(opts).toString()
+  info(`Downloading atlas, version: ${opts.atlasVersion}`)
   // Setting user-agent for downloadTool is currently not supported.
   const bin = await downloadTool(downloadURL)
   await exec(`chmod +x ${bin}`)

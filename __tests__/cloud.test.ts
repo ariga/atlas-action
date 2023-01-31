@@ -24,18 +24,18 @@ describe('report to cloud', () => {
         GITHUB_REPOSITORY: 'someProject/someRepo',
         GITHUB_SHA: '71d0bfc1',
         INPUT_DIR: 'migrations',
-        'INPUT_ARIGA-URL': `https://ci.ariga.cloud`,
-        'INPUT_ARIGA-TOKEN': `mysecrettoken`,
+        'INPUT_CLOUD-URL': `https://ingress.atlasgo.cloud`,
+        'INPUT_CLOUD-TOKEN': `mysecrettoken`,
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
     })
     process.env = env
     cleanupFn = cleanup
-    gqlInterceptor = nock(process.env['INPUT_ARIGA-URL'] as string)
+    gqlInterceptor = nock(process.env['INPUT_CLOUD-URL'] as string)
       .post('/api/query')
       .matchHeader(
         'Authorization',
-        `Bearer ${process.env['INPUT_ARIGA-TOKEN']}`
+        `Bearer ${process.env['INPUT_CLOUD-TOKEN']}`
       )
       .matchHeader('User-Agent', process.env.ATLASCI_USER_AGENT as string)
   })
@@ -47,7 +47,10 @@ describe('report to cloud', () => {
   })
 
   test('correct cloud url', async () => {
-    expect(getCloudURL()).toEqual(`${process.env['INPUT_ARIGA-URL']}/api/query`)
+    let opts: Options = OptionsFromEnv(process.env)
+    expect(getCloudURL(opts)).toEqual(
+      `${process.env['INPUT_CLOUD-URL']}/api/query`
+    )
   })
 
   test('successful', async () => {
@@ -108,7 +111,7 @@ describe('report to cloud', () => {
     expect(spyOnRequest).toBeCalledTimes(1)
 
     expect(spyOnRequest).toBeCalledWith(
-      'https://ci.ariga.cloud/api/query',
+      'https://ingress.atlasgo.cloud/api/query',
       mutation,
       {
         input: {
@@ -157,20 +160,20 @@ describe('report to cloud', () => {
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
     expect(spyOnRequest).toHaveBeenCalledWith(
-      'https://ci.ariga.cloud/api/query',
+      'https://ingress.atlasgo.cloud/api/query',
       expect.anything(),
       expect.anything(),
       expect.anything()
     )
-    expect(spyOnWarning).toHaveBeenCalledTimes(2)
+    expect(spyOnWarning).toHaveBeenCalledTimes(3)
     expect(spyOnWarning).toHaveBeenNthCalledWith(
-      1,
+      2,
       expect.stringContaining(
         'Received error: Error: GraphQL Error (Code: 500)'
       )
     )
     expect(spyOnWarning).toHaveBeenNthCalledWith(
-      2,
+      3,
       'Failed reporting to Atlas Cloud: Internal server error'
     )
   })
@@ -199,7 +202,7 @@ describe('report to cloud', () => {
     const payload = await reportToCloud(opts, res)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
-    expect(spyOnWarning).toHaveBeenCalledTimes(2)
+    expect(spyOnWarning).toHaveBeenCalledTimes(3)
     expect(spyOnWarning).toHaveBeenCalledWith(
       'Failed reporting to Atlas Cloud: Invalid Token'
     )
@@ -208,7 +211,7 @@ describe('report to cloud', () => {
   })
 
   test('ignore when missing token', async () => {
-    process.env['INPUT_ARIGA-TOKEN'] = ''
+    process.env['INPUT_CLOUD-TOKEN'] = ''
     const res: AtlasResult = {
       exitCode: ExitCodes.Success,
       raw: '[{"Name":"test","Text":"test"}]',
@@ -226,9 +229,9 @@ describe('report to cloud', () => {
     let opts: Options = OptionsFromEnv(process.env)
     const payload = await reportToCloud(opts, res)
     expect(spyOnRequest).not.toHaveBeenCalled()
-    expect(spyOnWarning).toHaveBeenCalledTimes(1)
+    expect(spyOnWarning).toHaveBeenCalledTimes(2)
     expect(spyOnWarning).toHaveBeenCalledWith(
-      'Skipping report to cloud missing ariga-token input'
+      'Skipping report to cloud missing cloud-token input'
     )
   })
 })
