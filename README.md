@@ -81,7 +81,7 @@ Sets the directory that contains the migration scripts to analyze.
 #### `dir-format`
 
 Sets the format of the migration directory. Options: `atlas` (default),
-`golang-migrate`, `goose` or `dbmate`. Coming soon: `flyway`, `liquibase`.
+`golang-migrate`, `goose`, `dbmate`, `flyway`, or `liquibase`.
 
 #### `dev-url`
 
