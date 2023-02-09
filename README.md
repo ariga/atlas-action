@@ -102,7 +102,7 @@ be checked out locally or you will see an error such as:
 Atlas failed with code 1: Error: git diff: exit status 128
 ```
 
-### `CLOUD-TOKEN`
+### `cloud-token`
 
 Connect the action to [Atlas Cloud](https://atlasgo.cloud/) to get access to more analyzers,
 entity relationship diagrams (ERDs) of your schema, and full CI reports.
