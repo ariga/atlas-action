@@ -148,10 +148,6 @@ describe('run with "latest" flag', () => {
       },
       Steps: [
         {
-          Name: 'Migration Integrity Check',
-          Text: 'File atlas.sum is valid'
-        },
-        {
           Name: 'Detect New Migration Files',
           Text: 'Found 0 new migration files (from 0 total)'
         },

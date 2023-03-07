@@ -24,7 +24,7 @@ describe('report to cloud', () => {
         GITHUB_REPOSITORY: 'someProject/someRepo',
         GITHUB_SHA: '71d0bfc1',
         INPUT_DIR: 'migrations',
-        'INPUT_CLOUD-URL': `https://ingress.atlasgo.cloud`,
+        'INPUT_CLOUD-URL': `https://api.atlasgo.cloud`,
         'INPUT_CLOUD-TOKEN': `mysecrettoken`,
         ATLASCI_USER_AGENT: 'test-atlasci-action'
       }
@@ -111,7 +111,7 @@ describe('report to cloud', () => {
     expect(spyOnRequest).toBeCalledTimes(1)
 
     expect(spyOnRequest).toBeCalledWith(
-      'https://ingress.atlasgo.cloud/api/query',
+      'https://api.atlasgo.cloud/api/query',
       mutation,
       {
         input: {
@@ -160,7 +160,7 @@ describe('report to cloud', () => {
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
     expect(spyOnRequest).toHaveBeenCalledWith(
-      'https://ingress.atlasgo.cloud/api/query',
+      'https://api.atlasgo.cloud/api/query',
       expect.anything(),
       expect.anything(),
       expect.anything()
