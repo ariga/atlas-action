@@ -13,7 +13,7 @@ const APPLE_ARCH = 'darwin-amd64'
 export const BASE_ADDRESS = 'https://release.ariga.io'
 export const S3_FOLDER = 'atlas'
 export const ARCHITECTURE = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH
-export const BASE_CLOUD_URL = 'https://ingress.atlasgo.cloud'
+export const BASE_CLOUD_URL = 'https://api.atlasgo.cloud'
 
 export const mutation = gql`
   mutation CreateReportInput($input: CreateReportInput!) {
