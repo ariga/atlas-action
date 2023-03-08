@@ -264,7 +264,7 @@ function getCloudURL(opts) {
     if (opts.cloudURL === '' || !opts.cloudURL) {
         base = exports.BASE_CLOUD_URL;
     }
-    return new url.URL('/api/query', base).toString();
+    return new url.URL('/query', base).toString();
 }
 exports.getCloudURL = getCloudURL;
 function getHeaders(token) {

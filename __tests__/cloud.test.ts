@@ -32,7 +32,7 @@ describe('report to cloud', () => {
     process.env = env
     cleanupFn = cleanup
     gqlInterceptor = nock(process.env['INPUT_CLOUD-URL'] as string)
-      .post('/api/query')
+      .post('/query')
       .matchHeader(
         'Authorization',
         `Bearer ${process.env['INPUT_CLOUD-TOKEN']}`
@@ -48,9 +48,7 @@ describe('report to cloud', () => {
 
   test('correct cloud url', async () => {
     let opts: Options = OptionsFromEnv(process.env)
-    expect(getCloudURL(opts)).toEqual(
-      `${process.env['INPUT_CLOUD-URL']}/api/query`
-    )
+    expect(getCloudURL(opts)).toEqual(`${process.env['INPUT_CLOUD-URL']}/query`)
   })
 
   test('successful', async () => {
@@ -111,7 +109,7 @@ describe('report to cloud', () => {
     expect(spyOnRequest).toBeCalledTimes(1)
 
     expect(spyOnRequest).toBeCalledWith(
-      'https://api.atlasgo.cloud/api/query',
+      'https://api.atlasgo.cloud/query',
       mutation,
       {
         input: {
@@ -160,7 +158,7 @@ describe('report to cloud', () => {
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
     expect(spyOnRequest).toHaveBeenCalledWith(
-      'https://api.atlasgo.cloud/api/query',
+      'https://api.atlasgo.cloud/query',
       expect.anything(),
       expect.anything(),
       expect.anything()
