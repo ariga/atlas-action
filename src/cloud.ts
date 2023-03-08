@@ -122,7 +122,7 @@ export function getCloudURL(opts: Options): string {
   if (opts.cloudURL === '' || !opts.cloudURL) {
     base = BASE_CLOUD_URL
   }
-  return new url.URL('/api/query', base).toString()
+  return new url.URL('/query', base).toString()
 }
 
 function getHeaders(token: string): { [p: string]: string } {
