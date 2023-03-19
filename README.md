@@ -37,6 +37,10 @@ on:
   pull_request:
     paths:
       - 'path/to/migration/dir/*'
+# Permissions to write comments on the pull request.
+permissions:
+  contents: read
+  pull-requests: write
 jobs:
   lint:
     services:
