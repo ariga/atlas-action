@@ -473,7 +473,7 @@ describe('all reports with pull request', () => {
     spyOnWarning = jest.spyOn(core, 'warning')
     const url = process.env['INPUT_CLOUD-URL'] as string
     gqlInterceptor = nock(url)
-      .post('/api/query', function (body) {
+      .post('/query', function (body) {
         actualRequestBody = body
         return body
       })
@@ -639,7 +639,7 @@ describe('all reports with push (branch)', () => {
     spyOnWarning = jest.spyOn(core, 'warning')
     const url = process.env['INPUT_ARIGA-URL'] as string
     gqlInterceptor = nock(url)
-      .post('/api/query', function (body) {
+      .post('/query', function (body) {
         actualRequestBody = body
         return body
       })
