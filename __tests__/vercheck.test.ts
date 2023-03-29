@@ -7,7 +7,11 @@ describe('vercheck', function () {
   afterEach(() => {
     nock.cleanAll()
   })
-  const testCase = async (v: string, payload: string, exp: Vercheck) => {
+  const testCase = async (
+    v: string,
+    payload: string,
+    exp: Vercheck
+  ): Promise<void> => {
     test(v, async () => {
       const scope = nock('https://vercheck.ariga.io')
         .get(`/atlas-action/${v}`)

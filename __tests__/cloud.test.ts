@@ -47,7 +47,7 @@ describe('report to cloud', () => {
   })
 
   test('correct cloud url', async () => {
-    let opts: Options = OptionsFromEnv(process.env)
+    const opts: Options = OptionsFromEnv(process.env)
     expect(getCloudURL(opts)).toEqual(`${process.env['INPUT_CLOUD-URL']}/query`)
   })
 
@@ -85,7 +85,7 @@ describe('report to cloud', () => {
       }
     })
     const spyOnRequest = jest.spyOn(gql, 'request')
-    let opts: Options = OptionsFromEnv(process.env)
+    const opts: Options = OptionsFromEnv(process.env)
     const payload = await reportToCloud(opts, res)
     const expected = {
       createReport: {
@@ -153,8 +153,8 @@ describe('report to cloud', () => {
 
     const spyOnRequest = jest.spyOn(gql, 'request')
 
-    let opts: Options = OptionsFromEnv(process.env)
-    const payload = await reportToCloud(opts, res)
+    const opts: Options = OptionsFromEnv(process.env)
+    await reportToCloud(opts, res)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
     expect(spyOnRequest).toHaveBeenCalledWith(
@@ -196,7 +196,7 @@ describe('report to cloud', () => {
     )
     const spyOnRequest = jest.spyOn(gql, 'request')
 
-    let opts: Options = OptionsFromEnv(process.env)
+    const opts: Options = OptionsFromEnv(process.env)
     const payload = await reportToCloud(opts, res)
     expect(scope.isDone()).toBeTruthy()
     expect(spyOnRequest).toBeCalledTimes(1)
@@ -224,8 +224,8 @@ describe('report to cloud', () => {
       }
     }
     const spyOnRequest = jest.spyOn(gql, 'request')
-    let opts: Options = OptionsFromEnv(process.env)
-    const payload = await reportToCloud(opts, res)
+    const opts: Options = OptionsFromEnv(process.env)
+    await reportToCloud(opts, res)
     expect(spyOnRequest).not.toHaveBeenCalled()
     expect(spyOnWarning).toHaveBeenCalledTimes(2)
     expect(spyOnWarning).toHaveBeenCalledWith(
