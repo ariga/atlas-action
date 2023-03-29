@@ -226,8 +226,17 @@ function getMutationVariables(opts, res) {
 }
 function reportToCloud(opts, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        const token = opts.cloudToken;
+        let token = opts.cloudToken;
         if (!token) {
+            if (opts.cloudPublic) {
+                try {
+                    token = yield (0, core_1.getIDToken)('ariga://atlas-ci-action');
+                }
+                catch (e) {
+                    (0, core_1.warning)('`id-token: write` permission is required to report to cloud');
+                    return {};
+                }
+            }
             (0, core_1.warning)(`Skipping report to cloud missing cloud-token input`);
             return {};
         }
@@ -610,6 +619,9 @@ function OptionsFromEnv(env) {
     }
     if (input('cloud-token')) {
         opts.cloudToken = input('cloud-token');
+    }
+    if (input('cloud-public') == 'true') {
+        opts.cloudPublic = true;
     }
     if (input('latest')) {
         const i = parseInt(input('latest'), 10);
