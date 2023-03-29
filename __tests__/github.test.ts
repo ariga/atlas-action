@@ -31,8 +31,7 @@ describe('resolve git base', () => {
   })
 
   test('branch mode - base is master', async () => {
-    const remote = `https://github.com/ariga/atlas.git`
-    await simpleGit().clone(remote, base)
+    await simpleGit(base).init({ initialBranch: 'master' })
     await expect(resolveGitBase(base)).resolves.toBe('master')
   })
 
@@ -40,7 +39,7 @@ describe('resolve git base', () => {
     Object.defineProperty(github, 'context', { value: {} })
     process.env.GITHUB_BASE_REF = ''
     const remote = `https://github.com/actions/javascript-action.git`
-    await simpleGit().clone(remote, base)
+    await simpleGit().clone(remote, base, ['--depth', '1'])
     await expect(resolveGitBase(base)).resolves.toBe('main')
   })
 
