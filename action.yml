@@ -29,6 +29,10 @@ inputs:
   cloud-token:
     description: 'Token for using Atlas Cloud (should be passed as a secret).'
     required: false
+  cloud-public:
+    description: 'Set true to send report to gh.atlasgo.cloud'
+    default: false
+    required: false
   schema-insights:
     description: 'Enable reporting of schema insights (requires cloud-token)'
     default: 'true'

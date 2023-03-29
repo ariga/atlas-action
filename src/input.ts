@@ -9,6 +9,7 @@ export type Options = {
   devUrl?: string
   latest?: number
   cloudToken?: string
+  cloudPublic?: boolean
   cloudURL?: string
   projectEnv?: string
   schemaInsights: boolean
@@ -68,6 +69,9 @@ export function OptionsFromEnv(env: Dict<string>): Options {
   }
   if (input('cloud-token')) {
     opts.cloudToken = input('cloud-token')
+  }
+  if (input('cloud-public') == 'true') {
+    opts.cloudPublic = true
   }
   if (input('latest')) {
     const i = parseInt(input('latest'), 10)
