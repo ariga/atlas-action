@@ -1,5 +1,5 @@
 import * as github from '@actions/github'
-import { info, setSecret, warning } from '@actions/core'
+import { getIDToken, info, setSecret, warning } from '@actions/core'
 import { AtlasResult, ExitCodes, getUserAgent } from './atlas'
 import * as url from 'url'
 import { ClientError, gql, request } from 'graphql-request'
@@ -82,8 +82,16 @@ export async function reportToCloud(
   opts: Options,
   res: AtlasResult
 ): Promise<CloudReport> {
-  const token = opts.cloudToken
+  let token = opts.cloudToken
   if (!token) {
+    if (opts.cloudPublic) {
+      try {
+        token = await getIDToken('ariga://atlas-ci-action')
+      } catch (e) {
+        warning('`id-token: write` permission is required to report to cloud')
+        return {} as CloudReport
+      }
+    }
     warning(`Skipping report to cloud missing cloud-token input`)
     return {} as CloudReport
   }

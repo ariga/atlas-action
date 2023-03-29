@@ -24,6 +24,7 @@ describe('input', () => {
       'INPUT_DEV-URL': 'dev-url',
       'INPUT_ARIGA-TOKEN': 'ariga-token',
       'INPUT_ARIGA-URL': 'ariga-url',
+      'INPUT_CLOUD-PUBLIC': 'true',
       INPUT_LATEST: '3',
       'INPUT_PROJECT-ENV': 'env',
       'INPUT_SKIP-CHECK-FOR-UPDATE': 'true'
@@ -35,6 +36,7 @@ describe('input', () => {
       dirFormat: 'atlas',
       devUrl: 'dev-url',
       cloudToken: 'ariga-token',
+      cloudPublic: true,
       cloudURL: 'ariga-url',
       latest: 3,
       projectEnv: 'env',
