@@ -4,18 +4,19 @@ import { defaultEnv, defaultVersion } from './env'
 import { atlasArgs } from '../src/atlas'
 import * as fs from 'fs/promises'
 import path from 'path'
+import { Context } from '@actions/github/lib/context'
 
 describe('input', () => {
   test('defaults', () => {
     const options = OptionsFromEnv(defaultEnv)
-    let expected: Options = {
+    const expected: Options = {
       atlasVersion: defaultVersion(),
       schemaInsights: true
     }
     expect(options).toEqual(expected)
   })
   test('all args set', () => {
-    let options = OptionsFromEnv({
+    const options = OptionsFromEnv({
       'INPUT_ATLAS-VERSION': 'v0.1.2',
       'INPUT_SCHEMA-INSIGHTS': 'false',
       INPUT_DIR: 'dir',
@@ -27,7 +28,7 @@ describe('input', () => {
       'INPUT_PROJECT-ENV': 'env',
       'INPUT_SKIP-CHECK-FOR-UPDATE': 'true'
     })
-    let expected: Options = {
+    const expected: Options = {
       atlasVersion: 'v0.1.2',
       schemaInsights: false,
       dir: 'dir',
@@ -51,26 +52,25 @@ describe('atlas args', () => {
       'INPUT_DIR-FORMAT': 'atlas',
       'INPUT_DEV-URL': 'dev-url'
     })
-    let args = await atlasArgs(opts)
-    const re: RegExp = new RegExp(
+    const args = await atlasArgs(opts)
+    const re = new RegExp(
       'migrate lint --log {{ json . }} --dir file://dir --dev-url dev-url --dir-format atlas --git-dir .*/atlas-action --git-base origin/master'
     )
     expect(args.join(' ')).toMatch(re)
   })
   test('env set', async () => {
-    let opts = OptionsFromEnv({
+    const opts = OptionsFromEnv({
       ...defaultEnv,
       'INPUT_PROJECT-ENV': 'test'
     })
-    let args = await atlasArgs(opts)
+    const args = await atlasArgs(opts)
     expect(args.join(' ')).toEqual('migrate lint --log {{ json . }} --env test')
   })
 })
 
 describe('ctx', () => {
   test('empty', function () {
-    // @ts-ignore (context gets populated when running in an action)
-    const pr = PullReqFromContext({})
+    const pr = PullReqFromContext({} as Context)
     expect(pr).toBeUndefined()
   })
   test('pr', async function () {

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import path from 'path'
 import * as github from '@actions/github'
-const yaml = require('js-yaml')
+import * as yaml from 'js-yaml'
 import * as fs from 'fs'
 
 interface ProcessEnv {
@@ -105,7 +105,9 @@ export async function createTestEnv(
 }
 
 export function defaultVersion(): string {
-  let action = fs.readFileSync('./action.yml')
-  let data = yaml.load(action)
+  const action = fs.readFileSync('./action.yml', { encoding: 'utf-8' })
+  const data = yaml.load(action) as {
+    inputs: { [key: string]: { default: string } }
+  }
   return data.inputs['atlas-version'].default
 }

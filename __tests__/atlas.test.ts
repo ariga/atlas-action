@@ -168,7 +168,7 @@ describe('run with "latest" flag', () => {
       'testdata',
       'sqlite-wrong-sum'
     )
-    let input: RunInput = {
+    const input: RunInput = {
       opts: OptionsFromEnv(process.env),
       pr: undefined
     }
@@ -220,7 +220,7 @@ describe('run with "latest" flag', () => {
       'sqlite-with-diagnostics'
     )
 
-    let input = {
+    const input = {
       opts: OptionsFromEnv(process.env),
       pr: undefined
     }

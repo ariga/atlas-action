@@ -16,7 +16,7 @@ describe('summary', () => {
   beforeAll(async () => {
     if (!process.env.GITHUB_STEP_SUMMARY) {
       summaryFile = path.join(dir, 'summary.txt')
-      let f = await fs.open(summaryFile, 'w')
+      const f = await fs.open(summaryFile, 'w')
       await f.close()
       process.env.GITHUB_STEP_SUMMARY = summaryFile
     }
@@ -86,7 +86,7 @@ describe('summary', () => {
 
 describe('annotations', () => {
   let spyErr: jest.SpyInstance
-  let origDir: string = getInput('dir')
+  const origDir: string = getInput('dir')
 
   beforeAll(() => {
     spyErr = jest.spyOn(core, 'error')
@@ -101,7 +101,7 @@ describe('annotations', () => {
 
   test('destructive', async () => {
     const sum = await loadRun('destructive')
-    let opts: Options = OptionsFromEnv(process.env)
+    const opts: Options = OptionsFromEnv(process.env)
     report(opts, sum)
     expect(spyErr).toHaveBeenCalledWith(
       `Dropping table "orders" (DS102)
