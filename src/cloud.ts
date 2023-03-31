@@ -14,6 +14,7 @@ export const BASE_ADDRESS = 'https://release.ariga.io'
 export const S3_FOLDER = 'atlas'
 export const ARCHITECTURE = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH
 export const BASE_CLOUD_URL = 'https://api.atlasgo.cloud'
+export const BASE_CLOUD_URL_PUBLIC = 'https://gh-api.atlasgo.cloud'
 
 export const mutation = gql`
   mutation CreateReportInput($input: CreateReportInput!) {
@@ -128,7 +129,7 @@ export async function reportToCloud(
 export function getCloudURL(opts: Options): string {
   let base = opts.cloudURL
   if (opts.cloudURL === '' || !opts.cloudURL) {
-    base = BASE_CLOUD_URL
+    base = opts.cloudPublic ? BASE_CLOUD_URL_PUBLIC : BASE_CLOUD_URL
   }
   return new url.URL('/query', base).toString()
 }

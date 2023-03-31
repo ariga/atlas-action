@@ -1,6 +1,11 @@
 import { expect } from '@jest/globals'
 import { AtlasResult, ExitCodes } from '../src/atlas'
-import { getCloudURL, mutation, reportToCloud } from '../src/cloud'
+import {
+  getCloudURL,
+  mutation,
+  reportToCloud,
+  BASE_CLOUD_URL_PUBLIC
+} from '../src/cloud'
 import * as http from '@actions/http-client'
 import nock from 'nock'
 import * as core from '@actions/core'
@@ -49,6 +54,9 @@ describe('report to cloud', () => {
   test('correct cloud url', async () => {
     const opts: Options = OptionsFromEnv(process.env)
     expect(getCloudURL(opts)).toEqual(`${process.env['INPUT_CLOUD-URL']}/query`)
+    opts.cloudURL = ''
+    opts.cloudPublic = true
+    expect(getCloudURL(opts)).toEqual(`${BASE_CLOUD_URL_PUBLIC}/query`)
   })
 
   test('successful', async () => {
