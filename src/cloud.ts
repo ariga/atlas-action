@@ -83,15 +83,15 @@ export async function reportToCloud(
   res: AtlasResult
 ): Promise<CloudReport> {
   let token = opts.cloudToken
-  if (!token) {
-    if (opts.cloudPublic) {
-      try {
-        token = await getIDToken('ariga://atlas-ci-action')
-      } catch (e) {
-        warning('`id-token: write` permission is required to report to cloud')
-        return {} as CloudReport
-      }
+  if (!token && opts.cloudPublic) {
+    try {
+      token = await getIDToken('ariga://atlas-ci-action')
+    } catch (e) {
+      warning('`id-token: write` permission is required to report to cloud')
+      return {} as CloudReport
     }
+  }
+  if (!token) {
     warning(`Skipping report to cloud missing cloud-token input`)
     return {} as CloudReport
   }
