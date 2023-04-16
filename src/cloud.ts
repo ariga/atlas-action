@@ -1,5 +1,5 @@
 import * as github from '@actions/github'
-import { info, setSecret, warning } from '@actions/core'
+import { getIDToken, info, setSecret, warning } from '@actions/core'
 import { AtlasResult, ExitCodes, getUserAgent } from './atlas'
 import * as url from 'url'
 import { ClientError, gql, request } from 'graphql-request'
@@ -14,6 +14,7 @@ export const BASE_ADDRESS = 'https://release.ariga.io'
 export const S3_FOLDER = 'atlas'
 export const ARCHITECTURE = os.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH
 export const BASE_CLOUD_URL = 'https://api.atlasgo.cloud'
+export const BASE_CLOUD_URL_PUBLIC = 'https://gh-api.atlasgo.cloud'
 
 export const mutation = gql`
   mutation CreateReportInput($input: CreateReportInput!) {
@@ -82,7 +83,15 @@ export async function reportToCloud(
   opts: Options,
   res: AtlasResult
 ): Promise<CloudReport> {
-  const token = opts.cloudToken
+  let token = opts.cloudToken
+  if (!token && opts.cloudPublic) {
+    try {
+      token = await getIDToken('ariga://atlas-ci-action')
+    } catch (e) {
+      warning('`id-token: write` permission is required to report to cloud')
+      return {} as CloudReport
+    }
+  }
   if (!token) {
     warning(`Skipping report to cloud missing cloud-token input`)
     return {} as CloudReport
@@ -120,7 +129,7 @@ export async function reportToCloud(
 export function getCloudURL(opts: Options): string {
   let base = opts.cloudURL
   if (opts.cloudURL === '' || !opts.cloudURL) {
-    base = BASE_CLOUD_URL
+    base = opts.cloudPublic ? BASE_CLOUD_URL_PUBLIC : BASE_CLOUD_URL
   }
   return new url.URL('/query', base).toString()
 }

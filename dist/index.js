@@ -166,7 +166,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.Status = exports.mutation = exports.BASE_CLOUD_URL = exports.ARCHITECTURE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
+exports.getDownloadURL = exports.getCloudURL = exports.reportToCloud = exports.Status = exports.mutation = exports.BASE_CLOUD_URL_PUBLIC = exports.BASE_CLOUD_URL = exports.ARCHITECTURE = exports.S3_FOLDER = exports.BASE_ADDRESS = void 0;
 const github = __importStar(__nccwpck_require__(5438));
 const core_1 = __nccwpck_require__(2186);
 const atlas_1 = __nccwpck_require__(1236);
@@ -181,6 +181,7 @@ exports.BASE_ADDRESS = 'https://release.ariga.io';
 exports.S3_FOLDER = 'atlas';
 exports.ARCHITECTURE = os_1.default.platform() === 'darwin' ? APPLE_ARCH : LINUX_ARCH;
 exports.BASE_CLOUD_URL = 'https://api.atlasgo.cloud';
+exports.BASE_CLOUD_URL_PUBLIC = 'https://gh-api.atlasgo.cloud';
 exports.mutation = (0, graphql_request_1.gql) `
   mutation CreateReportInput($input: CreateReportInput!) {
     createReport(input: $input) {
@@ -226,7 +227,16 @@ function getMutationVariables(opts, res) {
 }
 function reportToCloud(opts, res) {
     return __awaiter(this, void 0, void 0, function* () {
-        const token = opts.cloudToken;
+        let token = opts.cloudToken;
+        if (!token && opts.cloudPublic) {
+            try {
+                token = yield (0, core_1.getIDToken)('ariga://atlas-ci-action');
+            }
+            catch (e) {
+                (0, core_1.warning)('`id-token: write` permission is required to report to cloud');
+                return {};
+            }
+        }
         if (!token) {
             (0, core_1.warning)(`Skipping report to cloud missing cloud-token input`);
             return {};
@@ -262,7 +272,7 @@ exports.reportToCloud = reportToCloud;
 function getCloudURL(opts) {
     let base = opts.cloudURL;
     if (opts.cloudURL === '' || !opts.cloudURL) {
-        base = exports.BASE_CLOUD_URL;
+        base = opts.cloudPublic ? exports.BASE_CLOUD_URL_PUBLIC : exports.BASE_CLOUD_URL;
     }
     return new url.URL('/query', base).toString();
 }
@@ -610,6 +620,9 @@ function OptionsFromEnv(env) {
     }
     if (input('cloud-token')) {
         opts.cloudToken = input('cloud-token');
+    }
+    if (input('cloud-public') == 'true') {
+        opts.cloudPublic = true;
     }
     if (input('latest')) {
         const i = parseInt(input('latest'), 10);
