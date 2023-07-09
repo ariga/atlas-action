@@ -214,6 +214,7 @@ function getMutationVariables(opts, res) {
     return {
         input: {
             envName: 'CI',
+            repo: repository,
             projectName: `${repository}/${migrationDir}`,
             branch: sourceBranch !== null && sourceBranch !== void 0 ? sourceBranch : 'unknown',
             commit: commitID !== null && commitID !== void 0 ? commitID : 'unknown',
