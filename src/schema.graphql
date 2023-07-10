@@ -11,6 +11,8 @@ input CreateReportInput {
     envName: String!
     """The Project of the report."""
     projectName: String!
+    """ The repository of the report."""
+    repo: String
     """The branch of the report."""
     branch: String!
     """The branch of the report."""

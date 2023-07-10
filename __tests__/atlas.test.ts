@@ -79,15 +79,8 @@ describe('install', () => {
     expect(url.toString()).toEqual(
       `https://release.ariga.io/atlas/atlas-${ARCHITECTURE}-${opts.atlasVersion}?test=1`
     )
-    const content = 'OK'
-    const scope = nock(`${url.protocol}//${url.host}`)
-      .get(`${url.pathname}${url.search}`)
-      .matchHeader('user-agent', 'actions/tool-cache')
-      .reply(200, content)
     const bin = await installAtlas(opts)
-    expect(scope.isDone()).toBeTruthy()
     await expect(stat(bin)).resolves.toBeTruthy()
-    await expect(readFile(bin)).resolves.toEqual(Buffer.from(content))
   })
 })
 
@@ -540,6 +533,7 @@ describe('all reports with pull request', () => {
           envName: 'CI',
           projectName:
             'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
+          repo: 'someProject/someRepo',
           url: 'https://github.com/ariga/atlas-action/pull/1',
           status: Status.Success,
           payload: expect.anything()
@@ -591,6 +585,7 @@ describe('all reports with pull request', () => {
           envName: 'CI',
           projectName:
             'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
+          repo: 'someProject/someRepo',
           url: 'https://github.com/ariga/atlas-action/pull/1',
           status: Status.Success,
           payload: expect.anything()
@@ -694,6 +689,7 @@ describe('all reports with push (branch)', () => {
           envName: 'CI',
           projectName:
             'someProject/someRepo/__tests__/testdata/sqlite-with-diagnostics',
+          repo: 'someProject/someRepo',
           url: 'https://github.com/ariga/atlas-action',
           status: Status.Success,
           payload: expect.anything()

@@ -32,6 +32,8 @@ export type CreateReportInput = {
   payload?: InputMaybe<Scalars['Bytes']>
   /** The Project of the report. */
   projectName: Scalars['String']
+  /**  The repository of the report. */
+  repo?: InputMaybe<Scalars['String']>
   /** The status of the CI run. */
   status: RunStatus
   /** The URL back to the CI system. */

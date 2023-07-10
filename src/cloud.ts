@@ -57,6 +57,7 @@ function getMutationVariables(
   return {
     input: {
       envName: 'CI',
+      repo: repository,
       projectName: `${repository}/${migrationDir}`,
       branch: sourceBranch ?? 'unknown',
       commit: commitID ?? 'unknown',

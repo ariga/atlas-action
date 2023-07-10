@@ -129,6 +129,7 @@ describe('report to cloud', () => {
             process.env.GITHUB_REPOSITORY ?? '',
             res.summary?.Env?.Dir ?? ''
           ),
+          repo: process.env.GITHUB_REPOSITORY,
           status: RunStatus.Successful,
           url: 'https://github.com/ariga/atlas-action/pull/1'
         }
