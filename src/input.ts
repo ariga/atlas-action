@@ -11,7 +11,8 @@ export type Options = {
   cloudToken?: string
   cloudPublic?: boolean
   cloudURL?: string
-  projectEnv?: string
+  configPath?: string
+  configEnv?: string
   schemaInsights: boolean
   token?: string
   skipCheckForUpdate?: boolean
@@ -90,8 +91,15 @@ export function OptionsFromEnv(env: Dict<string>): Options {
   if (input('cloud-url')) {
     opts.cloudURL = input('cloud-url')
   }
+  if (input('config-path')) {
+    opts.configPath = input('config-path')
+  }
   if (input('project-env')) {
-    opts.projectEnv = input('project-env')
+    warning('project-env is deprecated, use config-env instead')
+    opts.configEnv = input('project-env')
+  }
+  if (input('config-env')) {
+    opts.configEnv = input('config-env')
   }
   if (input('token')) {
     opts.token = input('token')

@@ -27,7 +27,8 @@ describe('input', () => {
       'INPUT_CLOUD-PUBLIC': 'true',
       INPUT_LATEST: '3',
       'INPUT_PROJECT-ENV': 'env',
-      'INPUT_SKIP-CHECK-FOR-UPDATE': 'true'
+      'INPUT_SKIP-CHECK-FOR-UPDATE': 'true',
+      'INPUT_CONFIG-PATH': 'config-path'
     })
     const expected: Options = {
       atlasVersion: 'v0.1.2',
@@ -39,8 +40,9 @@ describe('input', () => {
       cloudPublic: true,
       cloudURL: 'ariga-url',
       latest: 3,
-      projectEnv: 'env',
-      skipCheckForUpdate: true
+      configEnv: 'env',
+      skipCheckForUpdate: true,
+      configPath: 'config-path'
     }
     expect(options).toEqual(expected)
   })
@@ -63,7 +65,7 @@ describe('atlas args', () => {
   test('env set', async () => {
     const opts = OptionsFromEnv({
       ...defaultEnv,
-      'INPUT_PROJECT-ENV': 'test'
+      'INPUT_CONFIG-ENV': 'test'
     })
     const args = await atlasArgs(opts)
     expect(args.join(' ')).toEqual('migrate lint --log {{ json . }} --env test')
