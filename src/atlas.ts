@@ -83,7 +83,7 @@ export async function installAtlas(opts: Options): Promise<string> {
 export async function atlasArgs(opts: Options): Promise<string[]> {
   const args = ['migrate', 'lint', '--log', '{{ json . }}']
   if (opts.configPath) {
-    args.push('--config', opts.configPath)
+    args.push('--config', `file://${opts.configPath}`)
   }
   if (opts.projectEnv) {
     args.push('--env', opts.projectEnv)
