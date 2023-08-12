@@ -11,6 +11,7 @@ export type Options = {
   cloudToken?: string
   cloudPublic?: boolean
   cloudURL?: string
+  configPath?: string
   projectEnv?: string
   schemaInsights: boolean
   token?: string
@@ -89,6 +90,9 @@ export function OptionsFromEnv(env: Dict<string>): Options {
   }
   if (input('cloud-url')) {
     opts.cloudURL = input('cloud-url')
+  }
+  if (input('config-path')) {
+    opts.configPath = input('config-path')
   }
   if (input('project-env')) {
     opts.projectEnv = input('project-env')

@@ -55,6 +55,9 @@ exports.installAtlas = installAtlas;
 function atlasArgs(opts) {
     return __awaiter(this, void 0, void 0, function* () {
         const args = ['migrate', 'lint', '--log', '{{ json . }}'];
+        if (opts.configPath) {
+            args.push('--config', opts.configPath);
+        }
         if (opts.projectEnv) {
             args.push('--env', opts.projectEnv);
         }
@@ -641,6 +644,9 @@ function OptionsFromEnv(env) {
     }
     if (input('cloud-url')) {
         opts.cloudURL = input('cloud-url');
+    }
+    if (input('config-path')) {
+        opts.configPath = input('config-path');
     }
     if (input('project-env')) {
         opts.projectEnv = input('project-env');

@@ -78,6 +78,11 @@ jobs:
 
 Configure the action by passing input parameters in the `with:` block.
 
+#### `config-path`
+
+Sets the path to the Atlas configuration file. By default, Atlas will
+look for a file named `atlas.hcl` in the current directory.
+
 #### `dir`
 
 Sets the directory that contains the migration scripts to analyze.

@@ -27,7 +27,8 @@ describe('input', () => {
       'INPUT_CLOUD-PUBLIC': 'true',
       INPUT_LATEST: '3',
       'INPUT_PROJECT-ENV': 'env',
-      'INPUT_SKIP-CHECK-FOR-UPDATE': 'true'
+      'INPUT_SKIP-CHECK-FOR-UPDATE': 'true',
+      'INPUT_CONFIG-PATH': 'config-path'
     })
     const expected: Options = {
       atlasVersion: 'v0.1.2',
@@ -40,7 +41,8 @@ describe('input', () => {
       cloudURL: 'ariga-url',
       latest: 3,
       projectEnv: 'env',
-      skipCheckForUpdate: true
+      skipCheckForUpdate: true,
+      configPath: 'config-path'
     }
     expect(options).toEqual(expected)
   })
