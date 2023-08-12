@@ -83,6 +83,10 @@ Configure the action by passing input parameters in the `with:` block.
 Sets the path to the Atlas configuration file. By default, Atlas will
 look for a file named `atlas.hcl` in the current directory.
 
+#### `config-env`
+
+Sets the environment to use from the Atlas configuration file. 
+
 #### `dir`
 
 Sets the directory that contains the migration scripts to analyze.

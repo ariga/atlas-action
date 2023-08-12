@@ -40,7 +40,7 @@ describe('input', () => {
       cloudPublic: true,
       cloudURL: 'ariga-url',
       latest: 3,
-      projectEnv: 'env',
+      configEnv: 'env',
       skipCheckForUpdate: true,
       configPath: 'config-path'
     }
@@ -65,7 +65,7 @@ describe('atlas args', () => {
   test('env set', async () => {
     const opts = OptionsFromEnv({
       ...defaultEnv,
-      'INPUT_PROJECT-ENV': 'test'
+      'INPUT_CONFIG-ENV': 'test'
     })
     const args = await atlasArgs(opts)
     expect(args.join(' ')).toEqual('migrate lint --log {{ json . }} --env test')

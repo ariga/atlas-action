@@ -38,7 +38,7 @@ inputs:
     default: 'true'
     required: false
   project-env:
-    description: "The env from the atlas.hcl project file to use"
+    description: "The env from the atlas.hcl project file to use (Deprecated use config-env instead)"
     required: false
   token:
     description: "GitHub token passed to the action"
@@ -48,6 +48,9 @@ inputs:
     default: false
   config-path:
     description: 'Path to the atlas.hcl file'
+    required: false
+  config-env:
+    description: 'The name of the env to select in the atlas.hcl file'
     required: false
 runs:
   using: 'node16'

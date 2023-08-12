@@ -85,8 +85,8 @@ export async function atlasArgs(opts: Options): Promise<string[]> {
   if (opts.configPath) {
     args.push('--config', `file://${opts.configPath}`)
   }
-  if (opts.projectEnv) {
-    args.push('--env', opts.projectEnv)
+  if (opts.configEnv) {
+    args.push('--env', opts.configEnv)
   }
   if (opts.dir) {
     args.push('--dir', `file://${opts.dir}`)
@@ -100,7 +100,7 @@ export async function atlasArgs(opts: Options): Promise<string[]> {
   if (opts.latest && opts.latest > 0) {
     args.push('--latest', opts.latest.toString())
   }
-  if (!opts.projectEnv) {
+  if (!opts.configEnv) {
     const gitRoot = path.resolve(await getWorkingDirectory())
     if (gitRoot) {
       args.push('--git-dir', gitRoot)

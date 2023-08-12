@@ -56,10 +56,10 @@ function atlasArgs(opts) {
     return __awaiter(this, void 0, void 0, function* () {
         const args = ['migrate', 'lint', '--log', '{{ json . }}'];
         if (opts.configPath) {
-            args.push('--config', opts.configPath);
+            args.push('--config', `file://${opts.configPath}`);
         }
-        if (opts.projectEnv) {
-            args.push('--env', opts.projectEnv);
+        if (opts.configEnv) {
+            args.push('--env', opts.configEnv);
         }
         if (opts.dir) {
             args.push('--dir', `file://${opts.dir}`);
@@ -73,7 +73,7 @@ function atlasArgs(opts) {
         if (opts.latest && opts.latest > 0) {
             args.push('--latest', opts.latest.toString());
         }
-        if (!opts.projectEnv) {
+        if (!opts.configEnv) {
             const gitRoot = path_1.default.resolve(yield (0, github_1.getWorkingDirectory)());
             if (gitRoot) {
                 args.push('--git-dir', gitRoot);
@@ -649,7 +649,11 @@ function OptionsFromEnv(env) {
         opts.configPath = input('config-path');
     }
     if (input('project-env')) {
-        opts.projectEnv = input('project-env');
+        (0, core_1.warning)('project-env is deprecated, use config-env instead');
+        opts.configEnv = input('project-env');
+    }
+    if (input('config-env')) {
+        opts.configEnv = input('config-env');
     }
     if (input('token')) {
         opts.token = input('token');
