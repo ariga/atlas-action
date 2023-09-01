@@ -100,6 +100,9 @@ export async function atlasArgs(opts: Options): Promise<string[]> {
   if (opts.latest && opts.latest > 0) {
     args.push('--latest', opts.latest.toString())
   }
+    if (opts.cloudToken) {
+        args.push('--token', opts.cloudToken)
+    }
   if (!opts.configEnv) {
     const gitRoot = path.resolve(await getWorkingDirectory())
     if (gitRoot) {
