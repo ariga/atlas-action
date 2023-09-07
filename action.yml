@@ -11,6 +11,9 @@ inputs:
   dir:
     description: 'select migration directory relative to working directory'
     required: false
+  dir-name:
+    description: 'target migration directory name (slug)'
+    required: false
   dir-format:
     description: 'Dir format for migration files ("atlas", "golang-migrate", "goose", "flyway", "liquibase", "dbmate")'
     required: false

@@ -214,11 +214,15 @@ function getMutationVariables(opts, res) {
     const sourceBranch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
     const migrationDir = ((_a = res.summary) === null || _a === void 0 ? void 0 : _a.Env.Dir.replace('file://', '')) || '';
     (0, core_1.info)(`Run metadata: ${JSON.stringify({ repository, commitID, sourceBranch, migrationDir }, null, 2)}`);
+    let projectName = `${repository}/${migrationDir}`;
+    if (opts.dirName) {
+        projectName = opts.dirName;
+    }
     return {
         input: {
             envName: 'CI',
             repo: repository,
-            projectName: `${repository}/${migrationDir}`,
+            projectName: projectName,
             branch: sourceBranch !== null && sourceBranch !== void 0 ? sourceBranch : 'unknown',
             commit: commitID !== null && commitID !== void 0 ? commitID : 'unknown',
             url: (_j = (_e = (_d = (_c = (_b = github === null || github === void 0 ? void 0 : github.context) === null || _b === void 0 ? void 0 : _b.payload) === null || _c === void 0 ? void 0 : _c.pull_request) === null || _d === void 0 ? void 0 : _d.html_url) !== null && _e !== void 0 ? _e : (_h = (_g = (_f = github === null || github === void 0 ? void 0 : github.context) === null || _f === void 0 ? void 0 : _f.payload) === null || _g === void 0 ? void 0 : _g.repository) === null || _h === void 0 ? void 0 : _h.html_url) !== null && _j !== void 0 ? _j : 'unknown',
@@ -611,6 +615,9 @@ function OptionsFromEnv(env) {
     };
     if (input('dir')) {
         opts.dir = input('dir');
+    }
+    if (input('dir-name')) {
+        opts.dirName = input('dir-name');
     }
     if (input('dir-format')) {
         opts.dirFormat = input('dir-format');

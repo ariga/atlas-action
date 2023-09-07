@@ -5,6 +5,7 @@ import { warning } from '@actions/core'
 export type Options = {
   atlasVersion: string
   dir?: string
+  dirName?: string
   dirFormat?: string
   devUrl?: string
   latest?: number
@@ -57,6 +58,9 @@ export function OptionsFromEnv(env: Dict<string>): Options {
   }
   if (input('dir')) {
     opts.dir = input('dir')
+  }
+  if (input('dir-name')) {
+    opts.dirName = input('dir-name')
   }
   if (input('dir-format')) {
     opts.dirFormat = input('dir-format')
