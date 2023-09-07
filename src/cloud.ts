@@ -54,11 +54,15 @@ function getMutationVariables(
       2
     )}`
   )
+  let projectName = `${repository}/${migrationDir}`
+  if (opts.dirName) {
+    projectName = opts.dirName
+  }
   return {
     input: {
       envName: 'CI',
       repo: repository,
-      projectName: `${repository}/${migrationDir}`,
+      projectName: projectName,
       branch: sourceBranch ?? 'unknown',
       commit: commitID ?? 'unknown',
       url:

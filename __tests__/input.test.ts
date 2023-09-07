@@ -28,13 +28,15 @@ describe('input', () => {
       INPUT_LATEST: '3',
       'INPUT_PROJECT-ENV': 'env',
       'INPUT_SKIP-CHECK-FOR-UPDATE': 'true',
-      'INPUT_CONFIG-PATH': 'config-path'
+      'INPUT_CONFIG-PATH': 'config-path',
+      'INPUT_DIR-NAME': 'dir-name'
     })
     const expected: Options = {
       atlasVersion: 'v0.1.2',
       schemaInsights: false,
       dir: 'dir',
       dirFormat: 'atlas',
+      dirName: 'dir-name',
       devUrl: 'dev-url',
       cloudToken: 'ariga-token',
       cloudPublic: true,
