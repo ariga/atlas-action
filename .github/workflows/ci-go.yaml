@@ -1,0 +1,29 @@
+name: Go Continuous Integration
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+jobs:
+  golangci-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - name: Run Go linters
+        uses: golangci/golangci-lint-action@v3
+        with:
+          args: --verbose
+          skip-pkg-cache: true
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ariga/setup-atlas@v0
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - name: Run tests
+        run: go test -race ./...
