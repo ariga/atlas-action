@@ -3,7 +3,7 @@ module ariga.io/atlas-action
 go 1.21.1
 
 require (
-	ariga.io/atlas v0.12.2-0.20230806193313-117e03f96e45
+	ariga.io/atlas v0.14.2-0.20230922121439-23ab22834173
 	ariga.io/atlas-go-sdk v0.1.1-0.20230918080233-877323176ff4
 	github.com/alecthomas/kong v0.8.0
 	github.com/mattn/go-sqlite3 v1.14.17
