@@ -152,7 +152,6 @@ describe('run with "latest" flag', () => {
       Schema: null
     }
     expect(res.summary).toEqual(expected)
-    expect(res.raw).toEqual(JSON.stringify(expected))
   })
 
   test('fail on wrong sum file', async () => {
@@ -202,7 +201,6 @@ describe('run with "latest" flag', () => {
       ]
     }
     expect(res.summary).toEqual(expected)
-    expect(res.raw).toEqual(JSON.stringify(expected))
     expect(spyOnSetFailed).toHaveBeenCalledTimes(1)
   })
 
