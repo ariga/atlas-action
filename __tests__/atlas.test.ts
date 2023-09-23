@@ -149,7 +149,7 @@ describe('run with "latest" flag', () => {
           Text: 'Loaded 0 changes on dev database'
         }
       ],
-      Schema: null,
+      Schema: null
     }
     expect(res.summary).toEqual(expected)
   })
