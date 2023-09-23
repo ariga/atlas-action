@@ -30,6 +30,7 @@ func TestMigrateApply(t *testing.T) {
 		require.NoError(t, err)
 
 		m, err := tt.outputs()
+		require.NoError(t, err)
 		require.EqualValues(t, map[string]string{
 			"applied_count": "1",
 			"current":       "",
