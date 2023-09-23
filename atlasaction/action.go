@@ -19,6 +19,8 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 	params := &atlasexec.MigrateApplyParams{
 		URL:             act.GetInput("url"),
 		DirURL:          act.GetInput("dir"),
+		ConfigURL:       act.GetInput("config"),
+		Env:             act.GetInput("env"),
 		TxMode:          act.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: act.GetInput("baseline"), // Hidden param.
 	}

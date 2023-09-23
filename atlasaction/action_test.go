@@ -72,7 +72,19 @@ func TestMigrateApply(t *testing.T) {
 			"error": exp,
 		}, m)
 	})
-
+	t.Run("config-broken", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("config", "file://testdata/config/broken.hcl")
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, `"testdata/config/broken.hcl" was not found`)
+	})
+	t.Run("config", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("config", "file://testdata/config/atlas.hcl")
+		tt.setInput("env", "test")
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+	})
 }
 
 // sqlitedb returns a path to an initialized sqlite database file. The file is
