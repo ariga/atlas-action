@@ -31,7 +31,10 @@ func TestMigrateApply(t *testing.T) {
 
 		m, err := tt.outputs()
 		require.EqualValues(t, map[string]string{
-			"error": "",
+			"applied_count": "1",
+			"current":       "",
+			"pending_count": "1",
+			"target":        "20230922132634",
 		}, m)
 	})
 	t.Run("tx-mode", func(t *testing.T) {
@@ -41,11 +44,12 @@ func TestMigrateApply(t *testing.T) {
 		tt.setInput("tx-mode", "fake")
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 
-		// An error here proves that the tx-mode was passed to atlasexec, which
+		// The error here proves that the tx-mode was passed to atlasexec, which
 		// is what we want to test.
-		exp := `run failed: unknown tx-mode "fake"`
+		exp := `unknown tx-mode "fake"`
 		require.EqualError(t, err, exp)
 		m, err := tt.outputs()
+		require.NoError(t, err)
 		require.EqualValues(t, map[string]string{
 			"error": exp,
 		}, m)
@@ -57,11 +61,12 @@ func TestMigrateApply(t *testing.T) {
 		tt.setInput("baseline", "111_fake")
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 
-		// An error here proves that the baseline was passed to atlasexec, which
+		// The error here proves that the baseline was passed to atlasexec, which
 		// is what we want to test.
 		exp := `atlasexec: baseline version "111_fake" not found`
 		require.EqualError(t, err, exp)
 		m, err := tt.outputs()
+		require.NoError(t, err)
 		require.EqualValues(t, map[string]string{
 			"error": exp,
 		}, m)

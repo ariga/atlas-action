@@ -7,7 +7,7 @@ package atlasaction
 import (
 	"context"
 	_ "embed"
-	"fmt"
+	"errors"
 	"strconv"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
@@ -29,7 +29,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 	}
 	if run.Error != "" {
 		act.SetOutput("error", run.Error)
-		return fmt.Errorf("run failed: %s", run.Error)
+		return errors.New(run.Error)
 	}
 	act.SetOutput("current", run.Current)
 	act.SetOutput("target", run.Target)
