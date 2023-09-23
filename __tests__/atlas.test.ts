@@ -139,7 +139,6 @@ describe('run with "latest" flag', () => {
         // This value is random and changes on every run.
         Dir: res.summary?.Env.Dir
       },
-      Schema: null,
       Steps: [
         {
           Name: 'Detect New Migration Files',
@@ -150,6 +149,7 @@ describe('run with "latest" flag', () => {
           Text: 'Loaded 0 changes on dev database'
         }
       ],
+      Schema: null,
     }
     expect(res.summary).toEqual(expected)
   })
