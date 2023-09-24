@@ -40,3 +40,12 @@ jobs:
         with:
           dir: file://atlasaction/testdata/migrations
           url: sqlite://file.db?mode=memory
+      - uses: ariga/setup-atlas@v0
+      - name: Login to Atlas
+        shell: bash
+        run: atlas login --token ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
+      - uses: ./migrate/push
+        with:
+          dir: file://atlasaction/testdata/migrations
+          dir-name: test-dir
+          dev-url: sqlite://file.db?mode=memory
