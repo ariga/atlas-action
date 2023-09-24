@@ -28,7 +28,14 @@ func main() {
 	if err != nil {
 		action.Fatalf("Failed to create client: %s", err)
 	}
-	cli := kong.Parse(&cli, kong.Bind(context.Background(), c, action))
+
+	ctx := context.Background()
+	cli := kong.Parse(
+		&cli,
+		kong.BindTo(ctx, (*context.Context)(nil)),
+		kong.Bind(c),
+		kong.Bind(action),
+	)
 	if err := cli.Run(); err != nil {
 		action.Fatalf("Failed to run command: %s", err)
 	}
