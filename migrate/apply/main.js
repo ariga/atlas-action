@@ -1,2 +1,6 @@
-const mainScript = `atlas-action --action migrate/apply`
-const spawnSyncReturns = childProcess.spawnSync(mainScript, { stdio: 'inherit' })
+const childProcess = require('child_process'); // Import the child_process module
+
+const mainCommand = 'atlas-action';
+const args = ['--action', 'migrate/apply']; // You can put the arguments in an array
+
+const spawnSyncReturns = childProcess.spawnSync(mainCommand, args, { stdio: 'inherit' });
