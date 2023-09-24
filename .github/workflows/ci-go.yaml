@@ -38,5 +38,5 @@ jobs:
       - run: go install ./cmd/atlas-action
       - uses: ./migrate/apply
         with:
-          dir: file://internal/testdata/migrations
+          dir: file://atlasaction/testdata/migrations
           url: sqlite://file.db?mode=memory
