@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-go-sdk/atlasexec"
@@ -24,6 +25,7 @@ var cli RunAction
 
 func main() {
 	action := githubactions.New()
+	action.Infof("Env: %s", os.Environ())
 	c, err := atlasexec.NewClient("", "atlas")
 	if err != nil {
 		action.Fatalf("Failed to create client: %s", err)
