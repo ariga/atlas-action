@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: ariga/setup-atlas@v0
+      - uses: actions/checkout@v3
       - uses: ./migrate/apply
         with:
           dir: file://internal/testdata/migrations
