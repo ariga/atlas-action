@@ -27,3 +27,11 @@ jobs:
           go-version: '1.21'
       - name: Run tests
         run: go test -race ./...
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ariga/setup-atlas@v0
+      - uses: ./migrate/apply
+        with:
+          dir: file://internal/testdata/migrations
+          url: sqlite://file.db?mode=memory

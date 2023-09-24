@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 
+	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/alecthomas/kong"
 	"github.com/sethvargo/go-githubactions"
@@ -38,9 +39,11 @@ type RunAction struct {
 	Action string `help:"Command to run" required:""`
 }
 
-func (r *RunAction) Run(_ context.Context, _ *atlasexec.Client, _ *githubactions.Action) error {
+func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action *githubactions.Action) error {
 	switch r.Action {
-	case CmdMigrateApply, CmdMigrateLint, CmdMigratePush:
+	case CmdMigrateApply:
+		return atlasaction.MigrateApply(ctx, client, action)
+	case CmdMigrateLint, CmdMigratePush:
 		return fmt.Errorf("not implemented: %s", r.Action)
 	}
 	return fmt.Errorf("unknown action: %s", r.Action)
