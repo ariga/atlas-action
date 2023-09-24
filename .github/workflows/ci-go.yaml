@@ -32,6 +32,10 @@ jobs:
     steps:
       - uses: ariga/setup-atlas@v0
       - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - run: go install ./cmd/atlas-action
       - uses: ./migrate/apply
         with:
           dir: file://internal/testdata/migrations
