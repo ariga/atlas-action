@@ -28,7 +28,6 @@ func main() {
 	if err != nil {
 		action.Fatalf("Failed to create client: %s", err)
 	}
-
 	ctx := context.Background()
 	cli := kong.Parse(
 		&cli,
