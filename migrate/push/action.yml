@@ -5,18 +5,23 @@ branding:
 author: "Ariga"
 inputs:
   dir:
-    description: "path to the migration directory, formatted as a URL, for example: file://migrations"
+    description: The migration directory URL (i.e file://path/to/migrations).
+    required: false
   dir-name:
-    description: dir name in Atlas Cloud where the migration directory should be saved
+    description: Target migration directory name (slug).
+    required: false
   dev-url:
-    description: "[driver://username:password@address/dbname?param=value] select a dev database using the URL format"
+    description: The development DB URL using atlas URL format [driver://username:password@address/dbname?param=value].
+    required: false
   tag:
-    description: The tag of the specific version of the migration directory
+    description: The tag of the specific version of the migration directory.
+    required: false
   working-directory:
-    description: path to the repository working directory
+    description: The path to the repository working directory.
+    required: false
     default: .
   config:
-    description: The url of the configuration
+    description: The url of the configuration.
     required: false
   env:
     description: The environment to use with the configuration file.
