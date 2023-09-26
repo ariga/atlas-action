@@ -296,10 +296,8 @@ func TestMigrateApplyCloud(t *testing.T) {
 				dir := testDir(t, "./testdata/migrations")
 				ad, err := migrate.ArchiveDir(&dir)
 				require.NoError(t, err)
-				// nolint:errcheck
 				fmt.Fprintf(w, `{"data":{"dirState":{"content":%q}}}`, base64.StdEncoding.EncodeToString(ad))
 			case strings.Contains(b, "mutation ReportMigration"):
-				// nolint:errcheck
 				fmt.Fprintf(w, `{"data":{"reportMigration":{"url":"https://atlas.com"}}}`)
 			case strings.Contains(b, "query {\\n\\t\\t\\tme"):
 			default:

@@ -1,0 +1,50 @@
+run:
+  go: '1.21'
+  timeout: 5m
+
+linters-settings:
+  errcheck:
+    ignore: fmt:.*,Read|Write|Close|Exec,io:Copy
+  dupl:
+    threshold: 100
+  funlen:
+    lines: 140
+    statements: 140
+  goheader:
+    template: |-
+      // Copyright 2021-present The Atlas Authors. All rights reserved.
+      // This source code is licensed under the Apache 2.0 license found
+      // in the LICENSE file in the root directory of this source tree.
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - bodyclose
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - funlen
+    - gocritic
+    # - gofmt; Enable back when upgrading CI to Go 1.20.
+    - goheader
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unused
+    - whitespace
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - dupl
+        - funlen
+        - gosec
+        - gocritic
