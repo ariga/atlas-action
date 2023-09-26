@@ -9,7 +9,6 @@ import (
 	_ "embed"
 	"errors"
 	"strconv"
-	"strings"
 	"text/template"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
@@ -31,19 +30,6 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 		Env:             act.GetInput("env"),
 		TxMode:          act.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: act.GetInput("baseline"), // Hidden param.
-	}
-	// If dir begins with atlas://, this is a cloud-based migration directory.
-	// If the user didn't provide a config URL and provided an env name, we'll
-	// generate a temporary config file containing a naked env block. This is
-	// done so Atlas can report the run to the cloud.
-	if strings.HasPrefix(params.DirURL, "atlas://") && params.Env != "" && params.ConfigURL == "" {
-		cfg, clean, err := atlasexec.TempFile(`env { name = atlas.env }`, "hcl")
-		if err != nil {
-			return err
-		}
-		// nolint:errcheck
-		defer clean()
-		params.ConfigURL = cfg
 	}
 	run, err := client.MigrateApply(ctx, params)
 	if err != nil {

@@ -115,24 +115,6 @@ func TestMigrateApplyCloud(t *testing.T) {
 			}
 		}
 	}
-	t.Run("with-dir", func(t *testing.T) {
-		tt := newT(t)
-		tt.setInput("url", "sqlite://"+tt.db)
-		tt.setInput("dir", "fail")
-		tt.setInput("dir-name", "cloud-project")
-
-		err := MigrateApply(context.Background(), tt.cli, tt.act)
-		require.ErrorContains(t, err, "dir and dir-name are mutually exclusive")
-	})
-	t.Run("with-config", func(t *testing.T) {
-		tt := newT(t)
-		tt.setInput("url", "sqlite://"+tt.db)
-		tt.setInput("dir-name", "fail")
-		tt.setInput("config", "file://atlas.hcl")
-
-		err := MigrateApply(context.Background(), tt.cli, tt.act)
-		require.ErrorContains(t, err, "config and dir-name are mutually exclusive")
-	})
 	t.Run("basic", func(t *testing.T) {
 		var payloads []string
 		srv := httptest.NewServer(handler(&payloads))
