@@ -124,7 +124,6 @@ func TestMigrateWithCloud(t *testing.T) {
 		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
 	}))
 	t.Cleanup(srv.Close)
-
 	t.Run("dev-url broken", func(t *testing.T) {
 		tt := newT(t)
 		tt.setupConfigWithLogin(t, srv.URL, token)
