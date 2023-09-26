@@ -315,7 +315,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		tt := newT(t)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "atlas://cloud-project")
-		tt.setInput("env", "atlas")
+		tt.setInput("env", "test")
 
 		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
 		cfgURL := generateHCL(t, srv.URL, "token")
