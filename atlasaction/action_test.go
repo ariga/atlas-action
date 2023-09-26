@@ -112,6 +112,8 @@ func TestMigratePush(t *testing.T) {
 		tt := newHttpT(t, nil)
 		tt.setupConfigWithLogin(t)
 		tt.setInput("env", "test")
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir-name", "test-dir")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
@@ -279,11 +281,7 @@ func generateHCL(t *testing.T, url, token string) string {
 		}	  
 	}
 	env "test" {
-		dev = "sqlite://file?mode=memory"
-		migration  {
-			dir = "file://testdata/migrations"
-		}
-	  }
+  	}
 	`
 	config := template.Must(template.New("atlashcl").Parse(tmpl))
 	templateParams := struct {
