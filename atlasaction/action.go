@@ -87,7 +87,7 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactio
 		return fmt.Errorf("failed to push dir tag: %w", err)
 	}
 	act.SetOutput("url", resp)
-	act.Infof("Uploaded migration dir %q to Atlas Cloud\n", params.Name)
+	act.Infof("Uploaded dir %q to Atlas Cloud", params.Name)
 	return nil
 }
 
