@@ -109,8 +109,7 @@ func TestMigratePush(t *testing.T) {
 		require.ErrorContains(t, err, `env "broken-env" not defined in project file`)
 	})
 	t.Run("config", func(t *testing.T) {
-		tt := newHttpT(t, nil)
-		tt.setupConfigWithLogin(t)
+		tt := newHTTPTest(t, nil)
 		tt.setInput("env", "test")
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
@@ -127,8 +126,7 @@ func TestMigratePush(t *testing.T) {
 		require.ErrorContains(t, err, `sql/migrate: stat some_broken_dir: no such file or directory`)
 	})
 	t.Run("dir-name invalid characters", func(t *testing.T) {
-		tt := newHttpT(t, nil)
-		tt.setupConfigWithLogin(t)
+		tt := newHTTPTest(t, nil)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-#dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
@@ -136,8 +134,7 @@ func TestMigratePush(t *testing.T) {
 		require.ErrorContains(t, err, "slug must be lowercase alphanumeric")
 	})
 	t.Run("dev-url broken", func(t *testing.T) {
-		tt := newHttpT(t, nil)
-		tt.setupConfigWithLogin(t)
+		tt := newHTTPTest(t, nil)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "broken-driver://")
@@ -145,8 +142,7 @@ func TestMigratePush(t *testing.T) {
 		require.ErrorContains(t, err, `unknown driver "broken-driver"`)
 	})
 	t.Run("invalid tag", func(t *testing.T) {
-		tt := newHttpT(t, nil)
-		tt.setupConfigWithLogin(t)
+		tt := newHTTPTest(t, nil)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
@@ -155,8 +151,7 @@ func TestMigratePush(t *testing.T) {
 		require.ErrorContains(t, err, `tag must be lowercase alphanumeric`)
 	})
 	t.Run("tag", func(t *testing.T) {
-		tt := newHttpT(t, nil)
-		tt.setupConfigWithLogin(t)
+		tt := newHTTPTest(t, nil)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
@@ -193,7 +188,7 @@ func TestMigratePush(t *testing.T) {
 
 		var syncDirCalls, pushDirCalls int
 
-		tt := newHttpT(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tt := newHTTPTest(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			query := graphQLQuery{}
 			err := json.NewDecoder(r.Body).Decode(&query)
 			require.NoError(t, err)
@@ -218,7 +213,6 @@ func TestMigratePush(t *testing.T) {
 				fmt.Fprint(w, `{"data":{"pushDir":{"url":"https://some-org.atlasgo.cloud/dirs/314159/tags/12345"}}}`)
 			}
 		}))
-		tt.setupConfigWithLogin(t)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
@@ -239,23 +233,23 @@ func TestMigratePush(t *testing.T) {
 type (
 	httpTest struct {
 		*test
-		srv        *httptest.Server
-		cloudToken string
+		srv *httptest.Server
 	}
 )
 
-func newHttpT(t *testing.T, handler http.HandlerFunc) *httpTest {
+func newHTTPTest(t *testing.T, handler http.HandlerFunc) *httpTest {
 	tt := &httpTest{
-		test:       newT(t),
-		cloudToken: "123456789",
+		test: newT(t),
 	}
-	tt.srv = fakeCloud(t, tt, handler)
+	token := "123456789"
+	tt.srv = fakeCloud(t, token, handler)
+	tt.setInput("config", generateHCL(t, tt.srv.URL, token))
 	return tt
 }
 
-func fakeCloud(t *testing.T, tt *httpTest, handler http.HandlerFunc) *httptest.Server {
+func fakeCloud(t *testing.T, token string, handler http.HandlerFunc) *httptest.Server {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "Bearer "+tt.cloudToken, r.Header.Get("Authorization"))
+		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
 		if handler != nil {
 			handler(w, r)
 		}
@@ -264,10 +258,6 @@ func fakeCloud(t *testing.T, tt *httpTest, handler http.HandlerFunc) *httptest.S
 		srv.Close()
 	})
 	return srv
-}
-
-func (tt *httpTest) setupConfigWithLogin(t *testing.T) {
-	tt.setInput("config", generateHCL(t, tt.srv.URL, tt.cloudToken))
 }
 
 func generateHCL(t *testing.T, url, token string) string {
