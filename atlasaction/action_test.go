@@ -131,6 +131,8 @@ func TestMigrateApplyCloud(t *testing.T) {
 			case strings.Contains(b, "mutation ReportMigration"):
 				// nolint:errcheck
 				fmt.Fprintf(w, `{"data":{"reportMigration":{"url":"https://atlas.com"}}}`)
+			case strings.Contains(b, "query {\\n\\t\\t\\tme"):
+
 			default:
 				t.Log("Unhandled call: ", body)
 			}
@@ -142,9 +144,9 @@ func TestMigrateApplyCloud(t *testing.T) {
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 
-		require.Len(t, payloads, 2)
+		require.Len(t, payloads, 3)
 		require.Contains(t, payloads[0], "query dirState")
-		require.Contains(t, payloads[1], "mutation ReportMigration")
+		require.Contains(t, payloads[2], "mutation ReportMigration")
 
 		m, err := tt.outputs()
 		require.NoError(t, err)
