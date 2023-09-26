@@ -108,15 +108,6 @@ func TestMigratePush(t *testing.T) {
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, `env "broken-env" not defined in project file`)
 	})
-	t.Run("config", func(t *testing.T) {
-		tt := newHTTPTest(t, nil)
-		tt.setInput("env", "test")
-		tt.setInput("dir", "file://testdata/migrations")
-		tt.setInput("dev-url", "sqlite://file?mode=memory")
-		tt.setInput("dir-name", "test-dir")
-		err := MigratePush(context.Background(), tt.cli, tt.act)
-		require.NoError(t, err)
-	})
 	t.Run("broken dir", func(t *testing.T) {
 		tt := newT(t)
 		tt.setInput("dir", "file://some_broken_dir")
@@ -125,16 +116,18 @@ func TestMigratePush(t *testing.T) {
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, `sql/migrate: stat some_broken_dir: no such file or directory`)
 	})
-	t.Run("dir-name invalid characters", func(t *testing.T) {
-		tt := newHTTPTest(t, nil)
-		tt.setInput("dir", "file://testdata/migrations")
-		tt.setInput("dir-name", "test-#dir")
-		tt.setInput("dev-url", "sqlite://file?mode=memory")
-		err := MigratePush(context.Background(), tt.cli, tt.act)
-		require.ErrorContains(t, err, "slug must be lowercase alphanumeric")
-	})
+}
+
+func TestMigrateWithCloud(t *testing.T) {
+	token := "123456789"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+	}))
+	t.Cleanup(srv.Close)
+
 	t.Run("dev-url broken", func(t *testing.T) {
-		tt := newHTTPTest(t, nil)
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "broken-driver://")
@@ -142,7 +135,8 @@ func TestMigratePush(t *testing.T) {
 		require.ErrorContains(t, err, `unknown driver "broken-driver"`)
 	})
 	t.Run("invalid tag", func(t *testing.T) {
-		tt := newHTTPTest(t, nil)
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
@@ -151,7 +145,8 @@ func TestMigratePush(t *testing.T) {
 		require.ErrorContains(t, err, `tag must be lowercase alphanumeric`)
 	})
 	t.Run("tag", func(t *testing.T) {
-		tt := newHTTPTest(t, nil)
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
@@ -159,105 +154,100 @@ func TestMigratePush(t *testing.T) {
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 	})
-	t.Run("e2e test", func(t *testing.T) {
-		type (
-			pushDir struct {
-				Slug   string `json:"slug"`
-				Tag    string `json:"tag"`
-				Driver string `json:"driver"`
-				Dir    string `json:"dir"`
-			}
-			syncDir struct {
-				Slug    string        `json:"slug"`
-				Driver  string        `json:"driver"`
-				Dir     string        `json:"dir"`
-				Context *ContextInput `json:"context"`
-			}
-
-			graphQLQuery struct {
-				Query     string          `json:"query"`
-				Variables json.RawMessage `json:"variables"`
-				PushDir   struct {
-					pushDir `json:"input"`
-				}
-				SyncDir struct {
-					syncDir `json:"input"`
-				}
-			}
-		)
-
-		var syncDirCalls, pushDirCalls int
-
-		tt := newHTTPTest(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			query := graphQLQuery{}
-			err := json.NewDecoder(r.Body).Decode(&query)
-			require.NoError(t, err)
-			switch {
-			case strings.Contains(query.Query, "syncDir"):
-				syncDirCalls++
-				require.NoError(t, json.Unmarshal(query.Variables, &query.SyncDir))
-				require.Equal(t, "test-dir", query.SyncDir.Slug)
-				expected := &ContextInput{
-					Repo:   "repository",
-					Path:   "file://testdata/migrations",
-					Branch: "testing-branch",
-					Commit: "sha1234",
-					URL:    "",
-				}
-				require.Equal(t, expected, query.SyncDir.Context)
-			case strings.Contains(query.Query, "pushDir"):
-				pushDirCalls++
-				require.NoError(t, json.Unmarshal(query.Variables, &query.PushDir))
-				require.Equal(t, query.PushDir.Tag, "sha1234")
-				require.Equal(t, query.PushDir.Slug, "test-dir")
-				fmt.Fprint(w, `{"data":{"pushDir":{"url":"https://some-org.atlasgo.cloud/dirs/314159/tags/12345"}}}`)
-			}
-		}))
+	t.Run("config", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("env", "test")
 		tt.setInput("dir", "file://testdata/migrations")
-		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
-		tt.env["GITHUB_REPOSITORY"] = "repository"
-		tt.env["GITHUB_REF_NAME"] = "testing-branch"
-		tt.env["GITHUB_SHA"] = "sha1234"
+		tt.setInput("dir-name", "test-dir")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
-		require.Equal(t, syncDirCalls, 1)
-		require.Equal(t, pushDirCalls, 1)
-		require.NoError(t, err)
-		outputs, _ := tt.outputs()
-		url := outputs["url"]
-		require.Equal(t, "https://some-org.atlasgo.cloud/dirs/314159/tags/12345", url)
+	})
+	t.Run("dir-name invalid characters", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-#dir")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "slug must be lowercase alphanumeric")
 	})
 }
 
-type (
-	httpTest struct {
-		*test
-		srv *httptest.Server
-	}
-)
+func TestMigrateE2E(t *testing.T) {
+	type (
+		pushDir struct {
+			Slug   string `json:"slug"`
+			Tag    string `json:"tag"`
+			Driver string `json:"driver"`
+			Dir    string `json:"dir"`
+		}
+		syncDir struct {
+			Slug    string        `json:"slug"`
+			Driver  string        `json:"driver"`
+			Dir     string        `json:"dir"`
+			Context *ContextInput `json:"context"`
+		}
 
-func newHTTPTest(t *testing.T, handler http.HandlerFunc) *httpTest {
-	tt := &httpTest{
-		test: newT(t),
-	}
+		graphQLQuery struct {
+			Query     string          `json:"query"`
+			Variables json.RawMessage `json:"variables"`
+			PushDir   struct {
+				pushDir `json:"input"`
+			}
+			SyncDir struct {
+				syncDir `json:"input"`
+			}
+		}
+	)
+
+	var syncDirCalls, pushDirCalls int
 	token := "123456789"
-	tt.srv = fakeCloud(t, token, handler)
-	tt.setInput("config", generateHCL(t, tt.srv.URL, token))
-	return tt
-}
-
-func fakeCloud(t *testing.T, token string, handler http.HandlerFunc) *httptest.Server {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
-		if handler != nil {
-			handler(w, r)
+		query := graphQLQuery{}
+		err := json.NewDecoder(r.Body).Decode(&query)
+		require.NoError(t, err)
+		switch {
+		case strings.Contains(query.Query, "syncDir"):
+			syncDirCalls++
+			require.NoError(t, json.Unmarshal(query.Variables, &query.SyncDir))
+			require.Equal(t, "test-dir", query.SyncDir.Slug)
+			expected := &ContextInput{
+				Repo:   "repository",
+				Path:   "file://testdata/migrations",
+				Branch: "testing-branch",
+				Commit: "sha1234",
+				URL:    "",
+			}
+			require.Equal(t, expected, query.SyncDir.Context)
+		case strings.Contains(query.Query, "pushDir"):
+			pushDirCalls++
+			require.NoError(t, json.Unmarshal(query.Variables, &query.PushDir))
+			require.Equal(t, query.PushDir.Tag, "sha1234")
+			require.Equal(t, query.PushDir.Slug, "test-dir")
+			fmt.Fprint(w, `{"data":{"pushDir":{"url":"https://some-org.atlasgo.cloud/dirs/314159/tags/12345"}}}`)
 		}
 	}))
-	t.Cleanup(func() {
-		srv.Close()
-	})
-	return srv
+	t.Cleanup(srv.Close)
+
+	tt := newT(t)
+	tt.setupConfigWithLogin(t, srv.URL, token)
+	tt.setInput("dir", "file://testdata/migrations")
+	tt.setInput("dir-name", "test-dir")
+	tt.setInput("dev-url", "sqlite://file?mode=memory")
+	tt.env["GITHUB_REPOSITORY"] = "repository"
+	tt.env["GITHUB_REF_NAME"] = "testing-branch"
+	tt.env["GITHUB_SHA"] = "sha1234"
+	err := MigratePush(context.Background(), tt.cli, tt.act)
+	require.NoError(t, err)
+	require.Equal(t, syncDirCalls, 1)
+	require.Equal(t, pushDirCalls, 1)
+	require.NoError(t, err)
+	outputs, _ := tt.outputs()
+	url := outputs["url"]
+	require.Equal(t, "https://some-org.atlasgo.cloud/dirs/314159/tags/12345", url)
 }
 
 func generateHCL(t *testing.T, url, token string) string {
@@ -290,6 +280,10 @@ func generateHCL(t *testing.T, url, token string) string {
 		require.NoError(t, clean())
 	})
 	return atlasConfigURL
+}
+
+func (tt *test) setupConfigWithLogin(t *testing.T, url, token string) {
+	tt.setInput("config", generateHCL(t, url, token))
 }
 
 // sqlitedb returns a path to an initialized sqlite database file. The file is
