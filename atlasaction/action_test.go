@@ -10,15 +10,19 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"html/template"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
+
+	"encoding/base64"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/sql/migrate"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sethvargo/go-githubactions"
 	"github.com/stretchr/testify/require"
@@ -281,6 +285,94 @@ func (tt *test) setupConfigWithLogin(t *testing.T, url, token string) {
 	tt.setInput("config", generateHCL(t, url, token))
 }
 
+func TestMigrateApplyCloud(t *testing.T) {
+	handler := func(payloads *[]string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+			body := readBody(t, r.Body)
+			*payloads = append(*payloads, body)
+			switch b := body; {
+			case strings.Contains(b, "query dirState"):
+				dir := testDir(t, "./testdata/migrations")
+				ad, err := migrate.ArchiveDir(&dir)
+				require.NoError(t, err)
+				fmt.Fprintf(w, `{"data":{"dirState":{"content":%q}}}`, base64.StdEncoding.EncodeToString(ad))
+			case strings.Contains(b, "mutation ReportMigration"):
+				fmt.Fprintf(w, `{"data":{"reportMigration":{"url":"https://atlas.com"}}}`)
+			case strings.Contains(b, "query {\\n\\t\\t\\tme"):
+			default:
+				t.Log("Unhandled call: ", body)
+			}
+		}
+	}
+	t.Run("basic", func(t *testing.T) {
+		var payloads []string
+		srv := httptest.NewServer(handler(&payloads))
+		t.Cleanup(srv.Close)
+
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "atlas://cloud-project")
+		tt.setInput("env", "test")
+
+		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
+		cfgURL := generateHCL(t, srv.URL, "token")
+		tt.setInput("config", cfgURL)
+
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+
+		require.Len(t, payloads, 3)
+		require.Contains(t, payloads[0], "query {\\n\\t\\t\\tme")
+		require.Contains(t, payloads[1], "query dirState")
+		require.Contains(t, payloads[2], "mutation ReportMigration")
+
+		m, err := tt.outputs()
+		require.NoError(t, err)
+		require.EqualValues(t, map[string]string{
+			"current":       "",
+			"applied_count": "1",
+			"pending_count": "1",
+			"target":        "20230922132634",
+		}, m)
+	})
+	t.Run("no-env", func(t *testing.T) {
+		var payloads []string
+		srv := httptest.NewServer(handler(&payloads))
+		t.Cleanup(srv.Close)
+
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "atlas://cloud-project")
+
+		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
+		cfgURL := generateHCL(t, srv.URL, "token")
+		tt.setInput("config", cfgURL)
+
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+
+		require.Len(t, payloads, 2)
+		require.Contains(t, payloads[0], "query {\\n\\t\\t\\tme")
+		require.Contains(t, payloads[1], "query dirState")
+
+		m, err := tt.outputs()
+		require.NoError(t, err)
+		require.EqualValues(t, map[string]string{
+			"current":       "",
+			"applied_count": "1",
+			"pending_count": "1",
+			"target":        "20230922132634",
+		}, m)
+	})
+}
+
+func readBody(t *testing.T, r io.Reader) string {
+	b, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(b)
+}
+
 // sqlitedb returns a path to an initialized sqlite database file. The file is
 // created in a temporary directory and will be deleted when the test finishes.
 func sqlitedb(t *testing.T) string {
@@ -372,4 +464,17 @@ func TestSetInput(t *testing.T) {
 
 	require.Equal(t, "greetings", tt.act.GetInput("hello-world"))
 	require.Equal(t, "farewell", tt.act.GetInput("goodbye-friends"))
+}
+
+// testDir returns a migrate.MemDir from the given path.
+func testDir(t *testing.T, path string) (d migrate.MemDir) {
+	rd, err := os.ReadDir(path)
+	require.NoError(t, err)
+	for _, f := range rd {
+		fp := filepath.Join(path, f.Name())
+		b, err := os.ReadFile(fp)
+		require.NoError(t, err)
+		require.NoError(t, d.WriteFile(f.Name(), b))
+	}
+	return d
 }

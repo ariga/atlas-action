@@ -1,0 +1,7 @@
+run:
+  go: '1.21'
+  timeout: 5m
+
+linters-settings:
+  errcheck:
+    ignore: fmt:.*,Read|Write|Close|Exec,io:Copy
