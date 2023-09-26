@@ -117,7 +117,7 @@ func TestMigratePush(t *testing.T) {
 	})
 }
 
-func TestMigrateWithCloud(t *testing.T) {
+func TestMigratePushWithCloud(t *testing.T) {
 	token := "123456789"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
