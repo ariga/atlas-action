@@ -49,7 +49,9 @@ func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action *g
 	switch r.Action {
 	case CmdMigrateApply:
 		return atlasaction.MigrateApply(ctx, client, action)
-	case CmdMigrateLint, CmdMigratePush:
+	case CmdMigratePush:
+		return atlasaction.MigratePush(ctx, client, action)
+	case CmdMigrateLint:
 		return fmt.Errorf("not implemented: %s", r.Action)
 	}
 	return fmt.Errorf("unknown action: %s", r.Action)
