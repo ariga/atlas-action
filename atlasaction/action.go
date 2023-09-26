@@ -78,10 +78,9 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactio
 		return fmt.Errorf("failed to push directory: %v", err)
 	}
 	tag := act.GetInput("tag")
+	params.Tag = ghContext.Commit
 	if tag != "" {
 		params.Tag = tag
-	} else {
-		params.Tag = ghContext.Commit
 	}
 	resp, err := client.MigratePush(ctx, params)
 	if err != nil {
