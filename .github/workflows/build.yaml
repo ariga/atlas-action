@@ -1,0 +1,31 @@
+on:
+  workflow_call:
+    inputs:
+      target-os:
+        type: string
+        description: The target OS of the binary, either "linux" or "darwin"
+        required: true
+      target-architecture:
+        description: The target CPU architecture of the binary, either "amd64" or "arm64"
+        type: string
+        required: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Build
+        run: env GOOS=${{ inputs.target-os }} GOARCH=${{ inputs.target-architecture }} go build -v -o build/atlas-action-${{ inputs.target-os }}-${{ inputs.target-architecture }} main.go
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: atlas-action-${{ inputs.target-os }}-${{ inputs.target-architecture }}
+          path: build/atlas-action-${{ inputs.target-os }}-${{ inputs.target-architecture }}
+          retention-days: 2
