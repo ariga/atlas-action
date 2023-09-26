@@ -11,13 +11,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
@@ -165,7 +163,33 @@ func TestMigratePush(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("e2e test", func(t *testing.T) {
-		var syncDirCalls, pushDirCalls atomicInt
+		type (
+			pushDir struct {
+				Slug   string `json:"slug"`
+				Tag    string `json:"tag"`
+				Driver string `json:"driver"`
+				Dir    string `json:"dir"`
+			}
+			syncDir struct {
+				Slug    string        `json:"slug"`
+				Driver  string        `json:"driver"`
+				Dir     string        `json:"dir"`
+				Context *ContextInput `json:"context"`
+			}
+
+			graphQLQuery struct {
+				Query     string          `json:"query"`
+				Variables json.RawMessage `json:"variables"`
+				PushDir   struct {
+					pushDir `json:"input"`
+				}
+				SyncDir struct {
+					syncDir `json:"input"`
+				}
+			}
+		)
+
+		var syncDirCalls, pushDirCalls int
 
 		tt := newHttpT(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			query := graphQLQuery{}
@@ -173,7 +197,7 @@ func TestMigratePush(t *testing.T) {
 			require.NoError(t, err)
 			switch {
 			case strings.Contains(query.Query, "syncDir"):
-				syncDirCalls.inc()
+				syncDirCalls++
 				require.NoError(t, json.Unmarshal(query.Variables, &query.SyncDir))
 				require.Equal(t, "test-dir", query.SyncDir.Slug)
 				expected := &ContextInput{
@@ -185,7 +209,7 @@ func TestMigratePush(t *testing.T) {
 				}
 				require.Equal(t, expected, query.SyncDir.Context)
 			case strings.Contains(query.Query, "pushDir"):
-				pushDirCalls.inc()
+				pushDirCalls++
 				require.NoError(t, json.Unmarshal(query.Variables, &query.PushDir))
 				require.Equal(t, query.PushDir.Tag, "sha1234")
 				require.Equal(t, query.PushDir.Slug, "test-dir")
@@ -201,8 +225,8 @@ func TestMigratePush(t *testing.T) {
 		tt.env["GITHUB_SHA"] = "sha1234"
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
-		require.Equal(t, syncDirCalls.get(), int32(1))
-		require.Equal(t, pushDirCalls.get(), int32(1))
+		require.Equal(t, syncDirCalls, 1)
+		require.Equal(t, pushDirCalls, 1)
 		require.NoError(t, err)
 		outputs, _ := tt.outputs()
 		url := outputs["url"]
@@ -216,41 +240,7 @@ type (
 		srv        *httptest.Server
 		cloudToken string
 	}
-
-	pushDir struct {
-		Slug   string `json:"slug"`
-		Tag    string `json:"tag"`
-		Driver string `json:"driver"`
-		Dir    string `json:"dir"`
-	}
-	syncDir struct {
-		Slug    string        `json:"slug"`
-		Driver  string        `json:"driver"`
-		Dir     string        `json:"dir"`
-		Context *ContextInput `json:"context"`
-	}
-
-	graphQLQuery struct {
-		Query     string          `json:"query"`
-		Variables json.RawMessage `json:"variables"`
-		PushDir   struct {
-			pushDir `json:"input"`
-		}
-		SyncDir struct {
-			syncDir `json:"input"`
-		}
-	}
 )
-
-type atomicInt int32
-
-func (c *atomicInt) inc() int32 {
-	return atomic.AddInt32((*int32)(c), 1)
-}
-
-func (c *atomicInt) get() int32 {
-	return atomic.LoadInt32((*int32)(c))
-}
 
 func newHttpT(t *testing.T, handler http.HandlerFunc) *httpTest {
 	tt := &httpTest{
@@ -275,10 +265,10 @@ func fakeCloud(t *testing.T, tt *httpTest, handler http.HandlerFunc) *httptest.S
 }
 
 func (tt *httpTest) setupConfigWithLogin(t *testing.T) {
-	tt.setInput("config", generateHCL(tt.srv.URL, tt.cloudToken, t))
+	tt.setInput("config", generateHCL(t, tt.srv.URL, tt.cloudToken))
 }
 
-func generateHCL(url, token string, t *testing.T) string {
+func generateHCL(t *testing.T, url, token string) string {
 	tmpl := `
 	atlas {
 		cloud {
@@ -289,7 +279,6 @@ func generateHCL(url, token string, t *testing.T) string {
 		}	  
 	}
 	env "test" {
-		url = "sqlite://file?mode=memory"
 		dev = "sqlite://file?mode=memory"
 		migration  {
 			dir = "file://testdata/migrations"
@@ -305,18 +294,12 @@ func generateHCL(url, token string, t *testing.T) string {
 		Token: token,
 	}
 	var buf bytes.Buffer
-	if err := config.Execute(&buf, templateParams); err != nil {
-		require.NoError(t, err)
-	}
+	err := config.Execute(&buf, templateParams)
+	require.NoError(t, err)
 	atlasConfigURL, clean, err := atlasexec.TempFile(buf.String(), "hcl")
-	if err != nil {
-		require.NoError(t, err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() {
-		err := clean()
-		if err != nil {
-			log.Printf("unable to cleanup after the test finished %v", err)
-		}
+		require.NoError(t, clean())
 	})
 	return atlasConfigURL
 }
