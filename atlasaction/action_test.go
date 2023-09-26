@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
@@ -93,6 +94,27 @@ func TestMigrateApply(t *testing.T) {
 }
 
 func TestMigrateApplyCloud(t *testing.T) {
+	handler := func(payloads *[]string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+			body := readBody(t, r.Body)
+			*payloads = append(*payloads, body)
+			switch b := body; {
+			case strings.Contains(b, "query dirState"):
+				dir := testDir(t, "./testdata/migrations")
+				ad, err := migrate.ArchiveDir(&dir)
+				require.NoError(t, err)
+				// nolint:errcheck
+				fmt.Fprintf(w, `{"data":{"dirState":{"content":%q}}}`, base64.StdEncoding.EncodeToString(ad))
+			case strings.Contains(b, "mutation ReportMigration"):
+				// nolint:errcheck
+				fmt.Fprintf(w, `{"data":{"reportMigration":{"url":"https://atlas.com"}}}`)
+			case strings.Contains(b, "query {\\n\\t\\t\\tme"):
+			default:
+				t.Log("Unhandled call: ", body)
+			}
+		}
+	}
 	t.Run("with-dir", func(t *testing.T) {
 		tt := newT(t)
 		tt.setInput("url", "sqlite://"+tt.db)
@@ -112,41 +134,55 @@ func TestMigrateApplyCloud(t *testing.T) {
 		require.ErrorContains(t, err, "config and dir-name are mutually exclusive")
 	})
 	t.Run("basic", func(t *testing.T) {
+		var payloads []string
+		srv := httptest.NewServer(handler(&payloads))
+		t.Cleanup(srv.Close)
+
 		tt := newT(t)
 		tt.setInput("url", "sqlite://"+tt.db)
-		tt.setInput("dir-name", "cloud-project")
+		tt.setInput("dir", "atlas://cloud-project")
+		tt.setInput("env", "atlas")
 
-		var payloads []string
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
-			body := readBody(t, r.Body)
-			payloads = append(payloads, body)
-			switch b := body; {
-			case strings.Contains(b, "query dirState"):
-				dir := testDir(t, "./testdata/migrations")
-				ad, err := migrate.ArchiveDir(&dir)
-				require.NoError(t, err)
-				// nolint:errcheck
-				fmt.Fprintf(w, `{"data":{"dirState":{"content":%q}}}`, base64.StdEncoding.EncodeToString(ad))
-			case strings.Contains(b, "mutation ReportMigration"):
-				// nolint:errcheck
-				fmt.Fprintf(w, `{"data":{"reportMigration":{"url":"https://atlas.com"}}}`)
-			case strings.Contains(b, "query {\\n\\t\\t\\tme"):
-
-			default:
-				t.Log("Unhandled call: ", body)
-			}
-		}))
-		t.Cleanup(srv.Close)
-		tt.setInput("cloud-url", srv.URL)
-		tt.setInput("cloud-token", "token")
+		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
+		cfgURL := generateHCL(t, srv.URL, "token")
+		tt.setInput("config", cfgURL)
 
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 
 		require.Len(t, payloads, 3)
-		require.Contains(t, payloads[0], "query dirState")
+		require.Contains(t, payloads[0], "query {\\n\\t\\t\\tme")
+		require.Contains(t, payloads[1], "query dirState")
 		require.Contains(t, payloads[2], "mutation ReportMigration")
+
+		m, err := tt.outputs()
+		require.NoError(t, err)
+		require.EqualValues(t, map[string]string{
+			"current":       "",
+			"applied_count": "1",
+			"pending_count": "1",
+			"target":        "20230922132634",
+		}, m)
+	})
+	t.Run("no-env", func(t *testing.T) {
+		var payloads []string
+		srv := httptest.NewServer(handler(&payloads))
+		t.Cleanup(srv.Close)
+
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "atlas://cloud-project")
+
+		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
+		cfgURL := generateHCL(t, srv.URL, "token")
+		tt.setInput("config", cfgURL)
+
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+
+		require.Len(t, payloads, 2)
+		require.Contains(t, payloads[0], "query {\\n\\t\\t\\tme")
+		require.Contains(t, payloads[1], "query dirState")
 
 		m, err := tt.outputs()
 		require.NoError(t, err)
@@ -269,4 +305,37 @@ func testDir(t *testing.T, path string) (d migrate.MemDir) {
 		require.NoError(t, d.WriteFile(f.Name(), b))
 	}
 	return d
+}
+
+func generateHCL(t *testing.T, url, token string) string {
+	tmpl := `
+	atlas {
+		cloud {
+			token = "{{ .Token }}"
+		{{- if .URL }}
+			url = "{{ .URL }}"
+		{{- end }}
+		}	  
+	}
+	env {
+      name = atlas.env
+  	}
+	`
+	config := template.Must(template.New("atlashcl").Parse(tmpl))
+	templateParams := struct {
+		URL   string
+		Token string
+	}{
+		URL:   url,
+		Token: token,
+	}
+	var buf bytes.Buffer
+	err := config.Execute(&buf, templateParams)
+	require.NoError(t, err)
+	atlasConfigURL, clean, err := atlasexec.TempFile(buf.String(), "hcl")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, clean())
+	})
+	return atlasConfigURL
 }
