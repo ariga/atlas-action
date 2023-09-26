@@ -1,0 +1,31 @@
+name: "Migrate Push"
+description: "Pushes the migration directory to Atlas Cloud"
+branding:
+  icon: database
+author: "Ariga"
+inputs:
+  dir:
+    description: The migration directory URL (i.e file://path/to/migrations).
+    required: false
+  dir-name:
+    description: Target migration directory name (slug).
+    required: false
+  dev-url:
+    description: The development DB URL using atlas URL format [driver://username:password@address/dbname?param=value].
+    required: false
+  tag:
+    description: The tag of the specific version of the migration directory.
+    required: false
+  working-directory:
+    description: The path to the repository working directory.
+    required: false
+    default: .
+  config:
+    description: The url of the configuration.
+    required: false
+  env:
+    description: The environment to use with the configuration file.
+    required: false
+runs:
+  using: node16
+  main: main.js

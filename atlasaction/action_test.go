@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +18,8 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+
+	"encoding/base64"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
@@ -67,7 +69,6 @@ func TestMigrateApply(t *testing.T) {
 		tt.setInput("dir", "file://testdata/migrations/")
 		tt.setInput("baseline", "111_fake")
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
-
 		// The error here proves that the baseline was passed to atlasexec, which
 		// is what we want to test.
 		exp := `atlasexec: baseline version "111_fake" not found`
@@ -91,6 +92,197 @@ func TestMigrateApply(t *testing.T) {
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 	})
+}
+
+func TestMigratePush(t *testing.T) {
+	t.Run("config-broken", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("config", "file://testdata/config/broken.hcl")
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, `"testdata/config/broken.hcl" was not found`)
+	})
+	t.Run("env-broken", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("config", "file://testdata/config/atlas.hcl")
+		tt.setInput("env", "broken-env")
+		tt.setInput("dir-name", "test-dir")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, `env "broken-env" not defined in project file`)
+	})
+	t.Run("broken dir", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("dir", "file://some_broken_dir")
+		tt.setInput("dir-name", "test-dir")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, `sql/migrate: stat some_broken_dir: no such file or directory`)
+	})
+}
+
+func TestMigratePushWithCloud(t *testing.T) {
+	token := "123456789"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+	}))
+	t.Cleanup(srv.Close)
+	t.Run("dev-url broken", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir")
+		tt.setInput("dev-url", "broken-driver://")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, `unknown driver "broken-driver"`)
+	})
+	t.Run("invalid tag", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("tag", "invalid-character@")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, `tag must be lowercase alphanumeric`)
+	})
+	t.Run("tag", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("tag", "valid-tag-123")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+	})
+	t.Run("config", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("env", "test")
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("dir-name", "test-dir")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+	})
+	t.Run("dir-name invalid characters", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-#dir")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "slug must be lowercase alphanumeric")
+	})
+}
+
+func TestMigrateE2E(t *testing.T) {
+	type (
+		pushDir struct {
+			Slug   string `json:"slug"`
+			Tag    string `json:"tag"`
+			Driver string `json:"driver"`
+			Dir    string `json:"dir"`
+		}
+		syncDir struct {
+			Slug    string        `json:"slug"`
+			Driver  string        `json:"driver"`
+			Dir     string        `json:"dir"`
+			Context *ContextInput `json:"context"`
+		}
+		graphQLQuery struct {
+			Query     string          `json:"query"`
+			Variables json.RawMessage `json:"variables"`
+			PushDir   struct {
+				pushDir `json:"input"`
+			}
+			SyncDir struct {
+				syncDir `json:"input"`
+			}
+		}
+	)
+	var syncDirCalls, pushDirCalls int
+	token := "123456789"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+		query := graphQLQuery{}
+		err := json.NewDecoder(r.Body).Decode(&query)
+		require.NoError(t, err)
+		switch {
+		case strings.Contains(query.Query, "syncDir"):
+			syncDirCalls++
+			require.NoError(t, json.Unmarshal(query.Variables, &query.SyncDir))
+			require.Equal(t, "test-dir", query.SyncDir.Slug)
+			expected := &ContextInput{
+				Repo:   "repository",
+				Path:   "file://testdata/migrations",
+				Branch: "testing-branch",
+				Commit: "sha1234",
+				URL:    "",
+			}
+			require.Equal(t, expected, query.SyncDir.Context)
+		case strings.Contains(query.Query, "pushDir"):
+			pushDirCalls++
+			require.NoError(t, json.Unmarshal(query.Variables, &query.PushDir))
+			require.Equal(t, query.PushDir.Tag, "sha1234")
+			require.Equal(t, query.PushDir.Slug, "test-dir")
+			fmt.Fprint(w, `{"data":{"pushDir":{"url":"https://some-org.atlasgo.cloud/dirs/314159/tags/12345"}}}`)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	tt := newT(t)
+	tt.setupConfigWithLogin(t, srv.URL, token)
+	tt.setInput("dir", "file://testdata/migrations")
+	tt.setInput("dir-name", "test-dir")
+	tt.setInput("dev-url", "sqlite://file?mode=memory")
+	tt.env["GITHUB_REPOSITORY"] = "repository"
+	tt.env["GITHUB_REF_NAME"] = "testing-branch"
+	tt.env["GITHUB_SHA"] = "sha1234"
+	err := MigratePush(context.Background(), tt.cli, tt.act)
+	require.NoError(t, err)
+	require.Equal(t, syncDirCalls, 1)
+	require.Equal(t, pushDirCalls, 1)
+	require.NoError(t, err)
+	outputs, _ := tt.outputs()
+	url := outputs["url"]
+	require.Equal(t, "https://some-org.atlasgo.cloud/dirs/314159/tags/12345", url)
+}
+
+func generateHCL(t *testing.T, url, token string) string {
+	tmpl := `
+	atlas {
+		cloud {
+			token = "{{ .Token }}"
+		{{- if .URL }}
+			url = "{{ .URL }}"
+		{{- end }}
+		}	  
+	}
+	env "test" {
+  	}
+	`
+	config := template.Must(template.New("atlashcl").Parse(tmpl))
+	templateParams := struct {
+		URL   string
+		Token string
+	}{
+		URL:   url,
+		Token: token,
+	}
+	var buf bytes.Buffer
+	err := config.Execute(&buf, templateParams)
+	require.NoError(t, err)
+	atlasConfigURL, clean, err := atlasexec.TempFile(buf.String(), "hcl")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, clean())
+	})
+	return atlasConfigURL
+}
+
+func (tt *test) setupConfigWithLogin(t *testing.T, url, token string) {
+	tt.setInput("config", generateHCL(t, url, token))
 }
 
 func TestMigrateApplyCloud(t *testing.T) {
@@ -287,37 +479,4 @@ func testDir(t *testing.T, path string) (d migrate.MemDir) {
 		require.NoError(t, d.WriteFile(f.Name(), b))
 	}
 	return d
-}
-
-func generateHCL(t *testing.T, url, token string) string {
-	tmpl := `
-	atlas {
-		cloud {
-			token = "{{ .Token }}"
-		{{- if .URL }}
-			url = "{{ .URL }}"
-		{{- end }}
-		}	  
-	}
-	env {
-      name = atlas.env
-  	}
-	`
-	config := template.Must(template.New("atlashcl").Parse(tmpl))
-	templateParams := struct {
-		URL   string
-		Token string
-	}{
-		URL:   url,
-		Token: token,
-	}
-	var buf bytes.Buffer
-	err := config.Execute(&buf, templateParams)
-	require.NoError(t, err)
-	atlasConfigURL, clean, err := atlasexec.TempFile(buf.String(), "hcl")
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, clean())
-	})
-	return atlasConfigURL
 }

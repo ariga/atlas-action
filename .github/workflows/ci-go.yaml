@@ -31,6 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
@@ -40,3 +42,14 @@ jobs:
         with:
           dir: file://atlasaction/testdata/migrations
           url: sqlite://file.db?mode=memory
+      - uses: ./migrate/push
+        id: push_action
+        with:
+          dir: file://atlasaction/testdata/migrations
+          dir-name: test-dir
+          dev-url: sqlite://file.db?mode=memory
+      - name: "Verify migrate/push output"
+        shell: bash
+        run: |
+          # Verifies that the output we got is a URL as expected
+          [[ "${{ steps.push_action.outputs.url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
