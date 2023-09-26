@@ -65,7 +65,6 @@ func TestMigrateApply(t *testing.T) {
 		tt.setInput("dir", "file://testdata/migrations/")
 		tt.setInput("baseline", "111_fake")
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
-
 		// The error here proves that the baseline was passed to atlasexec, which
 		// is what we want to test.
 		exp := `atlasexec: baseline version "111_fake" not found`
@@ -188,7 +187,6 @@ func TestMigrateE2E(t *testing.T) {
 			Dir     string        `json:"dir"`
 			Context *ContextInput `json:"context"`
 		}
-
 		graphQLQuery struct {
 			Query     string          `json:"query"`
 			Variables json.RawMessage `json:"variables"`
@@ -200,7 +198,6 @@ func TestMigrateE2E(t *testing.T) {
 			}
 		}
 	)
-
 	var syncDirCalls, pushDirCalls int
 	token := "123456789"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +227,6 @@ func TestMigrateE2E(t *testing.T) {
 		}
 	}))
 	t.Cleanup(srv.Close)
-
 	tt := newT(t)
 	tt.setupConfigWithLogin(t, srv.URL, token)
 	tt.setInput("dir", "file://testdata/migrations")
