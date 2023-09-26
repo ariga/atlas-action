@@ -11,17 +11,10 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"text/template"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sethvargo/go-githubactions"
-)
-
-var (
-	//go:embed atlas.hcl.tmpl
-	tmpl   string
-	config = template.Must(template.New("atlashcl").Parse(tmpl))
 )
 
 type (
