@@ -21,7 +21,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Build
-        run: env GOOS=${{ inputs.target-os }} GOARCH=${{ inputs.target-architecture }} go build -v -o build/atlas-action-${{ inputs.target-os }}-${{ inputs.target-architecture }} main.go
+        run: env GOOS=${{ inputs.target-os }} GOARCH=${{ inputs.target-architecture }} go build -v -o build/atlas-action-${{ inputs.target-os }}-${{ inputs.target-architecture }} cmd/atlas-action/main.go
 
       - name: Upload
         uses: actions/upload-artifact@v3
