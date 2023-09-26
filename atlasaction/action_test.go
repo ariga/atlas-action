@@ -8,13 +8,18 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/sql/migrate"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sethvargo/go-githubactions"
 	"github.com/stretchr/testify/require"
@@ -85,6 +90,77 @@ func TestMigrateApply(t *testing.T) {
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 	})
+}
+
+func TestMigrateApplyCloud(t *testing.T) {
+	t.Run("with-dir", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "fail")
+		tt.setInput("dir-name", "cloud-project")
+
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "dir and dir-name are mutually exclusive")
+	})
+	t.Run("with-config", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir-name", "fail")
+		tt.setInput("config", "file://atlas.hcl")
+
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "config and dir-name are mutually exclusive")
+	})
+	t.Run("basic", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir-name", "cloud-project")
+
+		var payloads []string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+			body := readBody(t, r.Body)
+			payloads = append(payloads, body)
+			switch b := body; {
+			case strings.Contains(b, "query dirState"):
+				dir := testDir(t, "./testdata/migrations")
+				ad, err := migrate.ArchiveDir(&dir)
+				require.NoError(t, err)
+				// nolint:errcheck
+				fmt.Fprintf(w, `{"data":{"dirState":{"content":%q}}}`, base64.StdEncoding.EncodeToString(ad))
+			case strings.Contains(b, "mutation ReportMigration"):
+				// nolint:errcheck
+				fmt.Fprintf(w, `{"data":{"reportMigration":{"url":"https://atlas.com"}}}`)
+			default:
+				t.Log("Unhandled call: ", body)
+			}
+		}))
+		t.Cleanup(srv.Close)
+		tt.setInput("cloud-url", srv.URL)
+		tt.setInput("cloud-token", "token")
+
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+
+		require.Len(t, payloads, 2)
+		require.Contains(t, payloads[0], "query dirState")
+		require.Contains(t, payloads[1], "mutation ReportMigration")
+
+		m, err := tt.outputs()
+		require.NoError(t, err)
+		require.EqualValues(t, map[string]string{
+			"current":       "",
+			"applied_count": "1",
+			"pending_count": "1",
+			"target":        "20230922132634",
+		}, m)
+	})
+}
+
+func readBody(t *testing.T, r io.Reader) string {
+	b, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(b)
 }
 
 // sqlitedb returns a path to an initialized sqlite database file. The file is
@@ -178,4 +254,17 @@ func TestSetInput(t *testing.T) {
 
 	require.Equal(t, "greetings", tt.act.GetInput("hello-world"))
 	require.Equal(t, "farewell", tt.act.GetInput("goodbye-friends"))
+}
+
+// testDir returns a migrate.MemDir from the given path.
+func testDir(t *testing.T, path string) (d migrate.MemDir) {
+	rd, err := os.ReadDir(path)
+	require.NoError(t, err)
+	for _, f := range rd {
+		fp := filepath.Join(path, f.Name())
+		b, err := os.ReadFile(fp)
+		require.NoError(t, err)
+		require.NoError(t, d.WriteFile(f.Name(), b))
+	}
+	return d
 }

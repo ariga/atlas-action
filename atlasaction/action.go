@@ -5,13 +5,21 @@
 package atlasaction
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"errors"
 	"strconv"
+	"text/template"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/sethvargo/go-githubactions"
+)
+
+var (
+	//go:embed atlas.hcl.tmpl
+	tmpl   string
+	config = template.Must(template.New("atlashcl").Parse(tmpl))
 )
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
@@ -23,6 +31,38 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 		Env:             act.GetInput("env"),
 		TxMode:          act.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: act.GetInput("baseline"), // Hidden param.
+	}
+	// Cloud-based migration directory.
+	if act.GetInput("dir-name") != "" {
+		if params.DirURL != "" {
+			return errors.New("dir and dir-name are mutually exclusive")
+		}
+		// Cloud-based migrations are currently based on creating a temporary atlas.hcl
+		// file therefore it cannot be used with a user-supplied config.
+		if params.ConfigURL != "" {
+			return errors.New("config and dir-name are mutually exclusive")
+		}
+		var buf bytes.Buffer
+		if err := config.Execute(&buf, &tmplParams{
+			Cloud: cloud{
+				Dir:   act.GetInput("dir-name"),
+				Tag:   act.GetInput("tag"),
+				Token: act.GetInput("cloud-token"), // Hidden param.
+				URL:   act.GetInput("cloud-url"),   // Hidden param. Used for testing.
+			},
+		}); err != nil {
+			return err
+		}
+		cfg, clean, err := atlasexec.TempFile(buf.String(), "hcl")
+		if err != nil {
+			return err
+		}
+		// nolint:errcheck
+		defer clean()
+		params.ConfigURL = cfg
+		if params.Env == "" {
+			params.Env = "atlas"
+		}
 	}
 	run, err := client.MigrateApply(ctx, params)
 	if err != nil {
@@ -40,3 +80,15 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 	act.Infof("Run complete: +%v", run)
 	return nil
 }
+
+type (
+	cloud struct {
+		Dir   string
+		Tag   string
+		Token string
+		URL   string
+	}
+	tmplParams struct {
+		Cloud cloud
+	}
+)

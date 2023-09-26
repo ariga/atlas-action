@@ -1,0 +1,26 @@
+{{- with .Cloud }}
+atlas {
+  cloud {
+  {{- if .Token }}
+    token = "{{ .Token }}"
+  {{- end }}
+  {{- if .URL }}
+    url = "{{ .URL }}"
+  {{- end }}
+  }
+}
+data "remote_dir" "this" {
+  name = "{{ .Dir }}"
+  {{- if .Tag }}
+  tag = "{{ .Tag }}"
+  {{- end }}
+}
+{{- end }}
+env {
+  name = atlas.env
+  migration {
+{{- with .Cloud }}
+    dir = data.remote_dir.this.url
+{{- end }}
+  }
+}
