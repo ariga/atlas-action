@@ -52,4 +52,4 @@ jobs:
         shell: bash
         run: |
           # Verifies that the output we got is a URL as expected
-          [[ "${{ steps.push_action.outputs.url }}" =~ "^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$" ]]
+          [[ "${{ steps.push_action.outputs.url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
