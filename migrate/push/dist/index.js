@@ -7144,12 +7144,6 @@ const core = __nccwpck_require__(2186);
 const toolcache = __nccwpck_require__(7784);
 
 module.exports = async function run(action) {
-    // core.info all env vars
-    core.info('Environment variables:')
-    for (const key in process.env) {
-        core.info(`${key}: ${process.env[key]}`)
-    }
-
     let isLocalMode = false;
     let version = "v1";
 
@@ -7160,7 +7154,7 @@ module.exports = async function run(action) {
     }
 
     // Check for version number
-    if (process.env.GITHUB_ACTION_REF) {
+    if (process.env.GITHUB_ACTION_REF && process.env.GITHUB_ACTION_REF.startsWith("v") > 0) {
         version = process.env.GITHUB_ACTION_REF;
     }
     core.info(`Using version ${version}`)
