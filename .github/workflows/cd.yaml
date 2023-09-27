@@ -1,0 +1,45 @@
+name: Build and Upload to CDN
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Commit SHA'
+        required: false
+      version:
+        description: 'Version (should follow semver v1.2.3)'
+        required: false
+  push:
+    branches:
+      - master
+jobs:
+  test:
+    uses: ./.github/workflows/ci-go.yaml
+    secrets: inherit
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.0.2
+        with:
+          ref: ${{ github.event.inputs.commit || 'master' }}
+      - name: Setup Go Environment
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - name: Set BINARY_NAME
+        id: set_binary_name
+        run: |
+          echo "BINARY_NAME=atlas-action-${{ github.event.inputs.version || 'v1' }}" >> $GITHUB_ENV
+      - name: Compile Go Binary
+        run: |
+          go build -o $BINARY_NAME ./cmd/atlas-action
+      - name: Configure AWS credentials
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.RELEASE_AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.RELEASE_AWS_SECRET_ACCESS_KEY }}
+      - name: Upload binary to S3
+        env:
+          AWS_REGION: us-east-1
+        run: |
+          aws s3 cp $BINARY_NAME s3://release.ariga.io/atlas-action/$BINARY_NAME
