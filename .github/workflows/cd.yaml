@@ -26,7 +26,7 @@ jobs:
       - name: Setup Go Environment
         uses: actions/setup-go@v2
         with:
-          go-version: '1.21'
+          go-version-file: go.mod
       - name: Set BINARY_NAME
         id: set_binary_name
         run: |
