@@ -27,5 +27,5 @@ inputs:
     description: The environment to use with the configuration file.
     required: false
 runs:
-  using: node16
-  main: main.js
+  using: node20
+  main: dist/index.js
