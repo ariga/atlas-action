@@ -76,3 +76,28 @@ jobs:
         run: |
           # Verifies that the output we got is a URL as expected
           [[ "${{ steps.push_action.outputs.url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
+      - id: lint_success
+        uses: ./migrate/lint
+        with:
+          dir: file://atlasaction/testdata/migrations
+          dev-url: sqlite://file.db?mode=memory
+          dir-name: test-dir
+      - id: lint_failure
+        uses: ./migrate/lint
+        continue-on-error: true
+        with:
+          dir: file://atlasaction/testdata/migrations_destructive
+          dev-url: sqlite://file.db?mode=memory
+          dir-name: test-dir
+      - id: check-lint-failure
+        if: steps.lint_failure.outcome == 'success'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('lint did not when it was supposed to')
+      - name: "Verify migrate/lint output"
+        shell: bash
+        run: |
+          # Verifies that the output we got for lint tests are URLs as expected
+          [[ "${{ steps.lint_success.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
+          [[ "${{ steps.lint_failure.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
