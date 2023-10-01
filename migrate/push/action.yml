@@ -16,10 +16,6 @@ inputs:
   tag:
     description: The tag of the specific version of the migration directory.
     required: false
-  working-directory:
-    description: The path to the repository working directory.
-    required: false
-    default: .
   config:
     description: The url of the configuration.
     required: false
