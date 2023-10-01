@@ -36,12 +36,10 @@ func main() {
 		kong.Bind(action),
 	)
 	if err := cli.Run(); err != nil {
-		unwrapped := errors.Unwrap(err)
-		if unwrapped != nil {
-			action.Fatalf(unwrapped.Error())
-		} else {
-			action.Fatalf(err.Error())
+		if uerr := errors.Unwrap(err); uerr != nil {
+			err = uerr
 		}
+		action.Fatalf(err.Error())
 	}
 }
 
