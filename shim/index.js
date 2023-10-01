@@ -2,7 +2,7 @@ const childProcess = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const core = require('@actions/core');
-const toolcache = require('@actions/tool-cache');
+const tc = require('@actions/tool-cache');
 
 module.exports = async function run(action) {
     let isLocalMode = false;
@@ -24,8 +24,14 @@ module.exports = async function run(action) {
     // Download the binary if not in local mode
     if (!isLocalMode) {
         const url = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
-        core.info('Downloading atlas-action binary: ', url)
-        toolPath = await toolcache.downloadTool(url, 'atlas-action');
+        core.info('Searching atlas-action binary in cache')
+        toolPath = tc.find('atlas-action', version);
+        if (!toolPath) {
+            core.info(`Downloading atlas-action binary: ${url}`)
+            toolPath = await tc.downloadTool(url, 'atlas-action');
+            let cachedToolPath = await tc.cacheFile(toolPath, 'atlas-action', 'atlas-action', version);
+            core.addPath(cachedToolPath);
+        }
         fs.chmodSync(toolPath, '700'); // Assuming the binary is directly within toolPath
     }
 
