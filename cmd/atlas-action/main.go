@@ -5,11 +5,11 @@
 package main
 
 import (
-	"context"
-	"fmt"
-
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"context"
+	"errors"
+	"fmt"
 	"github.com/alecthomas/kong"
 	"github.com/sethvargo/go-githubactions"
 )
@@ -36,7 +36,12 @@ func main() {
 		kong.Bind(action),
 	)
 	if err := cli.Run(); err != nil {
-		action.Fatalf("Failed to run command: %s", err)
+		unwrapped := errors.Unwrap(err)
+		if unwrapped != nil {
+			action.Fatalf(unwrapped.Error())
+		} else {
+			action.Fatalf(err.Error())
+		}
 	}
 }
 

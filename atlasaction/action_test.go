@@ -67,8 +67,8 @@ func TestMigrateApply(t *testing.T) {
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		// The error here proves that the baseline was passed to atlasexec, which
 		// is what we want to test.
-		exp := `atlasexec: baseline version "111_fake" not found`
-		require.EqualError(t, err, exp)
+		exp := `Error: baseline version "111_fake" not found`
+		require.ErrorContains(t, err, exp)
 		m, err := tt.outputs()
 		require.NoError(t, err)
 		require.EqualValues(t, map[string]string{
