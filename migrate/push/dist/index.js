@@ -7141,7 +7141,7 @@ const childProcess = __nccwpck_require__(2081);
 const fs = __nccwpck_require__(7147);
 const path = __nccwpck_require__(1017);
 const core = __nccwpck_require__(2186);
-const toolcache = __nccwpck_require__(7784);
+const toolCache = __nccwpck_require__(7784);
 
 module.exports = async function run(action) {
     let isLocalMode = false;
@@ -7163,8 +7163,14 @@ module.exports = async function run(action) {
     // Download the binary if not in local mode
     if (!isLocalMode) {
         const url = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
-        core.info('Downloading atlas-action binary: ', url)
-        toolPath = await toolcache.downloadTool(url, 'atlas-action');
+        core.info('Searching atlas-action binary in cache')
+        toolPath = toolCache.find('atlas-action', version);
+        if (!toolPath) {
+            core.info(`Downloading atlas-action binary: ${url}`)
+            toolPath = await toolCache.downloadTool(url, 'atlas-action');
+            let cachedToolPath = await toolCache.cacheFile(toolPath, 'atlas-action', 'atlas-action', version);
+            core.addPath(cachedToolPath);
+        }
         fs.chmodSync(toolPath, '700'); // Assuming the binary is directly within toolPath
     }
 
