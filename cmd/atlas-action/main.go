@@ -5,11 +5,12 @@
 package main
 
 import (
-	"ariga.io/atlas-action/atlasaction"
-	"ariga.io/atlas-go-sdk/atlasexec"
 	"context"
 	"errors"
 	"fmt"
+
+	"ariga.io/atlas-action/atlasaction"
+	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/alecthomas/kong"
 	"github.com/sethvargo/go-githubactions"
 )
