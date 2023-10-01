@@ -1,0 +1,24 @@
+name: 'Migrate Lint'
+description: 'CI for database schema changes with Atlas'
+branding:
+  icon: database
+author: 'Ariga'
+inputs:
+  dir:
+    description: The migration directory URL (i.e file://path/to/migrations)
+    required: false
+  dir-name:
+    description: Target migration directory name (slug)
+    required: false
+  dev-url:
+    description: Select development db URL using atlas URL format
+    required: false
+  config:
+    description: The url of the configuration.
+    required: false
+  env:
+    description: The environment to use with the configuration file.
+    required: false
+runs:
+  using: node20
+  main: dist/index.js

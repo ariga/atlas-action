@@ -5,12 +5,14 @@
 package atlasaction
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/mitchellh/mapstructure"
@@ -89,6 +91,34 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactio
 	act.SetOutput("url", resp)
 	act.Infof("Uploaded dir %q to Atlas Cloud", params.Name)
 	return nil
+}
+
+// MigrateLint runs the Github Action for "ariga/atlas-action/migrate/lint"
+func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
+	if act.GetInput("dir-name") == "" {
+		return errors.New("atlasaction: missing required parameter dir-name")
+	}
+	ghContext, err := createContext(act)
+	if err != nil {
+		return fmt.Errorf("failed to read github metadata: %w", err)
+	}
+	buf, err := json.Marshal(ghContext)
+	if err != nil {
+		return err
+	}
+	var resp bytes.Buffer
+	err = client.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
+		DevURL:    act.GetInput("dev-url"),
+		DirURL:    act.GetInput("dir"),
+		ConfigURL: act.GetInput("config"),
+		Env:       act.GetInput("env"),
+		Base:      "atlas://" + act.GetInput("dir-name"),
+		Context:   string(buf),
+		Web:       true,
+		Writer:    &resp,
+	})
+	act.SetOutput("report-url", strings.TrimSpace(resp.String()))
+	return err
 }
 
 func createContext(github *githubactions.Action) (*ContextInput, error) {

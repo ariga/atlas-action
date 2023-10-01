@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"ariga.io/atlas-action/atlasaction"
@@ -36,7 +37,10 @@ func main() {
 		kong.Bind(action),
 	)
 	if err := cli.Run(); err != nil {
-		action.Fatalf("Failed to run command: %s", err)
+		if uerr := errors.Unwrap(err); uerr != nil {
+			err = uerr
+		}
+		action.Fatalf(err.Error())
 	}
 }
 
@@ -52,7 +56,7 @@ func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action *g
 	case CmdMigratePush:
 		return atlasaction.MigratePush(ctx, client, action)
 	case CmdMigrateLint:
-		return fmt.Errorf("not implemented: %s", r.Action)
+		return atlasaction.MigrateLint(ctx, client, action)
 	}
 	return fmt.Errorf("unknown action: %s", r.Action)
 }

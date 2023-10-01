@@ -3,7 +3,8 @@ module ariga.io/atlas-action
 go 1.21.1
 
 require (
-	ariga.io/atlas-go-sdk v0.1.1-0.20230918080233-877323176ff4
+	ariga.io/atlas v0.14.2-0.20230922121439-23ab22834173
+	ariga.io/atlas-go-sdk v0.1.1-0.20231001054405-7edfcfc14f1c
 	github.com/alecthomas/kong v0.8.0
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/mitchellh/mapstructure v1.1.2
@@ -12,7 +13,6 @@ require (
 )
 
 require (
-	ariga.io/atlas v0.14.2-0.20230922121439-23ab22834173 // indirect
 	ariga.io/atlas/cmd/atlas v0.13.1 // indirect
 	github.com/agext/levenshtein v1.2.1 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220816024939-bc8df83d7b9d // indirect

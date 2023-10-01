@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,9 +18,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"text/template"
-
-	"encoding/base64"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
@@ -55,13 +53,11 @@ func TestMigrateApply(t *testing.T) {
 
 		// The error here proves that the tx-mode was passed to atlasexec, which
 		// is what we want to test.
-		exp := `unknown tx-mode "fake"`
-		require.EqualError(t, err, exp)
+		exp := `unknown tx-mode \"fake\"`
+		require.ErrorContains(t, err, exp)
 		m, err := tt.outputs()
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]string{
-			"error": exp,
-		}, m)
+		require.Contains(t, m["error"], exp)
 	})
 	t.Run("baseline", func(t *testing.T) {
 		tt := newT(t)
@@ -71,8 +67,8 @@ func TestMigrateApply(t *testing.T) {
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		// The error here proves that the baseline was passed to atlasexec, which
 		// is what we want to test.
-		exp := `atlasexec: baseline version "111_fake" not found`
-		require.EqualError(t, err, exp)
+		exp := `Error: baseline version "111_fake" not found`
+		require.ErrorContains(t, err, exp)
 		m, err := tt.outputs()
 		require.NoError(t, err)
 		require.EqualValues(t, map[string]string{
@@ -244,36 +240,106 @@ func TestMigrateE2E(t *testing.T) {
 	require.Equal(t, syncDirCalls, 1)
 	require.Equal(t, pushDirCalls, 1)
 	require.NoError(t, err)
-	outputs, _ := tt.outputs()
+	outputs, err := tt.outputs()
+	require.NoError(t, err)
 	url := outputs["url"]
 	require.Equal(t, "https://some-org.atlasgo.cloud/dirs/314159/tags/12345", url)
 }
 
+func TestMigrateLint(t *testing.T) {
+	type graphQLQuery struct {
+		Query     string          `json:"query"`
+		Variables json.RawMessage `json:"variables"`
+	}
+	type Dir struct {
+		Name    string `json:"name"`
+		Content string `json:"content"`
+		Slug    string `json:"slug"`
+	}
+	type dirsQueryResponse struct {
+		Data struct {
+			Dirs []Dir `json:"dirs"`
+		} `json:"data"`
+	}
+	token := "123456789"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+		var query graphQLQuery
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&query))
+		switch {
+		case strings.Contains(query.Query, "mutation reportMigrationLint"):
+			_, _ = fmt.Fprintf(w, `{ "data": { "reportMigrationLint": { "url": "https://migration-lint-report-url" } } }`)
+		case strings.Contains(query.Query, "query dirs"):
+			dir, err := migrate.NewLocalDir("./testdata/migrations")
+			require.NoError(t, err)
+			ad, err := migrate.ArchiveDir(dir)
+			require.NoError(t, err)
+			var resp dirsQueryResponse
+			resp.Data.Dirs = []Dir{{
+				Name:    "test-dir-name",
+				Slug:    "test-dir-slug",
+				Content: base64.StdEncoding.EncodeToString(ad),
+			}}
+			st2bytes, err := json.Marshal(resp)
+			require.NoError(t, err)
+			_, _ = fmt.Fprint(w, string(st2bytes))
+		}
+	}))
+	t.Run("lint - missing dev-url", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir-slug")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "required flag(s) \"dev-url\" not set")
+	})
+	t.Run("lint - missing dir", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("dir-name", "test-dir-slug")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "stat migrations: no such file or directory")
+	})
+	t.Run("lint - bad dir name", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "missing required parameter dir-name")
+		tt.setInput("dir-name", "fake-dir-name")
+		err = MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, `dir "fake-dir-name" not found`)
+		tt.setInput("dir-name", "atlas://test-dir-slug") // user must not add atlas://
+		err = MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, `slug must be lowercase alphanumeric and may contain .-_`)
+	})
+	t.Run("lint with error", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "https://migration-lint-report-url")
+		out, err := tt.outputs()
+		require.NoError(t, err)
+		require.Equal(t, "https://migration-lint-report-url", out["report-url"])
+	})
+}
+
 func generateHCL(t *testing.T, url, token string) string {
-	tmpl := `
-	atlas {
-		cloud {
-			token = "{{ .Token }}"
-		{{- if .URL }}
-			url = "{{ .URL }}"
-		{{- end }}
-		}	  
-	}
-	env "test" {
-  	}
-	`
-	config := template.Must(template.New("atlashcl").Parse(tmpl))
-	templateParams := struct {
-		URL   string
-		Token string
-	}{
-		URL:   url,
-		Token: token,
-	}
-	var buf bytes.Buffer
-	err := config.Execute(&buf, templateParams)
-	require.NoError(t, err)
-	atlasConfigURL, clean, err := atlasexec.TempFile(buf.String(), "hcl")
+	st := fmt.Sprintf(
+		`atlas { 
+			cloud {	
+				token = %q
+				url = %q
+			}
+		}
+		env "test" {}
+		`, token, url)
+	atlasConfigURL, clean, err := atlasexec.TempFile(st, "hcl")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, clean())
