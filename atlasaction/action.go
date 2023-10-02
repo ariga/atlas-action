@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 
@@ -121,49 +120,51 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	})
 	url := strings.TrimSpace(resp.String())
 	act.SetOutput("report-url", url)
-	publishErr := publishLintComment(url, err, act)
+	publishErr := publishSummary(url, err, act)
 	if publishErr != nil {
-		fmt.Printf("unable to publish report: %v", publishErr)
+		act.Warningf("unable to publish lint report: %v", publishErr)
 	}
 	return err
 }
 
-func publishLintComment(url string, err error, act *githubactions.Action) error {
+func publishSummary(url string, err error, act *githubactions.Action) error {
 	status := "success"
 	if err != nil {
 		status = "error"
 	}
-	icon := fmt.Sprintf(`<img src="https://release.ariga.io/images/assets/%v.svg"/>`, status)
-	summary := fmt.Sprintf(`# Atlas Lint Report
-<div>Analyzed <strong>%v</strong> %v </div><br>
-<strong>Lint report <a href=%q>available here</a></strong>`, act.GetInput("dir-name"), icon, url)
-	act.AddStepSummary(summary)
-
-	g := NewGithub()
-	ref := act.Getenv("GITHUB_REF")
-	prNumber, err := strconv.Atoi(ref)
-	if err != nil {
-		return fmt.Errorf("unkown pr: %v, err: %w", ref, err)
-	}
-	repo := act.Getenv("GITHUB_REPO")
-	if repo == "" {
-		log.Printf("repository not found, can't publish comment")
-		return errors.New("unknown github repository $GITHUB_REPO is empty")
-	}
-	ghToken := act.Getenv("GITHUB_TOKEN")
-	comments, err := g.GetIssueComments(prNumber, repo, ghToken)
+	ghContext, err := act.Context()
 	if err != nil {
 		return err
 	}
+	event, err := triggerEvent(ghContext)
+	if err != nil {
+		return err
+	}
+	icon := fmt.Sprintf(`<img src="https://release.ariga.io/images/assets/%v.svg"/>`, status)
 	migrationDir := act.GetInput("dir-name")
+	summary := fmt.Sprintf(`# Atlas Lint Report
+<div>Analyzed <strong>%v</strong> %v </div><br>
+<strong>Lint report <a href=%q>available here</a></strong>`, migrationDir, icon, url)
+	act.AddStepSummary(summary)
+
+	g := NewGithub()
+	prNumber := event.PullRequestNumber
+	if prNumber == 0 {
+		return fmt.Errorf("unknown pr number")
+	}
+	ghToken := act.GetInput("github-token")
+	comments, err := g.GetIssueComments(prNumber, event.Repository.Name, ghToken)
+	if err != nil {
+		return err
+	}
 	r, err := generateComment(summary, migrationDir)
 	if err != nil {
 		return err
 	}
 	if ac := findFirst(comments, isAtlasLintCommentFor(migrationDir)); ac != nil {
-		err = g.UpdateComment(ac.Id, r, repo, ghToken)
+		err = g.UpdateComment(ac.Id, r, event.Repository.Name, ghToken)
 	} else {
-		err = g.CreateIssueComment(prNumber, r, repo, ghToken)
+		err = g.CreateIssueComment(prNumber, r, event.Repository.Name, ghToken)
 	}
 
 	return err
@@ -181,31 +182,45 @@ func generateComment(data, dir string) (io.Reader, error) {
 	return bytes.NewReader(buf), err
 }
 
-func createContext(github *githubactions.Action) (*ContextInput, error) {
-	ghContext, err := github.Context()
+func createContext(act *githubactions.Action) (*ContextInput, error) {
+	ghContext, err := act.Context()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action context: %w", err)
 	}
-	var ev struct {
-		HeadCommit struct {
-			URL string `mapstructure:"url"`
-		} `mapstructure:"head_commit"`
-		Ref string `mapstructure:"ref"`
-	}
-	if err := mapstructure.Decode(ghContext.Event, &ev); err != nil {
-		return nil, fmt.Errorf("failed to parse push event: %v", err)
+	ev, err := triggerEvent(ghContext)
+	if err != nil {
+		return nil, err
 	}
 	return &ContextInput{
 		Repo:   ghContext.Repository,
 		Branch: ghContext.RefName,
-		Commit: github.Getenv("GITHUB_SHA"),
-		Path:   github.GetInput("dir"),
+		Commit: act.Getenv("GITHUB_SHA"),
+		Path:   act.GetInput("dir"),
 		URL:    ev.HeadCommit.URL,
 	}, nil
 }
 
+type githubTriggerEvent struct {
+	HeadCommit struct {
+		URL string `mapstructure:"url"`
+	} `mapstructure:"head_commit"`
+	Ref               string `mapstructure:"ref"`
+	PullRequestNumber int    `mapstructure:"number"`
+	Repository        struct {
+		Name string `mapstructure:"name"`
+	} `mapstructure:"repository"`
+}
+
+func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, error) {
+	var event githubTriggerEvent
+	if err := mapstructure.Decode(ghContext.Event, &event); err != nil {
+		return nil, fmt.Errorf("failed to parse push event: %v", err)
+	}
+	return &event, nil
+}
+
 func findFirst(comments []GithubIssueComment, filter func(comment *GithubIssueComment) bool) *GithubIssueComment {
-	for i, _ := range comments {
+	for i := range comments {
 		c := &comments[i]
 		if filter(c) {
 			return c

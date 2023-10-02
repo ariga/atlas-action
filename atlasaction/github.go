@@ -9,9 +9,8 @@ import (
 )
 
 type GithubIssueComment struct {
-	Id                    int    `json:"id"`
-	Body                  string `json:"body"`
-	PerformedViaGithubApp any    `json:"performed_via_github_app"`
+	Id   int    `json:"id"`
+	Body string `json:"body"`
 }
 
 type Github struct {
@@ -37,10 +36,14 @@ func (g *Github) GetIssueComments(id int, repo, authToken string) ([]GithubIssue
 		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", repo, id, err)
 	}
 	defer res.Body.Close()
-	var comments []GithubIssueComment
-	err = json.NewDecoder(res.Body).Decode(&comments)
+	all, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing github comments with %v/%v, %w", repo, id, err)
+		return nil, err
+	}
+	var comments []GithubIssueComment
+	err = json.Unmarshal(all, &comments)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", repo, id, string(all), err)
 	}
 	return comments, nil
 }

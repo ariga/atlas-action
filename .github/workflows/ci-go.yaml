@@ -81,7 +81,7 @@ jobs:
         with:
           dir: file://atlasaction/testdata/migrations
           dev-url: sqlite://file.db?mode=memory
-          dir-name: test-dir
+          dir-name: test_dir
       - id: lint_failure
         uses: ./migrate/lint
         continue-on-error: true
