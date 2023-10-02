@@ -117,7 +117,17 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 		Web:       true,
 		Writer:    &resp,
 	})
-	act.SetOutput("report-url", strings.TrimSpace(resp.String()))
+	url := strings.TrimSpace(resp.String())
+	act.SetOutput("report-url", url)
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+	icon := fmt.Sprintf(`<img src="https://release.ariga.io/images/assets/%v.svg"/>`, status)
+	summary := fmt.Sprintf(`# Atlas Lint Report
+<div>Analyzed <strong>%v</strong> %v </div><br>
+<strong>Lint report <a href=%q>available here</a></strong>`, act.GetInput("dir-name"), icon, url)
+	act.AddStepSummary(summary)
 	return err
 }
 
