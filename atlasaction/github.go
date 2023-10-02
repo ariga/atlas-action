@@ -13,17 +13,11 @@ type GithubIssueComment struct {
 	Body string `json:"body"`
 }
 
-type Github struct {
+type GithubAPI struct {
 	baseURL string
 }
 
-func NewGithub() *Github {
-	return &Github{
-		baseURL: "https://api.github.com",
-	}
-}
-
-func (g *Github) GetIssueComments(id int, repo, authToken string) ([]GithubIssueComment, error) {
+func (g *GithubAPI) GetIssueComments(id int, repo, authToken string) ([]GithubIssueComment, error) {
 	url := fmt.Sprintf("%v/repos/ariga/%v/issues/%v/comments", g.baseURL, repo, id)
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -48,7 +42,7 @@ func (g *Github) GetIssueComments(id int, repo, authToken string) ([]GithubIssue
 	return comments, nil
 }
 
-func (g *Github) CreateIssueComment(id int, content io.Reader, repo, authToken string) error {
+func (g *GithubAPI) CreateIssueComment(id int, content io.Reader, repo, authToken string) error {
 	url := fmt.Sprintf("%v/repos/ariga/%v/issues/%v/comments", g.baseURL, repo, id)
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodPost, url, content)
@@ -71,7 +65,7 @@ func (g *Github) CreateIssueComment(id int, content io.Reader, repo, authToken s
 	return err
 }
 
-func (g *Github) UpdateComment(id int, content io.Reader, repo, authToken string) error {
+func (g *GithubAPI) UpdateComment(id int, content io.Reader, repo, authToken string) error {
 	url := fmt.Sprintf("%v/repos/ariga/%v/issues/comments/%v", g.baseURL, repo, id)
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodPatch, url, content)

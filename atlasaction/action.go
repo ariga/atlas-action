@@ -58,7 +58,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 	return nil
 }
 
-// MigratePush runs the Github Action for "ariga/atlas-action/migrate/push"
+// MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
 func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
 	ghContext, err := createContext(act)
 	if err != nil {
@@ -94,7 +94,7 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactio
 	return nil
 }
 
-// MigrateLint runs the Github Action for "ariga/atlas-action/migrate/lint"
+// MigrateLint runs the GitHub Action for "ariga/atlas-action/migrate/lint"
 func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
 	if act.GetInput("dir-name") == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
@@ -147,7 +147,9 @@ func publishSummary(url string, err error, act *githubactions.Action) error {
 <strong>Lint report <a href=%q>available here</a></strong>`, migrationDir, icon, url)
 	act.AddStepSummary(summary)
 
-	g := NewGithub()
+	g := GithubAPI{
+		baseURL: ghContext.APIURL,
+	}
 	prNumber := event.PullRequestNumber
 	if prNumber == 0 {
 		return fmt.Errorf("unknown pr number")
@@ -170,15 +172,13 @@ func publishSummary(url string, err error, act *githubactions.Action) error {
 	return err
 }
 
-type githubComment struct {
-	Body string `json:"body"`
-}
-
 func generateComment(data, dir string) (io.Reader, error) {
-	c := githubComment{
-		fmt.Sprintf(data+"\n"+lintCommentTokenFormat, dir),
+	comment := struct {
+		Body string `json:"body"`
+	}{
+		Body: fmt.Sprintf(data+"\n"+lintCommentTokenFormat, dir),
 	}
-	buf, err := json.Marshal(c)
+	buf, err := json.Marshal(comment)
 	return bytes.NewReader(buf), err
 }
 
@@ -194,7 +194,7 @@ func createContext(act *githubactions.Action) (*ContextInput, error) {
 	return &ContextInput{
 		Repo:   ghContext.Repository,
 		Branch: ghContext.RefName,
-		Commit: act.Getenv("GITHUB_SHA"),
+		Commit: ghContext.SHA,
 		Path:   act.GetInput("dir"),
 		URL:    ev.HeadCommit.URL,
 	}, nil
