@@ -327,6 +327,44 @@ func TestMigrateLint(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "https://migration-lint-report-url", out["report-url"])
 	})
+	t.Run("lint summary - lint error", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "https://migration-lint-report-url")
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		lines := strings.Split(string(c), "\n")
+		expectedLines := []string{
+			`# Atlas Lint Report`,
+			`<div>Analyzed <strong>test-dir-slug</strong> <img src="https://release.ariga.io/images/assets/error.svg"/> </div><br>`,
+			`<strong>Lint report <a href="https://migration-lint-report-url">available here</a></strong>`,
+			"",
+		}
+		require.EqualValues(t, expectedLines, lines)
+	})
+	t.Run("lint summary - lint error", func(t *testing.T) {
+		tt := newT(t)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir-slug")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		lines := strings.Split(string(c), "\n")
+		expectedLines := []string{
+			`# Atlas Lint Report`,
+			`<div>Analyzed <strong>test-dir-slug</strong> <img src="https://release.ariga.io/images/assets/success.svg"/> </div><br>`,
+			`<strong>Lint report <a href="https://migration-lint-report-url">available here</a></strong>`,
+			"",
+		}
+		require.EqualValues(t, expectedLines, lines)
+	})
 }
 
 func generateHCL(t *testing.T, url, token string) string {
@@ -460,10 +498,13 @@ type test struct {
 func newT(t *testing.T) *test {
 	outputFile, err := os.CreateTemp("", "")
 	require.NoError(t, err)
+	summaryFile, err := os.CreateTemp("", "")
+	require.NoError(t, err)
 	tt := &test{
 		db: sqlitedb(t),
 		env: map[string]string{
-			"GITHUB_OUTPUT": outputFile.Name(),
+			"GITHUB_OUTPUT":       outputFile.Name(),
+			"GITHUB_STEP_SUMMARY": summaryFile.Name(),
 		},
 	}
 	tt.act = githubactions.New(
