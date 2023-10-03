@@ -121,9 +121,11 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 		Writer:    &resp,
 	})
 	url := strings.TrimSpace(resp.String())
-	act.SetOutput("report-url", url)
-	if publishErr := publishResult(url, err, act); publishErr != nil {
-		act.Warningf("unable to publish lint report: %v", publishErr)
+	if url != "" {
+		act.SetOutput("report-url", url)
+		if publishErr := publishResult(url, err, act); publishErr != nil {
+			act.Warningf("unable to publish lint report: %v", publishErr)
+		}
 	}
 	return err
 }
