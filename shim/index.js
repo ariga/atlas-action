@@ -30,6 +30,7 @@ module.exports = async function run(action) {
     let toolPath;
     // Download the binary if not in local mode
     if (!isLocalMode) {
+        // We only cache the binary between steps of a single run.
         const cacheVersion = `${semver.coerce(version).version}-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
         const url = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
         toolPath = toolCache.find('atlas-action', cacheVersion);
