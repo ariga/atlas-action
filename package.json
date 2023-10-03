@@ -59,6 +59,7 @@
     "@octokit/rest": "^19.0.4",
     "graphql": "^16.6.0",
     "graphql-request": "^4.3.0",
+    "semver": "^7.5.4",
     "simple-git": "^3.11.0"
   }
 }

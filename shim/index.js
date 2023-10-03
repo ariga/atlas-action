@@ -3,11 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const core = require('@actions/core');
 const toolCache = require('@actions/tool-cache');
+const semver = require("semver");
 
 module.exports = async function run(action) {
     let isLocalMode = false;
     let version = "v1";
-    let cacheVersion = "v1.0.0";
 
     // Check for local mode (for testing)
     if (!(process.env.GITHUB_ACTION_REPOSITORY && process.env.GITHUB_ACTION_REPOSITORY.length > 0)) {
@@ -16,14 +16,22 @@ module.exports = async function run(action) {
     }
 
     // Check for version number
-    if (process.env.GITHUB_ACTION_REF && process.env.GITHUB_ACTION_REF.startsWith("v") > 0) {
-        version = process.env.GITHUB_ACTION_REF;
+    if (process.env.GITHUB_ACTION_REF) {
+        if (process.env.GITHUB_ACTION_REF.startsWith("v")) {
+            version = process.env.GITHUB_ACTION_REF;
+        } else if (process.env.GITHUB_ACTION_REF !== "master") {
+            throw new Error(`Invalid version: ${process.env.GITHUB_ACTION_REF}`)
+        }
     }
+
+
     core.info(`Using version ${version}`)
 
     let toolPath;
     // Download the binary if not in local mode
     if (!isLocalMode) {
+        // We only cache the binary between steps of a single run.
+        const cacheVersion = `${semver.coerce(version).version}-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
         const url = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
         toolPath = toolCache.find('atlas-action', cacheVersion);
         if (!toolPath) {
