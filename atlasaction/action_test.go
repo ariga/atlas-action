@@ -405,7 +405,7 @@ func TestMigrateLint(t *testing.T) {
 				}
 				if request.Method == http.MethodPost {
 					require.Regexp(t, commentRegex, payload.Body)
-					writer.WriteHeader(201)
+					writer.WriteHeader(http.StatusCreated)
 				}
 			case "/repos/ariga/test-repository/issues/comments/789":
 				require.Regexp(t, commentRegex, payload.Body)

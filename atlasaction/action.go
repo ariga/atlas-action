@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"io"
 	"net/http"
 	"strconv"
@@ -121,8 +122,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	})
 	url := strings.TrimSpace(resp.String())
 	act.SetOutput("report-url", url)
-	publishErr := publishResult(url, err, act)
-	if publishErr != nil {
+	if publishErr := publishResult(url, err, act); publishErr != nil {
 		act.Warningf("unable to publish lint report: %v", publishErr)
 	}
 	return err
@@ -147,13 +147,12 @@ func publishResult(url string, err error, act *githubactions.Action) error {
 <div>Analyzed <strong>%v</strong> %v </div><br>
 <strong>Lint report <a href=%q>available here</a></strong>`, dirName, icon, url)
 	act.AddStepSummary(summary)
-
-	g := GithubAPI{
+	g := githubAPI{
 		baseURL: ghContext.APIURL,
 	}
 	prNumber := event.PullRequestNumber
 	if prNumber == 0 {
-		return fmt.Errorf("unknown pr number")
+		return nil
 	}
 	ghToken := act.GetInput("github-token")
 	comments, err := g.getIssueComments(prNumber, event.Repository.Name, ghToken)
@@ -164,33 +163,33 @@ func publishResult(url string, err error, act *githubactions.Action) error {
 	if err != nil {
 		return err
 	}
-	if ac := findFirst(comments, isAtlasLintCommentFor(dirName)); ac != nil {
-		err = g.updateComment(ac.Id, r, event.Repository.Name, ghToken)
+	if found := slices.IndexFunc(comments, isAtlasLintCommentFor(dirName)); found != -1 {
+		err = g.updateComment(comments[found].ID, r, event.Repository.Name, ghToken)
 	} else {
 		err = g.createIssueComment(prNumber, r, event.Repository.Name, ghToken)
 	}
-
 	return err
 }
 
-type GithubIssueComment struct {
-	Id   int    `json:"id"`
-	Body string `json:"body"`
-}
+type (
+	githubIssueComment struct {
+		ID   int    `json:"id"`
+		Body string `json:"body"`
+	}
 
-type GithubAPI struct {
-	baseURL string
-}
+	githubAPI struct {
+		baseURL string
+	}
+)
 
-func (g *GithubAPI) getIssueComments(id int, repo, authToken string) ([]GithubIssueComment, error) {
+func (g *githubAPI) getIssueComments(id int, repo, authToken string) ([]githubIssueComment, error) {
 	url := fmt.Sprintf("%v/repos/ariga/%v/issues/%v/comments", g.baseURL, repo, id)
-	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	addHeaders(req, authToken)
-	res, err := client.Do(req)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", repo, id, err)
 	}
@@ -199,7 +198,7 @@ func (g *GithubAPI) getIssueComments(id int, repo, authToken string) ([]GithubIs
 	if err != nil {
 		return nil, err
 	}
-	var comments []GithubIssueComment
+	var comments []githubIssueComment
 	err = json.Unmarshal(all, &comments)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", repo, id, string(all), err)
@@ -207,43 +206,41 @@ func (g *GithubAPI) getIssueComments(id int, repo, authToken string) ([]GithubIs
 	return comments, nil
 }
 
-func (g *GithubAPI) createIssueComment(id int, content io.Reader, repo, authToken string) error {
+func (g *githubAPI) createIssueComment(id int, content io.Reader, repo, authToken string) error {
 	url := fmt.Sprintf("%v/repos/ariga/%v/issues/%v/comments", g.baseURL, repo, id)
-	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodPost, url, content)
 	if err != nil {
 		return err
 	}
 	addHeaders(req, authToken)
-	res, err := client.Do(req)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
-	if res.StatusCode != 201 {
+	if res.StatusCode != http.StatusCreated {
 		b, err := io.ReadAll(res.Body)
-		if err == nil {
-			err = errors.New(string(b))
+		if err != nil {
+			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
 		}
-		return fmt.Errorf("create github comment failed with %v: %w", res.StatusCode, err)
+		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
 	return err
 }
 
-func (g *GithubAPI) updateComment(id int, content io.Reader, repo, authToken string) error {
+func (g *githubAPI) updateComment(id int, content io.Reader, repo, authToken string) error {
 	url := fmt.Sprintf("%v/repos/ariga/%v/issues/comments/%v", g.baseURL, repo, id)
-	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodPatch, url, content)
 	if err != nil {
 		return err
 	}
 	addHeaders(req, authToken)
-	res, err := client.Do(req)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		b, err := io.ReadAll(res.Body)
 		if err == nil {
 			err = errors.New(string(b))
@@ -305,18 +302,8 @@ func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, 
 	return &event, nil
 }
 
-func findFirst(comments []GithubIssueComment, filter func(comment *GithubIssueComment) bool) *GithubIssueComment {
-	for i := range comments {
-		c := &comments[i]
-		if filter(c) {
-			return c
-		}
-	}
-	return nil
-}
-
-func isAtlasLintCommentFor(dir string) func(c *GithubIssueComment) bool {
-	return func(c *GithubIssueComment) bool {
+func isAtlasLintCommentFor(dir string) func(c githubIssueComment) bool {
+	return func(c githubIssueComment) bool {
 		return strings.Contains(c.Body, fmt.Sprintf(lintCommentTokenFormat, dir))
 	}
 }
