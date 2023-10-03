@@ -120,14 +120,14 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	})
 	url := strings.TrimSpace(resp.String())
 	act.SetOutput("report-url", url)
-	publishErr := publishSummary(url, err, act)
+	publishErr := publishResult(url, err, act)
 	if publishErr != nil {
 		act.Warningf("unable to publish lint report: %v", publishErr)
 	}
 	return err
 }
 
-func publishSummary(url string, err error, act *githubactions.Action) error {
+func publishResult(url string, err error, act *githubactions.Action) error {
 	status := "success"
 	if err != nil {
 		status = "error"
@@ -141,10 +141,10 @@ func publishSummary(url string, err error, act *githubactions.Action) error {
 		return err
 	}
 	icon := fmt.Sprintf(`<img src="https://release.ariga.io/images/assets/%v.svg"/>`, status)
-	migrationDir := act.GetInput("dir-name")
+	dirName := act.GetInput("dir-name")
 	summary := fmt.Sprintf(`# Atlas Lint Report
 <div>Analyzed <strong>%v</strong> %v </div><br>
-<strong>Lint report <a href=%q>available here</a></strong>`, migrationDir, icon, url)
+<strong>Lint report <a href=%q>available here</a></strong>`, dirName, icon, url)
 	act.AddStepSummary(summary)
 
 	g := GithubAPI{
@@ -159,11 +159,11 @@ func publishSummary(url string, err error, act *githubactions.Action) error {
 	if err != nil {
 		return err
 	}
-	r, err := generateComment(summary, migrationDir)
+	r, err := generateComment(summary, dirName)
 	if err != nil {
 		return err
 	}
-	if ac := findFirst(comments, isAtlasLintCommentFor(migrationDir)); ac != nil {
+	if ac := findFirst(comments, isAtlasLintCommentFor(dirName)); ac != nil {
 		err = g.UpdateComment(ac.Id, r, event.Repository.Name, ghToken)
 	} else {
 		err = g.CreateIssueComment(prNumber, r, event.Repository.Name, ghToken)
@@ -204,8 +204,7 @@ type githubTriggerEvent struct {
 	HeadCommit struct {
 		URL string `mapstructure:"url"`
 	} `mapstructure:"head_commit"`
-	Ref               string `mapstructure:"ref"`
-	PullRequestNumber int    `mapstructure:"number"`
+	PullRequestNumber int `mapstructure:"number"`
 	Repository        struct {
 		Name string `mapstructure:"name"`
 	} `mapstructure:"repository"`
