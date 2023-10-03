@@ -392,7 +392,8 @@ func TestMigrateLint(t *testing.T) {
 				URL:    request.URL.Path,
 				Method: request.Method,
 			})
-			if request.URL.Path == "/repos/ariga/test-repository/issues/42/comments" {
+			switch request.URL.Path {
+			case "/repos/ariga/test-repository/issues/42/comments":
 				if request.Method == http.MethodGet {
 					comments := `[
 						{"id": 123, "body": "first awesome comment"},
@@ -406,9 +407,8 @@ func TestMigrateLint(t *testing.T) {
 					require.Regexp(t, commentRegex, payload.Body)
 					writer.WriteHeader(201)
 				}
-			} else if request.URL.Path == "/repos/ariga/test-repository/issues/comments/789" {
+			case "/repos/ariga/test-repository/issues/comments/789":
 				require.Regexp(t, commentRegex, payload.Body)
-				writer.WriteHeader(200)
 			}
 		}))
 		tt.env["GITHUB_API_URL"] = ghMock.URL
@@ -423,6 +423,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dir-name", "test-dir-slug")
 		// Run Lint while expecting no errors
 		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
 		require.Equal(t, 2, len(ghPayloads))
 		createdComment := ghPayloads[len(ghPayloads)-1]
 		require.Contains(t, createdComment.Body, "success.svg")
