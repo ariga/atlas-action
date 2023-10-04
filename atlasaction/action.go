@@ -157,7 +157,7 @@ func publishResult(url string, err error, act *githubactions.Action) error {
 		return nil
 	}
 	ghToken := act.GetInput("github-token")
-	comments, err := g.getIssueComments(prNumber, event.Repository.Name, ghToken)
+	comments, err := g.getIssueComments(prNumber, ghContext.Repository, ghToken)
 	if err != nil {
 		return err
 	}
@@ -175,9 +175,9 @@ func publishResult(url string, err error, act *githubactions.Action) error {
 		return strings.Contains(c.Body, fmt.Sprintf(lintCommentTokenFormat, dirName))
 	})
 	if found != -1 {
-		err = g.updateComment(comments[found].ID, r, event.Repository.Name, ghToken)
+		err = g.updateComment(comments[found].ID, r, ghContext.Repository, ghToken)
 	} else {
-		err = g.createIssueComment(prNumber, r, event.Repository.Name, ghToken)
+		err = g.createIssueComment(prNumber, r, ghContext.Repository, ghToken)
 	}
 	return err
 }
@@ -194,7 +194,7 @@ type (
 )
 
 func (g *githubAPI) getIssueComments(id int, repo, authToken string) ([]githubIssueComment, error) {
-	url := fmt.Sprintf("%v/repos/ariga/%v/issues/%v/comments", g.baseURL, repo, id)
+	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, repo, id)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -220,7 +220,7 @@ func (g *githubAPI) getIssueComments(id int, repo, authToken string) ([]githubIs
 }
 
 func (g *githubAPI) createIssueComment(id int, content io.Reader, repo, authToken string) error {
-	url := fmt.Sprintf("%v/repos/ariga/%v/issues/%v/comments", g.baseURL, repo, id)
+	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, repo, id)
 	req, err := http.NewRequest(http.MethodPost, url, content)
 	if err != nil {
 		return err
@@ -242,7 +242,7 @@ func (g *githubAPI) createIssueComment(id int, content io.Reader, repo, authToke
 }
 
 func (g *githubAPI) updateComment(id int, content io.Reader, repo, authToken string) error {
-	url := fmt.Sprintf("%v/repos/ariga/%v/issues/comments/%v", g.baseURL, repo, id)
+	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", g.baseURL, repo, id)
 	req, err := http.NewRequest(http.MethodPatch, url, content)
 	if err != nil {
 		return err
@@ -292,9 +292,6 @@ type githubTriggerEvent struct {
 		URL string `mapstructure:"url"`
 	} `mapstructure:"head_commit"`
 	PullRequestNumber int `mapstructure:"number"`
-	Repository        struct {
-		Name string `mapstructure:"name"`
-	} `mapstructure:"repository"`
 }
 
 func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, error) {
