@@ -82,6 +82,8 @@ jobs:
           dir: file://atlasaction/testdata/migrations
           dev-url: sqlite://file.db?mode=memory
           dir-name: test_dir
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - id: lint_failure
         uses: ./migrate/lint
         continue-on-error: true
@@ -89,6 +91,8 @@ jobs:
           dir: file://atlasaction/testdata/migrations_destructive
           dev-url: sqlite://file.db?mode=memory
           dir-name: test-dir
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - id: check-lint-failure
         if: steps.lint_failure.outcome == 'success'
         uses: actions/github-script@v3

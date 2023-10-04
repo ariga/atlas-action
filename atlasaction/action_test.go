@@ -420,7 +420,7 @@ func TestMigrateLint(t *testing.T) {
 			"repository": { "name": "test-repository" }
 		}`)
 		tt.setupConfigWithLogin(t, srv.URL, token)
-		tt.setInput("github-token", "very-secret-gh-token")
+		tt.env["GITHUB_TOKEN"] = "very-secret-gh-token"
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir-slug")

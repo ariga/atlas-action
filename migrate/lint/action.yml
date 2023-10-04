@@ -19,9 +19,6 @@ inputs:
   env:
     description: The environment to use with the configuration file.
     required: false
-  github-token:
-    description: The github token
-    default: ${{ github.token }}
 runs:
   using: node20
   main: dist/index.js
