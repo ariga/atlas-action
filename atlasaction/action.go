@@ -156,8 +156,8 @@ func publishResult(url string, err error, act *githubactions.Action) error {
 	if prNumber == 0 {
 		return nil
 	}
-	ghToken := act.GetInput("github-token")
-	comments, err := g.getIssueComments(prNumber, ghContext.Repository, ghToken)
+	ghToken := act.Getenv("GITHUB_TOKEN")
+  comments, err := g.getIssueComments(prNumber, ghContext.Repository, ghToken)
 	if err != nil {
 		return err
 	}
