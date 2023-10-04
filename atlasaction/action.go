@@ -204,6 +204,9 @@ func (g *githubAPI) getIssueComments(id int, repo, authToken string) ([]githubIs
 	if err != nil {
 		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", repo, id, err)
 	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %v when calling GitHub API", res.StatusCode)
+	}
 	defer res.Body.Close()
 	buf, err := io.ReadAll(res.Body)
 	if err != nil {
