@@ -191,15 +191,15 @@ func TestMigrateE2E(t *testing.T) {
 		graphQLQuery struct {
 			Query     string          `json:"query"`
 			Variables json.RawMessage `json:"variables"`
-			PushDir   struct {
+			PushDir   *struct {
 				pushDir `json:"input"`
 			}
-			SyncDir struct {
+			SyncDir *struct {
 				syncDir `json:"input"`
 			}
 		}
 	)
-	var syncDirCalls, pushDirCalls int
+	var payloads []graphQLQuery
 	token := "123456789"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
@@ -208,22 +208,11 @@ func TestMigrateE2E(t *testing.T) {
 		require.NoError(t, err)
 		switch {
 		case strings.Contains(query.Query, "syncDir"):
-			syncDirCalls++
 			require.NoError(t, json.Unmarshal(query.Variables, &query.SyncDir))
-			require.Equal(t, "test-dir", query.SyncDir.Slug)
-			expected := &ContextInput{
-				Repo:   "repository",
-				Path:   "file://testdata/migrations",
-				Branch: "testing-branch",
-				Commit: "sha1234",
-				URL:    "",
-			}
-			require.Equal(t, expected, query.SyncDir.Context)
+			payloads = append(payloads, query)
 		case strings.Contains(query.Query, "pushDir"):
-			pushDirCalls++
 			require.NoError(t, json.Unmarshal(query.Variables, &query.PushDir))
-			require.Equal(t, query.PushDir.Tag, "sha1234")
-			require.Equal(t, query.PushDir.Slug, "test-dir")
+			payloads = append(payloads, query)
 			fmt.Fprint(w, `{"data":{"pushDir":{"url":"https://some-org.atlasgo.cloud/dirs/314159/tags/12345"}}}`)
 		}
 	}))
@@ -234,12 +223,28 @@ func TestMigrateE2E(t *testing.T) {
 	tt.setInput("dir-name", "test-dir")
 	tt.setInput("dev-url", "sqlite://file?mode=memory")
 	tt.env["GITHUB_REPOSITORY"] = "repository"
-	tt.env["GITHUB_REF_NAME"] = "testing-branch"
+	tt.env["GITHUB_HEAD_REF"] = "testing-branch"
+	tt.env["GITHUB_REF_NAME"] = "refs/pulls/6/merge"
 	tt.env["GITHUB_SHA"] = "sha1234"
+	expected := &ContextInput{
+		Repo:   "repository",
+		Path:   "file://testdata/migrations",
+		Branch: "testing-branch",
+		Commit: "sha1234",
+		URL:    "",
+	}
 	err := MigratePush(context.Background(), tt.cli, tt.act)
 	require.NoError(t, err)
-	require.Equal(t, syncDirCalls, 1)
-	require.Equal(t, pushDirCalls, 1)
+	require.Equal(t, 2, len(payloads))
+	require.Equal(t, "test-dir", payloads[0].SyncDir.Slug)
+	require.Equal(t, expected, payloads[0].SyncDir.Context)
+	require.Equal(t, payloads[1].PushDir.Tag, "sha1234")
+	require.Equal(t, payloads[1].PushDir.Slug, "test-dir")
+	tt.env["GITHUB_HEAD_REF"] = ""
+	err = MigratePush(context.Background(), tt.cli, tt.act)
+	require.Equal(t, 4, len(payloads))
+	expected.Branch = tt.env["GITHUB_REF_NAME"]
+	require.Equal(t, expected, payloads[2].SyncDir.Context)
 	require.NoError(t, err)
 	outputs, err := tt.outputs()
 	require.NoError(t, err)
@@ -396,7 +401,7 @@ func TestMigrateLint(t *testing.T) {
 				Method: request.Method,
 			})
 			switch request.URL.Path {
-			case "/repos/ariga/test-repository/issues/42/comments":
+			case "/repos/test-owner/test-repository/issues/42/comments":
 				if request.Method == http.MethodGet {
 					comments := `[
 						{"id": 123, "body": "first awesome comment"},
@@ -410,14 +415,14 @@ func TestMigrateLint(t *testing.T) {
 					require.Regexp(t, commentRegex, payload.Body)
 					writer.WriteHeader(http.StatusCreated)
 				}
-			case "/repos/ariga/test-repository/issues/comments/789":
+			case "/repos/test-owner/test-repository/issues/comments/789":
 				require.Regexp(t, commentRegex, payload.Body)
 			}
 		}))
 		tt.env["GITHUB_API_URL"] = ghMock.URL
+		tt.env["GITHUB_REPOSITORY"] = "test-owner/test-repository"
 		tt.setEvent(t, `{
-			"number": 42,
-			"repository": { "name": "test-repository" }
+			"number": 42
 		}`)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.env["GITHUB_TOKEN"] = "very-secret-gh-token"
