@@ -396,7 +396,7 @@ func TestMigrateLint(t *testing.T) {
 				Method: request.Method,
 			})
 			switch request.URL.Path {
-			case "/repos/ariga/test-repository/issues/42/comments":
+			case "/repos/test-owner/test-repository/issues/42/comments":
 				if request.Method == http.MethodGet {
 					comments := `[
 						{"id": 123, "body": "first awesome comment"},
@@ -410,14 +410,14 @@ func TestMigrateLint(t *testing.T) {
 					require.Regexp(t, commentRegex, payload.Body)
 					writer.WriteHeader(http.StatusCreated)
 				}
-			case "/repos/ariga/test-repository/issues/comments/789":
+			case "/repos/test-owner/test-repository/issues/comments/789":
 				require.Regexp(t, commentRegex, payload.Body)
 			}
 		}))
 		tt.env["GITHUB_API_URL"] = ghMock.URL
+		tt.env["GITHUB_REPOSITORY"] = "test-owner/test-repository"
 		tt.setEvent(t, `{
-			"number": 42,
-			"repository": { "name": "test-repository" }
+			"number": 42
 		}`)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("github-token", "very-secret-gh-token")
