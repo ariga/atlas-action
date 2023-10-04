@@ -278,9 +278,13 @@ func createContext(act *githubactions.Action) (*ContextInput, error) {
 	if err != nil {
 		return nil, err
 	}
+	branch := ghContext.HeadRef
+	if branch == "" {
+		branch = ghContext.RefName
+	}
 	return &ContextInput{
 		Repo:   ghContext.Repository,
-		Branch: ghContext.RefName,
+		Branch: branch,
 		Commit: ghContext.SHA,
 		Path:   act.GetInput("dir"),
 		URL:    ev.HeadCommit.URL,
