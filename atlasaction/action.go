@@ -207,7 +207,10 @@ func (g *githubAPI) getIssueComments(id int, repo, authToken string) ([]githubIs
 	defer res.Body.Close()
 	buf, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading PR issue comments from %v/%v, %v", repo, id, err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %v when calling GitHub API", res.StatusCode)
 	}
 	var comments []githubIssueComment
 	if err = json.Unmarshal(buf, &comments); err != nil {
