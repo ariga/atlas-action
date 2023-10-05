@@ -352,8 +352,8 @@ func TestMigrateLint(t *testing.T) {
 		require.NoError(t, err)
 		lines := strings.Split(string(c), "\n")
 		expectedLines := []string{
-			`# Atlas Lint Report`,
-			`<div>Analyzed <strong>test-dir-slug</strong> <img src="https://release.ariga.io/images/assets/error.svg"/> </div><br>`,
+			`# Atlas Lint Report <img src="https://release.ariga.io/images/assets/error.svg"/>`,
+			`<div>Analyzed <strong>test-dir-slug</strong></div><br>`,
 			`<strong>Lint report <a href="https://migration-lint-report-url">available here</a></strong>`,
 			"",
 		}
@@ -371,8 +371,8 @@ func TestMigrateLint(t *testing.T) {
 		require.NoError(t, err)
 		lines := strings.Split(string(c), "\n")
 		expectedLines := []string{
-			`# Atlas Lint Report`,
-			`<div>Analyzed <strong>test-dir-slug</strong> <img src="https://release.ariga.io/images/assets/success.svg"/> </div><br>`,
+			`# Atlas Lint Report <img src="https://release.ariga.io/images/assets/success.svg"/>`,
+			`<div>Analyzed <strong>test-dir-slug</strong></div><br>`,
 			`<strong>Lint report <a href="https://migration-lint-report-url">available here</a></strong>`,
 			"",
 		}
