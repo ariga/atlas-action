@@ -145,9 +145,9 @@ func publishResult(url string, err error, act *githubactions.Action) error {
 	}
 	icon := fmt.Sprintf(`<img src="https://release.ariga.io/images/assets/%v.svg"/>`, status)
 	dirName := act.GetInput("dir-name")
-	summary := fmt.Sprintf(`# Atlas Lint Report
-<div>Analyzed <strong>%v</strong> %v </div><br>
-<strong>Lint report <a href=%q>available here</a></strong>`, dirName, icon, url)
+	summary := fmt.Sprintf(`## Atlas Lint Report %v
+<div>Analyzed <strong>%v</strong></div><br>
+<strong>Lint report <a href=%q>available here</a></strong>`, icon, dirName, url)
 	act.AddStepSummary(summary)
 	g := githubAPI{
 		baseURL: ghContext.APIURL,
@@ -157,7 +157,7 @@ func publishResult(url string, err error, act *githubactions.Action) error {
 		return nil
 	}
 	ghToken := act.Getenv("GITHUB_TOKEN")
-  comments, err := g.getIssueComments(prNumber, ghContext.Repository, ghToken)
+	comments, err := g.getIssueComments(prNumber, ghContext.Repository, ghToken)
 	if err != nil {
 		return err
 	}
