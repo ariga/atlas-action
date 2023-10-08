@@ -155,6 +155,8 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 Lint migration changes with Atlas
 
+#### Inputs
+
 All inputs are optional as they may be specified in the Atlas configuration file.
 
 * `dir` - The URL of the migration directory to lint.  For example: `file://migrations`.
