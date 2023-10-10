@@ -78,6 +78,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v3
         with:
