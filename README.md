@@ -127,7 +127,7 @@ jobs:
       - uses: ariga/atlas-action/migrate/apply@v1
         with:
           url: 'mysql://user:${{ secrets.DB_PASSWORD }}@db.hostname.io:3306/db'
-          dir: 'atlas://my-project:latest' # A directory stored in Atlas Cloud
+          dir: 'atlas://my-project' # A directory stored in Atlas Cloud, use ?tag=<tag> to specify a tag
 ```
 
 This example workflow shows how to configure a deployment pipeline for your database schema. 
