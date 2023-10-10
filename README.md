@@ -43,7 +43,9 @@ atlas login
 After logging in, push your migration directory to Atlas Cloud:
 
 ```bash
+atlas migrate push --dev-url docker://mysql/8/dev --dir-name my-project
 ```
+
 For a more detailed guide, see the [documentation](https://atlasgo.io/versioned/intro#pushing-migrations-to-atlas).
 
 Finally, you will need an API token to use the Atlas GitHub Actions.  To create a token, see 
