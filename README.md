@@ -16,7 +16,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/lint](#migrate-lint)   | Lint migrations                                         |
 | [ariga/atlas-action/migrate/apply](#migrate-apply) | Apply migrations to a database                          |
 
-## Example
+## Examples
 
 The Atlas GitHub Actions can be composed into workflows to create CI/CD pipelines for your database schema.
 Workflows will normally begin with the `setup-atlas` action, which will install the Atlas CLI and optionally
@@ -28,15 +28,34 @@ This example workflow shows how to configure a CI/CD pipeline for your database 
 verify the safety of your schema changes when in a pull request and push migrations to Atlas Cloud when
 merged into the main branch.
 
+#### Quick Setup: Using the `gh` CLI
+
+If you have the [gh](https://cli.github.com/) CLI installed, you can use the following command to
+setup a workflow for your repository:
+
+```bash
+gh extension install ariga/gh-atlas
+gh auth refresh -s write:packages,workflow
+gh atlas init-action
+```
+
+This will create a new workflow in your repository, which will run on every push to the your mainline branch.
+You can customize the workflow by editing the `.github/workflows/ci-atlas.yml` file.
+
+
+#### Manual Setup: Create a workflow
+
+Create a new file named `.github/workflows/atlas-ci.yaml` with the following contents:
+
 ```yaml
 name: Atlas CI/CD
 on:
   push:
     branches:
-      - master
+      - master # Use your main branch here.
   pull_request:
     paths:
-      - 'migrations/*'
+      - 'migrations/*' # Use the path to your migration directory here.
 # Permissions to write comments on the pull request.
 permissions:
   contents: read
@@ -76,8 +95,7 @@ jobs:
         with:
           dir: 'file://migrations'
           dir-name: 'my-project' 
-          dev-url: 'mysql://root:pass@mysql:3306/dev' # Use the service name "mysql" as the hostname
-          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+          dev-url: 'mysql://root:pass@localhost:3306/dev' # Use the service name "mysql" as the hostname
 ```
 
 This example uses a MySQL database, but you can use any database supported by Atlas.  
