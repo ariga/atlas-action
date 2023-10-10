@@ -22,6 +22,33 @@ The Atlas GitHub Actions can be composed into workflows to create CI/CD pipeline
 Workflows will normally begin with the `setup-atlas` action, which will install the Atlas CLI and optionally
 login to Atlas Cloud. Followed by whatever actions you need to run, such as `migrate lint` or `migrate apply`.
 
+### Pre-requisites
+
+The following examples require you to have an Atlas Cloud account and a push an initial version of your
+migration directory. 
+
+To create an account, first download the Atlas CLI (on Linux/macOS):
+
+```bash
+curl -sSL https://atlasgo.io/install | sh
+```
+For more installation options, see the [documentation](https://atlasgo.io/getting-started#installation).
+
+Then, create an account by running the following command and following the instructions:
+
+```bash
+atlas login
+```
+
+After logging in, push your migration directory to Atlas Cloud:
+
+```bash
+```
+For a more detailed guide, see the [documentation](https://atlasgo.io/versioned/intro#pushing-migrations-to-atlas).
+
+Finally, you will need an API token to use the Atlas GitHub Actions.  To create a token, see 
+the [docs](https://atlasgo.io/cloud/bots).
+
 ### Continuous Integration and Delivery
 
 This example workflow shows how to configure a CI/CD pipeline for your database schema. The workflow will
@@ -39,13 +66,13 @@ gh auth refresh -s write:packages,workflow
 gh atlas init-action
 ```
 
-This will create a new workflow in your repository, which will run on every push to the your mainline branch.
-You can customize the workflow by editing the `.github/workflows/ci-atlas.yml` file.
-
+This will create a pull request with a workflow that will run `migrate lint` on pull requests and
+`migrate push` on the main branch.  You can customize the workflow by editing the generated
+`.github/workflows/atlas-ci.yaml` file.
 
 #### Manual Setup: Create a workflow
 
-Create a new file named `.github/workflows/atlas-ci.yaml` with the following contents:
+Create a new file named `.github/workflows/atlas.yaml` with the following contents:
 
 ```yaml
 name: Atlas CI/CD
