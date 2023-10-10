@@ -2,7 +2,7 @@
 
 This repository contains GitHub Actions for working with [Atlas](https://atlasgo.io).
 
-If you are looking for the old TypeScript-based action, please see the old [README](doc/typescript-action.md). 
+> If you are looking for the old TypeScript-based action, please see the old [README](doc/typescript-action.md). 
 
 To learn more about the recommended way to build workflows, read our guide on 
 [Modern CI/CD for Databases](https://atlasgo.io/guides/modern-database-ci-cd).
@@ -171,7 +171,21 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 ### `ariga/atlas-action/migrate/lint`
 
-TODO
+Lint migration changes with Atlas
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `dir` - The URL of the migration directory to lint.  For example: `file://migrations`.
+  Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+* `dir-name` - The name of the project in Atlas Cloud.
+* `dev-url` - The URL of the dev-database to use for analysis.  For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).description: The migration directory URL (i.e file://path/to/migrations)
+* `config` The path to the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` The environment to use from the Atlas configuration file.  For example, `dev`.
 
 ### `ariga/atlas-action/migrate/apply`
 
