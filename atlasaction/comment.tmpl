@@ -14,7 +14,7 @@
                 <img src="https://release.ariga.io/images/assets/success.svg"/>
             </td>
             <td>
-                {{ .FilesCount }} new migration file{{ if ne .FilesCount 1 }}s{{ end }} detected.
+                {{ .FilesCount }} new migration file{{ if ne .FilesCount 1 }}s{{ end }} detected
             </td>
             <td>&nbsp;</td>
         </tr>
@@ -23,7 +23,7 @@
                 <img src="https://release.ariga.io/images/assets/success.svg"/>
             </td>
             <td>
-                ERD and Visual Diff generated.
+                ERD and Visual Diff generated
             </td>
             <td>
                 <a href="{{ .URL }}#erd">View Visualization</a>
@@ -35,7 +35,7 @@
                 <img src="https://release.ariga.io/images/assets/warning.svg"/>
             </td>
             <td>
-                {{ . }} issue{{ if gt . 1}}s{{ end }} found.
+                {{ . }} issue{{ if gt . 1}}s{{ end }} found
             </td>
             {{- else}}
             <td>
