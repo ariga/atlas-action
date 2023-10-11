@@ -1,0 +1,57 @@
+`atlas migrate lint` results:
+
+<table>
+    <thead>
+        <tr>
+            <th></th>
+            <th>Step</th>
+            <th>Link</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <img src="https://release.ariga.io/images/assets/success.svg"/>
+            </td>
+            <td>
+                {{ .FilesCount }} new migration file{{ if ne .FilesCount 1 }}s{{ end }} detected
+            </td>
+            <td>&nbsp;</td>
+        </tr>
+        <tr>
+            <td>
+                <img src="https://release.ariga.io/images/assets/success.svg"/>
+            </td>
+            <td>
+                ERD and Visual Diff generated
+            </td>
+            <td>
+                <a href="{{ .URL }}#erd">View Visualization</a>
+            </td>
+        </tr>
+        <tr>
+            {{- with .DiagnosticsCount }}
+            <td>
+                <img src="https://release.ariga.io/images/assets/warning.svg"/>
+            </td>
+            <td>
+                {{ . }} issue{{ if gt . 1}}s{{ end }} found
+            </td>
+            {{- else}}
+            <td>
+                <img src="https://release.ariga.io/images/assets/success.svg"/>
+            </td>
+            <td>
+                No issues found.
+            </td>
+            {{- end }}
+            <td>
+                <a href="{{ .URL }}">Full Report</a>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<hr/>
+
+*Migrations automatically reviewed with [Atlas](https://atlasgo.io)*
