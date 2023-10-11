@@ -1,14 +1,58 @@
-```
-✅ {{ .FilesCount }} new file{{ if ne .FilesCount 1 }}s{{ end }} detected.
-{{- with .DiagnosticsCount }}
-⚠️ {{ . }} issue{{ if gt . 1}}s{{ end }} found.
-{{- else }}
-✅ No issues found.
-{{- end }}
-```
+<table>
+    <thead>
+        <tr>
+            <th></th>
+            <th>Step</th>
+            <th>Link</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <img src="https://release.ariga.io/images/assets/success.svg"/>
+            </td>
+            <td>
+                {{ .FilesCount }} new migration file{{ if ne .FilesCount 1 }}s{{ end }} detected.
+            </td>
+            <td>&nbsp;</td>
+        </tr>
+        <tr>
+            <td>
+                <img src="https://release.ariga.io/images/assets/success.svg"/>
+            </td>
+            <td>
+                ERD and Visual Diff generated.
+            </td>
+            <td>
+                <a href="{{ .URL }}#erd">ERD</a> / <a href="{{ .URL }}#visual-diff">View</a>
+            </td>
+        </tr>
+        <tr>
+            {{ with .DiagnosticsCount }}
+            <td>
+                <img src="https://release.ariga.io/images/assets/warning.svg"/>
+            </td>
+            <td>
+                {{ . }} issue{{ if gt . 1}}s{{ end }} found.
+            </td>
+            {{ else}}
+            <td>
+                <img src="https://release.ariga.io/images/assets/success.svg"/>
+            </td>
+            <td>
+                No issues found.
+            </td>
+            {{ end }}
+            <td>
+                <a href="{{ .URL }}">Full Report</a>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
 
 [Full Report]({{ .URL }})
-[ERD / Visual Diff]({{ .URL }}#erd)
 
 <hr/>
-Migrations scanned with [Atlas](https://atlasgo.io):
+
+**Migrations automatically scanned with [Atlas](https://atlasgo.io).**

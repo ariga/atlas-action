@@ -351,8 +351,8 @@ func TestMigrateLint(t *testing.T) {
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
 		sum := string(c)
-		require.Contains(t, sum, "✅ 2 new files detected.")
-		require.Contains(t, sum, "⚠️ 1 issue found.")
+		require.Contains(t, sum, "2 new migration files detected.")
+		require.Contains(t, sum, "1 issue found.")
 		require.Contains(t, sum, "[Full Report](https://migration-lint-report-url)")
 	})
 	t.Run("lint summary - lint success", func(t *testing.T) {
@@ -366,8 +366,8 @@ func TestMigrateLint(t *testing.T) {
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
 		sum := string(c)
-		require.Contains(t, sum, "✅ 1 new file detected.")
-		require.Contains(t, sum, "✅ No issues found.")
+		require.Contains(t, sum, "1 new migration file detected.")
+		require.Contains(t, sum, "No issues found.")
 		require.Contains(t, sum, "[Full Report](https://migration-lint-report-url)")
 	})
 	t.Run("lint comment", func(t *testing.T) {
