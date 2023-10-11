@@ -48,7 +48,7 @@ atlas migrate push --dev-url docker://mysql/8/dev --dir-name my-project
 
 For a more detailed guide, see the [documentation](https://atlasgo.io/versioned/intro#pushing-migrations-to-atlas).
 
-Finally, you will need an API token to use the Atlas GitHub Actions.  To create a token, see 
+Finally, you will need an API token to use the Atlas GitHub Actions. To create a token, see 
 the [docs](https://atlasgo.io/cloud/bots).
 
 ### Continuous Integration and Delivery
