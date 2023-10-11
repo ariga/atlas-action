@@ -28,28 +28,27 @@
             </td>
         </tr>
         <tr>
-            {{ with .DiagnosticsCount }}
+            {{- with .DiagnosticsCount }}
             <td>
                 <img src="https://release.ariga.io/images/assets/warning.svg"/>
             </td>
             <td>
                 {{ . }} issue{{ if gt . 1}}s{{ end }} found.
             </td>
-            {{ else}}
+            {{- else}}
             <td>
                 <img src="https://release.ariga.io/images/assets/success.svg"/>
             </td>
             <td>
                 No issues found.
             </td>
-            {{ end }}
+            {{- end }}
             <td>
                 <a href="{{ .URL }}">Full Report</a>
             </td>
         </tr>
     </tbody>
 </table>
-
 
 [Full Report]({{ .URL }})
 
