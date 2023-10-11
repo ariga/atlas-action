@@ -172,7 +172,7 @@ For more examples, see the [documentation](https://atlasgo.io/integrations/githu
 Setup the Atlas CLI and optionally login to Atlas Cloud.
 
 #### Inputs
-* `cloud-token` - (Optional) The Atlas Cloud token to use for authentication.  To create
+* `cloud-token` - (Optional) The Atlas Cloud token to use for authentication. To create
    a cloud token see the [docs](https://atlasgo.io/cloud/bots).
 * `version` - (Optional) The version of the Atlas CLI to install.  Defaults to the latest
    version.
