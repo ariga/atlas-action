@@ -69,7 +69,7 @@ gh atlas init-action
 ```
 
 This will create a pull request with a workflow that will run `migrate lint` on pull requests and
-`migrate push` on the main branch.  You can customize the workflow by editing the generated
+`migrate push` on the main branch. You can customize the workflow by editing the generated
 `.github/workflows/atlas-ci.yaml` file.
 
 #### Manual Setup: Create a workflow
