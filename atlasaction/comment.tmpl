@@ -1,0 +1,14 @@
+```
+✅ {{ .FilesCount }} new file{{ if ne .FilesCount 1 }}s{{ end }} detected.
+{{- with .DiagnosticsCount }}
+⚠️ {{ . }} issue{{ if gt . 1}}s{{ end }} found.
+{{- else }}
+✅ No issues found.
+{{- end }}
+```
+
+[Full Report]({{ .URL }})
+[ERD / Visual Diff]({{ .URL }}#erd)
+
+<hr/>
+Migrations scanned with [Atlas](https://atlasgo.io):
