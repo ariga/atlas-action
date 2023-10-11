@@ -191,7 +191,7 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `dev-url` - The URL of the dev-database to use for analysis.  For example: `mysql://root:pass@localhost:3306/dev`.
    Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 * `tag` - The tag to apply to the migration directory.  By default the current git commit hash is used.
-* `config` The path to the Atlas configuration file.  By default, Atlas will look for a file
+* `config` The path to the Atlas configuration file. By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
 * `env` The environment to use from the Atlas configuration file.  For example, `dev`.
