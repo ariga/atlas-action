@@ -44,7 +44,7 @@
                 <img src="https://release.ariga.io/images/assets/warning.svg"/>
             </td>
             <td>
-                {{ . }} issue{{ if gt . 1}}s{{ end }} found
+                {{ . }} issue{{ if gt .DiagnosticsCount 1}}s{{ end }} found
             </td>
             {{- else}}
             <td>
