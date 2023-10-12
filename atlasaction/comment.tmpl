@@ -14,7 +14,7 @@
                 <img src="https://release.ariga.io/images/assets/success.svg"/>
             </td>
             <td>
-                {{ $fileCount := len .Files }}
+                {{- $fileCount := len .Files }}
                 {{ $fileCount }} new migration file{{ if ne $fileCount 1 }}s{{ end }} detected
             </td>
             <td>&nbsp;</td>
@@ -31,7 +31,7 @@
             </td>
         </tr>
         <tr>
-            {{ $errCount := fileErrors .}}
+            {{- $errCount := fileErrors .}}
             {{- if gt $errCount 0 }}
             <td>
                 <img src="https://release.ariga.io/images/assets/error.svg"/>
