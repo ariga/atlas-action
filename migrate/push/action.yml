@@ -1,26 +1,35 @@
 name: "Migrate Push"
-description: "Pushes the migration directory to Atlas Cloud"
+description: "Push the current version of your migration directory to Atlas Cloud."
 branding:
   icon: database
 author: "Ariga"
 inputs:
   dir:
-    description: The migration directory URL (i.e file://path/to/migrations).
+    description: |
+      The URL of the migration directory to push.  For example: `file://migrations`.
+      Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
     required: false
   dir-name:
-    description: Target migration directory name (slug).
+    description: The name (slug) of the project in Atlas Cloud.
     required: false
   dev-url:
-    description: The development DB URL using atlas URL format [driver://username:password@address/dbname?param=value].
+    description: |
+      The URL of the dev-database to use for analysis.  For example: `mysql://root:pass@localhost:3306/dev`.
+      Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
     required: false
   tag:
-    description: The tag of the specific version of the migration directory.
+    description: |
+      The tag to apply to the pushed migration directory.  By default the
+      current git commit hash is used.
     required: false
   config:
-    description: The url of the configuration.
+    description: |
+      The path to the Atlas configuration file. By default, Atlas will look for a file
+      named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+      Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
     required: false
   env:
-    description: The environment to use with the configuration file.
+    description: The environment to use from the Atlas configuration file.  For example, `dev`.
     required: false
 runs:
   using: node20

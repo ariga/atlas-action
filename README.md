@@ -187,14 +187,14 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 * `dir` - The URL of the migration directory to push.  For example: `file://migrations`.
    Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
-* `dir-name` - The name of the project in Atlas Cloud.  
+* `dir-name` - The name (slug) of the project in Atlas Cloud.  
 * `dev-url` - The URL of the dev-database to use for analysis.  For example: `mysql://root:pass@localhost:3306/dev`.
    Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
-* `tag` - The tag to apply to the migration directory.  By default the current git commit hash is used.
-* `config` The path to the Atlas configuration file. By default, Atlas will look for a file
+* `tag` - The tag to apply to the pushed migration directory.  By default the current git commit hash is used.
+* `config` - The path to the Atlas configuration file. By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-* `env` The environment to use from the Atlas configuration file.  For example, `dev`.
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
 
 #### Outputs
 
@@ -210,13 +210,18 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 * `dir` - The URL of the migration directory to lint.  For example: `file://migrations`.
   Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
-* `dir-name` - The name of the project in Atlas Cloud.
+* `dir-name` - The name (slug) of the project in Atlas Cloud.
 * `dev-url` - The URL of the dev-database to use for analysis.  For example: `mysql://root:pass@localhost:3306/dev`.
-  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).description: The migration directory URL (i.e file://path/to/migrations)
-* `config` The path to the Atlas configuration file.  By default, Atlas will look for a file
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+* `config` - The path to the Atlas configuration file.  By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-* `env` The environment to use from the Atlas configuration file.  For example, `dev`.
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+
+#### Outputs
+
+* `url` - The URL of the CI report in Atlas Cloud, containing an ERD visualization 
+   and analysis of the schema migrations.
 
 ### `ariga/atlas-action/migrate/apply`
 
@@ -229,17 +234,17 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `url` - The URL of the target database.  For example: `mysql://root:pass@localhost:3306/dev`.
 * `dir` - The URL of the migration directory to apply.  For example: `atlas://dir-name` for cloud
    based directories or `file://migrations` for local ones.
-* `config` The URL of the Atlas configuration file.  By default, Atlas will look for a file
+* `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects). 
-* `env` The environment to use from the Atlas configuration file.  For example, `dev`.
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
 
 #### Outputs
 
-* `current` - The current version of the database.
+* `current` - The current version of the database. (before applying migrations)
 * `target` - The target version of the database.
 * `pending_count` - The number of migrations that will be applied.
-* `applied_count` - The number of migrations that have been applied.
+* `applied_count` - The number of migrations that were applied.
 
 ### Legal 
 
