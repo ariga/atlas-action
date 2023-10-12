@@ -111,11 +111,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	}
 	var (
 		resp    bytes.Buffer
-		payload struct {
-			URL              string `json:"URL"`
-			DiagnosticsCount int    `json:"DiagnosticsCount"`
-			FilesCount       int    `json:"FilesCount"`
-		}
+		payload atlasexec.SummaryReport
 	)
 	err = client.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
 		DevURL:    act.GetInput("dev-url"),
@@ -126,7 +122,6 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 		Context:   string(buf),
 		Web:       true,
 		Writer:    &resp,
-		Format:    `{"URL": "{{ .URL }}", "DiagnosticsCount": {{ .DiagnosticsCount }}, "FilesCount": {{ len .Files }}}`,
 	})
 	if err != nil && !errors.Is(err, atlasexec.LintErr) {
 		return err
@@ -139,7 +134,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	}
 	dirName := act.GetInput("dir-name")
 	var summary bytes.Buffer
-	if err := comment.Execute(&summary, payload); err != nil {
+	if err := comment.Execute(&summary, &payload); err != nil {
 		return err
 	}
 	if err := publish(act, dirName, summary.String()); err != nil {
@@ -151,10 +146,26 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	return nil
 }
 
+func fileErrors(s *atlasexec.SummaryReport) int {
+	count := 0
+	for _, f := range s.Files {
+		if len(f.Error) > 0 {
+			count++
+		}
+	}
+	return count
+}
+
 var (
 	//go:embed comment.tmpl
 	commentTmpl string
-	comment     = template.Must(template.New("comment").Parse(commentTmpl))
+	comment     = template.Must(
+		template.New("comment").
+			Funcs(template.FuncMap{
+				"fileErrors": fileErrors,
+			}).
+			Parse(commentTmpl),
+	)
 )
 
 // publish writes a comment and summary to the pull request for dirName. It adds a marker
