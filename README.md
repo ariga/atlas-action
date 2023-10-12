@@ -1,61 +1,105 @@
-# atlas-action
+# GitHub Actions for Atlas
 
-A GitHub Action for [Atlas](https://github.com/ariga/atlas).
+This repository contains GitHub Actions for working with [Atlas](https://atlasgo.io).
 
-This action is used for [linting migration directories](https://atlasgo.io/versioned/lint)
-using the `atlas migrate lint` command. This command  validates and analyzes the contents
-of migration directories and generates insights and diagnostics on the selected changes:
+> If you are looking for the old TypeScript-based action, please see the old [README](doc/typescript-action.md). 
 
-* Ensure the migration history can be replayed from any point at time.
-* Protect from unexpected history changes when concurrent migrations are written to the migration directory by
-  multiple team members.
-* Detect whether destructive or irreversible changes have been made or whether they are dependent on tables'
-  contents and can cause a migration failure.
+To learn more about the recommended way to build workflows, read our guide on 
+[Modern CI/CD for Databases](https://atlasgo.io/guides/modern-database-ci-cd).
 
-### Supported directory formats
+## Actions
 
-This action supports analyzing migration directories in formats
-accepted by different schema migration tools:
-* [Atlas](https://atlasgo.io)
-* [golang-migrate](https://github.com/golang-migrate/migrate)
-* [goose](https://github.com/pressly/goose)
-* [dbmate](https://github.com/amacneil/dbmate)
-* [Flyway](https://flywaydb.org/)
-* [Liquibase](https://www.liquibase.org/)
+| Action                                             | Description                                             |
+|----------------------------------------------------|---------------------------------------------------------|
+| [ariga/setup-atlas](#setup-atlas)                  | Setup the Atlas CLI and optionally login to Atlas Cloud |
+| [ariga/atlas-action/migrate/push](#migrate-push)   | Push migrations to Atlas Cloud                          |
+| [ariga/atlas-action/migrate/lint](#migrate-lint)   | Lint migrations                                         |
+| [ariga/atlas-action/migrate/apply](#migrate-apply) | Apply migrations to a database                          |
 
-### Usage
+## Examples
 
-Add `.github/workflows/atlas-ci.yaml` to your repo with the following contents:
+The Atlas GitHub Actions can be composed into workflows to create CI/CD pipelines for your database schema.
+Workflows will normally begin with the `setup-atlas` action, which will install the Atlas CLI and optionally
+login to Atlas Cloud. Followed by whatever actions you need to run, such as `migrate lint` or `migrate apply`.
+
+### Pre-requisites
+
+The following examples require you to have an Atlas Cloud account and a push an initial version of your
+migration directory. 
+
+To create an account, first download the Atlas CLI (on Linux/macOS):
+
+```bash
+curl -sSL https://atlasgo.io/install | sh
+```
+For more installation options, see the [documentation](https://atlasgo.io/getting-started#installation).
+
+Then, create an account by running the following command and following the instructions:
+
+```bash
+atlas login
+```
+
+After logging in, push your migration directory to Atlas Cloud:
+
+```bash
+atlas migrate push --dev-url docker://mysql/8/dev --dir-name my-project
+```
+
+For a more detailed guide, see the [documentation](https://atlasgo.io/versioned/intro#pushing-migrations-to-atlas).
+
+Finally, you will need an API token to use the Atlas GitHub Actions. To create a token, see 
+the [docs](https://atlasgo.io/cloud/bots).
+
+### Continuous Integration and Delivery
+
+This example workflow shows how to configure a CI/CD pipeline for your database schema. The workflow will
+verify the safety of your schema changes when in a pull request and push migrations to Atlas Cloud when
+merged into the main branch.
+
+#### Quick Setup: Using the `gh` CLI
+
+If you have the [gh](https://cli.github.com/) CLI installed, you can use the following command to
+setup a workflow for your repository:
+
+```bash
+gh extension install ariga/gh-atlas
+gh auth refresh -s write:packages,workflow
+gh atlas init-action
+```
+
+This will create a pull request with a workflow that will run `migrate lint` on pull requests and
+`migrate push` on the main branch. You can customize the workflow by editing the generated
+`.github/workflows/atlas-ci.yaml` file.
+
+#### Manual Setup: Create a workflow
+
+Create a new file named `.github/workflows/atlas.yaml` with the following contents:
 
 ```yaml
-name: Atlas CI
+name: Atlas CI/CD
 on:
-  # Run whenever code is changed in the master branch,
-  # change this to your root branch.
   push:
     branches:
-      - master
-  # Run on PRs where something changed under the `path/to/migration/dir/` directory.
+      - master # Use your main branch here.
   pull_request:
     paths:
-      - 'path/to/migration/dir/*'
+      - 'migrations/*' # Use the path to your migration directory here.
 # Permissions to write comments on the pull request.
 permissions:
   contents: read
   pull-requests: write
 jobs:
-  lint:
+  atlas:
     services:
-      # Spin up a mysql:8.0.29 container to be used as the dev-database for analysis.
-      # If you use a different database, change the image configuration and update
-      # the `dev-url` configuration below.
+      # Spin up a mysql:8 container to be used as the dev-database for analysis.
       mysql:
-        image: mysql:8.0.29
+        image: mysql:8
         env:
+          MYSQL_DATABASE: dev
           MYSQL_ROOT_PASSWORD: pass
-          MYSQL_DATABASE: test
         ports:
-          - "3306:3306"
+          - 3306:3306
         options: >-
           --health-cmd "mysqladmin ping -ppass"
           --health-interval 10s
@@ -63,70 +107,141 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v3.0.1
+      - uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Mandatory unless "latest" is set below.
-      - uses: ariga/atlas-action@v0
+          fetch-depth: 0
+      - uses: ariga/setup-atlas@v0
         with:
-          dir: path/to/migrations
-          dir-format: atlas
-          dev-url: mysql://root:pass@localhost:3306/test
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+      - uses: ariga/atlas-action/migrate/lint@v1
+        with:
+          dir: 'file://migrations'
+          dir-name: 'my-project' # The name of the project in Atlas Cloud
+          dev-url: "mysql://root:pass@localhost:3306/dev"
+      - uses: ariga/atlas-action/migrate/push@v1
+        if: github.ref == 'refs/heads/master'
+        with:
+          dir: 'file://migrations'
+          dir-name: 'my-project' 
+          dev-url: 'mysql://root:pass@localhost:3306/dev' # Use the service name "mysql" as the hostname
 ```
 
-### Configuration
+This example uses a MySQL database, but you can use any database supported by Atlas.  
+For more examples, see the [documentation](https://atlasgo.io/integrations/github-actions).
 
-Configure the action by passing input parameters in the `with:` block.
+### Continuous Deployment
 
-#### `config-path`
+This example workflow shows how to configure a continuous deployment pipeline for your database schema. The workflow will
+apply migrations on the target database whenever a new commit is pushed to the main branch.
 
-Sets the path to the Atlas configuration file. By default, Atlas will
-look for a file named `atlas.hcl` in the current directory.
-
-#### `config-env`
-
-Sets the environment to use from the Atlas configuration file. 
-
-#### `dir`
-
-Sets the directory that contains the migration scripts to analyze.
-
-#### `dir-format`
-
-Sets the format of the migration directory. Options: `atlas` (default),
-`golang-migrate`, `goose`, `dbmate`, `flyway`, or `liquibase`.
-
-#### `dev-url`
-
-The URL of the dev-database to use for analysis.
-
-* Read about [Atlas URL formats](https://atlasgo.io/concepts/url)
-* Read about [dev-databases](https://atlasgo.io/concepts/dev-database)
-
-#### `latest`
-
-Use the `latest` mode to decide which files to analyze. By default,
-Atlas will use `git-base` to analyze any files that are present in the
-diff between the base branch and the current.
-
-Unless this option is set, the base branch (`master`/`main`/etc) must
-be checked out locally or you will see an error such as:
-```
-Atlas failed with code 1: Error: git diff: exit status 128
+```yaml
+name: Atlas Continuous Deployment
+on:
+  push:
+    branches:
+      - master
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+      - uses: ariga/atlas-action/migrate/apply@v1
+        with:
+          url: 'mysql://user:${{ secrets.DB_PASSWORD }}@db.hostname.io:3306/db'
+          dir: 'atlas://my-project' # A directory stored in Atlas Cloud, use ?tag=<tag> to specify a tag
 ```
 
-### `cloud-token`
+This example workflow shows how to configure a deployment pipeline for your database schema. 
+This workflow will pull the most recent version of your migration directory from Atlas Cloud
+and apply it to the target database.
 
-Connect the action to [Atlas Cloud](https://atlasgo.cloud/) to get access to more analyzers,
-entity relationship diagrams (ERDs) of your schema, and full CI reports.
-Generate the token from within Atlas Cloud by creating a CI Bot. Read the full tutorial
-[here](https://atlasgo.io/cloud/getting-started#connecting-to-the-atlas-github-action).
+For more examples, see the [documentation](https://atlasgo.io/integrations/github-actions).
 
-![atlas-cloud](https://atlasgo.io/uploads/images/issues-found-ci.png)
+## API 
 
-The full list of input options can be found in [action.yml](action.yml).
+### `ariga/setup-atlas`
 
-### Legal
+Setup the Atlas CLI and optionally login to Atlas Cloud.
+
+#### Inputs
+* `cloud-token` - (Optional) The Atlas Cloud token to use for authentication. To create
+   a cloud token see the [docs](https://atlasgo.io/cloud/bots).
+* `version` - (Optional) The version of the Atlas CLI to install.  Defaults to the latest
+   version.
+
+### `ariga/atlas-action/migrate/push` 
+
+Push the current version of your migration directory to Atlas Cloud.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `dir` - The URL of the migration directory to push.  For example: `file://migrations`.
+   Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+* `dir-name` - The name of the project in Atlas Cloud.  
+* `dev-url` - The URL of the dev-database to use for analysis.  For example: `mysql://root:pass@localhost:3306/dev`.
+   Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+* `tag` - The tag to apply to the migration directory.  By default the current git commit hash is used.
+* `config` The path to the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` The environment to use from the Atlas configuration file.  For example, `dev`.
+
+#### Outputs
+
+* `url` - The URL of the migration directory in Atlas Cloud, containing an ERD visualization of the schema.
+
+### `ariga/atlas-action/migrate/lint`
+
+Lint migration changes with Atlas
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `dir` - The URL of the migration directory to lint.  For example: `file://migrations`.
+  Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+* `dir-name` - The name of the project in Atlas Cloud.
+* `dev-url` - The URL of the dev-database to use for analysis.  For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).description: The migration directory URL (i.e file://path/to/migrations)
+* `config` The path to the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` The environment to use from the Atlas configuration file.  For example, `dev`.
+
+### `ariga/atlas-action/migrate/apply`
+
+Apply migrations to a database.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `url` - The URL of the target database.  For example: `mysql://root:pass@localhost:3306/dev`.
+* `dir` - The URL of the migration directory to apply.  For example: `atlas://dir-name` for cloud
+   based directories or `file://migrations` for local ones.
+* `config` The URL of the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects). 
+* `env` The environment to use from the Atlas configuration file.  For example, `dev`.
+
+#### Outputs
+
+* `current` - The current version of the database.
+* `target` - The target version of the database.
+* `pending_count` - The number of migrations that will be applied.
+* `applied_count` - The number of migrations that have been applied.
+
+### Legal 
 
 The source code for this GitHub Action is released under the Apache 2.0
 License, see [LICENSE](LICENSE).
