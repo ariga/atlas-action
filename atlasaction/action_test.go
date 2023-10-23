@@ -353,7 +353,7 @@ func TestMigrateLint(t *testing.T) {
 		sum := string(c)
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 error found")
-		require.Contains(t, sum, `<a href="https://migration-lint-report-url">`)
+		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank>`)
 	})
 	t.Run("lint summary - with diagnostics", func(t *testing.T) {
 		tt := newT(t)
@@ -368,7 +368,7 @@ func TestMigrateLint(t *testing.T) {
 		sum := string(c)
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 issue found")
-		require.Contains(t, sum, `<a href="https://migration-lint-report-url">`)
+		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank>`)
 	})
 	t.Run("lint summary - lint success", func(t *testing.T) {
 		tt := newT(t)
@@ -383,7 +383,7 @@ func TestMigrateLint(t *testing.T) {
 		sum := string(c)
 		require.Contains(t, sum, "1 new migration file detected")
 		require.Contains(t, sum, "No issues found")
-		require.Contains(t, sum, `<a href="https://migration-lint-report-url">`)
+		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank>`)
 	})
 	t.Run("lint comment", func(t *testing.T) {
 		tt := newT(t)
