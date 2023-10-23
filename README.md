@@ -9,12 +9,12 @@ To learn more about the recommended way to build workflows, read our guide on
 
 ## Actions
 
-| Action                                             | Description                                             |
-|----------------------------------------------------|---------------------------------------------------------|
-| [ariga/setup-atlas](#setup-atlas)                  | Setup the Atlas CLI and optionally login to Atlas Cloud |
-| [ariga/atlas-action/migrate/push](#migrate-push)   | Push migrations to Atlas Cloud                          |
-| [ariga/atlas-action/migrate/lint](#migrate-lint)   | Lint migrations                                         |
-| [ariga/atlas-action/migrate/apply](#migrate-apply) | Apply migrations to a database                          |
+| Action                                                             | Description                                             |
+|--------------------------------------------------------------------|---------------------------------------------------------|
+| [ariga/setup-atlas](#arigasetup-atlas)                             | Setup the Atlas CLI and optionally login to Atlas Cloud |
+| [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)   | Push migrations to Atlas Cloud                          |
+| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)   | Lint migrations                                         |
+| [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply) | Apply migrations to a database                          |
 
 ## Examples
 
