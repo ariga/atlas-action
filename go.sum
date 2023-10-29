@@ -2,6 +2,8 @@ ariga.io/atlas v0.14.3-0.20231010104048-0c071bfc9161 h1:xZS2wAf1AzRNA/8iD2LTAXtI
 ariga.io/atlas v0.14.3-0.20231010104048-0c071bfc9161/go.mod h1:isZrlzJ5cpoCoKFoY9knZug7Lq4pP1cm8g3XciLZ0Pw=
 ariga.io/atlas-go-sdk v0.1.1-0.20231011100517-4211cc50a84f h1:YWtJlZtSFaA7icHjp+G1cYDQFm3YTFO1MDK4nOGBc4s=
 ariga.io/atlas-go-sdk v0.1.1-0.20231011100517-4211cc50a84f/go.mod h1:c6Bbo/9k/0wayKliwknVwkfA39KQ0UYgIrNidCaETZo=
+ariga.io/atlas-go-sdk v0.1.1-0.20231029150106-1927c56b057b h1:pFSDzqE7YU7S8+fRnkiycFXCe39hpLALr2fgYhxjzAQ=
+ariga.io/atlas-go-sdk v0.1.1-0.20231029150106-1927c56b057b/go.mod h1:owkEEXw6jqne5KPVDfKsYB7cwMiMk3jtOiAAeKxS/yU=
 ariga.io/atlas/cmd/atlas v0.13.2-0.20231010104048-0c071bfc9161 h1:p1BMfuWE2Wy2PajTxosQkBvaUT8viCRNR1dnuk9Fskc=
 ariga.io/atlas/cmd/atlas v0.13.2-0.20231010104048-0c071bfc9161/go.mod h1:WgoPPWIlF+p6jswdiCWlsVOS7c6g+uTJ9FqYqTZ/C1U=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
