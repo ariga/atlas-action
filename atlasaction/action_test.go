@@ -54,7 +54,7 @@ func TestMigrateApply(t *testing.T) {
 
 		// The error here proves that the tx-mode was passed to atlasexec, which
 		// is what we want to test.
-		exp := `unknown tx-mode \"fake\"`
+		exp := `unknown tx-mode "fake"`
 		require.ErrorContains(t, err, exp)
 		m, err := tt.outputs()
 		require.NoError(t, err)
