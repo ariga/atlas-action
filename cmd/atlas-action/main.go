@@ -23,13 +23,15 @@ const (
 
 var cli RunAction
 
+var Version string
+
 func main() {
 	action := githubactions.New()
 	c, err := atlasexec.NewClient("", "atlas")
 	if err != nil {
 		action.Fatalf("Failed to create client: %s", err)
 	}
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), atlasaction.VersionContextKey, Version)
 	cli := kong.Parse(
 		&cli,
 		kong.BindTo(ctx, (*context.Context)(nil)),

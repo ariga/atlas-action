@@ -23,6 +23,8 @@ import (
 	"github.com/sethvargo/go-githubactions"
 )
 
+const VersionContextKey = "ACTION_VERSION"
+
 type (
 	// ContextInput is passed to atlas as a json string to add additional information
 	ContextInput struct {
@@ -32,10 +34,28 @@ type (
 		Commit string `json:"commit"`
 		URL    string `json:"url"`
 	}
+
+	// DeployContextInput is passed to atlas as a json string, describes what triggered this command (e.g., GitHub Action)
+	DeployContextInput struct {
+		TriggerVersion string `json:"triggerVersion,omitempty"`
+		TriggerType    string `json:"triggerType,omitempty"`
+	}
 )
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
+	ver, ok := ctx.Value(VersionContextKey).(string)
+	if !ok {
+		return fmt.Errorf("invalid type of context value for %v, expected string", VersionContextKey)
+	}
+	j, err := json.Marshal(DeployContextInput{
+		TriggerType:    "GITHUB_ACTION",
+		TriggerVersion: ver,
+	})
+	if err != nil {
+		act.SetOutput("error", err.Error())
+		return err
+	}
 	params := &atlasexec.MigrateApplyParams{
 		URL:             act.GetInput("url"),
 		DirURL:          act.GetInput("dir"),
@@ -43,6 +63,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 		Env:             act.GetInput("env"),
 		TxMode:          act.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: act.GetInput("baseline"), // Hidden param.
+		Context:         string(j),
 	}
 	run, err := client.MigrateApply(ctx, params)
 	if err != nil {

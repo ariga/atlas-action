@@ -33,7 +33,7 @@ jobs:
           echo "BINARY_NAME=atlas-action-${{ github.event.inputs.version || 'v1' }}" >> $GITHUB_ENV
       - name: Compile Go Binary
         run: |
-          go build -o $BINARY_NAME ./cmd/atlas-action
+          go build -o $BINARY_NAME -ldflags "-X main.Version=v1" ./cmd/atlas-action
       - name: Configure AWS credentials
         run: |
           aws configure set aws_access_key_id ${{ secrets.RELEASE_AWS_ACCESS_KEY_ID }}
