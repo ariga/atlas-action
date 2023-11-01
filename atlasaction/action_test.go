@@ -183,10 +183,10 @@ func TestMigrateE2E(t *testing.T) {
 			Dir    string `json:"dir"`
 		}
 		syncDir struct {
-			Slug    string        `json:"slug"`
-			Driver  string        `json:"driver"`
-			Dir     string        `json:"dir"`
-			Context *ContextInput `json:"context"`
+			Slug    string                `json:"slug"`
+			Driver  string                `json:"driver"`
+			Dir     string                `json:"dir"`
+			Context *atlasexec.RunContext `json:"context"`
 		}
 		graphQLQuery struct {
 			Query     string          `json:"query"`
@@ -226,7 +226,7 @@ func TestMigrateE2E(t *testing.T) {
 	tt.env["GITHUB_HEAD_REF"] = "testing-branch"
 	tt.env["GITHUB_REF_NAME"] = "refs/pulls/6/merge"
 	tt.env["GITHUB_SHA"] = "sha1234"
-	expected := &ContextInput{
+	expected := &atlasexec.RunContext{
 		Repo:   "repository",
 		Path:   "file://testdata/migrations",
 		Branch: "testing-branch",

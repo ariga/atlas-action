@@ -23,17 +23,6 @@ import (
 	"github.com/sethvargo/go-githubactions"
 )
 
-type (
-	// ContextInput is passed to atlas as a json string to add additional information
-	ContextInput struct {
-		Repo   string `json:"repo"`
-		Path   string `json:"path"`
-		Branch string `json:"branch"`
-		Commit string `json:"commit"`
-		URL    string `json:"url"`
-	}
-)
-
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
 	params := &atlasexec.MigrateApplyParams{
@@ -62,19 +51,15 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 
 // MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
 func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
-	ghContext, err := createContext(act)
+	runContext, err := createRunContext(act)
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
-	}
-	buf, err := json.Marshal(ghContext)
-	if err != nil {
-		return fmt.Errorf("failed to create MigratePushParams: %w", err)
 	}
 	params := &atlasexec.MigratePushParams{
 		Name:      act.GetInput("dir-name"),
 		DirURL:    act.GetInput("dir"),
 		DevURL:    act.GetInput("dev-url"),
-		Context:   string(buf),
+		Context:   runContext,
 		ConfigURL: act.GetInput("config"),
 		Env:       act.GetInput("env"),
 	}
@@ -83,7 +68,7 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactio
 		return fmt.Errorf("failed to push directory: %v", err)
 	}
 	tag := act.GetInput("tag")
-	params.Tag = ghContext.Commit
+	params.Tag = runContext.Commit
 	if tag != "" {
 		params.Tag = tag
 	}
@@ -101,13 +86,9 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if act.GetInput("dir-name") == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
-	ghContext, err := createContext(act)
+	runContext, err := createRunContext(act)
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
-	}
-	buf, err := json.Marshal(ghContext)
-	if err != nil {
-		return err
 	}
 	var (
 		resp    bytes.Buffer
@@ -119,7 +100,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 		ConfigURL: act.GetInput("config"),
 		Env:       act.GetInput("env"),
 		Base:      "atlas://" + act.GetInput("dir-name"),
-		Context:   string(buf),
+		Context:   runContext,
 		Web:       true,
 		Writer:    &resp,
 	})
@@ -300,7 +281,7 @@ func addHeaders(req *http.Request, authToken string) {
 	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
 }
 
-func createContext(act *githubactions.Action) (*ContextInput, error) {
+func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) {
 	ghContext, err := act.Context()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action context: %w", err)
@@ -313,7 +294,7 @@ func createContext(act *githubactions.Action) (*ContextInput, error) {
 	if branch == "" {
 		branch = ghContext.RefName
 	}
-	return &ContextInput{
+	return &atlasexec.RunContext{
 		Repo:   ghContext.Repository,
 		Branch: branch,
 		Commit: ghContext.SHA,
