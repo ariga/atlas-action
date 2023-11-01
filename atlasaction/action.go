@@ -23,14 +23,10 @@ import (
 	"github.com/sethvargo/go-githubactions"
 )
 
-type VersionContextKey struct{}
+var Version string
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
-	ver, ok := ctx.Value(VersionContextKey{}).(string)
-	if !ok {
-		return fmt.Errorf("invalid type of context value for %v, expected string", VersionContextKey{})
-	}
 	params := &atlasexec.MigrateApplyParams{
 		URL:             act.GetInput("url"),
 		DirURL:          act.GetInput("dir"),
@@ -40,7 +36,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 		BaselineVersion: act.GetInput("baseline"), // Hidden param.
 		Context: &atlasexec.DeployRunContext{
 			TriggerType:    "GITHUB_ACTION",
-			TriggerVersion: ver,
+			TriggerVersion: Version,
 		},
 	}
 	run, err := client.MigrateApply(ctx, params)

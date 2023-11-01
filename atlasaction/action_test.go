@@ -27,14 +27,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var applyCtx = context.WithValue(context.Background(), VersionContextKey{}, "v1.2.3")
-
 func TestMigrateApply(t *testing.T) {
 	t.Run("local dir", func(t *testing.T) {
 		tt := newT(t)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/migrations/")
-		err := MigrateApply(applyCtx, tt.cli, tt.act)
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 
 		m, err := tt.outputs()
@@ -51,7 +49,7 @@ func TestMigrateApply(t *testing.T) {
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/migrations/")
 		tt.setInput("tx-mode", "fake")
-		err := MigrateApply(applyCtx, tt.cli, tt.act)
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
 
 		// The error here proves that the tx-mode was passed to atlasexec, which
 		// is what we want to test.
@@ -66,7 +64,7 @@ func TestMigrateApply(t *testing.T) {
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/migrations/")
 		tt.setInput("baseline", "111_fake")
-		err := MigrateApply(applyCtx, tt.cli, tt.act)
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		// The error here proves that the baseline was passed to atlasexec, which
 		// is what we want to test.
 		exp := `Error: baseline version "111_fake" not found`
@@ -80,14 +78,14 @@ func TestMigrateApply(t *testing.T) {
 	t.Run("config-broken", func(t *testing.T) {
 		tt := newT(t)
 		tt.setInput("config", "file://testdata/config/broken.hcl")
-		err := MigrateApply(applyCtx, tt.cli, tt.act)
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, `"testdata/config/broken.hcl" was not found`)
 	})
 	t.Run("config", func(t *testing.T) {
 		tt := newT(t)
 		tt.setInput("config", "file://testdata/config/atlas.hcl")
 		tt.setInput("env", "test")
-		err := MigrateApply(applyCtx, tt.cli, tt.act)
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 	})
 }
@@ -514,6 +512,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		}
 	}
 	t.Run("basic", func(t *testing.T) {
+		Version = "v1.2.3"
 		var payloads []string
 		srv := httptest.NewServer(handler(&payloads))
 		t.Cleanup(srv.Close)
@@ -526,7 +525,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
 		cfgURL := generateHCL(t, srv.URL, "token")
 		tt.setInput("config", cfgURL)
-		err := MigrateApply(applyCtx, tt.cli, tt.act)
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 
 		require.Len(t, payloads, 3)
@@ -557,7 +556,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		cfgURL := generateHCL(t, srv.URL, "token")
 		tt.setInput("config", cfgURL)
 
-		err := MigrateApply(applyCtx, tt.cli, tt.act)
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 
 		require.Len(t, payloads, 2)

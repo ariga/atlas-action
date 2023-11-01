@@ -23,15 +23,13 @@ const (
 
 var cli RunAction
 
-var Version string
-
 func main() {
 	action := githubactions.New()
 	c, err := atlasexec.NewClient("", "atlas")
 	if err != nil {
 		action.Fatalf("Failed to create client: %s", err)
 	}
-	ctx := context.WithValue(context.Background(), atlasaction.VersionContextKey{}, Version)
+	ctx := context.Background()
 	cli := kong.Parse(
 		&cli,
 		kong.BindTo(ctx, (*context.Context)(nil)),
@@ -51,7 +49,7 @@ type VersionFlag bool
 
 // BeforeReset writes the version variable and terminates with a 0 exit status.
 func (v VersionFlag) BeforeReset(app *kong.Kong) error {
-	_, err := fmt.Fprintln(app.Stdout, Version)
+	_, err := fmt.Fprintln(app.Stdout, atlasaction.Version)
 	app.Exit(0)
 	return err
 }
