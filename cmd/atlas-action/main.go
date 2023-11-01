@@ -44,9 +44,20 @@ func main() {
 	}
 }
 
+// VersionFlag is a flag type that can be used to display a version number, stored in the "version" variable.
+type VersionFlag bool
+
+// BeforeReset writes the version variable and terminates with a 0 exit status.
+func (v VersionFlag) BeforeReset(app *kong.Kong) error {
+	_, err := fmt.Fprintln(app.Stdout, atlasaction.Version)
+	app.Exit(0)
+	return err
+}
+
 // RunAction is a command to run one of the Atlas GitHub Actions.
 type RunAction struct {
-	Action string `help:"Command to run" required:""`
+	Action  string      `help:"Command to run" required:""`
+	Version VersionFlag `help:"Prints the version and exits"`
 }
 
 func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action *githubactions.Action) error {

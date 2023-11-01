@@ -29,11 +29,18 @@ jobs:
           go-version-file: go.mod
       - name: Set BINARY_NAME
         id: set_binary_name
+        env:
+          VERSION: ${{ github.event.inputs.version || 'v1' }}
         run: |
-          echo "BINARY_NAME=atlas-action-${{ github.event.inputs.version || 'v1' }}" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BINARY_NAME=atlas-action-$VERSION" >> $GITHUB_ENV
       - name: Compile Go Binary
         run: |
-          go build -o $BINARY_NAME ./cmd/atlas-action
+          go build -o $BINARY_NAME -ldflags "-X ariga.io/atlas-action/atlasaction.Version=${{ github.event.inputs.version || 'v1' }}" ./cmd/atlas-action
+      - name: Check version
+        run: |
+          OUTPUT=$(./$BINARY_NAME --version)
+          [ $(echo $OUTPUT | grep -i "^$VERSION") ] && echo Version=$OUTPUT || (echo "unexpected output: $OUTPUT, expected: $VERSION"; exit 1)
       - name: Configure AWS credentials
         run: |
           aws configure set aws_access_key_id ${{ secrets.RELEASE_AWS_ACCESS_KEY_ID }}

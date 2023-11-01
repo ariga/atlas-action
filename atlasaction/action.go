@@ -23,6 +23,10 @@ import (
 	"github.com/sethvargo/go-githubactions"
 )
 
+// version holds atlas-action version. When built with cloud packages should be set by build flag, e.g.
+// "-X 'ariga.io/atlas-action/atlasaction.Version=v0.1.2'"
+var Version string
+
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
 	params := &atlasexec.MigrateApplyParams{
@@ -32,6 +36,10 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 		Env:             act.GetInput("env"),
 		TxMode:          act.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: act.GetInput("baseline"), // Hidden param.
+		Context: &atlasexec.DeployRunContext{
+			TriggerType:    "GITHUB_ACTION",
+			TriggerVersion: Version,
+		},
 	}
 	run, err := client.MigrateApply(ctx, params)
 	if err != nil {
