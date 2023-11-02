@@ -37,7 +37,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 		TxMode:          act.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: act.GetInput("baseline"), // Hidden param.
 		Context: &atlasexec.DeployRunContext{
-			TriggerType:    "GITHUB_ACTION",
+			TriggerType:    atlasexec.TriggerTypeGithubAction,
 			TriggerVersion: Version,
 		},
 	}
