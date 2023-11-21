@@ -37,6 +37,8 @@ jobs:
       - name: Compile Go Binary
         run: |
           go build -o $BINARY_NAME -ldflags "-X ariga.io/atlas-action/atlasaction.Version=${{ github.event.inputs.version || 'v1' }}" ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
       - name: Check version
         run: |
           OUTPUT=$(./$BINARY_NAME --version)

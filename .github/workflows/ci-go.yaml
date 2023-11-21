@@ -61,6 +61,8 @@ jobs:
         with:
           go-version: '1.21'
       - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
       - uses: ./migrate/apply
         with:
           dir: file://atlasaction/testdata/migrations
