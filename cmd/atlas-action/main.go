@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-go-sdk/atlasexec"
@@ -61,6 +62,10 @@ type RunAction struct {
 }
 
 func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action *githubactions.Action) error {
+	_ = os.Setenv("ATLAS_ACTION_COMMAND", r.Action)
+	defer func() {
+		_ = os.Unsetenv("ATLAS_ACTION_COMMAND")
+	}()
 	switch r.Action {
 	case CmdMigrateApply:
 		return atlasaction.MigrateApply(ctx, client, action)
