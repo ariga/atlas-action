@@ -5,16 +5,16 @@ branding:
 author: 'Ariga'
 inputs:
   url:
-    description: "The URL of the target database.  For example: `mysql://root:pass@localhost:3306/dev`."
+    description: "The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`."
     required: false
   dir:
     description: |
-      The URL of the migration directory to apply.  For example: `atlas://dir-name` for cloud
+      The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
       based directories or `file://migrations` for local ones.
     required: false
   config:
     description: |
-      The URL of the Atlas configuration file.  By default, Atlas will look for a file
+      The URL of the Atlas configuration file. By default, Atlas will look for a file
       named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
       Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
     required: false
