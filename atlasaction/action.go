@@ -29,11 +29,22 @@ var Version string
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
+	dryRun, err := func() (bool, error) {
+		inp := act.GetInput("dry-run")
+		if inp == "" {
+			return false, nil
+		}
+		return strconv.ParseBool(inp)
+	}()
+	if err != nil {
+		return fmt.Errorf(`invlid value for the "dry-run" input: %w`, err)
+	}
 	params := &atlasexec.MigrateApplyParams{
 		URL:             act.GetInput("url"),
 		DirURL:          act.GetInput("dir"),
 		ConfigURL:       act.GetInput("config"),
 		Env:             act.GetInput("env"),
+		DryRun:          dryRun,
 		TxMode:          act.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: act.GetInput("baseline"), // Hidden param.
 		Context: &atlasexec.DeployRunContext{
