@@ -44,6 +44,36 @@ func TestMigrateApply(t *testing.T) {
 			"target":        "20230922132634",
 		}, m)
 	})
+	t.Run("dry-run", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "file://testdata/migrations/")
+		tt.setInput("dry-run", "true")
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+		out, err := tt.cli.SchemaInspect(context.Background(), &atlasexec.SchemaInspectParams{
+			URL:     "sqlite://" + tt.db,
+			Exclude: []string{"atlas_schema_revisions"},
+			Format:  "sql",
+		})
+		require.NoError(t, err)
+		require.Empty(t, out)
+	})
+	t.Run("dry-run false", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "file://testdata/migrations/")
+		tt.setInput("dry-run", "false")
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+		out, err := tt.cli.SchemaInspect(context.Background(), &atlasexec.SchemaInspectParams{
+			URL:     "sqlite://" + tt.db,
+			Exclude: []string{"atlas_schema_revisions"},
+			Format:  "sql",
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, out)
+	})
 	t.Run("tx-mode", func(t *testing.T) {
 		tt := newT(t)
 		tt.setInput("url", "sqlite://"+tt.db)
