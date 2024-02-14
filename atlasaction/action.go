@@ -263,45 +263,63 @@ func addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) erro
 
 // addSuggestions comments on the pull request for the given payload.
 func addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
-	ghContext, err := act.Context()
-	if err != nil {
-		return err
-	}
-	event, err := triggerEvent(ghContext)
-	if err != nil {
-		return err
-	}
-	ghClient := githubAPI{
-		baseURL: ghContext.APIURL,
-		repo:    ghContext.Repository,
-		client: &http.Client{
-			Transport: &roundTripper{
-				authToken: act.Getenv("GITHUB_TOKEN"),
-			},
-			Timeout: time.Second * 30,
-		},
-	}
-	for _, file := range payload.Files {
-		filePath := path.Join(payload.Env.Dir, file.Name)
-		for _, report := range file.Reports {
-			for _, s := range report.SuggestedFixes {
-				buf, err := json.Marshal(pullRequestComment{
-					Body:      s.Message,
-					Path:      filePath,
-					CommitID:  ghContext.SHA,
-					StartLine: 1,
-					Line:      1,
-				})
-				if err != nil {
-					return err
-				}
-				if err := ghClient.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
+    ghContext, err := act.Context()
+    if err != nil {
+       return err
+    }
+    event, err := triggerEvent(ghContext)
+    if err != nil {
+       return err
+    }
+    ghClient := githubAPI{
+       baseURL: ghContext.APIURL,
+       repo:    ghContext.Repository,
+       client: &http.Client{
+          Transport: &roundTripper{
+             authToken: act.Getenv("GITHUB_TOKEN"),
+          },
+          Timeout: time.Second * 30,
+       },
+    }
+    for _, file := range payload.Files {
+       filePath := path.Join(payload.Env.Dir, file.Name)
+       for _, report := range file.Reports {
+          for _, s := range report.SuggestedFixes {
+             buf, err := json.Marshal(pullRequestComment{
+                Body:      s.Message,
+                Path:      filePath,
+                CommitID:  ghContext.SHA,
+                StartLine: 1,
+                Line:      1,
+             })
+             if err != nil {
+                return err
+             }
+             if err := ghClient.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
+                return err
+             }
+          }
+          for _, d := range report.Diagnostics {
+             fmt.Printf("suggestion fixes length: %d for diag: %v\n", len(d.SuggestedFixes), d)
+             for _, s := range d.SuggestedFixes {
+                buf, err := json.Marshal(pullRequestComment{
+                   Body:      s.Message,
+                   Path:      filePath,
+                   CommitID:  ghContext.SHA,
+                   StartLine: 1,
+                   Line:      1,
+                })
+                if err != nil {
+                   return err
+                }
+                if err := ghClient.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
+                   return err
+                }
+             }
+          }
+       }
+    }
+    return nil
 }
 
 type (
