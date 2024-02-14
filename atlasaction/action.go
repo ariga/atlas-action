@@ -134,15 +134,17 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if payload.URL != "" {
 		act.SetOutput("report-url", payload.URL)
 	}
-	dirName := act.GetInput("dir-name")
 	var summary bytes.Buffer
 	if err := comment.Execute(&summary, &payload); err != nil {
 		return err
 	}
-	if err := addSummary(act, dirName, summary.String()); err != nil {
+	if err := addSummary(act, summary.String()); err != nil {
 		return err
 	}
 	if err := addChecks(act, &payload); err != nil {
+		return err
+	}
+	if err := addSuggestions(act, &payload); err != nil {
 		return err
 	}
 	if errors.Is(err, atlasexec.LintErr) {
@@ -173,10 +175,10 @@ var (
 	)
 )
 
-// addSummary writes a summary to the pull request for dirName. It adds a marker
+// addSummary writes a summary to the pull request. It adds a marker
 // HTML comment to the end of the comment body to identify the comment as one created by
 // this action.
-func addSummary(act *githubactions.Action, dirName, summary string) error {
+func addSummary(act *githubactions.Action, summary string) error {
 	ghContext, err := act.Context()
 	if err != nil {
 		return err
@@ -188,6 +190,7 @@ func addSummary(act *githubactions.Action, dirName, summary string) error {
 	act.AddStepSummary(summary)
 	g := githubAPI{
 		baseURL: ghContext.APIURL,
+		repo:    ghContext.Repository,
 		client: &http.Client{
 			Transport: &roundTripper{
 				authToken: act.Getenv("GITHUB_TOKEN"),
@@ -199,11 +202,11 @@ func addSummary(act *githubactions.Action, dirName, summary string) error {
 	if prNumber == 0 {
 		return nil
 	}
-	comments, err := g.getIssueComments(prNumber, ghContext.Repository)
+	comments, err := g.getIssueComments(prNumber)
 	if err != nil {
 		return err
 	}
-	marker := commentMarker(dirName)
+	marker := commentMarker(act.GetInput("dir-name"))
 	comment := struct {
 		Body string `json:"body"`
 	}{
@@ -218,9 +221,9 @@ func addSummary(act *githubactions.Action, dirName, summary string) error {
 		return strings.Contains(c.Body, marker)
 	})
 	if found != -1 {
-		return g.updateComment(comments[found].ID, r, ghContext.Repository)
+		return g.updateComment(comments[found].ID, r)
 	}
-	return g.createIssueComment(prNumber, r, ghContext.Repository)
+	return g.createIssueComment(prNumber, r)
 }
 
 // addChecks runs to the pull request for the given payload.
@@ -258,14 +261,67 @@ func addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) erro
 	return nil
 }
 
+// addSuggestions comments on the pull request for the given payload.
+func addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+	ghContext, err := act.Context()
+	if err != nil {
+		return err
+	}
+	event, err := triggerEvent(ghContext)
+	if err != nil {
+		return err
+	}
+	ghClient := githubAPI{
+		baseURL: ghContext.APIURL,
+		repo:    ghContext.Repository,
+		client: &http.Client{
+			Transport: &roundTripper{
+				authToken: act.Getenv("GITHUB_TOKEN"),
+			},
+			Timeout: time.Second * 30,
+		},
+	}
+	for _, file := range payload.Files {
+		filePath := path.Join(payload.Env.Dir, file.Name)
+		for _, report := range file.Reports {
+			for _, s := range report.SuggestedFixes {
+				buf, err := json.Marshal(pullRequestComment{
+					Body:      s.Message,
+					Path:      filePath,
+					CommitID:  ghContext.SHA,
+					StartLine: 1,
+					Line:      1,
+				})
+				if err != nil {
+					return err
+				}
+				if err := ghClient.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 type (
 	githubIssueComment struct {
 		ID   int    `json:"id"`
 		Body string `json:"body"`
 	}
 
+	pullRequestComment struct {
+		Body      string `json:"body"`
+		Path      string `json:"path"`
+		CommitID  string `json:"commit_id"`
+		StartLine int    `json:"start_line"`
+		Line      int    `json:"line"`
+		StartSide string `json:"start_side" default:"RIGHT"`
+	}
+
 	githubAPI struct {
 		baseURL string
+		repo    string
 		client  *http.Client
 	}
 
@@ -283,33 +339,33 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return http.DefaultTransport.RoundTrip(req)
 }
 
-func (g *githubAPI) getIssueComments(id int, repo string) ([]githubIssueComment, error) {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, repo, id)
+func (g *githubAPI) getIssueComments(id int) ([]githubIssueComment, error) {
+	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, id)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	res, err := g.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", repo, id, err)
+		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", g.repo, id, err)
 	}
 	defer res.Body.Close()
 	buf, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading PR issue comments from %v/%v, %v", repo, id, err)
+		return nil, fmt.Errorf("error reading PR issue comments from %v/%v, %v", g.repo, id, err)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code %v when calling GitHub API", res.StatusCode)
 	}
 	var comments []githubIssueComment
 	if err = json.Unmarshal(buf, &comments); err != nil {
-		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", repo, id, string(buf), err)
+		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", g.repo, id, string(buf), err)
 	}
 	return comments, nil
 }
 
-func (g *githubAPI) createIssueComment(id int, content io.Reader, repo string) error {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, repo, id)
+func (g *githubAPI) createIssueComment(id int, content io.Reader) error {
+	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, id)
 	req, err := http.NewRequest(http.MethodPost, url, content)
 	if err != nil {
 		return err
@@ -329,8 +385,9 @@ func (g *githubAPI) createIssueComment(id int, content io.Reader, repo string) e
 	return err
 }
 
-func (g *githubAPI) updateComment(id int, content io.Reader, repo string) error {
-	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", g.baseURL, repo, id)
+// updateComment updates issue comment with the given id.
+func (g *githubAPI) updateComment(id int, content io.Reader) error {
+	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", g.baseURL, g.repo, id)
 	req, err := http.NewRequest(http.MethodPatch, url, content)
 	if err != nil {
 		return err
@@ -350,6 +407,27 @@ func (g *githubAPI) updateComment(id int, content io.Reader, repo string) error 
 	return err
 }
 
+// createPullRequestComment creates a review comment on the pull request.
+func (g *githubAPI) createPRComment(id int, content io.Reader) error {
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, id)
+	req, err := http.NewRequest(http.MethodPost, url, content)
+	if err != nil {
+		return err
+	}
+	res, err := g.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
+		}
+		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	return err
+}
 
 func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) {
 	ghContext, err := act.Context()
