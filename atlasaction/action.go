@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/mitchellh/mapstructure"
@@ -138,7 +139,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if err := comment.Execute(&summary, &payload); err != nil {
 		return err
 	}
-	if err := publish(act, dirName, summary.String()); err != nil {
+	if err := addSummary(act, dirName, summary.String()); err != nil {
 		return err
 	}
 	if err := addChecks(act, &payload); err != nil {
@@ -172,10 +173,10 @@ var (
 	)
 )
 
-// publish writes a comment and summary to the pull request for dirName. It adds a marker
+// addSummary writes a summary to the pull request for dirName. It adds a marker
 // HTML comment to the end of the comment body to identify the comment as one created by
 // this action.
-func publish(act *githubactions.Action, dirName, summary string) error {
+func addSummary(act *githubactions.Action, dirName, summary string) error {
 	ghContext, err := act.Context()
 	if err != nil {
 		return err
@@ -187,13 +188,18 @@ func publish(act *githubactions.Action, dirName, summary string) error {
 	act.AddStepSummary(summary)
 	g := githubAPI{
 		baseURL: ghContext.APIURL,
+		client: &http.Client{
+			Transport: &roundTripper{
+				authToken: act.Getenv("GITHUB_TOKEN"),
+			},
+			Timeout: time.Second * 30,
+		},
 	}
 	prNumber := event.PullRequestNumber
 	if prNumber == 0 {
 		return nil
 	}
-	ghToken := act.Getenv("GITHUB_TOKEN")
-	comments, err := g.getIssueComments(prNumber, ghContext.Repository, ghToken)
+	comments, err := g.getIssueComments(prNumber, ghContext.Repository)
 	if err != nil {
 		return err
 	}
@@ -212,9 +218,9 @@ func publish(act *githubactions.Action, dirName, summary string) error {
 		return strings.Contains(c.Body, marker)
 	})
 	if found != -1 {
-		return g.updateComment(comments[found].ID, r, ghContext.Repository, ghToken)
+		return g.updateComment(comments[found].ID, r, ghContext.Repository)
 	}
-	return g.createIssueComment(prNumber, r, ghContext.Repository, ghToken)
+	return g.createIssueComment(prNumber, r, ghContext.Repository)
 }
 
 // addChecks runs to the pull request for the given payload.
@@ -260,17 +266,30 @@ type (
 
 	githubAPI struct {
 		baseURL string
+		client  *http.Client
+	}
+
+	// roundTripper is a http.RoundTripper that adds the Authorization header.
+	roundTripper struct {
+		authToken string
 	}
 )
 
-func (g *githubAPI) getIssueComments(id int, repo, authToken string) ([]githubIssueComment, error) {
+// RoundTrip implements http.RoundTripper.
+func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Add("Accept", "application/vnd.github+json")
+	req.Header.Add("Authorization", "Bearer "+r.authToken)
+	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+func (g *githubAPI) getIssueComments(id int, repo string) ([]githubIssueComment, error) {
 	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, repo, id)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	addHeaders(req, authToken)
-	res, err := http.DefaultClient.Do(req)
+	res, err := g.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", repo, id, err)
 	}
@@ -289,14 +308,13 @@ func (g *githubAPI) getIssueComments(id int, repo, authToken string) ([]githubIs
 	return comments, nil
 }
 
-func (g *githubAPI) createIssueComment(id int, content io.Reader, repo, authToken string) error {
+func (g *githubAPI) createIssueComment(id int, content io.Reader, repo string) error {
 	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, repo, id)
 	req, err := http.NewRequest(http.MethodPost, url, content)
 	if err != nil {
 		return err
 	}
-	addHeaders(req, authToken)
-	res, err := http.DefaultClient.Do(req)
+	res, err := g.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -311,14 +329,13 @@ func (g *githubAPI) createIssueComment(id int, content io.Reader, repo, authToke
 	return err
 }
 
-func (g *githubAPI) updateComment(id int, content io.Reader, repo, authToken string) error {
+func (g *githubAPI) updateComment(id int, content io.Reader, repo string) error {
 	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", g.baseURL, repo, id)
 	req, err := http.NewRequest(http.MethodPatch, url, content)
 	if err != nil {
 		return err
 	}
-	addHeaders(req, authToken)
-	res, err := http.DefaultClient.Do(req)
+	res, err := g.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -333,11 +350,6 @@ func (g *githubAPI) updateComment(id int, content io.Reader, repo, authToken str
 	return err
 }
 
-func addHeaders(req *http.Request, authToken string) {
-	req.Header.Add("Accept", "application/vnd.github+json")
-	req.Header.Add("Authorization", "Bearer "+authToken)
-	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
-}
 
 func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) {
 	ghContext, err := act.Context()
