@@ -233,14 +233,19 @@ func addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) erro
 			for _, diag := range report.Diagnostics {
 				msg := diag.Text
 				if diag.Code != "" {
-					msg = fmt.Sprintf("%v (%v)\n\nDetails:: https://atlasgo.io/lint/analyzers#%v", msg, diag.Code, diag.Code)
+					msg = fmt.Sprintf("%v (%v)\n\nDetails: https://atlasgo.io/lint/analyzers#%v", msg, diag.Code, diag.Code)
 				}
-				line := strings.Split(file.Text[:diag.Pos], "\n")
-				act.WithFieldsMap(map[string]string{
+				lines := strings.Split(file.Text[:diag.Pos], "\n")
+				act = act.WithFieldsMap(map[string]string{
 					"file":  filePath,
-					"line":  strconv.Itoa(max(1, len(line))),
+					"line":  strconv.Itoa(max(1, len(lines))),
 					"title": report.Text,
-				}).Noticef(msg)
+				})
+				if file.Error != "" {
+					act.Errorf(msg)
+				} else {
+					act.Noticef(msg)
+				}
 			}
 		}
 	}
