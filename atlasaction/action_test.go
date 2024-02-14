@@ -381,6 +381,10 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 error found")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
+		out := tt.out.String()
+		require.Contains(t, out, "error file=testdata/migrations_destructive/20230925192914.sql")
+		require.Contains(t, out, "destructive changes detected")
+		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS102")
 	})
 	t.Run("lint summary - with diagnostics", func(t *testing.T) {
 		tt := newT(t)
@@ -396,6 +400,10 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 issue found")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
+		out := tt.out.String()
+		require.Contains(t, out, "notice file=testdata/diagnostics/20231016114135_add_not_null.sql")
+		require.Contains(t, out, "data dependent changes detected")
+		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#MF103")
 	})
 	t.Run("lint summary - lint success", func(t *testing.T) {
 		tt := newT(t)

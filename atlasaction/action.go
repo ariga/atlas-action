@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -140,6 +141,9 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if err := publish(act, dirName, summary.String()); err != nil {
 		return err
 	}
+	if err := addChecks(act, &payload); err != nil {
+		return err
+	}
 	if errors.Is(err, atlasexec.LintErr) {
 		return fmt.Errorf("lint completed with errors, see report: %s", payload.URL)
 	}
@@ -211,6 +215,41 @@ func publish(act *githubactions.Action, dirName, summary string) error {
 		return g.updateComment(comments[found].ID, r, ghContext.Repository, ghToken)
 	}
 	return g.createIssueComment(prNumber, r, ghContext.Repository, ghToken)
+}
+
+// addChecks runs to the pull request for the given payload.
+func addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+	dir := payload.Env.Dir
+	for _, file := range payload.Files {
+		filePath := path.Join(dir, file.Name)
+		if file.Error != "" && len(file.Reports) == 0 {
+			act.WithFieldsMap(map[string]string{
+				"file": filePath,
+				"line": "1",
+			}).Errorf(file.Error)
+			continue
+		}
+		for _, report := range file.Reports {
+			for _, diag := range report.Diagnostics {
+				msg := diag.Text
+				if diag.Code != "" {
+					msg = fmt.Sprintf("%v (%v)\n\nDetails: https://atlasgo.io/lint/analyzers#%v", msg, diag.Code, diag.Code)
+				}
+				lines := strings.Split(file.Text[:diag.Pos], "\n")
+				act = act.WithFieldsMap(map[string]string{
+					"file":  filePath,
+					"line":  strconv.Itoa(max(1, len(lines))),
+					"title": report.Text,
+				})
+				if file.Error != "" {
+					act.Errorf(msg)
+				} else {
+					act.Noticef(msg)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type (
