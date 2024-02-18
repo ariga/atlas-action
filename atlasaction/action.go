@@ -204,7 +204,7 @@ func (g *githubAPI) addSummary(act *githubactions.Action, summary string) error 
 		return err
 	}
 	act.AddStepSummary(summary)
-	prNumber := event.PullRequestNumber
+	prNumber := event.PullRequest.Number
 	if prNumber == 0 {
 		return nil
 	}
@@ -283,15 +283,17 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 	}
 	for _, file := range payload.Files {
 		filePath := path.Join(payload.Env.Dir, file.Name)
+		prNumber := event.PullRequest.Number
+		commitID := event.PullRequest.Head.SHA
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
-				if err := g.commentSuggestion(event.PullRequestNumber, ghContext.SHA, filePath, s); err != nil {
+				if err := g.commentSuggestion(prNumber, commitID, filePath, s); err != nil {
 					return err
 				}
 			}
 			for _, d := range report.Diagnostics {
 				for _, s := range d.SuggestedFixes {
-					if err := g.commentSuggestion(event.PullRequestNumber, ghContext.SHA, filePath, s); err != nil {
+					if err := g.commentSuggestion(prNumber, commitID, filePath, s); err != nil {
 						return err
 					}
 				}
@@ -404,7 +406,7 @@ func (g *githubAPI) updateComment(id int, content io.Reader) error {
 }
 
 // commentSuggestion creates a suggestion comment on the pull request.
-func (g *githubAPI) commentSuggestion(prID int, commitID, filePath string, suggestion sqlcheck.SuggestedFix) error {
+func (g *githubAPI) commentSuggestion(prNumber int, commitID, filePath string, suggestion sqlcheck.SuggestedFix) error {
 	prComment := pullRequestComment{
 		Body:     fmt.Sprintf("```suggestion\n%s\n```", suggestion.TextEdit.NewText),
 		Path:     filePath,
@@ -420,7 +422,8 @@ func (g *githubAPI) commentSuggestion(prID int, commitID, filePath string, sugge
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, prID)
+	fmt.Println("body sent:", string(buf))
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, prNumber)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf))
 	if err != nil {
 		return err
@@ -463,10 +466,16 @@ func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) 
 }
 
 type githubTriggerEvent struct {
+	PullRequest struct {
+		Number int `mapstructure:"number"`
+		Head   struct {
+			SHA string `mapstructure:"sha"`
+		} `mapstructure:"head"`
+	} `mapstructure:"pull_request"`
+	PRNumber int `mapstructure:"number"`
 	HeadCommit struct {
 		URL string `mapstructure:"url"`
 	} `mapstructure:"head_commit"`
-	PullRequestNumber int `mapstructure:"number"`
 }
 
 func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, error) {
@@ -474,6 +483,7 @@ func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, 
 	if err := mapstructure.Decode(ghContext.Event, &event); err != nil {
 		return nil, fmt.Errorf("failed to parse push event: %v", err)
 	}
+	fmt.Println("event:", event)
 	return &event, nil
 }
 
