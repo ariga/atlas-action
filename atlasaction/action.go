@@ -284,15 +284,15 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
 				prComment := pullRequestComment{
-					Body:     fmt.Sprintf("```suggestion\n%s\n```", s.TextEdits[0].NewText),
+					Body:     fmt.Sprintf("```suggestion\n%s\n```", s.TextEdit.NewText),
 					Path:     filePath,
 					CommitID: ghContext.SHA,
 				}
-				if s.TextEdits[0].End <= s.TextEdits[0].Line {
-					prComment.Line = s.TextEdits[0].Line
+				if s.TextEdit.End <= s.TextEdit.Line {
+					prComment.Line = s.TextEdit.Line
 				} else {
-					prComment.StartLine = s.TextEdits[0].Line
-					prComment.Line = s.TextEdits[0].End
+					prComment.StartLine = s.TextEdit.Line
+					prComment.Line = s.TextEdit.End
 				}
 				buf, err := json.Marshal(prComment)
 				if err != nil {
@@ -305,15 +305,15 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 			for _, d := range report.Diagnostics {
 				for _, s := range d.SuggestedFixes {
 					prComment := pullRequestComment{
-						Body:     fmt.Sprintf("```suggestion\n%s\n```", s.TextEdits[0].NewText),
+						Body:     fmt.Sprintf("```suggestion\n%s\n```", s.TextEdit.NewText),
 						Path:     filePath,
 						CommitID: ghContext.SHA,
 					}
-					if s.TextEdits[0].End <= s.TextEdits[0].Line {
-						prComment.Line = s.TextEdits[0].Line
+					if s.TextEdit.End <= s.TextEdit.Line {
+						prComment.Line = s.TextEdit.Line
 					} else {
-						prComment.StartLine = s.TextEdits[0].Line
-						prComment.Line = s.TextEdits[0].End
+						prComment.StartLine = s.TextEdit.Line
+						prComment.Line = s.TextEdit.End
 					}
 					buf, err := json.Marshal(prComment)
 					if err != nil {
