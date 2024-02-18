@@ -470,7 +470,9 @@ func TestMigrateLint(t *testing.T) {
 		tt.env["GITHUB_API_URL"] = ghMock.URL
 		tt.env["GITHUB_REPOSITORY"] = "test-owner/test-repository"
 		tt.setEvent(t, `{
-			"number": 42
+			"pull_request": {
+				"number": 42
+			}
 		}`)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.env["GITHUB_TOKEN"] = "very-secret-gh-token"
