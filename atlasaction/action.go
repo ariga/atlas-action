@@ -134,17 +134,31 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if payload.URL != "" {
 		act.SetOutput("report-url", payload.URL)
 	}
+	ghContext, err := act.Context()
+	if err != nil {
+		return err
+	}
+	ghClient := githubAPI{
+		baseURL: ghContext.APIURL,
+		repo:    ghContext.Repository,
+		client: &http.Client{
+			Transport: &roundTripper{
+				authToken: act.Getenv("GITHUB_TOKEN"),
+			},
+			Timeout: time.Second * 30,
+		},
+	}
 	var summary bytes.Buffer
 	if err := comment.Execute(&summary, &payload); err != nil {
 		return err
 	}
-	if err := addSummary(act, summary.String()); err != nil {
+	if err := ghClient.addSummary(act, summary.String()); err != nil {
 		return err
 	}
-	if err := addChecks(act, &payload); err != nil {
+	if err := ghClient.addChecks(act, &payload); err != nil {
 		return err
 	}
-	if err := addSuggestions(act, &payload); err != nil {
+	if err := ghClient.addSuggestions(act, &payload); err != nil {
 		return err
 	}
 	if errors.Is(err, atlasexec.LintErr) {
@@ -178,7 +192,7 @@ var (
 // addSummary writes a summary to the pull request. It adds a marker
 // HTML comment to the end of the comment body to identify the comment as one created by
 // this action.
-func addSummary(act *githubactions.Action, summary string) error {
+func (g *githubAPI) addSummary(act *githubactions.Action, summary string) error {
 	ghContext, err := act.Context()
 	if err != nil {
 		return err
@@ -188,16 +202,6 @@ func addSummary(act *githubactions.Action, summary string) error {
 		return err
 	}
 	act.AddStepSummary(summary)
-	g := githubAPI{
-		baseURL: ghContext.APIURL,
-		repo:    ghContext.Repository,
-		client: &http.Client{
-			Transport: &roundTripper{
-				authToken: act.Getenv("GITHUB_TOKEN"),
-			},
-			Timeout: time.Second * 30,
-		},
-	}
 	prNumber := event.PullRequestNumber
 	if prNumber == 0 {
 		return nil
@@ -226,8 +230,8 @@ func addSummary(act *githubactions.Action, summary string) error {
 	return g.createIssueComment(prNumber, r)
 }
 
-// addChecks runs to the pull request for the given payload.
-func addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+// addChecks runs annotations to the pull request for the given payload.
+func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
 	dir := payload.Env.Dir
 	for _, file := range payload.Files {
 		filePath := path.Join(dir, file.Name)
@@ -240,6 +244,10 @@ func addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) erro
 		}
 		for _, report := range file.Reports {
 			for _, diag := range report.Diagnostics {
+				// If there are suggested fixes, we will add them as comments, not as checks annotations.
+				if diag.SuggestedFixes != nil {
+					continue
+				}
 				msg := diag.Text
 				if diag.Code != "" {
 					msg = fmt.Sprintf("%v (%v)\n\nDetails: https://atlasgo.io/lint/analyzers#%v", msg, diag.Code, diag.Code)
@@ -262,7 +270,7 @@ func addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) erro
 }
 
 // addSuggestions comments on the pull request for the given payload.
-func addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
 	ghContext, err := act.Context()
 	if err != nil {
 		return err
@@ -271,48 +279,47 @@ func addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport)
 	if err != nil {
 		return err
 	}
-	ghClient := githubAPI{
-		baseURL: ghContext.APIURL,
-		repo:    ghContext.Repository,
-		client: &http.Client{
-			Transport: &roundTripper{
-				authToken: act.Getenv("GITHUB_TOKEN"),
-			},
-			Timeout: time.Second * 30,
-		},
-	}
 	for _, file := range payload.Files {
 		filePath := path.Join(payload.Env.Dir, file.Name)
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
-				buf, err := json.Marshal(pullRequestComment{
-					Body:      fmt.Sprintf("```suggestion\n%s\n```", s.Message),
-					Path:      filePath,
-					CommitID:  ghContext.SHA,
-					StartLine: 1,
-					Line:      1,
-
-				})
+				prComment := pullRequestComment{
+					Body:     fmt.Sprintf("```suggestion\n%s\n```", s.TextEdits[0].NewText),
+					Path:     filePath,
+					CommitID: ghContext.SHA,
+				}
+				if s.TextEdits[0].End <= s.TextEdits[0].Line {
+					prComment.Line = s.TextEdits[0].Line
+				} else {
+					prComment.StartLine = s.TextEdits[0].Line
+					prComment.Line = s.TextEdits[0].End
+				}
+				buf, err := json.Marshal(prComment)
 				if err != nil {
 					return err
 				}
-				if err := ghClient.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
+				if err := g.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
 					return err
 				}
 			}
 			for _, d := range report.Diagnostics {
 				for _, s := range d.SuggestedFixes {
-					buf, err := json.Marshal(pullRequestComment{
-						Body:      fmt.Sprintf("```suggestion\n%s\n```", s.Message),
-						Path:      filePath,
-						CommitID:  ghContext.SHA,
-						StartLine: 1,
-						Line:      1,
-					})
+					prComment := pullRequestComment{
+						Body:     fmt.Sprintf("```suggestion\n%s\n```", s.TextEdits[0].NewText),
+						Path:     filePath,
+						CommitID: ghContext.SHA,
+					}
+					if s.TextEdits[0].End <= s.TextEdits[0].Line {
+						prComment.Line = s.TextEdits[0].Line
+					} else {
+						prComment.StartLine = s.TextEdits[0].Line
+						prComment.Line = s.TextEdits[0].End
+					}
+					buf, err := json.Marshal(prComment)
 					if err != nil {
 						return err
 					}
-					if err := ghClient.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
+					if err := g.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
 						return err
 					}
 				}
