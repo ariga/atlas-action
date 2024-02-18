@@ -364,7 +364,8 @@ func TestMigrateLint(t *testing.T) {
 			var payload pullRequestComment
 			require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
 			require.Equal(t, "testdata/migrations_destructive/20230925192914.sql", payload.Path)
-			require.Equal(t, "```suggestion\nAdd a pre-migration check to ensure table \"t1\" is empty before dropping it\n```", payload.Body)
+			require.Equal(t, "```suggestion\n-- atlas:txtar\n\n-- checks/destructive.sql --\n-- atlas:assert DS102\nSELECT NOT EXISTS (SELECT 1 FROM `t1`) AS `is_empty`;\n\n-- migration.sql --\ndrop table t1;\n```", payload.Body)
+			require.Equal(t, 1, payload.Line)
 			writer.WriteHeader(http.StatusCreated)
 		}))
 		tt.env["GITHUB_API_URL"] = ghMock.URL
@@ -382,10 +383,8 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 error found")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
-		out := tt.out.String()
-		require.Contains(t, out, "error file=testdata/migrations_destructive/20230925192914.sql")
-		require.Contains(t, out, "destructive changes detected")
-		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS102")
+		// Since we wrote suggestion comment, we should see no error in check output
+		require.Empty(t, tt.out.String())
 	})
 	t.Run("lint summary - with diagnostics", func(t *testing.T) {
 		tt := newT(t)

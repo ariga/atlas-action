@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/sql/sqlcheck"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sethvargo/go-githubactions"
 )
@@ -125,7 +126,8 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 		Web:       true,
 		Writer:    &resp,
 	})
-	if err != nil && !errors.Is(err, atlasexec.LintErr) {
+	isLintErr := err != nil && errors.Is(err, atlasexec.LintErr)
+	if err != nil && !isLintErr {
 		return err
 	}
 	if err := json.NewDecoder(&resp).Decode(&payload); err != nil {
@@ -161,7 +163,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if err := ghClient.addSuggestions(act, &payload); err != nil {
 		return err
 	}
-	if errors.Is(err, atlasexec.LintErr) {
+	if isLintErr {
 		return fmt.Errorf("lint completed with errors, see report: %s", payload.URL)
 	}
 	return nil
@@ -283,43 +285,13 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 		filePath := path.Join(payload.Env.Dir, file.Name)
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
-				prComment := pullRequestComment{
-					Body:     fmt.Sprintf("```suggestion\n%s\n```", s.TextEdit.NewText),
-					Path:     filePath,
-					CommitID: ghContext.SHA,
-				}
-				if s.TextEdit.End <= s.TextEdit.Line {
-					prComment.Line = s.TextEdit.Line
-				} else {
-					prComment.StartLine = s.TextEdit.Line
-					prComment.Line = s.TextEdit.End
-				}
-				buf, err := json.Marshal(prComment)
-				if err != nil {
-					return err
-				}
-				if err := g.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
+				if err := g.commentSuggestion(event.PullRequestNumber, ghContext.SHA, filePath, s); err != nil {
 					return err
 				}
 			}
 			for _, d := range report.Diagnostics {
 				for _, s := range d.SuggestedFixes {
-					prComment := pullRequestComment{
-						Body:     fmt.Sprintf("```suggestion\n%s\n```", s.TextEdit.NewText),
-						Path:     filePath,
-						CommitID: ghContext.SHA,
-					}
-					if s.TextEdit.End <= s.TextEdit.Line {
-						prComment.Line = s.TextEdit.Line
-					} else {
-						prComment.StartLine = s.TextEdit.Line
-						prComment.Line = s.TextEdit.End
-					}
-					buf, err := json.Marshal(prComment)
-					if err != nil {
-						return err
-					}
-					if err := g.createPRComment(event.PullRequestNumber, bytes.NewReader(buf)); err != nil {
+					if err := g.commentSuggestion(event.PullRequestNumber, ghContext.SHA, filePath, s); err != nil {
 						return err
 					}
 				}
@@ -336,12 +308,11 @@ type (
 	}
 
 	pullRequestComment struct {
-		Body        string `json:"body"`
-		Path        string `json:"path"`
-		CommitID    string `json:"commit_id,omitempty"`
-		StartLine   int    `json:"start_line,omitempty"`
-		Line        int    `json:"line,omitempty"`
-		SubjectType string `json:"subject_type,omitempty"`
+		Body      string `json:"body"`
+		Path      string `json:"path"`
+		CommitID  string `json:"commit_id,omitempty"`
+		StartLine int    `json:"start_line,omitempty"`
+		Line      int    `json:"line,omitempty"`
 	}
 
 	githubAPI struct {
@@ -432,10 +403,25 @@ func (g *githubAPI) updateComment(id int, content io.Reader) error {
 	return err
 }
 
-// createPullRequestComment creates a review comment on the pull request.
-func (g *githubAPI) createPRComment(id int, content io.Reader) error {
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, id)
-	req, err := http.NewRequest(http.MethodPost, url, content)
+// commentSuggestion creates a suggestion comment on the pull request.
+func (g *githubAPI) commentSuggestion(prID int, commitID, filePath string, suggestion sqlcheck.SuggestedFix) error {
+	prComment := pullRequestComment{
+		Body:     fmt.Sprintf("```suggestion\n%s\n```", suggestion.TextEdit.NewText),
+		Path:     filePath,
+		CommitID: commitID,
+	}
+	if suggestion.TextEdit.End <= suggestion.TextEdit.Line {
+		prComment.Line = suggestion.TextEdit.Line
+	} else {
+		prComment.StartLine = suggestion.TextEdit.Line
+		prComment.Line = suggestion.TextEdit.End
+	}
+	buf, err := json.Marshal(prComment)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, prID)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf))
 	if err != nil {
 		return err
 	}
