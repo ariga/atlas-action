@@ -498,7 +498,7 @@ func (g *githubAPI) updateReviewComment(id int, body string) error {
 	type pullRequestUpdate struct {
 		Body string `json:"body"`
 	}
-	b, err := json.Marshal(pullRequestUpdate{Body: "updated"})
+	b, err := json.Marshal(pullRequestUpdate{Body: body})
 	if err != nil {
 		return err
 	}
