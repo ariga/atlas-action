@@ -560,6 +560,7 @@ func TestMigrateLint(t *testing.T) {
 		// Run Lint against a directory that has an existing comment, expecting a PATCH
 		tt.setInput("dir-name", "other-dir-slug")
 		err = MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		require.Equal(t, 10, len(ghPayloads))
 		found = slices.IndexFunc(ghPayloads, func(gh ghPayload) bool {
 			if gh.Method != http.MethodPatch {

@@ -425,7 +425,7 @@ func (g *githubAPI) upsertSuggestion(prNumber int, commitID, filePath string, su
 		return c.Path == filePath && strings.Contains(c.Body, marker)
 	})
 	if found != -1 {
-		if err := g.updateReviewComment(comments[found].ID, strings.NewReader(body)); err != nil {
+		if err := g.updateReviewComment(comments[found].ID, body); err != nil {
 			return err
 		}
 		return nil
@@ -492,9 +492,16 @@ func (g *githubAPI) listReviewComments(prNumber int) ([]pullRequestComment, erro
 }
 
 // updateReviewComment updates the review comment with the given id.
-func (g *githubAPI) updateReviewComment(id int, content io.Reader) error {
+func (g *githubAPI) updateReviewComment(id int, body string) error {
+	type pullRequestUpdate struct {
+		Body string `json:"body"`
+	}
+	b, err := json.Marshal(pullRequestUpdate{Body: body})
+	if err != nil {
+		return err
+	}
 	url := fmt.Sprintf("%v/repos/%v/pulls/comments/%v", g.baseURL, g.repo, id)
-	req, err := http.NewRequest(http.MethodPatch, url, content)
+	req, err := http.NewRequest(http.MethodPatch, url, bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
