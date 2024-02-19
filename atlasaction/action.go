@@ -242,9 +242,9 @@ func addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) erro
 					"title": report.Text,
 				})
 				if file.Error != "" {
-					act.Errorf(msg)
+					act.Warningf(msg)
 				} else {
-					act.Noticef(msg)
+					act.Warningf(msg)
 				}
 			}
 		}
