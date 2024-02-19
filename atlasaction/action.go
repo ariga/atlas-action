@@ -145,7 +145,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 		return err
 	}
 	ghClient := githubAPI{
-		event :  event,
+		event:   event,
 		baseURL: ghContext.APIURL,
 		repo:    ghContext.Repository,
 		client: &http.Client{
@@ -229,7 +229,7 @@ func (g *githubAPI) addSummary(act *githubactions.Action, summary string) error 
 	return g.createIssueComment(r)
 }
 
-// addChecks runs annotations to the pull request for the given payload.
+// addChecks runs annotations to the trigger event pull request for the given payload.
 func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
 	dir := payload.Env.Dir
 	for _, file := range payload.Files {
@@ -264,19 +264,25 @@ func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.Summ
 	return nil
 }
 
-// addSuggestions comments on the pull request for the given payload.
+// addSuggestions comments on the trigger event pull request for the given payload.
 func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
 	for _, file := range payload.Files {
 		filePath := path.Join(payload.Env.Dir, file.Name)
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
-				if err := g.upsertSuggestion(filePath, s); err != nil {
+				body := fmt.Sprintf("%s\n```suggestion\n%s\n```", s.Message, s.TextEdit.NewText)
+				if err := g.upsertSuggestion(filePath, body, s); err != nil {
 					return err
 				}
 			}
 			for _, d := range report.Diagnostics {
 				for _, s := range d.SuggestedFixes {
-					if err := g.upsertSuggestion(filePath, s); err != nil {
+					body := d.Text
+					if d.Code != "" {
+						body = fmt.Sprintf("%v [%v](https://atlasgo.io/lint/analyzers#%v)", body, d.Code, d.Code)
+					}
+					body = fmt.Sprintf("%s\n%s\n```suggestion\n%s\n```", body, s.Message, s.TextEdit.NewText)
+					if err := g.upsertSuggestion(filePath, body, s); err != nil {
 						return err
 					}
 				}
@@ -302,7 +308,7 @@ type (
 	}
 
 	githubAPI struct {
-		event  *githubTriggerEvent
+		event   *githubTriggerEvent
 		baseURL string
 		repo    string
 		client  *http.Client
@@ -390,12 +396,10 @@ func (g *githubAPI) updateIssueComment(id int, content io.Reader) error {
 	return err
 }
 
-// upsertSuggestion creates or updates a suggestion review comment on the pull request.
-func (g *githubAPI) upsertSuggestion(filePath string, suggestion sqlcheck.SuggestedFix) error {
-	var (
-		marker = commentMarker(suggestion.Message)
-		body   = fmt.Sprintf("%s\n```suggestion\n%s\n```\n%s", suggestion.Message, suggestion.TextEdit.NewText, marker)
-	)
+// upsertSuggestion creates or updates a suggestion review comment on trigger event pull request.
+func (g *githubAPI) upsertSuggestion(filePath, body string, suggestion sqlcheck.SuggestedFix) error {
+	marker := commentMarker(suggestion.Message)
+	body = fmt.Sprintf("%s\n%s", body, marker)
 	comments, err := g.listReviewComments()
 	if err != nil {
 		return err
@@ -447,7 +451,7 @@ func (g *githubAPI) upsertSuggestion(filePath string, suggestion sqlcheck.Sugges
 	return err
 }
 
-// listReviewComments for the given pull request.
+// listReviewComments for the trigger event pull request.
 func (g *githubAPI) listReviewComments() ([]pullRequestComment, error) {
 	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, g.event.PullRequest.Number)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -478,7 +482,7 @@ func (g *githubAPI) updateReviewComment(id int, body string) error {
 	type pullRequestUpdate struct {
 		Body string `json:"body"`
 	}
-	b, err := json.Marshal(pullRequestUpdate{Body: "updated"})
+	b, err := json.Marshal(pullRequestUpdate{Body: body})
 	if err != nil {
 		return err
 	}
