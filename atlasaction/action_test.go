@@ -364,7 +364,18 @@ func TestMigrateLint(t *testing.T) {
 			var payload pullRequestComment
 			require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
 			require.Equal(t, "testdata/migrations_destructive/20230925192914.sql", payload.Path)
-			require.Equal(t, "```suggestion\n-- atlas:txtar\n\n-- checks/destructive.sql --\n-- atlas:assert DS102\nSELECT NOT EXISTS (SELECT 1 FROM `t1`) AS `is_empty`;\n\n-- migration.sql --\ndrop table t1;\n```", payload.Body)
+			require.Equal(t, "Add a pre-migration check to ensure table \"t1\" is empty before dropping it\n" +
+				"```suggestion\n" +
+				"-- atlas:txtar\n" +
+				"\n" +
+				"-- checks/destructive.sql --" +
+				"\n" +
+				"-- atlas:assert DS102\n" +
+				"SELECT NOT EXISTS (SELECT 1 FROM `t1`) AS `is_empty`;\n" +
+				"\n" +
+				"-- migration.sql --\n" +
+				"drop table t1;\n" +
+				"```", payload.Body)
 			require.Equal(t, 1, payload.Line)
 			writer.WriteHeader(http.StatusCreated)
 		}))

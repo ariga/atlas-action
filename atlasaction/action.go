@@ -408,7 +408,7 @@ func (g *githubAPI) updateComment(id int, content io.Reader) error {
 // commentSuggestion creates a suggestion comment on the pull request.
 func (g *githubAPI) commentSuggestion(prNumber int, commitID, filePath string, suggestion sqlcheck.SuggestedFix) error {
 	prComment := pullRequestComment{
-		Body:     fmt.Sprintf("```suggestion\n%s\n```", suggestion.TextEdit.NewText),
+		Body:     fmt.Sprintf("%s\n```suggestion\n%s\n```", suggestion.Message, suggestion.TextEdit.NewText),
 		Path:     filePath,
 		CommitID: commitID,
 	}
