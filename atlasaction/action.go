@@ -247,7 +247,9 @@ func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.Summ
 		for _, report := range file.Reports {
 			for _, diag := range report.Diagnostics {
 				// If there are suggested fixes, we will add them as comments, not as checks annotations.
-				if diag.SuggestedFixes != nil {
+				if slices.ContainsFunc(diag.SuggestedFixes, func(s sqlcheck.SuggestedFix) bool {
+					return s.TextEdit != nil
+				}) {
 					continue
 				}
 				msg := diag.Text
@@ -263,7 +265,7 @@ func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.Summ
 				if file.Error != "" {
 					act.Errorf(msg)
 				} else {
-					act.Noticef(msg)
+					act.Warningf(msg)
 				}
 			}
 		}
