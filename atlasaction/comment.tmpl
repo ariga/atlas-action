@@ -11,7 +11,9 @@
     <tbody>
         <tr>
             <td>
-                <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
             </td>
             <td>
                 {{- $fileCount := len .Files }}
@@ -21,7 +23,9 @@
         </tr>
         <tr>
             <td>
-                <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
             </td>
             <td>
                 ERD and Visual Diff generated
@@ -34,21 +38,27 @@
             {{- $errCount := fileErrors .}}
             {{- if gt $errCount 0 }}
             <td>
-                <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
+                </div>
             </td>
             <td>
                 {{ $errCount }} error{{ if gt $errCount 1}}s{{ end }} found
             </td>
             {{- else if .DiagnosticsCount }}
             <td>
-                <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
+                </div>
             </td>
             <td>
                 {{ .DiagnosticsCount }} issue{{ if gt .DiagnosticsCount 1}}s{{ end }} found
             </td>
             {{- else}}
             <td>
-                <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
             </td>
             <td>
                 No issues found
