@@ -277,11 +277,17 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 			}
 			for _, d := range report.Diagnostics {
 				for _, s := range d.SuggestedFixes {
-					body := d.Text
-					if d.Code != "" {
-						body = fmt.Sprintf("%v [%v](https://atlasgo.io/lint/analyzers#%v)", body, d.Code, d.Code)
+					sevirity := "WARNING"
+					if file.Error != "" {
+						sevirity = "CAUTION"
 					}
-					body = fmt.Sprintf("%s\n%s\n```suggestion\n%s\n```", body, s.Message, s.TextEdit.NewText)
+					title := fmt.Sprintf("> [%s]\n" +
+						"> **%s**\n" +
+						"> %s", sevirity, report.Text, d.Text)
+					if d.Code != "" {
+						title = fmt.Sprintf("%v [%v](https://atlasgo.io/lint/analyzers#%v)\n", title, d.Code, d.Code)
+					}
+					body:= fmt.Sprintf("%s\n%s\n```suggestion\n%s\n```", title, s.Message, s.TextEdit.NewText)
 					if err := g.upsertSuggestion(filePath, body, s); err != nil {
 						return err
 					}
