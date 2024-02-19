@@ -227,7 +227,7 @@ func (g *githubAPI) addSummary(act *githubactions.Action, summary string) error 
 		return strings.Contains(c.Body, marker)
 	})
 	if found != -1 {
-		return g.updateComment(comments[found].ID, r)
+		return g.updateIssueComment(comments[found].ID, r)
 	}
 	return g.createIssueComment(prNumber, r)
 }
@@ -281,19 +281,25 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 	if err != nil {
 		return err
 	}
+	var (
+		prNumber = event.PullRequest.Number
+		commitID = event.PullRequest.Head.SHA
+	)
+	comments, err := g.listReviewComments(prNumber)
+	if err != nil {
+		return err
+	}
 	for _, file := range payload.Files {
 		filePath := path.Join(payload.Env.Dir, file.Name)
-		prNumber := event.PullRequest.Number
-		commitID := event.PullRequest.Head.SHA
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
-				if err := g.commentSuggestion(prNumber, commitID, filePath, s); err != nil {
+				if err := g.upsertSuggestion(comments, prNumber, commitID, filePath, s); err != nil {
 					return err
 				}
 			}
 			for _, d := range report.Diagnostics {
 				for _, s := range d.SuggestedFixes {
-					if err := g.commentSuggestion(prNumber, commitID, filePath, s); err != nil {
+					if err := g.upsertSuggestion(comments, prNumber, commitID, filePath, s); err != nil {
 						return err
 					}
 				}
@@ -310,6 +316,7 @@ type (
 	}
 
 	pullRequestComment struct {
+		ID        int    `json:"id"`
 		Body      string `json:"body"`
 		Path      string `json:"path"`
 		CommitID  string `json:"commit_id,omitempty"`
@@ -383,8 +390,8 @@ func (g *githubAPI) createIssueComment(id int, content io.Reader) error {
 	return err
 }
 
-// updateComment updates issue comment with the given id.
-func (g *githubAPI) updateComment(id int, content io.Reader) error {
+// updateIssueComment updates issue comment with the given id.
+func (g *githubAPI) updateIssueComment(id int, content io.Reader) error {
 	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", g.baseURL, g.repo, id)
 	req, err := http.NewRequest(http.MethodPatch, url, content)
 	if err != nil {
@@ -405,10 +412,26 @@ func (g *githubAPI) updateComment(id int, content io.Reader) error {
 	return err
 }
 
-// commentSuggestion creates a suggestion comment on the pull request.
-func (g *githubAPI) commentSuggestion(prNumber int, commitID, filePath string, suggestion sqlcheck.SuggestedFix) error {
+// upsertSuggestion creates or updates a suggestion review comment on the pull request.
+func (g *githubAPI) upsertSuggestion(comments []pullRequestComment, prNumber int, commitID, filePath string, suggestion sqlcheck.SuggestedFix) error {
+	var (
+		marker = commentMarker(suggestion.Message)
+		body   = fmt.Sprintf("%s\n```suggestion\n%s\n```\n%s", suggestion.Message, suggestion.TextEdit.NewText, marker)
+	)
+	// Search for the comment marker in the comments list.
+	// If found, update the comment with the new suggestion.
+	// If not found, create a new suggestion comment.
+	found := slices.IndexFunc(comments, func(c pullRequestComment) bool {
+		return c.Path == filePath && strings.Contains(c.Body, marker)
+	})
+	if found != -1 {
+		if err := g.updateReviewComment(comments[found].ID, strings.NewReader(body)); err != nil {
+			return err
+		}
+		return nil
+	}
 	prComment := pullRequestComment{
-		Body:     fmt.Sprintf("%s\n```suggestion\n%s\n```", suggestion.Message, suggestion.TextEdit.NewText),
+		Body:     body,
 		Path:     filePath,
 		CommitID: commitID,
 	}
@@ -433,6 +456,54 @@ func (g *githubAPI) commentSuggestion(prNumber int, commitID, filePath string, s
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusCreated {
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
+		}
+		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	return err
+}
+
+// listReviewComments for the given pull request.
+func (g *githubAPI) listReviewComments(prNumber int) ([]pullRequestComment, error) {
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, prNumber)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := g.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
+		}
+		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	var comments []pullRequestComment
+	if err = json.NewDecoder(res.Body).Decode(&comments); err != nil {
+		return nil, err
+	}
+	return comments, nil
+}
+
+// updateReviewComment updates the review comment with the given id.
+func (g *githubAPI) updateReviewComment(id int, content io.Reader) error {
+	url := fmt.Sprintf("%v/repos/%v/pulls/comments/%v", g.baseURL, g.repo, id)
+	req, err := http.NewRequest(http.MethodPatch, url, content)
+	if err != nil {
+		return err
+	}
+	res, err := g.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
 		b, err := io.ReadAll(res.Body)
 		if err != nil {
 			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
@@ -476,6 +547,7 @@ type githubTriggerEvent struct {
 	} `mapstructure:"pull_request"`
 }
 
+// triggerEvent extracts the trigger event data from the action context.
 func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, error) {
 	var event githubTriggerEvent
 	if err := mapstructure.Decode(ghContext.Event, &event); err != nil {
@@ -484,6 +556,7 @@ func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, 
 	return &event, nil
 }
 
-func commentMarker(dirName string) string {
-	return fmt.Sprintf(`<!-- generated by ariga/atlas-action for %v -->`, dirName)
+// commentMarker creates a hidden marker to identify the comment as one created by this action.
+func commentMarker(id string) string {
+	return fmt.Sprintf(`<!-- generated by ariga/atlas-action for %v -->`, id)
 }
