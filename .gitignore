@@ -49,3 +49,6 @@ build/Release
 # Ignore built ts files
 __tests__/runner/*
 lib/**/*
+
+# IDE files
+.idea/

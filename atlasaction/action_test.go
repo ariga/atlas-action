@@ -404,11 +404,16 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 error found")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
-		// Since we wrote suggestion comment, we should see no error in check output
-		require.Empty(t, tt.out.String())
+		out := tt.out.String()
+		require.Contains(t, out, "error file=testdata/migrations_destructive/20230925192914.sql")
+		require.Contains(t, out, "destructive changes detected")
+		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS102")
 		require.Len(t, comments, 1)
 		require.Equal(t, "testdata/migrations_destructive/20230925192914.sql", comments[0].Path)
-		require.Equal(t, "Add a pre-migration check to ensure table \"t1\" is empty before dropping it\n"+
+		require.Equal(t, "> [!CAUTION]\n" +
+			"> **destructive changes detected**\n" +
+			"> Dropping table \"t1\" [DS102](https://atlasgo.io/lint/analyzers#DS102)\n\n" +
+			"Add a pre-migration check to ensure table \"t1\" is empty before dropping it\n"+
 			"```suggestion\n"+
 			"-- atlas:txtar\n"+
 			"\n"+
