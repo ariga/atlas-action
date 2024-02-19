@@ -281,7 +281,7 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 					if file.Error != "" {
 						sevirity = "CAUTION"
 					}
-					title := fmt.Sprintf("> [%s]\n" +
+					title := fmt.Sprintf("> [!%s]\n" +
 						"> **%s**\n" +
 						"> %s", sevirity, report.Text, d.Text)
 					if d.Code != "" {

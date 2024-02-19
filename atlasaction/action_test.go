@@ -410,7 +410,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS102")
 		require.Len(t, comments, 1)
 		require.Equal(t, "testdata/migrations_destructive/20230925192914.sql", comments[0].Path)
-		require.Equal(t, "> [CAUTION]\n" +
+		require.Equal(t, "> [!CAUTION]\n" +
 			"> **destructive changes detected**\n" +
 			"> Dropping table \"t1\" [DS102](https://atlasgo.io/lint/analyzers#DS102)\n\n" +
 			"Add a pre-migration check to ensure table \"t1\" is empty before dropping it\n"+
