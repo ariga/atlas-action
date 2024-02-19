@@ -285,21 +285,17 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 		prNumber = event.PullRequest.Number
 		commitID = event.PullRequest.Head.SHA
 	)
-	comments, err := g.listReviewComments(prNumber)
-	if err != nil {
-		return err
-	}
 	for _, file := range payload.Files {
 		filePath := path.Join(payload.Env.Dir, file.Name)
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
-				if err := g.upsertSuggestion(comments, prNumber, commitID, filePath, s); err != nil {
+				if err := g.upsertSuggestion(prNumber, commitID, filePath, s); err != nil {
 					return err
 				}
 			}
 			for _, d := range report.Diagnostics {
 				for _, s := range d.SuggestedFixes {
-					if err := g.upsertSuggestion(comments, prNumber, commitID, filePath, s); err != nil {
+					if err := g.upsertSuggestion(prNumber, commitID, filePath, s); err != nil {
 						return err
 					}
 				}
@@ -316,7 +312,7 @@ type (
 	}
 
 	pullRequestComment struct {
-		ID        int    `json:"id"`
+		ID        int    `json:"id,omitempty"`
 		Body      string `json:"body"`
 		Path      string `json:"path"`
 		CommitID  string `json:"commit_id,omitempty"`
@@ -413,11 +409,15 @@ func (g *githubAPI) updateIssueComment(id int, content io.Reader) error {
 }
 
 // upsertSuggestion creates or updates a suggestion review comment on the pull request.
-func (g *githubAPI) upsertSuggestion(comments []pullRequestComment, prNumber int, commitID, filePath string, suggestion sqlcheck.SuggestedFix) error {
+func (g *githubAPI) upsertSuggestion(prNumber int, commitID, filePath string, suggestion sqlcheck.SuggestedFix) error {
 	var (
 		marker = commentMarker(suggestion.Message)
 		body   = fmt.Sprintf("%s\n```suggestion\n%s\n```\n%s", suggestion.Message, suggestion.TextEdit.NewText, marker)
 	)
+	comments, err := g.listReviewComments(prNumber)
+	if err != nil {
+		return err
+	}
 	// Search for the comment marker in the comments list.
 	// If found, update the comment with the new suggestion.
 	// If not found, create a new suggestion comment.
