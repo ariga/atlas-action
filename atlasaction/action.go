@@ -266,7 +266,25 @@ func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.Summ
 
 // addSuggestions comments on the trigger event pull request for the given payload.
 func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+	hasReport := false
+	for _, f := range payload.Files {
+		if len(f.Reports) > 0 {
+			hasReport = true
+			break
+		}
+	}
+	if !hasReport {
+		return nil
+	}
+	changedFiles, err := g.listPullRequestFiles()
+	if err != nil {
+		return err
+	}
 	for _, file := range payload.Files {
+		// Sending suggestions only for the files that are part of the PR.
+		if !slices.Contains(changedFiles, pullRequestFile{Name: file.Name}) {
+			continue
+		}
 		filePath := path.Join(payload.Env.Dir, file.Name)
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
@@ -311,6 +329,10 @@ type (
 		CommitID  string `json:"commit_id,omitempty"`
 		StartLine int    `json:"start_line,omitempty"`
 		Line      int    `json:"line,omitempty"`
+	}
+
+	pullRequestFile struct {
+		Name string `json:"filename"`
 	}
 
 	githubAPI struct {
@@ -452,6 +474,10 @@ func (g *githubAPI) upsertSuggestion(filePath, body string, suggestion sqlcheck.
 		if err != nil {
 			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
 		}
+		// Trying to create comment on file that is not in the PR
+		if res.StatusCode == http.StatusUnprocessableEntity && strings.Contains(string(b), "pull_request_review_thread.path") {
+			return nil
+		}
 		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
 	return err
@@ -510,6 +536,31 @@ func (g *githubAPI) updateReviewComment(id int, body string) error {
 		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
 	return err
+}
+
+func (g *githubAPI) listPullRequestFiles() ([]pullRequestFile, error) {
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/files", g.baseURL, g.repo, g.event.PullRequest.Number)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := g.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
+		}
+		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	var files []pullRequestFile
+	if err = json.NewDecoder(res.Body).Decode(&files); err != nil {
+		return nil, err
+	}
+	return files, nil
 }
 
 func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) {
