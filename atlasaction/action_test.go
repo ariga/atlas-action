@@ -387,7 +387,7 @@ func TestMigrateLint(t *testing.T) {
 				return
 			// List pull request files endpoint
 			case path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
-				_, err := writer.Write([]byte(`[{"filename": "20230925192914.sql"}]`))
+				_, err := writer.Write([]byte(`[{"filename": "testdata/migrations_destructive/20230925192914.sql"}]`))
 				require.NoError(t, err)
 			default:
 				writer.WriteHeader(http.StatusNotFound)
@@ -559,7 +559,7 @@ func TestMigrateLint(t *testing.T) {
 				writer.WriteHeader(http.StatusCreated)
 			// List pull request files endpoint
 			case path == "/repos/test-owner/test-repository/pulls/42/files" && method == http.MethodGet:
-				_, err := writer.Write([]byte(`[{"filename": "20230925192914.sql"}]`))
+				_, err := writer.Write([]byte(`[{"filename": "testdata/migrations_destructive/20230925192914.sql"}]`))
 				require.NoError(t, err)
 			}
 		}))

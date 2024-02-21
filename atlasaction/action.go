@@ -282,10 +282,10 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 	}
 	for _, file := range payload.Files {
 		// Sending suggestions only for the files that are part of the PR.
-		if !slices.Contains(changedFiles, pullRequestFile{Name: file.Name}) {
+		filePath := path.Join(payload.Env.Dir, file.Name)
+		if !slices.Contains(changedFiles, filePath) {
 			continue
 		}
-		filePath := path.Join(payload.Env.Dir, file.Name)
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
 				body := fmt.Sprintf("%s\n```suggestion\n%s\n```", s.Message, s.TextEdit.NewText)
@@ -534,7 +534,8 @@ func (g *githubAPI) updateReviewComment(id int, body string) error {
 	return err
 }
 
-func (g *githubAPI) listPullRequestFiles() ([]pullRequestFile, error) {
+// listPullRequestFiles return paths of the files in the trigger event pull request.
+func (g *githubAPI) listPullRequestFiles() ([]string, error) {
 	url := fmt.Sprintf("%v/repos/%v/pulls/%v/files", g.baseURL, g.repo, g.event.PullRequest.Number)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -556,7 +557,11 @@ func (g *githubAPI) listPullRequestFiles() ([]pullRequestFile, error) {
 	if err = json.NewDecoder(res.Body).Decode(&files); err != nil {
 		return nil, err
 	}
-	return files, nil
+	paths := make([]string, len(files))
+	for i := range files {
+		paths[i] = files[i].Name
+	}
+	return paths, nil
 }
 
 func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) {
