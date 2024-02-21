@@ -277,6 +277,7 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 		return nil
 	}
 	changedFiles, err := g.listPullRequestFiles()
+	fmt.Println("changedFiles", changedFiles)
 	if err != nil {
 		return err
 	}
