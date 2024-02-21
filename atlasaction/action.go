@@ -140,6 +140,13 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if err != nil {
 		return err
 	}
+	// In case of a pull request, we need to add checks and comments to the PR.
+	if ghContext.EventName != "pull_request" {
+		if isLintErr {
+			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
+		}
+		return nil
+	}
 	event, err := triggerEvent(ghContext)
 	if err != nil {
 		return err
@@ -155,11 +162,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 			Timeout: time.Second * 30,
 		},
 	}
-	var summary bytes.Buffer
-	if err := comment.Execute(&summary, &payload); err != nil {
-		return err
-	}
-	if err := ghClient.addSummary(act, summary.String()); err != nil {
+	if err := ghClient.addSummary(act, &payload); err != nil {
 		return err
 	}
 	if err := ghClient.addChecks(act, &payload); err != nil {
@@ -169,7 +172,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 		return err
 	}
 	if isLintErr {
-		return fmt.Errorf("lint completed with errors, see report: %s", payload.URL)
+		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 	}
 	return nil
 }
@@ -199,7 +202,12 @@ var (
 // addSummary writes a summary to the pull request. It adds a marker
 // HTML comment to the end of the comment body to identify the comment as one created by
 // this action.
-func (g *githubAPI) addSummary(act *githubactions.Action, summary string) error {
+func (g *githubAPI) addSummary(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+	var buf bytes.Buffer
+	if err := comment.Execute(&buf, &payload); err != nil {
+		return err
+	}
+	summary := buf.String()
 	act.AddStepSummary(summary)
 	prNumber := g.event.PullRequest.Number
 	if prNumber == 0 {
@@ -215,11 +223,11 @@ func (g *githubAPI) addSummary(act *githubactions.Action, summary string) error 
 	}{
 		Body: summary + "\n" + marker,
 	}
-	buf, err := json.Marshal(comment)
+	b, err := json.Marshal(comment)
 	if err != nil {
 		return err
 	}
-	r := bytes.NewReader(buf)
+	r := bytes.NewReader(b)
 	found := slices.IndexFunc(comments, func(c githubIssueComment) bool {
 		return strings.Contains(c.Body, marker)
 	})
@@ -299,13 +307,13 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 					if file.Error != "" {
 						sevirity = "CAUTION"
 					}
-					title := fmt.Sprintf("> [!%s]\n" +
-						"> **%s**\n" +
+					title := fmt.Sprintf("> [!%s]\n"+
+						"> **%s**\n"+
 						"> %s", sevirity, report.Text, d.Text)
 					if d.Code != "" {
 						title = fmt.Sprintf("%v [%v](https://atlasgo.io/lint/analyzers#%v)\n", title, d.Code, d.Code)
 					}
-					body:= fmt.Sprintf("%s\n%s\n```suggestion\n%s\n```", title, s.Message, s.TextEdit.NewText)
+					body := fmt.Sprintf("%s\n%s\n```suggestion\n%s\n```", title, s.Message, s.TextEdit.NewText)
 					if err := g.upsertSuggestion(filePath, body, s); err != nil {
 						return err
 					}

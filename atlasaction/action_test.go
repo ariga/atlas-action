@@ -414,9 +414,9 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS102")
 		require.Len(t, comments, 1)
 		require.Equal(t, "testdata/migrations_destructive/20230925192914.sql", comments[0].Path)
-		require.Equal(t, "> [!CAUTION]\n" +
-			"> **destructive changes detected**\n" +
-			"> Dropping table \"t1\" [DS102](https://atlasgo.io/lint/analyzers#DS102)\n\n" +
+		require.Equal(t, "> [!CAUTION]\n"+
+			"> **destructive changes detected**\n"+
+			"> Dropping table \"t1\" [DS102](https://atlasgo.io/lint/analyzers#DS102)\n\n"+
 			"Add a pre-migration check to ensure table \"t1\" is empty before dropping it\n"+
 			"```suggestion\n"+
 			"-- atlas:txtar\n"+
@@ -436,6 +436,21 @@ func TestMigrateLint(t *testing.T) {
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		require.Len(t, comments, 1)
 		require.Equal(t, "updated comment", comments[0].Body)
+	})
+	t.Run("lint summary - lint error - push event", func(t *testing.T) {
+		tt := newT(t)
+		tt.env["GITHUB_EVENT_NAME"] = "push"
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "`atlas migrate lint` completed with errors, see report: https://migration-lint-report-url")
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		// Check there is no summary file created in case of non-pull request event
+		require.Empty(t, string(c))
+		require.Empty(t, tt.out.String())
 	})
 	t.Run("lint summary - with diagnostics file not included in the pull request", func(t *testing.T) {
 		tt := newT(t)
@@ -769,6 +784,7 @@ func newT(t *testing.T) *test {
 			"GITHUB_OUTPUT":       outputFile.Name(),
 			"GITHUB_STEP_SUMMARY": summaryFile.Name(),
 			"GITHUB_EVENT_PATH":   eventPath.Name(),
+			"GITHUB_EVENT_NAME":   "pull_request",
 		},
 	}
 	tt.setEvent(t, `{}`)
