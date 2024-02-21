@@ -143,7 +143,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	// In case of a pull request, we need to add checks and comments to the PR.
 	if ghContext.EventName != "pull_request" {
 		if isLintErr {
-			return fmt.Errorf("lint completed with errors, see report: %s", payload.URL)
+			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 		}
 		return nil
 	}
@@ -172,7 +172,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 		return err
 	}
 	if isLintErr {
-		return fmt.Errorf("lint completed with errors, see report: %s", payload.URL)
+		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 	}
 	return nil
 }

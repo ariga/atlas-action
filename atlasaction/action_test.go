@@ -445,7 +445,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dir", "file://testdata/migrations_destructive")
 		tt.setInput("dir-name", "test-dir-slug")
 		err := MigrateLint(context.Background(), tt.cli, tt.act)
-		require.ErrorContains(t, err, "https://migration-lint-report-url")
+		require.ErrorContains(t, err, "`atlas migrate lint` completed with errors, see report: https://migration-lint-report-url")
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
 		// Check there is no summary file created in case of non-pull request event
