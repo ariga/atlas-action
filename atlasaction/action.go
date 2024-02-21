@@ -474,10 +474,6 @@ func (g *githubAPI) upsertSuggestion(filePath, body string, suggestion sqlcheck.
 		if err != nil {
 			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
 		}
-		// Trying to create comment on file that is not in the PR
-		if res.StatusCode == http.StatusUnprocessableEntity && strings.Contains(string(b), "pull_request_review_thread.path") {
-			return nil
-		}
 		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
 	return err

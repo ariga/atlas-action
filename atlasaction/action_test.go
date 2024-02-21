@@ -385,6 +385,10 @@ func TestMigrateLint(t *testing.T) {
 				require.Len(t, comments, 1)
 				comments[0].Body = "updated comment"
 				return
+			// List pull request files endpoint
+			case path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
+				_, err := writer.Write([]byte(`[{"filename": "20230925192914.sql"}]`))
+				require.NoError(t, err)
 			default:
 				writer.WriteHeader(http.StatusNotFound)
 			}
@@ -433,8 +437,40 @@ func TestMigrateLint(t *testing.T) {
 		require.Len(t, comments, 1)
 		require.Equal(t, "updated comment", comments[0].Body)
 	})
-	t.Run("lint summary - with diagnostics", func(t *testing.T) {
+	t.Run("lint summary - with diagnostics file not included in the pull request", func(t *testing.T) {
 		tt := newT(t)
+		var comments []pullRequestComment
+		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			var (
+				path   = request.URL.Path
+				method = request.Method
+			)
+			switch {
+			// List comments endpoint
+			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodGet:
+				b, err := json.Marshal(comments)
+				require.NoError(t, err)
+				_, err = writer.Write(b)
+				require.NoError(t, err)
+				return
+			// Create comment endpoint
+			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodPost:
+				var payload pullRequestComment
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+				payload.ID = 123
+				comments = append(comments, payload)
+				writer.WriteHeader(http.StatusCreated)
+				return
+			// List pull request files endpoint
+			case path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
+				_, err := writer.Write([]byte(`[{"filename": "new_file.sql"}]`))
+				require.NoError(t, err)
+			default:
+				writer.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		tt.env["GITHUB_API_URL"] = ghMock.URL
+		tt.env["GITHUB_REPOSITORY"] = "test-owner/test-repository"
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://testdata/diagnostics")
@@ -452,6 +488,8 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, out, "warning file=testdata/diagnostics/20231016114135_add_not_null.sql")
 		require.Contains(t, out, "data dependent changes detected")
 		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#MF103")
+		// Assert no comments were created, since migration file is not included in the pull request
+		require.Len(t, comments, 0)
 	})
 	t.Run("lint summary - lint success", func(t *testing.T) {
 		tt := newT(t)
@@ -519,6 +557,10 @@ func TestMigrateLint(t *testing.T) {
 			// Create pull request comment endpoint
 			case path == "/repos/test-owner/test-repository/pulls/42/comments" && method == http.MethodPost:
 				writer.WriteHeader(http.StatusCreated)
+			// List pull request files endpoint
+			case path == "/repos/test-owner/test-repository/pulls/42/files" && method == http.MethodGet:
+				_, err := writer.Write([]byte(`[{"filename": "20230925192914.sql"}]`))
+				require.NoError(t, err)
 			}
 		}))
 		tt.env["GITHUB_API_URL"] = ghMock.URL
@@ -551,7 +593,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dir", "file://testdata/migrations_destructive")
 		err = MigrateLint(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
-		require.Equal(t, 6, len(ghPayloads))
+		require.Equal(t, 7, len(ghPayloads))
 		found = slices.IndexFunc(ghPayloads, func(gh ghPayload) bool {
 			if gh.Method != http.MethodPost {
 				return false
@@ -566,7 +608,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dir-name", "other-dir-slug")
 		err = MigrateLint(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
-		require.Equal(t, 10, len(ghPayloads))
+		require.Equal(t, 12, len(ghPayloads))
 		found = slices.IndexFunc(ghPayloads, func(gh ghPayload) bool {
 			if gh.Method != http.MethodPatch {
 				return false
@@ -580,7 +622,7 @@ func TestMigrateLint(t *testing.T) {
 		// Run Lint with input errors, no calls to github api should be made
 		tt.setInput("dir-name", "fake-dir-name")
 		err = MigrateLint(context.Background(), tt.cli, tt.act)
-		require.Equal(t, 10, len(ghPayloads))
+		require.Equal(t, 12, len(ghPayloads))
 		require.ErrorContains(t, err, `dir "fake-dir-name" not found`)
 	})
 }
