@@ -36,12 +36,14 @@ module.exports = async function run(action) {
         toolPath = toolCache.find('atlas-action', cacheVersion);
         if (!toolPath) {
             core.info(`Downloading atlas-action binary: ${url}`)
-            toolPath = await toolCache.downloadTool(url, 'atlas-action');
+            // check if the binary is already in 'atlas-action' file
+            if (fs.existsSync('atlas-action')) {
+                toolPath = 'atlas-action';
+            } else {
+                toolPath = await toolCache.downloadTool(url, 'atlas-action');
+            }
             let cachedToolPath = await toolCache.cacheFile(toolPath, 'atlas-action', 'atlas-action', cacheVersion);
             core.addPath(cachedToolPath);
-            // Remove the downloaded binary
-            fs.unlinkSync(toolPath);
-            toolPath = cachedToolPath;
         }
         fs.chmodSync(toolPath, '700'); // Assuming the binary is directly within toolPath
     }
