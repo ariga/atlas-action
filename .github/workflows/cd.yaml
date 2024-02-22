@@ -55,3 +55,34 @@ jobs:
           AWS_REGION: us-east-1
         run: |
           aws s3 cp $BINARY_NAME s3://release.ariga.io/atlas-action/$BINARY_NAME
+
+  # Run end-to-end test on the published binary.
+  e2e-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ariga/setup-atlas@master
+        with:
+          cloud-token: ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
+      - name: "Run Migrate Lint"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        uses: jenseng/dynamic-uses@v1
+        with:
+          uses: ariga/atlas-action/migrate/lint@${{ github.event.inputs.version || 'v1' }}
+          with: '{
+            "dir": "file://atlasaction/testdata/migrations",
+            "dev-url": "sqlite://dev?mode=memory",
+            "dir-name": "test-dir"
+            }'
+
+      - name: "Run Migrate Push"
+        uses: jenseng/dynamic-uses@v1
+        with:
+          uses: ariga/atlas-action/migrate/push@${{ github.event.inputs.version || 'v1' }}
+          with: '{
+          "dir": "file://atlasaction/testdata/migrations",
+          "dev-url": "sqlite://dev?mode=memory",
+          "dir-name": "test-dir"
+          }'
