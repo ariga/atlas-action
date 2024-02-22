@@ -60,23 +60,29 @@ jobs:
   e2e-test:
     needs: build
     runs-on: ubuntu-latest
-    env:
-      MIGRATE_LINT_ACTION: ariga/atlas-action/migrate/lint@${{ github.event.inputs.version || 'v1' }}
-      MIGRATE_PUSH_ACTION: ariga/atlas-action/migrate/push@${{ github.event.inputs.version || 'v1' }}
     steps:
       - uses: actions/checkout@v3
       - uses: ariga/setup-atlas@master
         with:
           cloud-token: ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
-      - uses: ${{ env.MIGRATE_LINT_ACTION }}
-        with:
-          dir: 'file://atlasaction/testdata/migrations'
-          dev-url: 'sqlite://dev?mode=memory'
-          dir-name: 'name'
+      - name: "Run Migrate Lint"
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - uses: ${{ env.MIGRATE_PUSH_ACTION }}
+        uses: jenseng/dynamic-uses@v1
         with:
-          dir: 'file://atlasaction/testdata/migrations'
-          dev-url: 'sqlite://dev?mode=memory'
-          dir-name: 'test-dir'
+          uses: ariga/atlas-action/migrate/lint@${{ github.event.inputs.version || 'v1' }}
+          with: '{
+            "dir": "file://atlasaction/testdata/migrations",
+            "dev-url": "sqlite://dev?mode=memory",
+            "dir-name": "test-dir"
+            }'
+
+      - name: "Run Migrate Push"
+        uses: jenseng/dynamic-uses@v1
+        with:
+          uses: ariga/atlas-action/migrate/push@${{ github.event.inputs.version || 'v1' }}
+          with: '{
+          "dir": "file://atlasaction/testdata/migrations",
+          "dev-url": "sqlite://dev?mode=memory",
+          "dir-name": "test-dir"
+          }'
