@@ -254,19 +254,21 @@ func TestMigrateE2E(t *testing.T) {
 	tt.env["GITHUB_HEAD_REF"] = "testing-branch"
 	tt.env["GITHUB_REF_NAME"] = "refs/pulls/6/merge"
 	tt.env["GITHUB_SHA"] = "sha1234"
-	tt.env["GITHUB_ACTOR"] = "test-user"
-	tt.env["GITHUB_ACTOR_ID"] = "123"
+	err := os.Setenv("GITHUB_ACTOR", "test-user")
+	require.NoError(t, err)
+	err = os.Setenv("GITHUB_ACTOR_ID", "123")
+	require.NoError(t, err)
 	expected := &atlasexec.RunContext{
-		Repo:   "repository",
-		Path:   "file://testdata/migrations",
-		Branch: "testing-branch",
-		Commit: "sha1234",
-		URL:    "",
-		Username:  "test-user",
-		UserID:    "123",
-		SCMType: "GITHUB",
+		Repo:     "repository",
+		Path:     "file://testdata/migrations",
+		Branch:   "testing-branch",
+		Commit:   "sha1234",
+		URL:      "",
+		Username: "test-user",
+		UserID:   "123",
+		SCMType:  "GITHUB",
 	}
-	err := MigratePush(context.Background(), tt.cli, tt.act)
+	err = MigratePush(context.Background(), tt.cli, tt.act)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(payloads))
 	require.Equal(t, "test-dir", payloads[0].SyncDir.Slug)

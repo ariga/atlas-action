@@ -23,6 +23,7 @@ import (
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/sqlcheck"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sethvargo/go-envconfig"
 	"github.com/sethvargo/go-githubactions"
 )
 
@@ -73,7 +74,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 
 // MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
 func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
-	runContext, err := createRunContext(act)
+	runContext, err := createRunContext(ctx, act)
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
 	}
@@ -108,7 +109,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if act.GetInput("dir-name") == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
-	runContext, err := createRunContext(act)
+	runContext, err := createRunContext(ctx, act)
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
 	}
@@ -572,14 +573,16 @@ func (g *githubAPI) listPullRequestFiles() ([]string, error) {
 	return paths, nil
 }
 
-func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) {
+// Actor Information about the actor that triggered the action.
+type Actor struct {
+	Name string `env:"GITHUB_ACTOR"`
+	ID   string `env:"GITHUB_ACTOR_ID"`
+}
+
+func createRunContext(ctx context.Context, act *githubactions.Action) (*atlasexec.RunContext, error) {
 	ghContext, err := act.Context()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action context: %w", err)
-	}
-	// loop over ghContext.Event and extract the trigger event data.
-	for k, v := range ghContext.Event {
-		fmt.Printf("%v: %v\n", k, v)
 	}
 	ev, err := triggerEvent(ghContext)
 	if err != nil {
@@ -589,14 +592,18 @@ func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) 
 	if branch == "" {
 		branch = ghContext.RefName
 	}
+	var a Actor
+	if err := envconfig.Process(ctx, &a); err != nil {
+		return nil, fmt.Errorf("failed to load actor: %w", err)
+	}
 	return &atlasexec.RunContext{
 		Repo:     ghContext.Repository,
 		Branch:   branch,
 		Commit:   ghContext.SHA,
 		Path:     act.GetInput("dir"),
 		URL:      ev.HeadCommit.URL,
-		Username: ghContext.Actor,
-		UserID:   ghContext.Actor,
+		Username: a.Name,
+		UserID:   a.ID,
 		SCMType:  "GITHUB",
 	}, nil
 }
