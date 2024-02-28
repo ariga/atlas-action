@@ -577,6 +577,10 @@ func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action context: %w", err)
 	}
+	// loop over ghContext.Event and extract the trigger event data.
+	for k, v := range ghContext.Event {
+		fmt.Printf("%v: %v\n", k, v)
+	}
 	ev, err := triggerEvent(ghContext)
 	if err != nil {
 		return nil, err
@@ -586,11 +590,14 @@ func createRunContext(act *githubactions.Action) (*atlasexec.RunContext, error) 
 		branch = ghContext.RefName
 	}
 	return &atlasexec.RunContext{
-		Repo:   ghContext.Repository,
-		Branch: branch,
-		Commit: ghContext.SHA,
-		Path:   act.GetInput("dir"),
-		URL:    ev.HeadCommit.URL,
+		Repo:     ghContext.Repository,
+		Branch:   branch,
+		Commit:   ghContext.SHA,
+		Path:     act.GetInput("dir"),
+		URL:      ev.HeadCommit.URL,
+		Username: ghContext.Actor,
+		UserID:   ghContext.Actor,
+		SCMType:  "GITHUB",
 	}, nil
 }
 
