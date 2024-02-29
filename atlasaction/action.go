@@ -596,12 +596,16 @@ func createRunContext(ctx context.Context, act *githubactions.Action) (*atlasexe
 	if err := envconfig.Process(ctx, &a); err != nil {
 		return nil, fmt.Errorf("failed to load actor: %w", err)
 	}
+	url := ev.PullRequest.URL
+	if url == "" {
+		url = ev.Repository.URL
+	}
 	return &atlasexec.RunContext{
 		Repo:     ghContext.Repository,
 		Branch:   branch,
 		Commit:   ghContext.SHA,
 		Path:     act.GetInput("dir"),
-		URL:      ev.HeadCommit.URL,
+		URL:      url,
 		Username: a.Name,
 		UserID:   a.ID,
 		SCMType:  "GITHUB",
@@ -609,16 +613,16 @@ func createRunContext(ctx context.Context, act *githubactions.Action) (*atlasexe
 }
 
 type githubTriggerEvent struct {
-	HeadCommit struct {
-		URL string `mapstructure:"url"`
-	} `mapstructure:"head_commit"`
 	PullRequest struct {
 		Number int `mapstructure:"number"`
+		URL   string `mapstructure:"html_url"`
 		Head   struct {
 			SHA string `mapstructure:"sha"`
-			URL string `mapstructure:"url"`
 		} `mapstructure:"head"`
 	} `mapstructure:"pull_request"`
+	Repository struct{
+		URL string `mapstructure:"html_url"`
+	} `mapstructure:"repository"`
 }
 
 // triggerEvent extracts the trigger event data from the action context.
@@ -627,7 +631,6 @@ func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, 
 	if err := mapstructure.Decode(ghContext.Event, &event); err != nil {
 		return nil, fmt.Errorf("failed to parse push event: %v", err)
 	}
-	fmt.Printf("event: %+v\n", event)
 	return &event, nil
 }
 
