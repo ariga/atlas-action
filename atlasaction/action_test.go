@@ -258,12 +258,17 @@ func TestMigrateE2E(t *testing.T) {
 	require.NoError(t, err)
 	err = os.Setenv("GITHUB_ACTOR_ID", "123")
 	require.NoError(t, err)
+	tt.setEvent(t, `{
+			"pull_request": {
+				"html_url": "http://test"
+			}
+		}`)
 	expected := &atlasexec.RunContext{
 		Repo:     "repository",
 		Path:     "file://testdata/migrations",
 		Branch:   "testing-branch",
 		Commit:   "sha1234",
-		URL:      "",
+		URL:      "http://test",
 		Username: "test-user",
 		UserID:   "123",
 		SCMType:  "GITHUB",
