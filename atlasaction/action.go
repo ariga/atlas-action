@@ -616,6 +616,7 @@ type githubTriggerEvent struct {
 		Number int `mapstructure:"number"`
 		Head   struct {
 			SHA string `mapstructure:"sha"`
+			URL string `mapstructure:"url"`
 		} `mapstructure:"head"`
 	} `mapstructure:"pull_request"`
 }
@@ -626,6 +627,7 @@ func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, 
 	if err := mapstructure.Decode(ghContext.Event, &event); err != nil {
 		return nil, fmt.Errorf("failed to parse push event: %v", err)
 	}
+	fmt.Printf("event: %+v\n", event)
 	return &event, nil
 }
 
