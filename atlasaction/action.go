@@ -297,7 +297,8 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 		}
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
-				body := fmt.Sprintf("%s\n```suggestion\n%s\n```", s.Message, s.TextEdit.NewText)
+				footer := fmt.Sprintf("Ensure to run `atlas migrate hash --dir \"file://%s\"` after applying the suggested changes.", payload.Env.Dir)
+				body := fmt.Sprintf("%s\n```suggestion\n%s\n```\n%s", s.Message, s.TextEdit.NewText, footer)
 				if err := g.upsertSuggestion(filePath, body, s); err != nil {
 					return err
 				}
@@ -314,7 +315,8 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 					if d.Code != "" {
 						title = fmt.Sprintf("%v [%v](https://atlasgo.io/lint/analyzers#%v)\n", title, d.Code, d.Code)
 					}
-					body := fmt.Sprintf("%s\n%s\n```suggestion\n%s\n```", title, s.Message, s.TextEdit.NewText)
+					footer := fmt.Sprintf("Ensure to run `atlas migrate hash --dir \"file://%s\"` after applying the suggested changes.", payload.Env.Dir)
+					body := fmt.Sprintf("%s\n%s\n```suggestion\n%s\n```\n%s", title, s.Message, s.TextEdit.NewText, footer)
 					if err := g.upsertSuggestion(filePath, body, s); err != nil {
 						return err
 					}
