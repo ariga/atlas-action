@@ -24,6 +24,9 @@ inputs:
   dry-run:
     description: Print SQL without executing it. Either "true" or "false".
     required: false
+  working-directory:
+    description: Atlas working directory, default is project root
+    required: false
 outputs:
   current:
     description: The current version of the database. (before applying migrations)

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path"
 	"slices"
 	"strconv"
@@ -42,6 +43,9 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 	}()
 	if err != nil {
 		return fmt.Errorf(`invlid value for the "dry-run" input: %w`, err)
+	}
+	if act.GetInput("working-directory") != "" {
+		os.Chdir(act.GetInput("working-directory"))
 	}
 	params := &atlasexec.MigrateApplyParams{
 		URL:             act.GetInput("url"),
@@ -74,6 +78,9 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 
 // MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
 func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
+	if act.GetInput("working-directory") != "" {
+		os.Chdir(act.GetInput("working-directory"))
+	}
 	runContext, err := createRunContext(ctx, act)
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
@@ -109,6 +116,11 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if act.GetInput("dir-name") == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
+	if act.GetInput("working-directory") != "" {
+		os.Chdir(act.GetInput("working-directory"))
+	}
+	cwd, _ := os.Getwd()
+	fmt.Println("current working directory", cwd)
 	runContext, err := createRunContext(ctx, act)
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
@@ -616,13 +628,13 @@ func createRunContext(ctx context.Context, act *githubactions.Action) (*atlasexe
 
 type githubTriggerEvent struct {
 	PullRequest struct {
-		Number int `mapstructure:"number"`
-		URL   string `mapstructure:"html_url"`
+		Number int    `mapstructure:"number"`
+		URL    string `mapstructure:"html_url"`
 		Head   struct {
 			SHA string `mapstructure:"sha"`
 		} `mapstructure:"head"`
 	} `mapstructure:"pull_request"`
-	Repository struct{
+	Repository struct {
 		URL string `mapstructure:"html_url"`
 	} `mapstructure:"repository"`
 }
