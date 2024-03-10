@@ -616,13 +616,13 @@ func createRunContext(ctx context.Context, act *githubactions.Action) (*atlasexe
 
 type githubTriggerEvent struct {
 	PullRequest struct {
-		Number int `mapstructure:"number"`
-		URL   string `mapstructure:"html_url"`
+		Number int    `mapstructure:"number"`
+		URL    string `mapstructure:"html_url"`
 		Head   struct {
 			SHA string `mapstructure:"sha"`
 		} `mapstructure:"head"`
 	} `mapstructure:"pull_request"`
-	Repository struct{
+	Repository struct {
 		URL string `mapstructure:"html_url"`
 	} `mapstructure:"repository"`
 }

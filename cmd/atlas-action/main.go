@@ -66,6 +66,11 @@ func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action *g
 	defer func() {
 		_ = os.Unsetenv("ATLAS_ACTION_COMMAND")
 	}()
+	if action.GetInput("working-directory") != "" {
+		if err := os.Chdir(action.GetInput("working-directory")); err != nil {
+			return fmt.Errorf("failed to change working directory: %w", err)
+		}
+	}
 	switch r.Action {
 	case CmdMigrateApply:
 		return atlasaction.MigrateApply(ctx, client, action)

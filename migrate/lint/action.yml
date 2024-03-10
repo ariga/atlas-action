@@ -26,6 +26,9 @@ inputs:
   env:
     description: The environment to use from the Atlas configuration file.  For example, `dev`.
     required: false
+  working-directory:
+    description: Atlas working directory, default is project root
+    required: false
 outputs:
   url:
     description: |
