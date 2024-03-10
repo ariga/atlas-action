@@ -27,6 +27,11 @@ inputs:
   working-directory:
     description: Atlas working directory, default is project root
     required: false
+  vars:
+    description: |
+      A JSON object containing variables to be used in the Atlas configuration file.
+      For example, `{"var1": "value1", "var2": "value2"}`.
+    required: false
 outputs:
   current:
     description: The current version of the database. (before applying migrations)

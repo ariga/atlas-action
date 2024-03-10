@@ -43,6 +43,12 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 	if err != nil {
 		return fmt.Errorf(`invlid value for the "dry-run" input: %w`, err)
 	}
+	var vars atlasexec.Vars
+	if v := act.GetInput("vars"); v != "" {
+		if err := json.Unmarshal([]byte(v), &vars); err != nil {
+			return fmt.Errorf("failed to parse vars: %w", err)
+		}
+	}
 	params := &atlasexec.MigrateApplyParams{
 		URL:             act.GetInput("url"),
 		DirURL:          act.GetInput("dir"),
@@ -55,6 +61,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 			TriggerType:    atlasexec.TriggerTypeGithubAction,
 			TriggerVersion: Version,
 		},
+		Vars: vars,
 	}
 	run, err := client.MigrateApply(ctx, params)
 	if err != nil {
@@ -78,6 +85,12 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
 	}
+	var vars atlasexec.Vars
+	if v := act.GetInput("vars"); v != "" {
+		if err := json.Unmarshal([]byte(v), &vars); err != nil {
+			return fmt.Errorf("failed to parse vars: %w", err)
+		}
+	}
 	params := &atlasexec.MigratePushParams{
 		Name:      act.GetInput("dir-name"),
 		DirURL:    act.GetInput("dir"),
@@ -85,6 +98,7 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactio
 		Context:   runContext,
 		ConfigURL: act.GetInput("config"),
 		Env:       act.GetInput("env"),
+		Vars:      vars,
 	}
 	_, err = client.MigratePush(ctx, params)
 	if err != nil {
@@ -116,7 +130,13 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	var (
 		resp    bytes.Buffer
 		payload atlasexec.SummaryReport
+		vars    atlasexec.Vars
 	)
+	if v := act.GetInput("vars"); v != "" {
+		if err := json.Unmarshal([]byte(v), &vars); err != nil {
+			return fmt.Errorf("failed to parse vars: %w", err)
+		}
+	}
 	err = client.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
 		DevURL:    act.GetInput("dev-url"),
 		DirURL:    act.GetInput("dir"),
@@ -124,6 +144,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 		Env:       act.GetInput("env"),
 		Base:      "atlas://" + act.GetInput("dir-name"),
 		Context:   runContext,
+		Vars:      vars,
 		Web:       true,
 		Writer:    &resp,
 	})

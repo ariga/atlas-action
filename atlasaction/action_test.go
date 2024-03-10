@@ -535,6 +535,17 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "No issues found")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
 	})
+	t.Run("lint summary - lint success - vars input", func(t *testing.T) {
+		tt := newT(t)
+		cfgURL := generateHCLWithVars(t)
+		tt.setInput("config", cfgURL)
+		tt.setInput("vars", fmt.Sprintf(`{"token":"%s", "url":"%s"}`, token, srv.URL))
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir-slug")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+	})
 	t.Run("lint comment", func(t *testing.T) {
 		tt := newT(t)
 		type ghPayload struct {
@@ -672,6 +683,32 @@ func generateHCL(t *testing.T, url, token string) string {
 	})
 	return atlasConfigURL
 }
+
+func generateHCLWithVars(t *testing.T) string {
+	hcl :=`
+variable "token" {
+  type = string
+}
+
+variable "url" {
+  type = string
+}
+atlas {
+  cloud {
+    token = var.token
+    url   = var.url
+  }
+}
+env "test" {}
+`
+	atlasConfigURL, clean, err := atlasexec.TempFile(hcl, "hcl")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, clean())
+	})
+	return atlasConfigURL
+}
+
 
 func (tt *test) setupConfigWithLogin(t *testing.T, url, token string) {
 	tt.setInput("config", generateHCL(t, url, token))
