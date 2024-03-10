@@ -292,7 +292,7 @@ func TestMigrateE2E(t *testing.T) {
 	require.Equal(t, "https://some-org.atlasgo.cloud/dirs/314159/tags/12345", url)
 }
 
-feunc TestMigrateLint(t *testing.T) {
+func TestMigrateLint(t *testing.T) {
 	type graphQLQuery struct {
 		Query     string          `json:"query"`
 		Variables json.RawMessage `json:"variables"`

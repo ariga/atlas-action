@@ -119,8 +119,6 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactio
 	if act.GetInput("working-directory") != "" {
 		os.Chdir(act.GetInput("working-directory"))
 	}
-	cwd, _ := os.Getwd()
-	fmt.Println("current working directory", cwd)
 	runContext, err := createRunContext(ctx, act)
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)

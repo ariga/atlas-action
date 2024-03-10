@@ -81,7 +81,7 @@ jobs:
       - id: lint_success
         uses: ./migrate/lint
         with:
-          dir: file://atlasaction/testdata/migrations
+          working-directory: atlasaction/testdata
           dev-url: sqlite://file.db?mode=memory
           dir-name: test_dir
         env:
