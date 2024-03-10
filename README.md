@@ -195,6 +195,8 @@ All inputs are optional as they may be specified in the Atlas configuration file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
 * `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+   For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
 
 #### Outputs
@@ -218,6 +220,8 @@ All inputs are optional as they may be specified in the Atlas configuration file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
 * `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+   For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
 
 #### Outputs
@@ -241,6 +245,8 @@ All inputs are optional as they may be specified in the Atlas configuration file
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects). 
 * `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
 * `dry-run` - Print SQL without executing it. Defaults to `false`
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+   For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
 
 #### Outputs
