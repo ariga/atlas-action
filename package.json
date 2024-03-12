@@ -11,7 +11,7 @@
     "package": "ncc build --source-map --license licenses.txt",
     "test": "jest",
     "all": "npm run codegen && npm run build && npm run format && npm run lint && npm test && npm run package",
-    "shim": "ncc build migrate/apply/index.js -o migrate/apply/dist && ncc build migrate/push/index.js -o migrate/push/dist && ncc build migrate/lint/index.js -o migrate/lint/dist",
+    "shim": "ncc build migrate/apply/index.js -o migrate/apply/dist && ncc build migrate/push/index.js -o migrate/push/dist && ncc build migrate/lint/index.js -o migrate/lint/dist&& ncc build migrate/down/index.js -o migrate/down/dist",
     "codegen": "graphql-codegen --config codegen.ts"
   },
   "repository": {

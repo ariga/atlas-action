@@ -1,7 +1,7 @@
-ariga.io/atlas v0.19.1-0.20240218093714-1a4929bdea1f h1:76LCzgWyu26mvXyZG9rvreRey44cNCB05CZWgzv5Evo=
-ariga.io/atlas v0.19.1-0.20240218093714-1a4929bdea1f/go.mod h1:uj3pm+hUTVN/X5yfdBexHlZv+1Xu5u5ZbZx7+CDavNU=
-ariga.io/atlas-go-sdk v0.5.3-0.20240228104110-2a4454423c83 h1:vPBlrQ8CTTk2hf5EXHhjiadhGUrh1ubgao63xy+zsU4=
-ariga.io/atlas-go-sdk v0.5.3-0.20240228104110-2a4454423c83/go.mod h1:9mrVidREa1AU5WeSxNz7LuTwB1o6CzEMHSYfD8U0Zpc=
+ariga.io/atlas v0.20.1-0.20240321075817-75fd3b1accbf h1:jpDQmb4YyO6SADrfS2+13p+dKOBfNJB80K8sTLQMr9g=
+ariga.io/atlas v0.20.1-0.20240321075817-75fd3b1accbf/go.mod h1:VPlcXdd4w2KqKnH54yEZcry79UAhpaWaxEsmn5JRNoE=
+ariga.io/atlas-go-sdk v0.5.3-0.20240321141910-66e2f2b18896 h1:AMnt45J1xsRbP6h1C53slPG2SAIOpdtTAAf3hoJjLVc=
+ariga.io/atlas-go-sdk v0.5.3-0.20240321141910-66e2f2b18896/go.mod h1:wCso3QwMboXPUD5vNjBPDc3z086Ix3kfooanvcdlwV4=
 github.com/DATA-DOG/go-sqlmock v1.5.0 h1:Shsta01QNfFxHCfpW6YH2STWB0MudeXXEWMr20OEh60=
 github.com/DATA-DOG/go-sqlmock v1.5.0/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/agext/levenshtein v1.2.3 h1:YB2fHEn0UJagG8T1rrWknE3ZQzWM06O8AMAatNn7lmo=
@@ -57,8 +57,8 @@ github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcU
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/zclconf/go-cty v1.14.1 h1:t9fyA35fwjjUMcmL5hLER+e/rEPqrbCK1/OSE4SI9KA=
 github.com/zclconf/go-cty v1.14.1/go.mod h1:VvMs5i0vgZdhYawQNq5kePSpLAoz8u1xvZgrPIxfnZE=
-golang.org/x/text v0.13.0 h1:ablQoSUd0tRdKxZewP80B+BaqeKJuVhuRxj/dkrun3k=
-golang.org/x/text v0.13.0/go.mod h1:TvPlkZtksWOMsz7fbANvkp4WM8x/WCo/om8BMLbz+aE=
+golang.org/x/text v0.14.0 h1:ScX5w1eTa3QqT8oi6+ziP7dTV1S2+ALU0bI+0zXKWiQ=
+golang.org/x/text v0.14.0/go.mod h1:18ZOQIKpY8NJVqYksKHtTdi31H5itFRjB5/qKTNYzSU=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f h1:BLraFXnmrev5lT+xlilqcH8XK9/i0At2xKjWk4p6zsU=

@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -119,6 +120,141 @@ func TestMigrateApply(t *testing.T) {
 	})
 }
 
+func TestMigrateDown(t *testing.T) {
+	setup := func(t *testing.T) *test {
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "file://testdata/down/")
+		// Ensure files are applied.
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+		require.EqualValues(t, map[string]string{
+			"current":       "",
+			"target":        "3",
+			"pending_count": "3",
+			"applied_count": "3",
+		}, must(tt.outputs()))
+		tt.resetOut(t)
+		tt.setInput("dev-url", "sqlite://dev?mode=memory")
+		return tt
+	}
+
+	t.Run("down 1 file (default)", func(t *testing.T) {
+		tt := setup(t)
+		require.NoError(t, MigrateDown(context.Background(), tt.cli, tt.act))
+		require.EqualValues(t, map[string]string{
+			"current":        "3",
+			"target":         "2",
+			"planned_count":  "1",
+			"reverted_count": "1",
+		}, must(tt.outputs()))
+	})
+
+	t.Run("down two files", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("amount", "2")
+		require.NoError(t, MigrateDown(context.Background(), tt.cli, tt.act))
+		require.EqualValues(t, map[string]string{
+			"current":        "3",
+			"target":         "1",
+			"planned_count":  "1", // sqlite has transactional DDL -> one file to apply
+			"reverted_count": "1",
+		}, must(tt.outputs()))
+	})
+
+	t.Run("down to version", func(t *testing.T) {
+		t.Run("1", func(t *testing.T) {
+			tt := setup(t)
+			tt.setInput("to-version", "1")
+			require.NoError(t, MigrateDown(context.Background(), tt.cli, tt.act))
+			require.EqualValues(t, map[string]string{
+				"current":        "3",
+				"target":         "1",
+				"planned_count":  "1", // sqlite has transactional DDL -> one file to apply
+				"reverted_count": "1",
+			}, must(tt.outputs()))
+		})
+		t.Run("2", func(t *testing.T) {
+			tt := setup(t)
+			tt.setInput("to-version", "2")
+			require.NoError(t, MigrateDown(context.Background(), tt.cli, tt.act))
+			require.EqualValues(t, map[string]string{
+				"current":        "3",
+				"target":         "2",
+				"planned_count":  "1", // sqlite has transactional DDL -> one file to apply
+				"reverted_count": "1",
+			}, must(tt.outputs()))
+		})
+	})
+
+	t.Run("down approval pending", func(t *testing.T) {
+		tt := setup(t)
+		tt.cli = must(atlasexec.NewClient("", "./mock-atlas-down.sh"))
+		tt.setupConfigWithLogin(t, "", "")
+		st := must(json.Marshal(atlasexec.MigrateDown{
+			URL:    "URL",
+			Status: "PENDING_USER",
+		}))
+		t.Setenv("TEST_STDOUT", string(st))
+		tt.setInput("env", "test")
+		require.EqualError(t, MigrateDown(context.Background(), tt.cli, tt.act), "plan approval pending, review here: URL")
+		require.EqualValues(t, map[string]string{"url": "URL"}, must(tt.outputs()))
+	})
+
+	t.Run("aborted", func(t *testing.T) {
+		tt := setup(t)
+		tt.cli = must(atlasexec.NewClient("", "./mock-atlas-down.sh"))
+		tt.setupConfigWithLogin(t, "", "")
+		st := must(json.Marshal(atlasexec.MigrateDown{
+			URL:    "URL",
+			Status: "ABORTED",
+		}))
+		t.Setenv("TEST_STDOUT", string(st))
+		t.Setenv("TEST_EXIT_CODE", "1")
+		tt.setInput("env", "test")
+		require.EqualError(t, MigrateDown(context.Background(), tt.cli, tt.act), "plan rejected, review here: URL")
+		require.EqualValues(t, map[string]string{"url": "URL"}, must(tt.outputs()))
+	})
+
+	t.Run("wait configuration", func(t *testing.T) {
+		tt := setup(t)
+		tt.cli = must(atlasexec.NewClient("", "./mock-atlas-down.sh"))
+		tt.setupConfigWithLogin(t, "", "")
+		st := must(json.Marshal(atlasexec.MigrateDown{
+			URL:    "URL",
+			Status: "PENDING_USER",
+		}))
+		t.Setenv("TEST_STDOUT", string(st))
+		tt.setInput("env", "test")
+
+		// Defaults have been tested before by other tests.
+
+		tt.setInput("wait-interval", "1")
+		err := MigrateDown(context.Background(), tt.cli, tt.act)
+		require.EqualError(t, err, "both \"wait-interval\" and \"wait-timeout\" must be given or be empty, got \"1\" and \"\"")
+		tt.setInput("wait-interval", "")
+
+		tt.setInput("wait-timeout", "1")
+		err = MigrateDown(context.Background(), tt.cli, tt.act)
+		require.EqualError(t, err, "both \"wait-interval\" and \"wait-timeout\" must be given or be empty, got \"\" and \"1\"")
+
+		tt.setInput("wait-interval", "1") // wait one second before next attempt
+		tt.setInput("wait-timeout", "2")  // stop waiting once one second has passed
+
+		// Considering we are waiting 1 second between attempts (~0 seconds per attempt)
+		// and a maximum of 2 second to wait, expect at least 3 retries (1 immediate, 2 retries).
+		cf := filepath.Join(t.TempDir(), "counter")
+		t.Setenv("TEST_COUNTER_FILE", cf)
+		require.EqualError(t, MigrateDown(context.Background(), tt.cli, tt.act), "plan approval pending, review here: URL")
+		require.FileExists(t, cf)
+		b, err := os.ReadFile(cf)
+		require.NoError(t, err)
+		i, err := strconv.Atoi(strings.TrimSpace(string(b)))
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, i, 3)
+	})
+}
+
 func TestMigratePush(t *testing.T) {
 	t.Run("config-broken", func(t *testing.T) {
 		tt := newT(t)
@@ -134,7 +270,7 @@ func TestMigratePush(t *testing.T) {
 		tt.setInput("env", "broken-env")
 		tt.setInput("dir-name", "test-dir")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
-		require.ErrorContains(t, err, `env "broken-env" not defined in project file`)
+		require.ErrorContains(t, err, `env "broken-env" not defined in config file`)
 	})
 	t.Run("broken dir", func(t *testing.T) {
 		tt := newT(t)
@@ -363,7 +499,7 @@ func TestMigrateLint(t *testing.T) {
 		require.ErrorContains(t, err, `dir "fake-dir-name" not found`)
 		tt.setInput("dir-name", "atlas://test-dir-slug") // user must not add atlas://
 		err = MigrateLint(context.Background(), tt.cli, tt.act)
-		require.ErrorContains(t, err, `slug must be lowercase alphanumeric and may contain .-_`)
+		require.ErrorContains(t, err, `slug must be lowercase alphanumeric and may contain /.-_`)
 		out, err := tt.outputs()
 		require.NoError(t, err)
 		require.Equal(t, 0, len(out))
@@ -441,8 +577,8 @@ func TestMigrateLint(t *testing.T) {
 			"-- migration.sql --\n"+
 			"drop table t1;\n"+
 			"```\n"+
-			"Ensure to run `atlas migrate hash --dir \"file://testdata/migrations_destructive\"` after applying the suggested changes.\n" +
-			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->" , comments[0].Body)
+			"Ensure to run `atlas migrate hash --dir \"file://testdata/migrations_destructive\"` after applying the suggested changes.\n"+
+			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->", comments[0].Body)
 		require.Equal(t, 1, comments[0].Line)
 		// Run Lint against a directory that has an existing suggestion comment, expecting a PATCH of the comment
 		err = MigrateLint(context.Background(), tt.cli, tt.act)
@@ -685,7 +821,7 @@ func generateHCL(t *testing.T, url, token string) string {
 }
 
 func generateHCLWithVars(t *testing.T) string {
-	hcl :=`
+	hcl := `
 variable "token" {
   type = string
 }
@@ -708,7 +844,6 @@ env "test" {}
 	})
 	return atlasConfigURL
 }
-
 
 func (tt *test) setupConfigWithLogin(t *testing.T, url, token string) {
 	tt.setInput("config", generateHCL(t, url, token))
@@ -824,10 +959,13 @@ type test struct {
 func newT(t *testing.T) *test {
 	outputFile, err := os.CreateTemp("", "")
 	require.NoError(t, err)
+	defer outputFile.Close()
 	summaryFile, err := os.CreateTemp("", "")
 	require.NoError(t, err)
+	defer summaryFile.Close()
 	eventPath, err := os.CreateTemp("", "")
 	require.NoError(t, err)
+	defer eventPath.Close()
 	tt := &test{
 		db: sqlitedb(t),
 		env: map[string]string{
@@ -850,25 +988,25 @@ func newT(t *testing.T) *test {
 	return tt
 }
 
-func (t *test) setInput(k, v string) {
-	t.env["INPUT_"+strings.ToUpper(k)] = v
+func (tt *test) setInput(k, v string) {
+	tt.env["INPUT_"+strings.ToUpper(k)] = v
 }
 
-func (t *test) setEvent(test *testing.T, payload string) {
-	err := os.WriteFile(t.env["GITHUB_EVENT_PATH"], []byte(payload), 0644)
+func (tt *test) setEvent(test *testing.T, payload string) {
+	err := os.WriteFile(tt.env["GITHUB_EVENT_PATH"], []byte(payload), 0644)
 	require.NoError(test, err)
 }
 
 // outputs is a helper that parses the GitHub Actions output file format. This is
 // used to parse the output file written by the action.
-func (t *test) outputs() (map[string]string, error) {
+func (tt *test) outputs() (map[string]string, error) {
 	var (
 		key   string
 		value strings.Builder
 		token = "_GitHubActionsFileCommandDelimeter_"
 	)
 	m := make(map[string]string)
-	c, err := os.ReadFile(t.env["GITHUB_OUTPUT"])
+	c, err := os.ReadFile(tt.env["GITHUB_OUTPUT"])
 	if err != nil {
 		return nil, err
 	}
@@ -886,6 +1024,13 @@ func (t *test) outputs() (map[string]string, error) {
 		value.WriteString(line)
 	}
 	return m, nil
+}
+
+func (tt *test) resetOut(t *testing.T) {
+	f, err := os.CreateTemp("", "")
+	require.NoError(t, err)
+	defer f.Close()
+	tt.env["GITHUB_OUTPUT"] = f.Name()
 }
 
 func TestParseGitHubOutputFile(t *testing.T) {
@@ -920,4 +1065,11 @@ func testDir(t *testing.T, path string) (d migrate.MemDir) {
 		require.NoError(t, d.WriteFile(f.Name(), b))
 	}
 	return d
+}
+
+func must[T any](t T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return t
 }

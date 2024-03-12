@@ -20,6 +20,7 @@ const (
 	CmdMigratePush  = "migrate/push"
 	CmdMigrateLint  = "migrate/lint"
 	CmdMigrateApply = "migrate/apply"
+	CmdMigrateDown  = "migrate/down"
 )
 
 var cli RunAction
@@ -74,6 +75,8 @@ func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action *g
 	switch r.Action {
 	case CmdMigrateApply:
 		return atlasaction.MigrateApply(ctx, client, action)
+	case CmdMigrateDown:
+		return atlasaction.MigrateDown(ctx, client, action)
 	case CmdMigratePush:
 		return atlasaction.MigratePush(ctx, client, action)
 	case CmdMigrateLint:
