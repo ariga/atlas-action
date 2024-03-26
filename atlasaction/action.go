@@ -27,7 +27,7 @@ import (
 	"github.com/sethvargo/go-githubactions"
 )
 
-// version holds atlas-action version. When built with cloud packages should be set by build flag, e.g.
+// Version holds atlas-action version. When built with cloud packages should be set by build flag, e.g.
 // "-X 'ariga.io/atlas-action/atlasaction.Version=v0.1.2'"
 var Version string
 
@@ -76,6 +76,105 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubacti
 	act.SetOutput("target", run.Target)
 	act.SetOutput("pending_count", strconv.Itoa(len(run.Pending)))
 	act.SetOutput("applied_count", strconv.Itoa(len(run.Applied)))
+	return nil
+}
+
+const (
+	StatePending  = "PENDING_USER"
+	StateApproved = "APPROVED"
+	StateAborted  = "ABORTED"
+	StateApplied  = "APPLIED"
+)
+
+// MigrateDown runs the GitHub Action for "ariga/atlas-action/migrate/down".
+func MigrateDown(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) (err error) {
+	var vars atlasexec.Vars
+	if v := act.GetInput("vars"); v != "" {
+		if err := json.Unmarshal([]byte(v), &vars); err != nil {
+			return fmt.Errorf("failed to parse vars: %w", err)
+		}
+	}
+	var a uint64
+	if i := act.GetInput("amount"); i != "" {
+		a, err = strconv.ParseUint(act.GetInput("amount"), 10, 64)
+		if err != nil {
+			return fmt.Errorf("failed to parse amount: %w", err)
+		}
+	}
+	params := &atlasexec.MigrateDownParams{
+		URL:       act.GetInput("url"),
+		DevURL:    act.GetInput("dev-url"),
+		DirURL:    act.GetInput("dir"),
+		ConfigURL: act.GetInput("config"),
+		Env:       act.GetInput("env"),
+		ToVersion: act.GetInput("to-version"),
+		ToTag:     act.GetInput("to-tag"),
+		Amount:    a,
+		Context: &atlasexec.DeployRunContext{
+			TriggerType:    atlasexec.TriggerTypeGithubAction,
+			TriggerVersion: Version,
+		},
+		Vars: vars,
+	}
+	// Based on the retry configuration values, retry the action if there is an error.
+	var (
+		started  = time.Now()
+		interval = time.Second
+		timeout  time.Duration
+	)
+	if v := act.GetInput("wait-interval"); v != "" {
+		interval, err = time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf(`parsing "wait-interval": %w`, err)
+		}
+	}
+	if v := act.GetInput("wait-timeout"); v != "" {
+		timeout, err = time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf(`parsing "wait-timeout": %w`, err)
+		}
+	}
+	var (
+		run     *atlasexec.MigrateDown
+		printed bool
+	)
+	for {
+		run, err = client.MigrateDown(ctx, params)
+		if err != nil {
+			act.SetOutput("error", err.Error())
+			return err
+		}
+		if run.Error != "" {
+			act.SetOutput("error", run.Error)
+			return errors.New(run.Error)
+		}
+		// Break the loop if no wait / retry is configured.
+		if run.Status != StatePending || timeout == 0 || time.Since(started) >= timeout {
+			if timeout != 0 {
+				act.Warningf("plan has not been approved in configured waiting period, exiting")
+			}
+			break
+		}
+		if !printed {
+			printed = true
+			act.Infof("plan approval pending, review here: %s", run.URL)
+		}
+		time.Sleep(interval)
+	}
+	if run.URL != "" {
+		act.SetOutput("url", run.URL)
+	}
+	switch run.Status {
+	case StatePending:
+		return fmt.Errorf("plan approval pending, review here: %s", run.URL)
+	case StateAborted:
+		return fmt.Errorf("plan rejected, review here: %s", run.URL)
+	case StateApplied, StateApproved:
+		act.SetOutput("current", run.Current)
+		act.SetOutput("target", run.Target)
+		act.SetOutput("planned_count", strconv.Itoa(len(run.Planned)))
+		act.SetOutput("reverted_count", strconv.Itoa(len(run.Reverted)))
+	}
 	return nil
 }
 

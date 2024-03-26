@@ -15,6 +15,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)   | Push migrations to Atlas Cloud                          |
 | [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)   | Lint migrations                                         |
 | [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply) | Apply migrations to a database                          |
+| [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)   | Revert migrations to a database                         |
 
 ## Examples
 
@@ -174,7 +175,7 @@ Setup the Atlas CLI and optionally login to Atlas Cloud.
 #### Inputs
 * `cloud-token` - (Optional) The Atlas Cloud token to use for authentication. To create
    a cloud token see the [docs](https://atlasgo.io/cloud/bots).
-* `version` - (Optional) The version of the Atlas CLI to install.  Defaults to the latest
+* `version` - (Optional) The version of the Atlas CLI to install. Defaults to the latest
    version.
 
 ### `ariga/atlas-action/migrate/push` 
@@ -185,7 +186,7 @@ Push the current version of your migration directory to Atlas Cloud.
 
 All inputs are optional as they may be specified in the Atlas configuration file.
 
-* `dir` - The URL of the migration directory to push.  For example: `file://migrations`.
+* `dir` - The URL of the migration directory to push. For example: `file://migrations`.
    Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
 * `dir-name` - The name (slug) of the project in Atlas Cloud.  
 * `dev-url` - The URL of the dev-database to use for analysis.  For example: `mysql://root:pass@localhost:3306/dev`.
@@ -194,7 +195,7 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `config` - The path to the Atlas configuration file. By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
 * `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
    For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
@@ -211,15 +212,15 @@ Lint migration changes with Atlas
 
 All inputs are optional as they may be specified in the Atlas configuration file.
 
-* `dir` - The URL of the migration directory to lint.  For example: `file://migrations`.
+* `dir` - The URL of the migration directory to lint. For example: `file://migrations`.
   Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
 * `dir-name` - The name (slug) of the project in Atlas Cloud.
-* `dev-url` - The URL of the dev-database to use for analysis.  For example: `mysql://root:pass@localhost:3306/dev`.
+* `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
   Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
-* `config` - The path to the Atlas configuration file.  By default, Atlas will look for a file
+* `config` - The path to the Atlas configuration file. By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
 * `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
    For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
@@ -255,6 +256,38 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `target` - The target version of the database.
 * `pending_count` - The number of migrations that will be applied.
 * `applied_count` - The number of migrations that were applied.
+
+### `ariga/atlas-action/migrate/down`
+
+Revert migrations to a database.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `url` - The URL of the target database.  For example: `mysql://root:pass@localhost:3306/dev`.
+* `dir` - The URL of the migration directory to apply.  For example: `atlas://dir-name` for cloud
+   based directories or `file://migrations` for local ones.
+* `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects). 
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `amount` - The amount of applied migrations to revert, defaults to 1.
+* `to-version` - To which version to revert.
+* `to-tag` - To which tag to revert.
+* `wait-timeout` - Time after which no other retry attempt is made and the action exits. If not set, only one attempt is made.
+* `wait-interval` - Time in seconds between different migrate down attempts, useful when waiting for plan approval, defaults to 1s. 
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+   For example: `'{"var1": "value1", "var2": "value2"}'`.
+* `working-directory` - The working directory to run from.  Defaults to project root.
+
+#### Outputs
+
+* `current` - The current version of the database. (before applying migrations)
+* `target` - The target version of the database.
+* `pending_count` - The number of migrations that will be applied.
+* `reverted_count` - The number of migrations that were reverted.
+* `url` - The URL of the plan to review and approve / reject.
 
 ### Legal 
 

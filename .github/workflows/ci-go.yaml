@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - name: Run Go linters
         uses: golangci/golangci-lint-action@v3
         with:
@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - run: go install ./cmd/atlas-action
         env:
           CGO_ENABLED: 0
@@ -71,7 +71,7 @@ jobs:
         id: push_action
         with:
           dir: file://atlasaction/testdata/migrations
-          dir-name: test-dir
+          dir-name: test-dir-sqlite
           dev-url: sqlite://file.db?mode=memory
       - name: "Verify migrate/push output"
         shell: bash
@@ -83,7 +83,7 @@ jobs:
         with:
           working-directory: atlasaction/testdata
           dev-url: sqlite://file.db?mode=memory
-          dir-name: test_dir
+          dir-name: test-dir-sqlite
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - id: lint_failure
@@ -92,7 +92,7 @@ jobs:
         with:
           dir: file://atlasaction/testdata/migrations_destructive
           dev-url: sqlite://file.db?mode=memory
-          dir-name: test-dir
+          dir-name: test-dir-sqlite
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - id: check-lint-failure
@@ -107,3 +107,87 @@ jobs:
           # Verifies that the output we got for lint tests are URLs as expected
           [[ "${{ steps.lint_success.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
           [[ "${{ steps.lint_failure.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
+  migrate-down:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - name: mock atlas
+        run: |
+          cp atlasaction/mock-atlas-down.sh $HOME/atlas  
+          echo "$HOME" >> $GITHUB_PATH
+      - id: pending-approval
+        continue-on-error: true
+        uses: ./migrate/down
+        with:
+          dir: file://atlasaction/testdata/down
+          dev-url: sqlite://dev?mode=memory
+        env:
+          TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
+          TEST_EXIT_CODE: 1
+      - name: check-exit-code
+        if: steps.pending-approval.outcome == 'success'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('expect to fail, but did not')
+      - id: pending-approval-wait
+        continue-on-error: true
+        uses: ./migrate/down
+        with:
+          dir: file://atlasaction/testdata/down
+          dev-url: sqlite://dev?mode=memory
+          wait-timeout: 5s
+        env:
+          TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
+          TEST_EXIT_CODE: 1
+      - name: check-exit-code-wait
+        if: steps.pending-approval-wait.outcome == 'success'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('expect to fail, but did not')
+      - id: aborted
+        continue-on-error: true
+        uses: ./migrate/down
+        with:
+          dir: file://atlasaction/testdata/down
+          dev-url: sqlite://dev?mode=memory
+        env:
+          TEST_STDOUT: "{\"URL\":\"ABORTED_URL\",\"Status\":\"ABORTED\"}"
+          TEST_EXIT_CODE: 1
+      - name: check-exit-code
+        if: steps.aborted.outcome == 'success'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('expect to fail, but did not')
+      - id: approved
+        uses: ./migrate/down
+        with:
+          dir: file://atlasaction/testdata/down
+          dev-url: sqlite://dev?mode=memory
+        env:
+          TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPROVED\"}"
+      - id: applied
+        uses: ./migrate/down
+        with:
+          dir: file://atlasaction/testdata/down
+          dev-url: sqlite://dev?mode=memory
+        env:
+          TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPLIED\"}"
+      - name: verify output
+        run: |
+          [[ "${{ steps.pending-approval.outputs.url }}" = PENDING_URL ]]
+          [[ "${{ steps.pending-approval-wait.outputs.url }}" = PENDING_URL ]]
+          [[ "${{ steps.aborted.outputs.url }}" = ABORTED_URL ]]
+          [[ "${{ steps.approved.outputs.planned_count }}" = 1 ]]
+          [[ "${{ steps.approved.outputs.reverted_count }}" = 1 ]]
+          [[ "${{ steps.applied.outputs.planned_count }}" = 1 ]]
+          [[ "${{ steps.applied.outputs.reverted_count }}" = 1 ]]
+          
