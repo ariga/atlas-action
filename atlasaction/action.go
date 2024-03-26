@@ -134,7 +134,10 @@ func MigrateDown(ctx context.Context, client *atlasexec.Client, act *githubactio
 			return fmt.Errorf(`parsing "wait-timeout": %w`, err)
 		}
 	}
-	var run *atlasexec.MigrateDown
+	var (
+		run     *atlasexec.MigrateDown
+		printed bool
+	)
 	for {
 		run, err = client.MigrateDown(ctx, params)
 		if err != nil {
@@ -152,7 +155,10 @@ func MigrateDown(ctx context.Context, client *atlasexec.Client, act *githubactio
 			}
 			break
 		}
-		act.Infof("plan approval pending, review here: %s", run.URL)
+		if !printed {
+			printed = true
+			act.Infof("plan approval pending, review here: %s", run.URL)
+		}
 		time.Sleep(interval)
 	}
 	if run.URL != "" {
