@@ -226,20 +226,8 @@ func TestMigrateDown(t *testing.T) {
 		}))
 		t.Setenv("TEST_STDOUT", string(st))
 		tt.setInput("env", "test")
-
-		// Defaults have been tested before by other tests.
-
-		tt.setInput("wait-interval", "1")
-		err := MigrateDown(context.Background(), tt.cli, tt.act)
-		require.EqualError(t, err, "both \"wait-interval\" and \"wait-timeout\" must be given or be empty, got \"1\" and \"\"")
-		tt.setInput("wait-interval", "")
-
-		tt.setInput("wait-timeout", "1")
-		err = MigrateDown(context.Background(), tt.cli, tt.act)
-		require.EqualError(t, err, "both \"wait-interval\" and \"wait-timeout\" must be given or be empty, got \"\" and \"1\"")
-
-		tt.setInput("wait-interval", "1") // wait one second before next attempt
-		tt.setInput("wait-timeout", "2")  // stop waiting once one second has passed
+		tt.setInput("wait-interval", "1s") // wait one second before next attempt
+		tt.setInput("wait-timeout", "2s")  // stop waiting once one second has passed
 
 		// Considering we are waiting 1 second between attempts (~0 seconds per attempt)
 		// and a maximum of 2 second to wait, expect at least 3 retries (1 immediate, 2 retries).

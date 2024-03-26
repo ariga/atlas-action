@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - name: Run Go linters
         uses: golangci/golangci-lint-action@v3
         with:
@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - run: go install ./cmd/atlas-action
         env:
           CGO_ENABLED: 0
@@ -113,7 +113,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - run: go install ./cmd/atlas-action
         env:
           CGO_ENABLED: 0
@@ -142,8 +142,7 @@ jobs:
         with:
           dir: file://atlasaction/testdata/down
           dev-url: sqlite://dev?mode=memory
-          wait-interval: 1
-          wait-timeout: 5
+          wait-timeout: 5s
         env:
           TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
           TEST_EXIT_CODE: 1

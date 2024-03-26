@@ -116,33 +116,23 @@ func MigrateDown(ctx context.Context, client *atlasexec.Client, act *githubactio
 		},
 		Vars: vars,
 	}
-	if a := act.GetInput("amount"); a != "" {
-		params.Amount, err = strconv.ParseUint(a, 10, 64)
-		if err != nil {
-			return err
-		}
-	}
 	// Based on the retry configuration values, retry the action if there is an error.
 	var (
-		started           = time.Now()
-		interval, timeout time.Duration
+		started  = time.Now()
+		interval = time.Second
+		timeout  time.Duration
 	)
-	switch wi, wt := act.GetInput("wait-interval"), act.GetInput("wait-timeout"); {
-	case wi == "" && wt == "": // default, run once
-	case wi != "" && wt != "":
-		// Configure the wait / retry behaviour as defined by the caller.
-		wii, err := strconv.Atoi(wi)
+	if v := act.GetInput("wait-interval"); v != "" {
+		interval, err = time.ParseDuration(v)
 		if err != nil {
 			return fmt.Errorf(`parsing "wait-interval": %w`, err)
 		}
-		wti, err := strconv.Atoi(wt)
+	}
+	if v := act.GetInput("wait-timeout"); v != "" {
+		timeout, err = time.ParseDuration(v)
 		if err != nil {
 			return fmt.Errorf(`parsing "wait-timeout": %w`, err)
 		}
-		interval = time.Duration(wii) * time.Second
-		timeout = time.Duration(wti) * time.Second
-	default: // bad input
-		return fmt.Errorf(`both "wait-interval" and "wait-timeout" must be given or be empty, got %q and %q`, wi, wt)
 	}
 	var run *atlasexec.MigrateDown
 	for {
@@ -157,7 +147,9 @@ func MigrateDown(ctx context.Context, client *atlasexec.Client, act *githubactio
 		}
 		// Break the loop if no wait / retry is configured.
 		if run.Status != StatePending || timeout == 0 || time.Since(started) >= timeout {
-			act.Warningf("plan has not been approved in configured waiting period, exiting")
+			if timeout != 0 {
+				act.Warningf("plan has not been approved in configured waiting period, exiting")
+			}
 			break
 		}
 		act.Infof("plan approval pending, review here: %s", run.URL)

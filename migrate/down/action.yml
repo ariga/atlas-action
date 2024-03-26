@@ -36,11 +36,11 @@ inputs:
     description: The tag to revert to. Mutually exclusive with `amount` and `to-version`.
     required: false
   working-directory:
-    description: Atlas working directory, default is project root
+    description: Atlas working directory, default is project root.
     required: false
   wait-interval:
     description: Time in seconds between different migrate down attempts.
-    required: false
+    default: 1s
   wait-timeout:
     description: Time after which no other retry attempt is made and the action exits.
     required: false

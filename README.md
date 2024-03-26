@@ -274,9 +274,9 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
 * `amount` - The amount of applied migrations to revert, defaults to 1.
 * `to-version` - To which version to revert.
-* `to-version` - To which tag to revert.
-* `wait-interval` - Time in seconds between different migrate down attempts, useful when waiting for plan approval. 
-* `wait-timeout` - Time after which no other retry attempt is made and the action exits.
+* `to-tag` - To which tag to revert.
+* `wait-timeout` - Time after which no other retry attempt is made and the action exits. If not set, only one attempt is made.
+* `wait-interval` - Time in seconds between different migrate down attempts, useful when waiting for plan approval, defaults to 1s. 
 * `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
    For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
