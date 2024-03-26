@@ -71,7 +71,7 @@ jobs:
         id: push_action
         with:
           dir: file://atlasaction/testdata/migrations
-          dir-name: test-dir
+          dir-name: test-dir-sqlite
           dev-url: sqlite://file.db?mode=memory
       - name: "Verify migrate/push output"
         shell: bash
@@ -92,7 +92,7 @@ jobs:
         with:
           dir: file://atlasaction/testdata/migrations_destructive
           dev-url: sqlite://file.db?mode=memory
-          dir-name: test-dir
+          dir-name: test-dir-sqlite
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - id: check-lint-failure
