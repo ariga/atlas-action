@@ -359,7 +359,7 @@ func TestMigrateE2E(t *testing.T) {
 		err := json.NewDecoder(r.Body).Decode(&query)
 		require.NoError(t, err)
 		switch {
-		case strings.Contains(query.Query, "syncDir"):
+		case strings.Contains(query.Query, "diffSyncDir"):
 			require.NoError(t, json.Unmarshal(query.Variables, &query.SyncDir))
 			payloads = append(payloads, query)
 		case strings.Contains(query.Query, "pushDir"):
@@ -576,7 +576,7 @@ func TestMigrateLint(t *testing.T) {
 	})
 	t.Run("lint summary - lint error - working directory is set", func(t *testing.T) {
 		tt := newT(t)
-		// Same as the previous test but with working directory input set
+		// Same as the previous test but with working directory input set.
 		require.NoError(t, os.Chdir("testdata"))
 		t.Cleanup(func() {
 			err := os.Chdir("..")
