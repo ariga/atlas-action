@@ -360,7 +360,7 @@ func (g *githubAPI) addSummary(act *githubactions.Action, payload *atlasexec.Sum
 
 // addChecks runs annotations to the trigger event pull request for the given payload.
 func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
-	dir := payload.Env.Dir
+	dir := path.Join(act.GetInput("working-directory"), payload.Env.Dir)
 	for _, file := range payload.Files {
 		filePath := path.Join(dir, file.Name)
 		if file.Error != "" && len(file.Reports) == 0 {

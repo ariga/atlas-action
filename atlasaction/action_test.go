@@ -662,7 +662,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "1 error found")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
 		out := tt.out.String()
-		require.Contains(t, out, "error file=migrations_destructive/20230925192914.sql")
+		require.Contains(t, out, "error file=testdata/migrations_destructive/20230925192914.sql")
 		require.Contains(t, out, "destructive changes detected")
 		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS102")
 		require.Len(t, comments, 1)
