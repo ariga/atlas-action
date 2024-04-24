@@ -411,7 +411,7 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 	}
 	for _, file := range payload.Files {
 		// Sending suggestions only for the files that are part of the PR.
-		filePath := path.Join(payload.Env.Dir, file.Name)
+		filePath := path.Join(act.GetInput("working-directory"), payload.Env.Dir, file.Name)
 		if !slices.Contains(changedFiles, filePath) {
 			continue
 		}
