@@ -395,6 +395,7 @@ func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.Summ
 
 // addSuggestions comments on the trigger event pull request for the given payload.
 func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+	fmt.Println("adding Suggestions")
 	hasReport := false
 	for _, f := range payload.Files {
 		if len(f.Reports) > 0 {
@@ -409,13 +410,18 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 	if err != nil {
 		return err
 	}
+	fmt.Println("changedFiles:", changedFiles)
 	for _, file := range payload.Files {
 		// Sending suggestions only for the files that are part of the PR.
 		filePath := path.Join(payload.Env.Dir, file.Name)
+		fmt.Println("file name:", filePath)
+		fmt.Println("file:", file)
 		if !slices.Contains(changedFiles, filePath) {
 			continue
 		}
+		fmt.Printf("file %s has %d reports\n", filePath, len(file.Reports))
 		for _, report := range file.Reports {
+			fmt.Println("report:", report)
 			for _, s := range report.SuggestedFixes {
 				footer := fmt.Sprintf("Ensure to run `atlas migrate hash --dir \"file://%s\"` after applying the suggested changes.", payload.Env.Dir)
 				body := fmt.Sprintf("%s\n```suggestion\n%s\n```\n%s", s.Message, s.TextEdit.NewText, footer)
@@ -557,6 +563,7 @@ func (g *githubAPI) updateIssueComment(id int, content io.Reader) error {
 
 // upsertSuggestion creates or updates a suggestion review comment on trigger event pull request.
 func (g *githubAPI) upsertSuggestion(filePath, body string, suggestion sqlcheck.SuggestedFix) error {
+	fmt.Println("upsertSuggestion into", filePath, "with body", body)
 	marker := commentMarker(suggestion.Message)
 	body = fmt.Sprintf("%s\n%s", body, marker)
 	comments, err := g.listReviewComments()
