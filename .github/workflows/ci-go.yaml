@@ -90,9 +90,9 @@ jobs:
         uses: ./migrate/lint
         continue-on-error: true
         with:
-          dir: file://atlasaction/testdata/migrations_destructive
-          dev-url: sqlite://file.db?mode=memory
-          dir-name: test-dir-sqlite
+          working-directory: sqlalchemy
+          dir-name: 'sqla'
+          env: 'sqlalchemy'
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - id: check-lint-failure

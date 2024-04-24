@@ -395,7 +395,7 @@ func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.Summ
 
 // addSuggestions comments on the trigger event pull request for the given payload.
 func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
-	fmt.Println("adding Suggestions")
+	fmt.Println("adding Suggestions!")
 	hasReport := false
 	for _, f := range payload.Files {
 		if len(f.Reports) > 0 {
@@ -413,7 +413,8 @@ func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec
 	fmt.Println("changedFiles:", changedFiles)
 	for _, file := range payload.Files {
 		// Sending suggestions only for the files that are part of the PR.
-		filePath := path.Join(payload.Env.Dir, file.Name)
+		wd := act.GetInput("working-directory")
+		filePath := path.Join(wd, payload.Env.Dir, file.Name)
 		fmt.Println("file name:", filePath)
 		fmt.Println("file:", file)
 		if !slices.Contains(changedFiles, filePath) {
