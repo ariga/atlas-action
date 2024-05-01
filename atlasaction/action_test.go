@@ -24,6 +24,8 @@ import (
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
+	"ariga.io/atlas/sql/sqlcheck"
+	"ariga.io/atlas/sql/sqlclient"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sethvargo/go-githubactions"
 	"github.com/stretchr/testify/require"
@@ -905,6 +907,228 @@ func TestMigrateLint(t *testing.T) {
 		require.Equal(t, 12, len(ghPayloads))
 		require.ErrorContains(t, err, `dir "fake-dir-name" not found`)
 	})
+}
+
+func TestTemplateGeneration(t *testing.T) {
+	type env struct {
+		Driver string         `json:"Driver,omitempty"`
+		URL    *sqlclient.URL `json:"URL,omitempty"`
+		Dir    string         `json:"Dir,omitempty"`
+	}
+	for _, tt := range []struct {
+		name     string
+		payload  *atlasexec.SummaryReport
+		expected string // expected HTML output of the comment template
+	}{
+		{
+			name: "no errors",
+			payload: &atlasexec.SummaryReport{
+				URL: "https://migration-lint-report-url",
+				Env: env{
+					Dir: "testdata/migrations",
+				},
+				Files: []*atlasexec.FileReport{{}},
+			},
+			// language=html
+			expected: `<table>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Step</th>
+            <th>Link</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                1 new migration file detected
+            </td>
+            <td>&nbsp;</td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                ERD and visual diff generated
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                No issues found
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url" target="_blank">View Report</a>
+            </td>
+        </tr>
+    </tbody>
+</table>`,
+		},
+		{
+			name: "file with 2 issues",
+			payload: &atlasexec.SummaryReport{
+				URL: "https://migration-lint-report-url",
+				Env: env{
+					Dir: "testdata/migrations",
+				},
+				Files: []*atlasexec.FileReport{{
+					Reports: []sqlcheck.Report{
+						{
+							Diagnostics: []sqlcheck.Diagnostic{
+								{
+									Text: "data dependent changes detected",
+								},
+								{
+									Text: "incorrect column type",
+								},
+							},
+						},
+					},
+				}},
+			},
+			// language=html
+			expected: `<table>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Step</th>
+            <th>Link</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                1 new migration file detected
+            </td>
+            <td>&nbsp;</td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                ERD and visual diff generated
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
+                </div>
+            </td>
+            <td>
+                2 issues were found
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url" target="_blank">View Report</a>
+            </td>
+        </tr>
+    </tbody>
+</table>`,
+		},
+		{
+			name: "file with an error, 1 issue",
+			payload: &atlasexec.SummaryReport{
+				URL: "https://migration-lint-report-url",
+				Env: env{
+					Dir: "testdata/migrations",
+				},
+				Files: []*atlasexec.FileReport{{
+					Error: "destructive changes detected",
+					Reports: []sqlcheck.Report{
+						{
+							Diagnostics: []sqlcheck.Diagnostic{
+								{
+									Text: "dropping column is not allowed",
+								},
+							},
+						},
+					},
+				}},
+			},
+			// language=html
+			expected: `<table>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Step</th>
+            <th>Link</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                1 new migration file detected
+            </td>
+            <td>&nbsp;</td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                ERD and visual diff generated
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
+                </div>
+            </td>
+            <td>
+                1 issue was found
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url" target="_blank">View Report</a>
+            </td>
+        </tr>
+    </tbody>
+</table>`,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			require.NoError(t, comment.Execute(&buf, tt.payload))
+			require.Contains(t, buf.String(), tt.expected)
+		})
+	}
+
 }
 
 func generateHCL(t *testing.T, url, token string) string {
