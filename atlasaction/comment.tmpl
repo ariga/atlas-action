@@ -35,9 +35,9 @@
             </td>
         </tr>
         <tr>
-            {{- if .DiagnosticsCount }}
+            {{- $errCount := fileErrors .}}
+            {{- if or (gt $errCount 0) (gt .DiagnosticsCount 0) }}
             <td>
-                {{- $errCount := fileErrors .}}
                 {{- if gt $errCount 0 }}
                 <div align="center">
                     <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
@@ -49,7 +49,11 @@
                 {{- end }}
             </td>
             <td>
+                {{- if .DiagnosticsCount }}
                 {{ .DiagnosticsCount }} issue{{ if gt .DiagnosticsCount 1}}s{{ end }} {{ if gt .DiagnosticsCount 1}}were{{ else }}was{{ end }} found
+                {{- else }}
+                {{ $errCount }} error{{ if gt $errCount 1}}s{{ end }} found
+                {{- end }}
             </td>
             {{- else}}
             <td>
