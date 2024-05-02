@@ -1121,6 +1121,67 @@ func TestTemplateGeneration(t *testing.T) {
     </tbody>
 </table>`,
 		},
+		{
+			name: "checksum error",
+			payload: &atlasexec.SummaryReport{
+				URL: "https://migration-lint-report-url",
+				Env: env{
+					Dir: "testdata/migrations",
+				},
+				Files: []*atlasexec.FileReport{{
+					Error: "checksum mismatch",
+				}},
+			},
+			// language=html
+			expected: `<table>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Step</th>
+            <th>Link</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                1 new migration file detected
+            </td>
+            <td>&nbsp;</td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                ERD and visual diff generated
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
+                </div>
+            </td>
+            <td>
+                checksum mismatch
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url" target="_blank">View Report</a>
+            </td>
+        </tr>
+    </tbody>
+</table>`,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
