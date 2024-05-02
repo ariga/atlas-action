@@ -28,31 +28,28 @@
                 </div>
             </td>
             <td>
-                ERD and Visual Diff generated
+                ERD and visual diff generated
             </td>
             <td>
                 <a href="{{ .URL }}#erd" target="_blank">View Visualization</a>
             </td>
         </tr>
         <tr>
-            {{- $errCount := fileErrors .}}
-            {{- if gt $errCount 0 }}
+            {{- if .DiagnosticsCount }}
             <td>
+                {{- $errCount := fileErrors .}}
+                {{- if gt $errCount 0 }}
                 <div align="center">
                     <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
                 </div>
-            </td>
-            <td>
-                {{ $errCount }} error{{ if gt $errCount 1}}s{{ end }} found
-            </td>
-            {{- else if .DiagnosticsCount }}
-            <td>
+                {{- else }}
                 <div align="center">
                     <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
                 </div>
+                {{- end }}
             </td>
             <td>
-                {{ .DiagnosticsCount }} issue{{ if gt .DiagnosticsCount 1}}s{{ end }} found
+                {{ .DiagnosticsCount }} issue{{ if gt .DiagnosticsCount 1}}s{{ end }} {{ if gt .DiagnosticsCount 1}}were{{ else }}was{{ end }} found
             </td>
             {{- else}}
             <td>
@@ -65,7 +62,7 @@
             </td>
             {{- end }}
             <td>
-                <a href="{{ .URL }}" target="_blank">Full Report</a>
+                <a href="{{ .URL }}" target="_blank">View Report</a>
             </td>
         </tr>
     </tbody>
