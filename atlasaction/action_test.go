@@ -1173,7 +1173,7 @@ func TestTemplateGeneration(t *testing.T) {
                 </div>
             </td>
             <td>
-                1 error found
+                checksum mismatch
             </td>
             <td>
                 <a href="https://migration-lint-report-url" target="_blank">View Report</a>

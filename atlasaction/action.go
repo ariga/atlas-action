@@ -308,6 +308,15 @@ func fileErrors(s *atlasexec.SummaryReport) int {
 	return count
 }
 
+func firstError(s *atlasexec.SummaryReport) string {
+	for _, f := range s.Files {
+		if len(f.Error) > 0 {
+			return f.Error
+		}
+	}
+	return ""
+}
+
 var (
 	//go:embed comment.tmpl
 	commentTmpl string
@@ -315,6 +324,7 @@ var (
 		template.New("comment").
 			Funcs(template.FuncMap{
 				"fileErrors": fileErrors,
+				"firstError": firstError,
 			}).
 			Parse(commentTmpl),
 	)

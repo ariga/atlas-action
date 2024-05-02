@@ -51,8 +51,10 @@
             <td>
                 {{- if .DiagnosticsCount }}
                 {{ .DiagnosticsCount }} issue{{ if gt .DiagnosticsCount 1}}s{{ end }} {{ if gt .DiagnosticsCount 1}}were{{ else }}was{{ end }} found
-                {{- else }}
-                {{ $errCount }} error{{ if gt $errCount 1}}s{{ end }} found
+                {{- else if eq $errCount 1}}
+                {{ firstError . }}
+                {{- else}}
+                {{ $errCount }} errors were found
                 {{- end }}
             </td>
             {{- else}}
