@@ -24,15 +24,49 @@ import (
 	"ariga.io/atlas/sql/sqlcheck"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sethvargo/go-envconfig"
-	"github.com/sethvargo/go-githubactions"
 )
 
 // Version holds atlas-action version. When built with cloud packages should be set by build flag, e.g.
 // "-X 'ariga.io/atlas-action/atlasaction.Version=v0.1.2'"
 var Version string
 
+// Atlas action interface.
+type Action interface {
+	// GetInput returns the value of the input with the given name.
+	GetInput(string) string
+	// SetOutput sets the value of the output with the given name.
+	SetOutput(string, string)
+	// Infof logs an info message.
+	Infof(string, ...interface{})
+	// Warningf logs a warning message.
+	Warningf(string, ...interface{})
+	// Errorf logs an error message.
+	Errorf(string, ...interface{})
+	// Fatalf logs a fatal error message and exits the action.
+	Fatalf(string, ...interface{})
+	// Context returns the context of environment the action is running in.
+	Context() (*Context, error)
+	// Getenv returns the value of the environment variable with the given name.
+	Getenv(string) string
+	// AddStepSummary adds a summary to the action step.
+	AddStepSummary(string)
+	// WithFieldsMap returns a new action with the given fields.
+	WithFieldsMap(map[string]string) Action
+}
+
+// Context holds the context of the environment the action is running in.
+type Context struct {
+	Repository string
+	Event      map[string]interface{}
+	EventName  string
+	HeadRef    string
+	RefName    string
+	APIURL     string
+	SHA        string
+}
+
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
-func MigrateApply(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
+func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) error {
 	dryRun, err := func() (bool, error) {
 		inp := act.GetInput("dry-run")
 		if inp == "" {
@@ -87,7 +121,7 @@ const (
 )
 
 // MigrateDown runs the GitHub Action for "ariga/atlas-action/migrate/down".
-func MigrateDown(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) (err error) {
+func MigrateDown(ctx context.Context, client *atlasexec.Client, act Action) (err error) {
 	var vars atlasexec.Vars
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
@@ -179,7 +213,7 @@ func MigrateDown(ctx context.Context, client *atlasexec.Client, act *githubactio
 }
 
 // MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
-func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
+func MigratePush(ctx context.Context, client *atlasexec.Client, act Action) error {
 	runContext, err := createRunContext(ctx, act)
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
@@ -218,7 +252,7 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act *githubactio
 }
 
 // MigrateLint runs the GitHub Action for "ariga/atlas-action/migrate/lint"
-func MigrateLint(ctx context.Context, client *atlasexec.Client, act *githubactions.Action) error {
+func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) error {
 	if act.GetInput("dir-name") == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
@@ -333,7 +367,7 @@ var (
 // addSummary writes a summary to the pull request. It adds a marker
 // HTML comment to the end of the comment body to identify the comment as one created by
 // this action.
-func (g *githubAPI) addSummary(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+func (g *githubAPI) addSummary(act Action, payload *atlasexec.SummaryReport) error {
 	var buf bytes.Buffer
 	if err := comment.Execute(&buf, &payload); err != nil {
 		return err
@@ -369,7 +403,7 @@ func (g *githubAPI) addSummary(act *githubactions.Action, payload *atlasexec.Sum
 }
 
 // addChecks runs annotations to the trigger event pull request for the given payload.
-func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+func (g *githubAPI) addChecks(act Action, payload *atlasexec.SummaryReport) error {
 	dir := path.Join(act.GetInput("working-directory"), payload.Env.Dir)
 	for _, file := range payload.Files {
 		filePath := path.Join(dir, file.Name)
@@ -404,7 +438,7 @@ func (g *githubAPI) addChecks(act *githubactions.Action, payload *atlasexec.Summ
 }
 
 // addSuggestions comments on the trigger event pull request for the given payload.
-func (g *githubAPI) addSuggestions(act *githubactions.Action, payload *atlasexec.SummaryReport) error {
+func (g *githubAPI) addSuggestions(act Action, payload *atlasexec.SummaryReport) error {
 	hasReport := false
 	for _, f := range payload.Files {
 		if len(f.Reports) > 0 {
@@ -711,7 +745,7 @@ type Actor struct {
 	ID   string `env:"GITHUB_ACTOR_ID"`
 }
 
-func createRunContext(ctx context.Context, act *githubactions.Action) (*atlasexec.RunContext, error) {
+func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, error) {
 	ghContext, err := act.Context()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action context: %w", err)
@@ -758,9 +792,9 @@ type githubTriggerEvent struct {
 }
 
 // triggerEvent extracts the trigger event data from the action context.
-func triggerEvent(ghContext *githubactions.GitHubContext) (*githubTriggerEvent, error) {
+func triggerEvent(context *Context) (*githubTriggerEvent, error) {
 	var event githubTriggerEvent
-	if err := mapstructure.Decode(ghContext.Event, &event); err != nil {
+	if err := mapstructure.Decode(context.Event, &event); err != nil {
 		return nil, fmt.Errorf("failed to parse push event: %v", err)
 	}
 	return &event, nil

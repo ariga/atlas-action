@@ -8,15 +8,15 @@ import (
 	"context"
 	"testing"
 
+	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-go-sdk/atlasexec"
-	"github.com/sethvargo/go-githubactions"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRunAction_Run(t *testing.T) {
 	client, err := atlasexec.NewClient("", "atlas")
 	require.NoError(t, err)
-	act := githubactions.New()
+	act := atlasaction.NewGHAction()
 
 	t.Run("fake", func(t *testing.T) {
 		r := &RunAction{

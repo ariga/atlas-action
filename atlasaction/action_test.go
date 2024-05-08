@@ -1343,7 +1343,7 @@ type test struct {
 	env map[string]string
 	out bytes.Buffer
 	cli *atlasexec.Client
-	act *githubactions.Action
+	act Action
 }
 
 func newT(t *testing.T) *test {
@@ -1366,7 +1366,7 @@ func newT(t *testing.T) *test {
 		},
 	}
 	tt.setEvent(t, `{}`)
-	tt.act = githubactions.New(
+	tt.act = NewGHAction(
 		githubactions.WithGetenv(func(key string) string {
 			return tt.env[key]
 		}),
