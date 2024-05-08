@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path"
 	"slices"
 	"strconv"
@@ -32,10 +33,18 @@ var Version string
 
 // Atlas action interface.
 type Action interface {
+	Logger
 	// GetInput returns the value of the input with the given name.
 	GetInput(string) string
 	// SetOutput sets the value of the output with the given name.
 	SetOutput(string, string)
+	// TriggerContext returns the context of the trigger event.
+	GetTriggerContext() (*TriggerContext, error)
+	// AddStepSummary adds a summary to the action step.
+	AddStepSummary(string)
+}
+
+type Logger interface {
 	// Infof logs an info message.
 	Infof(string, ...interface{})
 	// Warningf logs a warning message.
@@ -44,18 +53,12 @@ type Action interface {
 	Errorf(string, ...interface{})
 	// Fatalf logs a fatal error message and exits the action.
 	Fatalf(string, ...interface{})
-	// Context returns the context of environment the action is running in.
-	Context() (*Context, error)
-	// Getenv returns the value of the environment variable with the given name.
-	Getenv(string) string
-	// AddStepSummary adds a summary to the action step.
-	AddStepSummary(string)
-	// WithFieldsMap returns a new action with the given fields.
-	WithFieldsMap(map[string]string) Action
+	// WithFieldsMap returns a new Logger with the given fields.
+	WithFieldsMap(map[string]string) Logger
 }
 
 // Context holds the context of the environment the action is running in.
-type Context struct {
+type TriggerContext struct {
 	Repository string
 	Event      map[string]interface{}
 	EventName  string
@@ -291,7 +294,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 	if payload.URL != "" {
 		act.SetOutput("report-url", payload.URL)
 	}
-	ghContext, err := act.Context()
+	ghContext, err := act.GetTriggerContext()
 	if err != nil {
 		return err
 	}
@@ -312,7 +315,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 		repo:    ghContext.Repository,
 		client: &http.Client{
 			Transport: &roundTripper{
-				authToken: act.Getenv("GITHUB_TOKEN"),
+				authToken: os.Getenv("GITHUB_TOKEN"),
 			},
 			Timeout: time.Second * 30,
 		},
@@ -421,15 +424,15 @@ func (g *githubAPI) addChecks(act Action, payload *atlasexec.SummaryReport) erro
 					msg = fmt.Sprintf("%v (%v)\n\nDetails: https://atlasgo.io/lint/analyzers#%v", msg, diag.Code, diag.Code)
 				}
 				lines := strings.Split(file.Text[:diag.Pos], "\n")
-				act = act.WithFieldsMap(map[string]string{
+				logger := act.WithFieldsMap(map[string]string{
 					"file":  filePath,
 					"line":  strconv.Itoa(max(1, len(lines))),
 					"title": report.Text,
 				})
 				if file.Error != "" {
-					act.Errorf(msg)
+					logger.Errorf(msg)
 				} else {
-					act.Warningf(msg)
+					logger.Warningf(msg)
 				}
 			}
 		}
@@ -746,7 +749,7 @@ type Actor struct {
 }
 
 func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, error) {
-	ghContext, err := act.Context()
+	ghContext, err := act.GetTriggerContext()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action context: %w", err)
 	}
@@ -792,7 +795,7 @@ type githubTriggerEvent struct {
 }
 
 // triggerEvent extracts the trigger event data from the action context.
-func triggerEvent(context *Context) (*githubTriggerEvent, error) {
+func triggerEvent(context *TriggerContext) (*githubTriggerEvent, error) {
 	var event githubTriggerEvent
 	if err := mapstructure.Decode(context.Event, &event); err != nil {
 		return nil, fmt.Errorf("failed to parse push event: %v", err)

@@ -17,12 +17,12 @@ func NewGHAction(otps ...githubactions.Option) Action {
 }
 
 // Context returns the context of the action.
-func (a *ghAction) Context() (*Context, error) {
+func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 	ctx, err := a.Action.Context()
 	if err != nil {
 		return nil, err
 	}
-	return &Context{
+	return &TriggerContext{
 		Repository: ctx.Repository,
 		Event:      ctx.Event,
 		EventName:  ctx.EventName,
@@ -33,7 +33,7 @@ func (a *ghAction) Context() (*Context, error) {
 	}, nil
 }
 
-// WithFieldsMap returns a new action with the given fields.
-func (a *ghAction) WithFieldsMap(m map[string]string) Action {
+// WithFieldsMap return a new Logger with the given fields.
+func (a *ghAction) WithFieldsMap(m map[string]string) Logger {
 	return &ghAction{a.Action.WithFieldsMap(m)}
 }
