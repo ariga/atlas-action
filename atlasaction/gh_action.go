@@ -22,14 +22,18 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 	if err != nil {
 		return nil, err
 	}
+	// HeadRef will be empty for push events, so we use RefName instead.
+	branch := ctx.HeadRef
+	if branch == "" {
+		branch = ctx.RefName
+	}
 	return &TriggerContext{
-		Repository: ctx.Repository,
-		Event:      ctx.Event,
-		EventName:  ctx.EventName,
-		HeadRef:    ctx.HeadRef,
-		RefName:    ctx.RefName,
-		APIURL:     ctx.APIURL,
-		SHA:        ctx.SHA,
+		Repo:      ctx.Repository,
+		Event:     ctx.Event,
+		EventName: ctx.EventName,
+		Branch:    branch,
+		APIURL:    ctx.APIURL,
+		SHA:       ctx.SHA,
 	}, nil
 }
 
