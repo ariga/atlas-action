@@ -93,5 +93,8 @@ func newAction() (atlasaction.Action, error) {
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
 		return atlasaction.NewGHAction(), nil
 	}
+	if os.Getenv("CIRCLECI") == "true" {
+		return atlasaction.NewOrb(), nil
+	}
 	return nil, errors.New("unsupported environment")
 }
