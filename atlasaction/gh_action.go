@@ -1,6 +1,9 @@
 package atlasaction
 
 import (
+	"fmt"
+
+	"github.com/mitchellh/mapstructure"
 	"github.com/sethvargo/go-githubactions"
 )
 
@@ -27,21 +30,62 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 	if branch == "" {
 		branch = ctx.RefName
 	}
+	// SCM information.
 	scm := SCM{
-		Provider: PROVIDER_GITHUB,
+		Provider: ProviderGithub,
 		APIURL:   ctx.APIURL,
 	}
+	// Extract the event data to fill up Repo and PR information.
+	ghEvent, err := extractEvent(ctx.Event)
+	if err != nil {
+		return nil, err
+	}
+	var repoURL string
+	if ghEvent.Repository.URL != "" {
+		repoURL = ghEvent.Repository.URL
+	}
+	var pr *PullRequest
+	if ctx.EventName == "pull_request" {
+		pr = &PullRequest{
+			Number: ghEvent.PullRequest.Number,
+			URL:    ghEvent.PullRequest.URL,
+			Commit: ghEvent.PullRequest.Head.SHA,
+		}
+	}
 	return &TriggerContext{
-		SCM:       scm,
-		Repo:      ctx.Repository,
-		Branch:    branch,
-		Commit:    ctx.SHA,
-		Event:     ctx.Event,
-		EventName: ctx.EventName,
+		SCM:         scm,
+		Repo:        ctx.Repository,
+		RepoURL:     repoURL,
+		Branch:      branch,
+		Commit:      ctx.SHA,
+		PullRequest: pr,
 	}, nil
 }
 
 // WithFieldsMap return a new Logger with the given fields.
 func (a *ghAction) WithFieldsMap(m map[string]string) Logger {
 	return &ghAction{a.Action.WithFieldsMap(m)}
+}
+
+// githubTriggerEvent is the structure of the GitHub trigger event.
+type githubTriggerEvent struct {
+	PullRequest struct {
+		Number int    `mapstructure:"number"`
+		URL    string `mapstructure:"html_url"`
+		Head   struct {
+			SHA string `mapstructure:"sha"`
+		} `mapstructure:"head"`
+	} `mapstructure:"pull_request"`
+	Repository struct {
+		URL string `mapstructure:"html_url"`
+	} `mapstructure:"repository"`
+}
+
+// extractEvent extracts the trigger event data from the raw event.
+func extractEvent(raw map[string]any) (*githubTriggerEvent, error) {
+	var event githubTriggerEvent
+	if err := mapstructure.Decode(raw, &event); err != nil {
+		return nil, fmt.Errorf("failed to parse push event: %v", err)
+	}
+	return &event, nil
 }
