@@ -3,6 +3,7 @@ package atlasaction
 import (
 	"fmt"
 
+	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sethvargo/go-githubactions"
 )
@@ -17,6 +18,11 @@ type ghAction struct {
 // New returns a new Action for GitHub Actions.
 func NewGHAction(otps ...githubactions.Option) Action {
 	return &ghAction{githubactions.New(otps...)}
+}
+
+// GetType implements the Action interface.
+func (a *ghAction) GetType() atlasexec.TriggerType {
+	return atlasexec.TriggerTypeGithubAction
 }
 
 // Context returns the context of the action.

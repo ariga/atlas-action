@@ -33,6 +33,9 @@ var Version string
 // Atlas action interface.
 type Action interface {
 	Logger
+	// GetType returns the type of atlasexec trigger Type. e.g. "GITHUB_ACTION"
+	// The value is used to identify the type on CI-Run page in Atlas Cloud.
+	GetType() atlasexec.TriggerType
 	// GetInput returns the value of the input with the given name.
 	GetInput(string) string
 	// SetOutput sets the value of the output with the given name.
@@ -123,7 +126,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) err
 		TxMode:          act.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: act.GetInput("baseline"), // Hidden param.
 		Context: &atlasexec.DeployRunContext{
-			TriggerType:    atlasexec.TriggerTypeGithubAction,
+			TriggerType:    act.GetType(),
 			TriggerVersion: Version,
 		},
 		Vars: vars,
