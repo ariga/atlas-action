@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"ariga.io/atlas-go-sdk/atlasexec"
 )
 
 var _ Action = (*circleCIOrb)(nil)
@@ -20,6 +22,11 @@ func NewCircleCIOrb() Action {
 	return &circleCIOrb{
 		w: os.Stdout,
 	}
+}
+
+// GetType implements the Action interface.
+func (a *circleCIOrb) GetType() atlasexec.TriggerType {
+	return atlasexec.TriggerTypeCircleCIOrb
 }
 
 // GetInput implements the Action interface.
