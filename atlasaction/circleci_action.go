@@ -8,22 +8,22 @@ import (
 	"strings"
 )
 
-var _ Action = (*orb)(nil)
+var _ Action = (*circleCIOrb)(nil)
 
-// Orb is an implementation of the Action interface for GitHub Actions.
-type orb struct {
+// circleciOrb is an implementation of the Action interface for GitHub Actions.
+type circleCIOrb struct {
 	w io.Writer
 }
 
 // New returns a new Action for GitHub Actions.
-func NewOrb() Action {
-	return &orb{
+func NewCircleCIOrb() Action {
+	return &circleCIOrb{
 		w: os.Stdout,
 	}
 }
 
 // GetInput implements the Action interface.
-func (a *orb) GetInput(name string) string {
+func (a *circleCIOrb) GetInput(name string) string {
 	e := strings.ReplaceAll(name, " ", "_")
 	e = strings.ToUpper(e)
 	e = "INPUT_" + e
@@ -31,13 +31,13 @@ func (a *orb) GetInput(name string) string {
 }
 
 // SetOutput implements the Action interface.
-func (a *orb) SetOutput(name, value string) {
+func (a *circleCIOrb) SetOutput(name, value string) {
 	// unsupported
 }
 
 // GetTriggerContext implements the Action interface.
 // https://circleci.com/docs/variables/#built-in-environment-variables
-func (a *orb) GetTriggerContext() (*TriggerContext, error) {
+func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	ctx := &TriggerContext{}
 	ctx.Repo = a.GetInput("CIRCLE_PR_REPONAME")
 	ctx.RepoURL = a.GetInput("CIRCLE_REPOSITORY_URL")
@@ -71,33 +71,33 @@ func (a *orb) GetTriggerContext() (*TriggerContext, error) {
 const EOF = "\n"
 
 // Infof implements the Logger interface.
-func (o *orb) Infof(msg string, args ...any) {
+func (o *circleCIOrb) Infof(msg string, args ...any) {
 	fmt.Fprintf(o.w, "Info: "+msg+EOF, args...)
 }
 
 // Warningf implements the Logger interface.
-func (o *orb) Warningf(msg string, args ...any) {
+func (o *circleCIOrb) Warningf(msg string, args ...any) {
 	fmt.Fprintf(o.w, "Warning: "+msg+EOF, args...)
 }
 
 // Errorf implements the Logger interface.
-func (o *orb) Errorf(msg string, args ...any) {
+func (o *circleCIOrb) Errorf(msg string, args ...any) {
 	fmt.Fprintf(o.w, "Error: "+msg+EOF, args...)
 }
 
 // Fatalf implements the Logger interface.
-func (a *orb) Fatalf(msg string, args ...any) {
+func (a *circleCIOrb) Fatalf(msg string, args ...any) {
 	a.Errorf(msg, args...)
 	os.Exit(1)
 }
 
 // WithFieldsMap implements the Logger interface.
-func (a *orb) WithFieldsMap(map[string]string) Logger {
+func (a *circleCIOrb) WithFieldsMap(map[string]string) Logger {
 	// unsupported
 	return a
 }
 
 // AddStepSummary implements the Action interface.
-func (a *orb) AddStepSummary(summary string) {
+func (a *circleCIOrb) AddStepSummary(summary string) {
 	// unsupported
 }

@@ -94,7 +94,7 @@ func newAction() (atlasaction.Action, error) {
 		return atlasaction.NewGHAction(), nil
 	}
 	if os.Getenv("CIRCLECI") == "true" {
-		return atlasaction.NewOrb(), nil
+		return atlasaction.NewCircleCIOrb(), nil
 	}
 	return nil, errors.New("unsupported environment")
 }
