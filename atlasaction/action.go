@@ -59,13 +59,12 @@ type Logger interface {
 
 // Context holds the context of the environment the action is running in.
 type TriggerContext struct {
-	Repository string
-	Event      map[string]interface{}
-	EventName  string
-	HeadRef    string
-	RefName    string
-	APIURL     string
-	SHA        string
+	Repo      string
+	Event     map[string]interface{}
+	EventName string
+	Branch    string
+	APIURL    string
+	SHA       string
 }
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
@@ -312,7 +311,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 	ghClient := githubAPI{
 		event:   event,
 		baseURL: ghContext.APIURL,
-		repo:    ghContext.Repository,
+		repo:    ghContext.Repo,
 		client: &http.Client{
 			Transport: &roundTripper{
 				authToken: os.Getenv("GITHUB_TOKEN"),
@@ -757,10 +756,6 @@ func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, e
 	if err != nil {
 		return nil, err
 	}
-	branch := ghContext.HeadRef
-	if branch == "" {
-		branch = ghContext.RefName
-	}
 	var a Actor
 	if err := envconfig.Process(ctx, &a); err != nil {
 		return nil, fmt.Errorf("failed to load actor: %w", err)
@@ -770,8 +765,8 @@ func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, e
 		url = ev.Repository.URL
 	}
 	return &atlasexec.RunContext{
-		Repo:     ghContext.Repository,
-		Branch:   branch,
+		Repo:     ghContext.Repo,
+		Branch:   ghContext.Branch,
 		Commit:   ghContext.SHA,
 		Path:     act.GetInput("dir"),
 		URL:      url,
