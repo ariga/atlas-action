@@ -23,7 +23,6 @@ import (
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/sqlcheck"
-	"github.com/mitchellh/mapstructure"
 	"github.com/sethvargo/go-envconfig"
 )
 
@@ -61,19 +60,33 @@ type Logger interface {
 type TriggerContext struct {
 	// SCM is the source control management system.
 	SCM SCM
-	// Repo is the repository name.
+	// Repo is the repository name. e.g. "ariga/atlas-action".
 	Repo string
+	// RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
+	RepoURL string
 	// Branch name.
 	Branch string
 	// Commit SHA.
-	Commit    string
-	Event     map[string]interface{}
-	EventName string
+	Commit string
+	// Event is the event type.
+	Event string
+	// PullRequest will be available if the event is "pull_request".
+	PullRequest *PullRequest
+}
+
+// PullRequest holds the pull request information.
+type PullRequest struct {
+	// Pull Request Number
+	Number int
+	// URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
+	URL string
+	// Lastest commit SHA.
+	Commit string
 }
 
 // SCM Provider constants.
 const (
-	PROVIDER_GITHUB Provider = "GITHUB"
+	ProviderGithub Provider = "GITHUB"
 )
 
 // SCM holds the source control management system information.
@@ -316,19 +329,15 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 		return err
 	}
 	// In case of a pull request, we need to add checks and comments to the PR.
-	if tctx.EventName != "pull_request" {
+	if tctx.PullRequest == nil {
 		if isLintErr {
 			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 		}
 		return nil
 	}
-	event, err := triggerEvent(tctx)
-	if err != nil {
-		return err
-	}
 	ghClient := githubAPI{
-		event:   event,
 		baseURL: tctx.SCM.APIURL,
+		pr:      *tctx.PullRequest,
 		repo:    tctx.Repo,
 		client: &http.Client{
 			Transport: &roundTripper{
@@ -394,7 +403,7 @@ func (g *githubAPI) addSummary(act Action, payload *atlasexec.SummaryReport) err
 	}
 	summary := buf.String()
 	act.AddStepSummary(summary)
-	prNumber := g.event.PullRequest.Number
+	prNumber := g.pr.Number
 	if prNumber == 0 {
 		return nil
 	}
@@ -531,8 +540,8 @@ type (
 	}
 
 	githubAPI struct {
-		event   *githubTriggerEvent
 		baseURL string
+		pr      PullRequest
 		repo    string
 		client  *http.Client
 	}
@@ -552,32 +561,32 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func (g *githubAPI) getIssueComments() ([]githubIssueComment, error) {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, g.event.PullRequest.Number)
+	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, g.pr.Number)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	res, err := g.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", g.repo, g.event.PullRequest.Number, err)
+		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", g.repo, g.pr.Number, err)
 	}
 	defer res.Body.Close()
 	buf, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading PR issue comments from %v/%v, %v", g.repo, g.event.PullRequest.Number, err)
+		return nil, fmt.Errorf("error reading PR issue comments from %v/%v, %v", g.repo, g.pr.Number, err)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code %v when calling GitHub API", res.StatusCode)
 	}
 	var comments []githubIssueComment
 	if err = json.Unmarshal(buf, &comments); err != nil {
-		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", g.repo, g.event.PullRequest.Number, string(buf), err)
+		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", g.repo, g.pr.Number, string(buf), err)
 	}
 	return comments, nil
 }
 
 func (g *githubAPI) createIssueComment(content io.Reader) error {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, g.event.PullRequest.Number)
+	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, g.pr.Number)
 	req, err := http.NewRequest(http.MethodPost, url, content)
 	if err != nil {
 		return err
@@ -642,7 +651,7 @@ func (g *githubAPI) upsertSuggestion(filePath, body string, suggestion sqlcheck.
 	prComment := pullRequestComment{
 		Body:     body,
 		Path:     filePath,
-		CommitID: g.event.PullRequest.Head.SHA,
+		CommitID: g.pr.Commit,
 	}
 	if suggestion.TextEdit.End <= suggestion.TextEdit.Line {
 		prComment.Line = suggestion.TextEdit.Line
@@ -654,7 +663,7 @@ func (g *githubAPI) upsertSuggestion(filePath, body string, suggestion sqlcheck.
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, g.event.PullRequest.Number)
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, g.pr.Number)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf))
 	if err != nil {
 		return err
@@ -676,7 +685,7 @@ func (g *githubAPI) upsertSuggestion(filePath, body string, suggestion sqlcheck.
 
 // listReviewComments for the trigger event pull request.
 func (g *githubAPI) listReviewComments() ([]pullRequestComment, error) {
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, g.event.PullRequest.Number)
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, g.pr.Number)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -731,7 +740,7 @@ func (g *githubAPI) updateReviewComment(id int, body string) error {
 
 // listPullRequestFiles return paths of the files in the trigger event pull request.
 func (g *githubAPI) listPullRequestFiles() ([]string, error) {
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/files", g.baseURL, g.repo, g.event.PullRequest.Number)
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/files", g.baseURL, g.repo, g.pr.Number)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -770,17 +779,13 @@ func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action context: %w", err)
 	}
-	ev, err := triggerEvent(tctx)
-	if err != nil {
-		return nil, err
-	}
 	var a Actor
 	if err := envconfig.Process(ctx, &a); err != nil {
 		return nil, fmt.Errorf("failed to load actor: %w", err)
 	}
-	url := ev.PullRequest.URL
-	if url == "" {
-		url = ev.Repository.URL
+	url := tctx.RepoURL
+	if tctx.PullRequest != nil {
+		url = tctx.PullRequest.URL
 	}
 	return &atlasexec.RunContext{
 		Repo:     tctx.Repo,
@@ -792,28 +797,6 @@ func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, e
 		UserID:   a.ID,
 		SCMType:  string(tctx.SCM.Provider),
 	}, nil
-}
-
-type githubTriggerEvent struct {
-	PullRequest struct {
-		Number int    `mapstructure:"number"`
-		URL    string `mapstructure:"html_url"`
-		Head   struct {
-			SHA string `mapstructure:"sha"`
-		} `mapstructure:"head"`
-	} `mapstructure:"pull_request"`
-	Repository struct {
-		URL string `mapstructure:"html_url"`
-	} `mapstructure:"repository"`
-}
-
-// triggerEvent extracts the trigger event data from the action context.
-func triggerEvent(context *TriggerContext) (*githubTriggerEvent, error) {
-	var event githubTriggerEvent
-	if err := mapstructure.Decode(context.Event, &event); err != nil {
-		return nil, fmt.Errorf("failed to parse push event: %v", err)
-	}
-	return &event, nil
 }
 
 // commentMarker creates a hidden marker to identify the comment as one created by this action.
