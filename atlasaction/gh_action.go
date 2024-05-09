@@ -58,7 +58,6 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 		RepoURL:     repoURL,
 		Branch:      branch,
 		Commit:      ctx.SHA,
-		Event:       ctx.EventName,
 		PullRequest: pr,
 	}, nil
 }

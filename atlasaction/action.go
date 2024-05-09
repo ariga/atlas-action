@@ -68,8 +68,6 @@ type TriggerContext struct {
 	Branch string
 	// Commit SHA.
 	Commit string
-	// Event is the event type.
-	Event string
 	// PullRequest will be available if the event is "pull_request".
 	PullRequest *PullRequest
 }
