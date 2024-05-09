@@ -73,16 +73,17 @@ type TriggerContext struct {
 
 // SCM Provider constants.
 const (
-	PROVIDER_GITHUB string = "GITHUB"
+	PROVIDER_GITHUB Provider = "GITHUB"
 )
 
 // SCM holds the source control management system information.
 type SCM struct {
 	// Type of the SCM, e.g. "GITHUB" / "GITLAB" / "BITBUCKET".
-	Provider string
+	Provider Provider
 	// APIURL is the base URL for the SCM API.
 	APIURL string
 }
+type Provider string
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) error {
@@ -789,7 +790,7 @@ func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, e
 		URL:      url,
 		Username: a.Name,
 		UserID:   a.ID,
-		SCMType:  tctx.SCM.Provider,
+		SCMType:  string(tctx.SCM.Provider),
 	}, nil
 }
 
