@@ -27,13 +27,17 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 	if branch == "" {
 		branch = ctx.RefName
 	}
+	scm := SCM{
+		Provider: PROVIDER_GITHUB,
+		APIURL:   ctx.APIURL,
+	}
 	return &TriggerContext{
+		SCM:       scm,
 		Repo:      ctx.Repository,
+		Branch:    branch,
+		Commit:    ctx.SHA,
 		Event:     ctx.Event,
 		EventName: ctx.EventName,
-		Branch:    branch,
-		APIURL:    ctx.APIURL,
-		SHA:       ctx.SHA,
 	}, nil
 }
 
