@@ -13,7 +13,6 @@ import (
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/alecthomas/kong"
-	"github.com/sethvargo/go-githubactions"
 )
 
 const (
@@ -26,7 +25,11 @@ const (
 var cli RunAction
 
 func main() {
-	action := githubactions.New()
+	action, err := newAction()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to run action in the current environment: %s\n", err)
+		os.Exit(1)
+	}
 	c, err := atlasexec.NewClient("", "atlas")
 	if err != nil {
 		action.Fatalf("Failed to create client: %s", err)
@@ -36,7 +39,7 @@ func main() {
 		&cli,
 		kong.BindTo(ctx, (*context.Context)(nil)),
 		kong.Bind(c),
-		kong.Bind(action),
+		kong.BindTo(action, (*atlasaction.Action)(nil)),
 	)
 	if err := cli.Run(); err != nil {
 		if uerr := errors.Unwrap(err); uerr != nil {
@@ -62,7 +65,7 @@ type RunAction struct {
 	Version VersionFlag `help:"Prints the version and exits"`
 }
 
-func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action *githubactions.Action) error {
+func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action atlasaction.Action) error {
 	_ = os.Setenv("ATLAS_ACTION_COMMAND", r.Action)
 	defer func() {
 		_ = os.Unsetenv("ATLAS_ACTION_COMMAND")
@@ -83,4 +86,12 @@ func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action *g
 		return atlasaction.MigrateLint(ctx, client, action)
 	}
 	return fmt.Errorf("unknown action: %s", r.Action)
+}
+
+// newAction creates a new atlasaction.Action based on the environment.
+func newAction() (atlasaction.Action, error) {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		return atlasaction.NewGHAction(), nil
+	}
+	return nil, errors.New("unsupported environment")
 }
