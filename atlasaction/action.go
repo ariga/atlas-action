@@ -59,12 +59,29 @@ type Logger interface {
 
 // Context holds the context of the environment the action is running in.
 type TriggerContext struct {
-	Repo      string
+	// SCM is the source control management system.
+	SCM SCM
+	// Repo is the repository name.
+	Repo string
+	// Branch name.
+	Branch string
+	// Commit SHA.
+	Commit    string
 	Event     map[string]interface{}
 	EventName string
-	Branch    string
-	APIURL    string
-	SHA       string
+}
+
+// SCM Provider constants.
+const (
+	PROVIDER_GITHUB string = "GITHUB"
+)
+
+// SCM holds the source control management system information.
+type SCM struct {
+	// Type of the SCM, e.g. "GITHUB" / "GITLAB" / "BITBUCKET".
+	Provider string
+	// APIURL is the base URL for the SCM API.
+	APIURL string
 }
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
@@ -293,25 +310,25 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 	if payload.URL != "" {
 		act.SetOutput("report-url", payload.URL)
 	}
-	ghContext, err := act.GetTriggerContext()
+	tctx, err := act.GetTriggerContext()
 	if err != nil {
 		return err
 	}
 	// In case of a pull request, we need to add checks and comments to the PR.
-	if ghContext.EventName != "pull_request" {
+	if tctx.EventName != "pull_request" {
 		if isLintErr {
 			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 		}
 		return nil
 	}
-	event, err := triggerEvent(ghContext)
+	event, err := triggerEvent(tctx)
 	if err != nil {
 		return err
 	}
 	ghClient := githubAPI{
 		event:   event,
-		baseURL: ghContext.APIURL,
-		repo:    ghContext.Repo,
+		baseURL: tctx.SCM.APIURL,
+		repo:    tctx.Repo,
 		client: &http.Client{
 			Transport: &roundTripper{
 				authToken: os.Getenv("GITHUB_TOKEN"),
@@ -748,11 +765,11 @@ type Actor struct {
 }
 
 func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, error) {
-	ghContext, err := act.GetTriggerContext()
+	tctx, err := act.GetTriggerContext()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action context: %w", err)
 	}
-	ev, err := triggerEvent(ghContext)
+	ev, err := triggerEvent(tctx)
 	if err != nil {
 		return nil, err
 	}
@@ -765,14 +782,14 @@ func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, e
 		url = ev.Repository.URL
 	}
 	return &atlasexec.RunContext{
-		Repo:     ghContext.Repo,
-		Branch:   ghContext.Branch,
-		Commit:   ghContext.SHA,
+		Repo:     tctx.Repo,
+		Branch:   tctx.Branch,
+		Commit:   tctx.Commit,
 		Path:     act.GetInput("dir"),
 		URL:      url,
 		Username: a.Name,
 		UserID:   a.ID,
-		SCMType:  "GITHUB",
+		SCMType:  tctx.SCM.Provider,
 	}, nil
 }
 
