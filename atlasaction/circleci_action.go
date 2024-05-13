@@ -31,7 +31,7 @@ func (a *circleCIOrb) GetType() atlasexec.TriggerType {
 
 // GetInput implements the Action interface.
 func (a *circleCIOrb) GetInput(name string) string {
-	e := strings.ReplaceAll(name, " ", "_")
+	e := strings.ReplaceAll(name, "-", "_")
 	e = strings.ToUpper(e)
 	e = "INPUT_" + e
 	return strings.TrimSpace(os.Getenv(e))
