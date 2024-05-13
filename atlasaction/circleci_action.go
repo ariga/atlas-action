@@ -47,12 +47,12 @@ func (a *circleCIOrb) SetOutput(name, value string) {
 // https://circleci.com/docs/variables/#built-in-environment-variables
 func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	ctx := &TriggerContext{}
-	ctx.Repo = a.GetInput("CIRCLE_PR_REPONAME")
-	ctx.RepoURL = a.GetInput("CIRCLE_REPOSITORY_URL")
-	ctx.Branch = a.GetInput("CIRCLE_BRANCH")
-	ctx.Commit = a.GetInput("CIRCLE_SHA1")
+	ctx.Repo = os.Getenv("CIRCLE_PR_REPONAME")
+	ctx.RepoURL = os.Getenv("CIRCLE_REPOSITORY_URL")
+	ctx.Branch = os.Getenv("CIRCLE_BRANCH")
+	ctx.Commit = os.Getenv("CIRCLE_SHA1")
 	// fill up PR information if the pr number is available.
-	prNumber := a.GetInput("CIRCLE_PR_NUMBER")
+	prNumber := os.Getenv("CIRCLE_PR_NUMBER")
 	if prNumber != "" {
 		n, err := strconv.Atoi(prNumber)
 		if err != nil {
@@ -60,8 +60,8 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		}
 		ctx.PullRequest = &PullRequest{
 			Number: n,
-			URL:    a.GetInput("CIRCLE_PULL_REQUEST"),
-			Commit: a.GetInput("CIRCLE_SHA1"),
+			URL:    os.Getenv("CIRCLE_PULL_REQUEST"),
+			Commit: os.Getenv("CIRCLE_SHA1"),
 		}
 	}
 	// Detect SCM provider based on the repository URL.
