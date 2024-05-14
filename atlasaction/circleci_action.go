@@ -74,13 +74,10 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		ctx.SCM.Provider = ProviderGithub
 		ctx.SCM.APIURL = defaultGHApiUrl
 		// get open pull requests for the branch.
-		prs, err := getGHPRs(username, ctx.Repo, ctx.Branch)
+		var err error
+		ctx.PullRequest, err = getGHPR(username, ctx.Repo, ctx.Branch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
-		}
-		// get the newest PR.
-		if len(prs) > 0 {
-			ctx.PullRequest = &prs[0]
 		}
 	default:
 		return nil, fmt.Errorf("unsupported SCM provider")
@@ -123,8 +120,8 @@ func (a *circleCIOrb) AddStepSummary(summary string) {
 	// unsupported
 }
 
-// get github open pull requests based on branch.
-func getGHPRs(username, repo, branch string) ([]PullRequest, error) {
+// getGHPR gets the newest open pull request for the branch.
+func getGHPR(username, repo, branch string) (*PullRequest, error) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		return nil, fmt.Errorf("missing GITHUB_TOKEN environment variable")
@@ -137,7 +134,7 @@ func getGHPRs(username, repo, branch string) ([]PullRequest, error) {
 	}
 	// get open pull requests for the branch.
 	req, err := client.Get(
-		fmt.Sprintf("%s/repos/%s/%s/pulls?state=open&head=%s",
+		fmt.Sprintf("%s/repos/%s/%s/pulls?state=open&head=%s&sort=created&direction=desc&per_page=1&page=1",
 			defaultGHApiUrl,
 			username,
 			repo,
@@ -156,13 +153,12 @@ func getGHPRs(username, repo, branch string) ([]PullRequest, error) {
 	if err := json.NewDecoder(req.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
-	prs := make([]PullRequest, 0, len(resp))
-	for _, r := range resp {
-		prs = append(prs, PullRequest{
-			Number: r.Number,
-			URL:    r.Url,
-			Commit: r.Head.Sha,
-		})
+	if len(resp) == 0 {
+		return nil, nil
 	}
-	return prs, nil
+	return &PullRequest{
+		Number: resp[0].Number,
+		URL:    resp[0].Url,
+		Commit: resp[0].Head.Sha,
+	}, nil
 }
