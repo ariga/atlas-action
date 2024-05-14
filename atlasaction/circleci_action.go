@@ -1,16 +1,21 @@
 package atlasaction
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
-	"strconv"
 	"strings"
+	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 )
 
-var _ Action = (*circleCIOrb)(nil)
+var (
+	defaultGHApiUrl        = "https://api.github.com"
+	_               Action = (*circleCIOrb)(nil)
+)
 
 // circleciOrb is an implementation of the Action interface for GitHub Actions.
 type circleCIOrb struct {
@@ -47,28 +52,33 @@ func (a *circleCIOrb) SetOutput(name, value string) {
 // https://circleci.com/docs/variables/#built-in-environment-variables
 func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	ctx := &TriggerContext{}
-	ctx.Repo = os.Getenv("CIRCLE_PR_REPONAME")
-	ctx.RepoURL = os.Getenv("CIRCLE_REPOSITORY_URL")
-	ctx.Branch = os.Getenv("CIRCLE_BRANCH")
-	ctx.Commit = os.Getenv("CIRCLE_SHA1")
-	// fill up PR information if the pr number is available.
-	prNumber := os.Getenv("CIRCLE_PR_NUMBER")
-	if prNumber != "" {
-		n, err := strconv.Atoi(prNumber)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse PR number: %w", err)
-		}
-		ctx.PullRequest = &PullRequest{
-			Number: n,
-			URL:    os.Getenv("CIRCLE_PULL_REQUEST"),
-			Commit: os.Getenv("CIRCLE_SHA1"),
-		}
+	if ctx.Repo = os.Getenv("CIRCLE_PROJECT_REPONAME"); ctx.Repo == "" {
+		return nil, fmt.Errorf("missing CIRCLE_PROJECT_REPONAME environment variable")
+	}
+	if ctx.RepoURL = os.Getenv("CIRCLE_REPOSITORY_URL"); ctx.RepoURL == "" {
+		return nil, fmt.Errorf("missing CIRCLE_REPOSITORY_URL environment variable")
+	}
+	if ctx.Branch = os.Getenv("CIRCLE_BRANCH"); ctx.Branch == "" {
+		return nil, fmt.Errorf("missing CIRCLE_BRANCH environment variable")
+	}
+	if ctx.Commit = os.Getenv("CIRCLE_SHA1"); ctx.Commit == "" {
+		return nil, fmt.Errorf("missing CIRCLE_SHA1 environment variable")
+	}
+	username := os.Getenv("CIRCLE_PROJECT_USERNAME")
+	if username == "" {
+		return nil, fmt.Errorf("missing CIRCLE_PROJECT_USERNAME environment variable")
 	}
 	// Detect SCM provider based on the repository URL.
 	switch {
 	case strings.Contains(ctx.RepoURL, "github.com"):
 		ctx.SCM.Provider = ProviderGithub
-		ctx.SCM.APIURL = "https://api.github.com"
+		ctx.SCM.APIURL = defaultGHApiUrl
+		// get open pull requests for the branch.
+		var err error
+		ctx.PullRequest, err = getGHPR(username, ctx.Repo, ctx.Branch)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported SCM provider")
 	}
@@ -108,4 +118,47 @@ func (a *circleCIOrb) WithFieldsMap(map[string]string) Logger {
 // AddStepSummary implements the Action interface.
 func (a *circleCIOrb) AddStepSummary(summary string) {
 	// unsupported
+}
+
+// getGHPR gets the newest open pull request for the branch.
+func getGHPR(username, repo, branch string) (*PullRequest, error) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		return nil, fmt.Errorf("missing GITHUB_TOKEN environment variable")
+	}
+	client := &http.Client{
+		Transport: &roundTripper{
+			authToken: token,
+		},
+		Timeout: time.Second * 30,
+	}
+	// get open pull requests for the branch.
+	req, err := client.Get(
+		fmt.Sprintf("%s/repos/%s/%s/pulls?state=open&head=%s&sort=created&direction=desc&per_page=1&page=1",
+			defaultGHApiUrl,
+			username,
+			repo,
+			branch))
+	if err != nil {
+		return nil, err
+	}
+	defer req.Body.Close()
+	var resp []struct {
+		Url    string `json:"url"`
+		Number int    `json:"number"`
+		Head   struct {
+			Sha string `json:"sha"`
+		} `json:"head"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+	if len(resp) == 0 {
+		return nil, nil
+	}
+	return &PullRequest{
+		Number: resp[0].Number,
+		URL:    resp[0].Url,
+		Commit: resp[0].Head.Sha,
+	}, nil
 }
