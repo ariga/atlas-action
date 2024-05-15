@@ -143,6 +143,13 @@ func getGHPR(username, repo, branch string) (*PullRequest, error) {
 		return nil, err
 	}
 	defer req.Body.Close()
+	buf, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading open pull requests: %w", err)
+	}
+	if req.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d when calling GitHub API", req.StatusCode)
+	}
 	var resp []struct {
 		Url    string `json:"url"`
 		Number int    `json:"number"`
@@ -150,7 +157,7 @@ func getGHPR(username, repo, branch string) (*PullRequest, error) {
 			Sha string `json:"sha"`
 		} `json:"head"`
 	}
-	if err := json.NewDecoder(req.Body).Decode(&resp); err != nil {
+	if err = json.Unmarshal(buf, &resp); err != nil {
 		return nil, err
 	}
 	if len(resp) == 0 {
