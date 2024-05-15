@@ -52,9 +52,15 @@ func (a *circleCIOrb) SetOutput(name, value string) {
 // https://circleci.com/docs/variables/#built-in-environment-variables
 func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	ctx := &TriggerContext{}
-	if ctx.Repo = os.Getenv("CIRCLE_PROJECT_REPONAME"); ctx.Repo == "" {
+	repo := os.Getenv("CIRCLE_PROJECT_REPONAME")
+	if repo == "" {
 		return nil, fmt.Errorf("missing CIRCLE_PROJECT_REPONAME environment variable")
 	}
+	username := os.Getenv("CIRCLE_PROJECT_USERNAME")
+	if username == "" {
+		return nil, fmt.Errorf("missing CIRCLE_PROJECT_USERNAME environment variable")
+	}
+	ctx.Repo = fmt.Sprintf("%s/%s", username, repo)
 	if ctx.RepoURL = os.Getenv("CIRCLE_REPOSITORY_URL"); ctx.RepoURL == "" {
 		return nil, fmt.Errorf("missing CIRCLE_REPOSITORY_URL environment variable")
 	}
@@ -64,10 +70,6 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	if ctx.Commit = os.Getenv("CIRCLE_SHA1"); ctx.Commit == "" {
 		return nil, fmt.Errorf("missing CIRCLE_SHA1 environment variable")
 	}
-	username := os.Getenv("CIRCLE_PROJECT_USERNAME")
-	if username == "" {
-		return nil, fmt.Errorf("missing CIRCLE_PROJECT_USERNAME environment variable")
-	}
 	// Detect SCM provider based on the repository URL.
 	switch {
 	case strings.Contains(ctx.RepoURL, "github.com"):
@@ -75,7 +77,7 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		ctx.SCM.APIURL = defaultGHApiUrl
 		// get open pull requests for the branch.
 		var err error
-		ctx.PullRequest, err = getGHPR(username, ctx.Repo, ctx.Branch)
+		ctx.PullRequest, err = getGHPR(ctx.Repo, ctx.Branch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
 		}
@@ -121,7 +123,7 @@ func (a *circleCIOrb) AddStepSummary(summary string) {
 }
 
 // getGHPR gets the newest open pull request for the branch.
-func getGHPR(username, repo, branch string) (*PullRequest, error) {
+func getGHPR(repo, branch string) (*PullRequest, error) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		return nil, fmt.Errorf("missing GITHUB_TOKEN environment variable")
@@ -134,9 +136,8 @@ func getGHPR(username, repo, branch string) (*PullRequest, error) {
 	}
 	// get open pull requests for the branch.
 	req, err := client.Get(
-		fmt.Sprintf("%s/repos/%s/%s/pulls?state=open&head=%s&sort=created&direction=desc&per_page=1&page=1",
+		fmt.Sprintf("%s/repos/%s/pulls?state=open&head=%s&sort=created&direction=desc&per_page=1&page=1",
 			defaultGHApiUrl,
-			username,
 			repo,
 			branch))
 	if err != nil {
