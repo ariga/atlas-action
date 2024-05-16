@@ -61,18 +61,16 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		return nil, fmt.Errorf("missing CIRCLE_PROJECT_USERNAME environment variable")
 	}
 	ctx.Repo = fmt.Sprintf("%s/%s", username, repo)
-	if ctx.RepoURL = os.Getenv("CIRCLE_REPOSITORY_URL"); ctx.RepoURL == "" {
-		return nil, fmt.Errorf("missing CIRCLE_REPOSITORY_URL environment variable")
-	}
+	ctx.RepoURL = os.Getenv("CIRCLE_REPOSITORY_URL")
 	if ctx.Branch = os.Getenv("CIRCLE_BRANCH"); ctx.Branch == "" {
 		return nil, fmt.Errorf("missing CIRCLE_BRANCH environment variable")
 	}
 	if ctx.Commit = os.Getenv("CIRCLE_SHA1"); ctx.Commit == "" {
 		return nil, fmt.Errorf("missing CIRCLE_SHA1 environment variable")
 	}
-	// Detect SCM provider based on the repository URL.
+	// Detect SCM provider based on Token.
 	switch {
-	case strings.Contains(ctx.RepoURL, "github.com"):
+	case os.Getenv("GITHUB_TOKEN") != "":
 		ctx.SCM.Provider = ProviderGithub
 		ctx.SCM.APIURL = defaultGHApiUrl
 		// get open pull requests for the branch.
@@ -80,6 +78,11 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		ctx.PullRequest, err = getGHPR(ctx.Repo, ctx.Branch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
+		}
+		// CIRCLE_REPOSITORY_URL will be empty for some reason, causing ctx.RepoURL to be empty.
+		// To workaround this, we can construct the URL based on SCM Token
+		if ctx.RepoURL == "" {
+			ctx.RepoURL = fmt.Sprintf("https://github.com/%s/%s", username, repo)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported SCM provider")
