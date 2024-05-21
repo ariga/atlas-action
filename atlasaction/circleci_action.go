@@ -62,9 +62,7 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	}
 	ctx.Repo = fmt.Sprintf("%s/%s", username, repo)
 	ctx.RepoURL = os.Getenv("CIRCLE_REPOSITORY_URL")
-	if ctx.Branch = os.Getenv("CIRCLE_BRANCH"); ctx.Branch == "" {
-		return nil, fmt.Errorf("missing CIRCLE_BRANCH environment variable")
-	}
+	ctx.Branch = os.Getenv("CIRCLE_BRANCH")
 	if ctx.Commit = os.Getenv("CIRCLE_SHA1"); ctx.Commit == "" {
 		return nil, fmt.Errorf("missing CIRCLE_SHA1 environment variable")
 	}
@@ -73,16 +71,26 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	case os.Getenv("GITHUB_TOKEN") != "":
 		ctx.SCM.Provider = ProviderGithub
 		ctx.SCM.APIURL = defaultGHApiUrl
+		// CIRCLE_REPOSITORY_URL will be empty for some reason, causing ctx.RepoURL to be empty.
+		// To workaround this, we can construct the URL based on SCM Token
+		if ctx.RepoURL == "" {
+			ctx.RepoURL = fmt.Sprintf("https://github.com/%s/%s", username, repo)
+		}
+		// CIRCLE_BRANCH will be empty when the event is triggered by a tag.
+		// In this case, we can use CIRCLE_TAG as the branch.
+		if ctx.Branch == "" {
+			tag := os.Getenv("CIRCLE_TAG")
+			if tag == "" {
+				return nil, fmt.Errorf("cannot determine branch due to missing CIRCLE_BRANCH and CIRCLE_TAG environment variables")
+			}
+			ctx.Branch = tag
+			return ctx, nil
+		}
 		// get open pull requests for the branch.
 		var err error
 		ctx.PullRequest, err = getGHPR(ctx.Repo, ctx.Branch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
-		}
-		// CIRCLE_REPOSITORY_URL will be empty for some reason, causing ctx.RepoURL to be empty.
-		// To workaround this, we can construct the URL based on SCM Token
-		if ctx.RepoURL == "" {
-			ctx.RepoURL = fmt.Sprintf("https://github.com/%s/%s", username, repo)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported SCM provider")
