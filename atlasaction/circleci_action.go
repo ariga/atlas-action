@@ -52,15 +52,9 @@ func (a *circleCIOrb) SetOutput(name, value string) {
 // https://circleci.com/docs/variables/#built-in-environment-variables
 func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	ctx := &TriggerContext{}
-	repo := os.Getenv("CIRCLE_PROJECT_REPONAME")
-	if repo == "" {
+	if ctx.Repo = os.Getenv("CIRCLE_PROJECT_REPONAME"); ctx.Repo == "" {
 		return nil, fmt.Errorf("missing CIRCLE_PROJECT_REPONAME environment variable")
 	}
-	username := os.Getenv("CIRCLE_PROJECT_USERNAME")
-	if username == "" {
-		return nil, fmt.Errorf("missing CIRCLE_PROJECT_USERNAME environment variable")
-	}
-	ctx.Repo = fmt.Sprintf("%s/%s", username, repo)
 	ctx.RepoURL = os.Getenv("CIRCLE_REPOSITORY_URL")
 	ctx.Branch = os.Getenv("CIRCLE_BRANCH")
 	if ctx.Commit = os.Getenv("CIRCLE_SHA1"); ctx.Commit == "" {
@@ -72,9 +66,9 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		ctx.SCM.Provider = ProviderGithub
 		ctx.SCM.APIURL = defaultGHApiUrl
 		// CIRCLE_REPOSITORY_URL will be empty for some reason, causing ctx.RepoURL to be empty.
-		// To workaround this, we can construct the URL based on SCM Token
+		// In this case, we default to the GitHub Cloud URL.
 		if ctx.RepoURL == "" {
-			ctx.RepoURL = fmt.Sprintf("https://github.com/%s/%s", username, repo)
+			ctx.RepoURL = fmt.Sprintf("https://github.com/%s", ctx.Repo)
 		}
 		// CIRCLE_BRANCH will be empty when the event is triggered by a tag.
 		// In this case, we can use CIRCLE_TAG as the branch.
