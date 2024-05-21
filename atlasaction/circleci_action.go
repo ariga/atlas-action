@@ -65,6 +65,12 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	case os.Getenv("GITHUB_TOKEN") != "":
 		ctx.SCM.Provider = ProviderGithub
 		ctx.SCM.APIURL = defaultGHApiUrl
+		// Used to change the location that the linting results are posted to.
+		// If GITHUB_REPOSITORY is not set, we default to the CIRCLE_PROJECT_REPONAME repo.
+		ghRepo := os.Getenv("GITHUB_REPOSITORY")
+		if ghRepo != "" {
+			ctx.Repo = ghRepo
+		}
 		// CIRCLE_REPOSITORY_URL will be empty for some reason, causing ctx.RepoURL to be empty.
 		// In this case, we default to the GitHub Cloud URL.
 		if ctx.RepoURL == "" {
