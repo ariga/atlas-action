@@ -34,11 +34,36 @@
                 <a href="{{ .URL }}#erd" target="_blank">View Visualization</a>
             </td>
         </tr>
+        {{- if not (hasComments .) }}
         <tr>
-            {{- $errCount := fileErrors .}}
-            {{- if or (gt $errCount 0) (gt .DiagnosticsCount 0) }}
             <td>
-                {{- if gt $errCount 0 }}
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                No issues found
+            </td>
+            <td>
+                <a href="{{ .URL }}" target="_blank">View Report</a>
+            </td>
+        </tr>
+        {{- end }}
+    </tbody>
+    {{- if hasComments . }}
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>File</th>
+            <th>Diagnostics</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{- range $file := .Files }}
+        {{- $hasError := $file.Error }}
+        <tr>
+            <td>
+                {{- if $hasError }}
                 <div align="center">
                     <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
                 </div>
@@ -49,31 +74,33 @@
                 {{- end }}
             </td>
             <td>
-                {{- if .DiagnosticsCount }}
-                {{ .DiagnosticsCount }} issue{{ if gt .DiagnosticsCount 1}}s{{ end }} {{ if gt .DiagnosticsCount 1}}were{{ else }}was{{ end }} found
-                {{- else if eq $errCount 1}}
-                {{ firstError . }}
-                {{- else}}
-                {{ $errCount }} errors were found
+                Analyze {{ $file.Name }}
+             {{- if $hasError }}
+                <br/> Error found
+            {{- else }}
+                {{- $diagnostocs := fileDiagnosticCount $file }}
+                {{- if gt $diagnostocs 0 }}
+                <br/>{{ $diagnostocs }} issue{{ if gt $diagnostocs 1 }}s{{ end }} {{ if gt $diagnostocs 1 }}were{{ else }}was{{ end }} found
                 {{- end }}
-            </td>
-            {{- else}}
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                No issues found
-            </td>
             {{- end }}
+            </td>
             <td>
-                <a href="{{ .URL }}" target="_blank">View Report</a>
+            {{- if $hasError }}
+                {{ $file.Error }}
+            {{- else }}
+                {{- range .Reports }}
+                {{- range .Diagnostics }}
+                {{ .Text }} <a href="https://atlasgo.io/lint/analyzers#{{ .Code }}" target="_blank">({{ .Code }})</a> <br/>
+                {{- end }}
+                {{- end }}
+            {{- end }}
             </td>
         </tr>
+        {{- end }}
     </tbody>
+    {{- end }}
 </table>
 
 <hr/>
 
-*Migrations automatically reviewed with [Atlas](https://atlasgo.io)*
+*Read the full linting report on [Atlas Cloud]({{ .URL }})*

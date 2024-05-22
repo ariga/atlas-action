@@ -545,7 +545,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "`atlas migrate lint` on <strong>testdata/migrations_destructive</strong>\n")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 issue was found")
-		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
+		require.Contains(t, sum, `https://migration-lint-report-url)`)
 		out := tt.out.String()
 		require.Contains(t, out, "error file=testdata/migrations_destructive/20230925192914.sql")
 		require.Contains(t, out, "destructive changes detected")
@@ -662,7 +662,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "`atlas migrate lint` on <strong>migrations_destructive</strong>\n")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 issue was found")
-		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
+		require.Contains(t, sum, `https://migration-lint-report-url)`)
 		out := tt.out.String()
 		require.Contains(t, out, "error file=testdata/migrations_destructive/20230925192914.sql")
 		require.Contains(t, out, "destructive changes detected")
@@ -754,7 +754,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "`atlas migrate lint` on <strong>testdata/diagnostics</strong>\n")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 issue was found")
-		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
+		require.Contains(t, sum, `https://migration-lint-report-url)`)
 		out := tt.out.String()
 		require.Contains(t, out, "warning file=testdata/diagnostics/20231016114135_add_not_null.sql")
 		require.Contains(t, out, "data dependent changes detected")
@@ -987,14 +987,17 @@ func TestTemplateGeneration(t *testing.T) {
 					Dir: "testdata/migrations",
 				},
 				Files: []*atlasexec.FileReport{{
+					Name: "20230925192914.sql",
 					Reports: []sqlcheck.Report{
 						{
 							Diagnostics: []sqlcheck.Diagnostic{
 								{
-									Text: "data dependent changes detected",
+									Text: "Add unique index to existing column",
+									Code: "MF101",
 								},
 								{
-									Text: "incorrect column type",
+									Text: "Adding a non-nullable column to a table without a DEFAULT",
+									Code: "MY101",
 								},
 							},
 						},
@@ -1033,6 +1036,117 @@ func TestTemplateGeneration(t *testing.T) {
             </td>
             <td>
                 <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
+            </td>
+        </tr>
+    </tbody>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>File</th>
+            <th>Diagnostics</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
+                </div>
+            </td>
+            <td>
+                Analyze 20230925192914.sql
+                <br/>2 issues were found
+            </td>
+            <td>
+                Add unique index to existing column <a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a> <br/>
+                Adding a non-nullable column to a table without a DEFAULT <a href="https://atlasgo.io/lint/analyzers#MY101" target="_blank">(MY101)</a> <br/>
+            </td>
+        </tr>
+    </tbody>
+</table>
+`,
+		},
+		{
+			name: "2 files, 1 with error, 1 with issue",
+			payload: &atlasexec.SummaryReport{
+				URL: "https://migration-lint-report-url",
+				Env: env{
+					Dir: "testdata/migrations",
+				},
+				Files: []*atlasexec.FileReport{{
+					Name:  "20230925192914.sql",
+					Error: "Destructive changes detected",
+				},
+				{
+					Name: "20230925192915.sql",
+					Reports: []sqlcheck.Report{
+						{
+							Diagnostics: []sqlcheck.Diagnostic{
+								{
+									Text: "Missing the CONCURRENTLY in index creation",
+									Code: "PG101",
+								},
+							},
+						},
+					},
+				},
+				},
+			},
+			// language=html
+			expected: `<table>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Step</th>
+            <th>Link</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                2 new migration files detected
+            </td>
+            <td>&nbsp;</td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                ERD and visual diff generated
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
+            </td>
+        </tr>
+    </tbody>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>File</th>
+            <th>Diagnostics</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
+                </div>
+            </td>
+            <td>
+                Analyze 20230925192914.sql
+                <br/> Error found
+            </td>
+            <td>
+                Destructive changes detected
             </td>
         </tr>
         <tr>
@@ -1042,93 +1156,25 @@ func TestTemplateGeneration(t *testing.T) {
                 </div>
             </td>
             <td>
-                2 issues were found
+                Analyze 20230925192915.sql
+                <br/>1 issue was found
             </td>
             <td>
-                <a href="https://migration-lint-report-url" target="_blank">View Report</a>
+                Missing the CONCURRENTLY in index creation <a href="https://atlasgo.io/lint/analyzers#PG101" target="_blank">(PG101)</a> <br/>
             </td>
         </tr>
     </tbody>
 </table>`,
 		},
 		{
-			name: "file with an error, 1 issue",
+			name: "1 checksum error",
 			payload: &atlasexec.SummaryReport{
 				URL: "https://migration-lint-report-url",
 				Env: env{
 					Dir: "testdata/migrations",
 				},
 				Files: []*atlasexec.FileReport{{
-					Error: "destructive changes detected",
-					Reports: []sqlcheck.Report{
-						{
-							Diagnostics: []sqlcheck.Diagnostic{
-								{
-									Text: "dropping column is not allowed",
-								},
-							},
-						},
-					},
-				}},
-			},
-			// language=html
-			expected: `<table>
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>Step</th>
-            <th>Link</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                1 new migration file detected
-            </td>
-            <td>&nbsp;</td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                ERD and visual diff generated
-            </td>
-            <td>
-                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
-                </div>
-            </td>
-            <td>
-                1 issue was found
-            </td>
-            <td>
-                <a href="https://migration-lint-report-url" target="_blank">View Report</a>
-            </td>
-        </tr>
-    </tbody>
-</table>`,
-		},
-		{
-			name: "checksum error",
-			payload: &atlasexec.SummaryReport{
-				URL: "https://migration-lint-report-url",
-				Env: env{
-					Dir: "testdata/migrations",
-				},
-				Files: []*atlasexec.FileReport{{
+					Name:  "20230925192914.sql",
 					Error: "checksum mismatch",
 				}},
 			},
@@ -1166,6 +1212,15 @@ func TestTemplateGeneration(t *testing.T) {
                 <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
             </td>
         </tr>
+    </tbody>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>File</th>
+            <th>Diagnostics</th>
+        </tr>
+    </thead>
+    <tbody>
         <tr>
             <td>
                 <div align="center">
@@ -1173,10 +1228,11 @@ func TestTemplateGeneration(t *testing.T) {
                 </div>
             </td>
             <td>
-                checksum mismatch
+                Analyze 20230925192914.sql
+                <br/> Error found
             </td>
             <td>
-                <a href="https://migration-lint-report-url" target="_blank">View Report</a>
+                checksum mismatch
             </td>
         </tr>
     </tbody>
