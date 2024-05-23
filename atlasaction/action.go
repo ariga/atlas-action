@@ -362,23 +362,25 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 	return nil
 }
 
-func fileErrors(s *atlasexec.SummaryReport) int {
-	count := 0
+// Returns true if the summary report has diagnostics or errors.
+func hasComments(s *atlasexec.SummaryReport) bool {
 	for _, f := range s.Files {
-		if len(f.Error) > 0 {
-			count++
+		if f.Error != "" {
+			return true
+		}
+		if len(f.Reports) > 0 {
+			return true
 		}
 	}
-	return count
+	return false
 }
 
-func firstError(s *atlasexec.SummaryReport) string {
-	for _, f := range s.Files {
-		if len(f.Error) > 0 {
-			return f.Error
-		}
+func fileDiagnosticCount(f *atlasexec.FileReport) int {
+	count := 0
+	for _, r := range f.Reports {
+		count += len(r.Diagnostics)
 	}
-	return ""
+	return count
 }
 
 var (
@@ -387,8 +389,8 @@ var (
 	comment     = template.Must(
 		template.New("comment").
 			Funcs(template.FuncMap{
-				"fileErrors": fileErrors,
-				"firstError": firstError,
+				"hasComments": hasComments,
+				"fileDiagnosticCount": fileDiagnosticCount,
 			}).
 			Parse(commentTmpl),
 	)
