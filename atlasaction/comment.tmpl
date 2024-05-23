@@ -5,7 +5,7 @@
         <tr>
             <th>Status</th>
             <th>Step</th>
-            <th>Link</th>
+            <th>Result</th>
         </tr>
     </thead>
     <tbody>
@@ -49,18 +49,9 @@
             </td>
         </tr>
         {{- end }}
-    </tbody>
     {{- if hasComments . }}
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>File</th>
-            <th>Diagnostics</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{- range $file := .Files }}
-        {{- $hasError := $file.Error }}
+    {{- range $file := .Files }}
+    {{- $hasError := $file.Error }}
         <tr>
             <td>
                 {{- if $hasError }}
@@ -97,10 +88,11 @@
             </td>
         </tr>
         {{- end }}
-    </tbody>
     {{- end }}
+    <td colspan="4">
+        <div align="center">
+            Read the full linting report on <a href="{{ .URL }}" target="_blank">Atlas Cloud</a>
+        </div>
+    </td>
+    </tbody>
 </table>
-
-<hr/>
-
-*Read the full linting report on [Atlas Cloud]({{ .URL }})*

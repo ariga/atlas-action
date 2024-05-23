@@ -545,7 +545,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "`atlas migrate lint` on <strong>testdata/migrations_destructive</strong>\n")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "Error was found")
-		require.Contains(t, sum, `https://migration-lint-report-url)`)
+		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
 		out := tt.out.String()
 		require.Contains(t, out, "error file=testdata/migrations_destructive/20230925192914.sql")
 		require.Contains(t, out, "destructive changes detected")
@@ -662,7 +662,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "`atlas migrate lint` on <strong>migrations_destructive</strong>\n")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "Error was found")
-		require.Contains(t, sum, `https://migration-lint-report-url)`)
+		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
 		out := tt.out.String()
 		require.Contains(t, out, "error file=testdata/migrations_destructive/20230925192914.sql")
 		require.Contains(t, out, "destructive changes detected")
@@ -754,7 +754,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, "`atlas migrate lint` on <strong>testdata/diagnostics</strong>\n")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 issue was found")
-		require.Contains(t, sum, `https://migration-lint-report-url)`)
+		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
 		out := tt.out.String()
 		require.Contains(t, out, "warning file=testdata/diagnostics/20231016114135_add_not_null.sql")
 		require.Contains(t, out, "data dependent changes detected")
@@ -935,7 +935,7 @@ func TestTemplateGeneration(t *testing.T) {
         <tr>
             <th>Status</th>
             <th>Step</th>
-            <th>Link</th>
+            <th>Result</th>
         </tr>
     </thead>
     <tbody>
@@ -976,6 +976,11 @@ func TestTemplateGeneration(t *testing.T) {
                 <a href="https://migration-lint-report-url" target="_blank">View Report</a>
             </td>
         </tr>
+    <td colspan="4">
+        <div align="center">
+            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
+        </div>
+    </td>
     </tbody>
 </table>`,
 		},
@@ -1010,7 +1015,7 @@ func TestTemplateGeneration(t *testing.T) {
         <tr>
             <th>Status</th>
             <th>Step</th>
-            <th>Link</th>
+            <th>Result</th>
         </tr>
     </thead>
     <tbody>
@@ -1038,15 +1043,6 @@ func TestTemplateGeneration(t *testing.T) {
                 <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
             </td>
         </tr>
-    </tbody>
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>File</th>
-            <th>Diagnostics</th>
-        </tr>
-    </thead>
-    <tbody>
         <tr>
             <td>
                 <div align="center">
@@ -1062,9 +1058,13 @@ func TestTemplateGeneration(t *testing.T) {
                 Adding a non-nullable column to a table without a DEFAULT <a href="https://atlasgo.io/lint/analyzers#MY101" target="_blank">(MY101)</a> <br/>
             </td>
         </tr>
+    <td colspan="4">
+        <div align="center">
+            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
+        </div>
+    </td>
     </tbody>
-</table>
-`,
+</table>`,
 		},
 		{
 			name: "2 files, 1 with error, 1 with issue",
@@ -1098,7 +1098,7 @@ func TestTemplateGeneration(t *testing.T) {
         <tr>
             <th>Status</th>
             <th>Step</th>
-            <th>Link</th>
+            <th>Result</th>
         </tr>
     </thead>
     <tbody>
@@ -1126,15 +1126,6 @@ func TestTemplateGeneration(t *testing.T) {
                 <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
             </td>
         </tr>
-    </tbody>
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>File</th>
-            <th>Diagnostics</th>
-        </tr>
-    </thead>
-    <tbody>
         <tr>
             <td>
                 <div align="center">
@@ -1163,6 +1154,11 @@ func TestTemplateGeneration(t *testing.T) {
                 Missing the CONCURRENTLY in index creation <a href="https://atlasgo.io/lint/analyzers#PG101" target="_blank">(PG101)</a> <br/>
             </td>
         </tr>
+    <td colspan="4">
+        <div align="center">
+            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
+        </div>
+    </td>
     </tbody>
 </table>`,
 		},
@@ -1184,7 +1180,7 @@ func TestTemplateGeneration(t *testing.T) {
         <tr>
             <th>Status</th>
             <th>Step</th>
-            <th>Link</th>
+            <th>Result</th>
         </tr>
     </thead>
     <tbody>
@@ -1212,15 +1208,6 @@ func TestTemplateGeneration(t *testing.T) {
                 <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
             </td>
         </tr>
-    </tbody>
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>File</th>
-            <th>Diagnostics</th>
-        </tr>
-    </thead>
-    <tbody>
         <tr>
             <td>
                 <div align="center">
@@ -1235,6 +1222,11 @@ func TestTemplateGeneration(t *testing.T) {
                 checksum mismatch
             </td>
         </tr>
+    <td colspan="4">
+        <div align="center">
+            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
+        </div>
+    </td>
     </tbody>
 </table>`,
 		},
