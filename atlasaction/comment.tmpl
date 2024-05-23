@@ -76,7 +76,7 @@
             <td>
                 Analyze {{ $file.Name }}
              {{- if $hasError }}
-                <br/> Error found
+                <br/> Error was found
             {{- else }}
                 {{- $diagnostocs := fileDiagnosticCount $file }}
                 {{- if gt $diagnostocs 0 }}
