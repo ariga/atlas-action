@@ -16,8 +16,12 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	_, err = orb.GetTriggerContext()
 	require.EqualError(t, err, "missing CIRCLE_SHA1 environment variable")
 	t.Setenv("CIRCLE_SHA1", "1234567890")
-	_, err = orb.GetTriggerContext()
-	require.EqualError(t, err, "unsupported SCM provider")
+	ctx, err := orb.GetTriggerContext()
+	require.NoError(t, err)
+	require.Equal(t, &TriggerContext{
+		Repo:   "atlas-orb",
+		Commit: "1234567890",
+	}, ctx)
 	t.Setenv("GITHUB_TOKEN", "1234567890")
 	_, err = orb.GetTriggerContext()
 	require.EqualError(t, err, "cannot determine branch due to missing CIRCLE_BRANCH and CIRCLE_TAG environment variables")
@@ -34,7 +38,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	}))
 	defer server.Close()
 	defaultGHApiUrl = server.URL
-	ctx, err := orb.GetTriggerContext()
+	ctx, err = orb.GetTriggerContext()
 	require.NoError(t, err)
 	require.Equal(t, &PullRequest{
 		Number: 1,

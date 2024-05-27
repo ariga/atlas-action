@@ -86,8 +86,6 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
 		}
-	default:
-		return nil, fmt.Errorf("unsupported SCM provider")
 	}
 	return ctx, nil
 }
