@@ -1077,19 +1077,19 @@ func TestTemplateGeneration(t *testing.T) {
 					Name:  "20230925192914.sql",
 					Error: "Destructive changes detected",
 				},
-				{
-					Name: "20230925192915.sql",
-					Reports: []sqlcheck.Report{
-						{
-							Diagnostics: []sqlcheck.Diagnostic{
-								{
-									Text: "Missing the CONCURRENTLY in index creation",
-									Code: "PG101",
+					{
+						Name: "20230925192915.sql",
+						Reports: []sqlcheck.Report{
+							{
+								Diagnostics: []sqlcheck.Diagnostic{
+									{
+										Text: "Missing the CONCURRENTLY in index creation",
+										Code: "PG101",
+									},
 								},
 							},
 						},
 					},
-				},
 				},
 			},
 			// language=html
@@ -1301,7 +1301,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 				fmt.Fprintf(w, `{"data":{"dirState":{"content":%q}}}`, base64.StdEncoding.EncodeToString(ad))
 			case strings.Contains(b, "mutation ReportMigration"):
 				fmt.Fprintf(w, `{"data":{"reportMigration":{"url":"https://atlas.com"}}}`)
-			case strings.Contains(b, "query {\\n\\t\\t\\tme"):
+			case strings.Contains(b, "query Bot"):
 			default:
 				t.Log("Unhandled call: ", body)
 			}
@@ -1325,7 +1325,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, payloads, 3)
-		require.Contains(t, payloads[0], "query {\\n\\t\\t\\tme")
+		require.Contains(t, payloads[0], "query Bot")
 		require.Contains(t, payloads[1], "query dirState")
 		require.Contains(t, payloads[2], "mutation ReportMigration")
 		require.Contains(t, payloads[2], `"context":{"triggerType":"GITHUB_ACTION","triggerVersion":"v1.2.3"}`)
@@ -1356,7 +1356,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, payloads, 2)
-		require.Contains(t, payloads[0], "query {\\n\\t\\t\\tme")
+		require.Contains(t, payloads[0], "query Bot")
 		require.Contains(t, payloads[1], "query dirState")
 
 		m, err := tt.outputs()
