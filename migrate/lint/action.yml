@@ -11,7 +11,7 @@ inputs:
     required: false
   dir-name:
     description: The name (slug) of the project in Atlas Cloud.
-    required: false
+    required: true
   dev-url:
     description: |
       The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
