@@ -13,7 +13,7 @@ To learn more about the recommended way to build workflows, read our guide on
 |--------------------------------------------------------------------|---------------------------------------------------------|
 | [ariga/setup-atlas](#arigasetup-atlas)                             | Setup the Atlas CLI and optionally login to Atlas Cloud |
 | [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)   | Push migrations to Atlas Cloud                          |
-| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)   | Lint migrations                                         |
+| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)   | Lint migrations (required `atlas login` )               |
 | [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply) | Apply migrations to a database                          |
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)   | Revert migrations to a database                         |
 
@@ -204,7 +204,7 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 * `url` - The URL of the migration directory in Atlas Cloud, containing an ERD visualization of the schema.
 
-### `ariga/atlas-action/migrate/lint`
+### `ariga/atlas-action/migrate/lint` (Required `atlas login`)
 
 Lint migration changes with Atlas
 
