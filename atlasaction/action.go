@@ -140,6 +140,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) err
 		act.SetOutput("error", run.Error)
 		return errors.New(run.Error)
 	}
+	act.Infof(`"atlas migrate apply" completed successfully, applied to version %q`, run.Target)
 	act.SetOutput("current", run.Current)
 	act.SetOutput("target", run.Target)
 	act.SetOutput("pending_count", strconv.Itoa(len(run.Pending)))
@@ -238,6 +239,7 @@ func MigrateDown(ctx context.Context, client *atlasexec.Client, act Action) (err
 	case StateAborted:
 		return fmt.Errorf("plan rejected, review here: %s", run.URL)
 	case StateApplied, StateApproved:
+		act.Infof(`"atlas migrate down" completed successfully, downgraded to version %q`, run.Target)
 		act.SetOutput("current", run.Current)
 		act.SetOutput("target", run.Target)
 		act.SetOutput("planned_count", strconv.Itoa(len(run.Planned)))
@@ -280,8 +282,8 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act Action) erro
 	if err != nil {
 		return fmt.Errorf("failed to push dir tag: %w", err)
 	}
+	act.Infof(`"atlas migrate push" completed successfully, pushed dir %q to Atlas Cloud`, act.GetInput("dir-name"))
 	act.SetOutput("url", resp)
-	act.Infof("Uploaded dir %q to Atlas Cloud", params.Name)
 	return nil
 }
 
@@ -359,6 +361,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 	if isLintErr {
 		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 	}
+	act.Infof("`atlas migrate lint` completed successfully, no issues found")
 	return nil
 }
 
@@ -389,7 +392,7 @@ var (
 	comment     = template.Must(
 		template.New("comment").
 			Funcs(template.FuncMap{
-				"hasComments": hasComments,
+				"hasComments":         hasComments,
 				"fileDiagnosticCount": fileDiagnosticCount,
 			}).
 			Parse(commentTmpl),
