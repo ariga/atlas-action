@@ -1,6 +1,7 @@
 Running `atlas migrate apply` with **{{- .Dir }}** Directory, on `{{- .URL.URL }}`
 
-### Planned Migrations
+### Migration Summary
+
 {{- if .Pending }}
 Migrating to version **{{ .Target }}**{{ with .Current }} from **{{ . }}**{{ end }} ({{ len .Pending }} migrations in total):
 {{- else }}
@@ -10,32 +11,59 @@ Migrating to version **{{ .Target }}**{{ with .Current }} from **{{ . }}**{{ end
 {{- if .Error }}
 ### ❌ Migration Failed
 - **Error:** {{ .Error }}
-{{- else }}
+{{- else if .Pending }}
 ### ✅ Migration Succeeded
 {{- end }}
+
 {{ if .Pending }}
-{{ .Summary  "" }}
+{{ .Summary "" }}
 {{- end }}
 
-{{ if .Applied }}
+{{- $dir := .Dir }}
+{{- if .Applied }}
+
 ### Applied Migrations
-{{- range .Applied }}
-- **{{ .File.Name }}**
-  - **Execution Time:** {{ execTime .Start .End }}
-  {{- if .Error }}
-  - **❌ Error:** {{ .Error.Error }} on SQL: `{{ .Error.SQL }}`
-  {{- else }}
-  - **✅ Successfully Applied Statements:**
-    {{ range .Applied }}
-    - ```sql
-      {{ . }}
-      ```
+
+<table>
+    <tr>
+        <th>Status</th>
+        <th>File Name</th>
+        <th>Executed Statements</th>
+        <th>Execution Time</th>
+    </tr>
+    {{- range .Applied }}
+    <tr>
+        <td>{{ if .Error }}❌ Failed{{ else }}✅ Succeeded{{ end }}</td>
+        <td>{{ .File.Name }}</td>
+        <td>{{ len .Applied }}</td>
+        <td>{{ execTime .Start .End }}</td>
+    </tr>
     {{- end }}
-  {{- if .Skipped }}
-  - **Skipped Statements:** {{ .Skipped }}
-  {{- end }}
-  {{- end }}
-{{ end }}
-{{- else }}
-- **No migrations applied.**
+</table>
+
+{{- end }}
+
+{{- if .Applied }}
+
+<details>
+
+<summary><h3>SQL Statements</h3></summary>
+
+```sql
+{{- range .Applied }}
+
+-- File: {{ .File.Name }}
+
+{{- $err := .Error }}
+{{- range .Applied }}
+{{- if and $err ( eq $err.SQL . ) }}
+-- {{ $err.Error }}
+{{- end }}
+{{ . }}
+{{- end }}
+
+{{- end }}
+```
+
+</details>
 {{- end }}

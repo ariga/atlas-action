@@ -1248,7 +1248,7 @@ func TestApplyTemplateGeneration(t *testing.T) {
 		expected string // expected output of the comment template
 	}{
 		{
-			name: "no errors 2 files, 2 migrations",
+			name: "no errors 2 files, 3 migrations",
 			payload: &atlasexec.MigrateApply{
 				Env: atlasexec.Env{
 					Driver: "sqlite",
@@ -1282,6 +1282,7 @@ func TestApplyTemplateGeneration(t *testing.T) {
 						End:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.940343+03:00")),
 						Applied: []string{
 							"CREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";",
+							"CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;",
 						},
 					},
 					{
@@ -1302,7 +1303,7 @@ func TestApplyTemplateGeneration(t *testing.T) {
 				End:     must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
 			},
 			// language=markdown
-			expected: "Running `atlas migrate apply` with **testdata/migrations** Directory, on `sqlite://file?_fk=1&mode=memory`\n\n### Planned Migrations\nMigrating to version **20221108173658** from **20221108143624** (2 migrations in total):\n### ✅ Migration Succeeded\n\n- **54.297ms**\n- **2 migrations**\n- **2 sql statements**\n\n\n### Applied Migrations\n- **20221108173626.sql**\n  - **Execution Time:** 25.765ms\n  - **✅ Successfully Applied Statements:**\n    \n    - ```sql\n      CREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";\n      ```\n\n- **20221108173658.sql**\n  - **Execution Time:** 23.4ms\n  - **✅ Successfully Applied Statements:**\n    \n    - ```sql\n      CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n      ```\n",
+			expected: "Running `atlas migrate apply` with **testdata/migrations** Directory, on `sqlite://file?_fk=1&mode=memory`\n\n### Migration Summary\nMigrating to version **20221108173658** from **20221108143624** (2 migrations in total):\n### ✅ Migration Succeeded\n\n\n- **54.297ms**\n- **2 migrations**\n- **3 sql statements**\n\n### Applied Migrations\n\n<table>\n    <tr>\n        <th>Status</th>\n        <th>File Name</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n    </tr>\n    <tr>\n        <td>✅ Succeeded</td>\n        <td>20221108173626.sql</td>\n        <td>2</td>\n        <td>25.765ms</td>\n    </tr>\n    <tr>\n        <td>✅ Succeeded</td>\n        <td>20221108173658.sql</td>\n        <td>1</td>\n        <td>23.4ms</td>\n    </tr>\n</table>\n\n<details>\n\n<summary><h3>SQL Statements</h3></summary>\n\n```sql\n\n-- File: 20221108173626.sql\nCREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";\nCREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n\n-- File: 20221108173658.sql\nCREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n```\n\n</details>",
 		},
 		{
 			name: "2 files, 1 with error",
@@ -1368,7 +1369,7 @@ func TestApplyTemplateGeneration(t *testing.T) {
 				Error: "sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
 			},
 			// language=markdown
-			expected: "Running `atlas migrate apply` with **testdata/migrations** Directory, on `mysql://localhost:3306/test?parseTime=true`\n\n### Planned Migrations\nMigrating to version **20221108173658** from **20221108143624** (2 migrations in total):\n### ❌ Migration Failed\n- **Error:** sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1\n\n- **54.297ms**\n- **1 migration ok, 1 with errors**\n- **1 sql statement ok, 1 with errors**\n\n\n### Applied Migrations\n- **20221108173626.sql**\n  - **Execution Time:** 25.765ms\n  - **✅ Successfully Applied Statements:**\n    \n    - ```sql\n      CREATE TABLE Persons ( PersonID int );\n      ```\n\n- **20221108173658.sql**\n  - **Execution Time:** 23.4ms\n  - **❌ Error:** Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1 on SQL: `create Table Err?`\n",
+			expected: "Running `atlas migrate apply` with **testdata/migrations** Directory, on `mysql://localhost:3306/test?parseTime=true`\n\n### Migration Summary\nMigrating to version **20221108173658** from **20221108143624** (2 migrations in total):\n### ❌ Migration Failed\n- **Error:** sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1\n\n\n- **54.297ms**\n- **1 migration ok, 1 with errors**\n- **1 sql statement ok, 1 with errors**\n\n### Applied Migrations\n\n<table>\n    <tr>\n        <th>Status</th>\n        <th>File Name</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n    </tr>\n    <tr>\n        <td>✅ Succeeded</td>\n        <td>20221108173626.sql</td>\n        <td>1</td>\n        <td>25.765ms</td>\n    </tr>\n    <tr>\n        <td>❌ Failed</td>\n        <td>20221108173658.sql</td>\n        <td>1</td>\n        <td>23.4ms</td>\n    </tr>\n</table>\n\n<details>\n\n<summary><h3>SQL Statements</h3></summary>\n\n```sql\n\n-- File: 20221108173626.sql\nCREATE TABLE Persons ( PersonID int );\n\n-- File: 20221108173658.sql\n-- Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1\ncreate Table Err?\n```\n\n</details>",
 		},
 		{
 			name: "no work migration",
@@ -1390,7 +1391,7 @@ func TestApplyTemplateGeneration(t *testing.T) {
 				Start:   must(time.Parse(time.RFC3339, "2024-06-16T16:09:01.683771+03:00")),
 				End:     must(time.Parse(time.RFC3339, "2024-06-16T16:09:01.683771+03:00")),
 			},
-			expected: "### Planned Migrations\n- **No migration files to execute.**\n### ✅ Migration Succeeded\n\n\n\n- **No migrations applied.**",
+			expected: "### Migration Summary\n- **No migration files to execute.**",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
