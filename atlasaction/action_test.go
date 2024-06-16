@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
@@ -909,7 +911,7 @@ func TestMigrateLint(t *testing.T) {
 	})
 }
 
-func TestTemplateGeneration(t *testing.T) {
+func TestLintTemplateGeneration(t *testing.T) {
 	type env struct {
 		Driver string         `json:"Driver,omitempty"`
 		URL    *sqlclient.URL `json:"URL,omitempty"`
@@ -1233,11 +1235,170 @@ func TestTemplateGeneration(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			require.NoError(t, comment.Execute(&buf, tt.payload))
+			require.NoError(t, lintComment.Execute(&buf, tt.payload))
 			require.Contains(t, buf.String(), tt.expected)
 		})
 	}
+}
 
+func TestApplyTemplateGeneration(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		payload  *atlasexec.MigrateApply
+		expected string // expected output of the comment template
+	}{
+		{
+			name: "no errors 2 files, 2 migrations",
+			payload: &atlasexec.MigrateApply{
+				Env: atlasexec.Env{
+					Driver: "sqlite",
+					Dir:    "testdata/migrations",
+					URL: &sqlclient.URL{
+						URL: &url.URL{
+							Scheme:   "sqlite",
+							Host:     "file",
+							RawQuery: "_fk=1&mode=memory",
+						},
+						Schema: "main",
+					},
+				},
+				Pending: []atlasexec.File{
+					{
+						Name:    "20221108173626.sql",
+						Version: "20221108173626",
+					},
+					{
+						Name:    "20221108173658.sql",
+						Version: "20221108173658",
+					},
+				},
+				Applied: []*atlasexec.AppliedFile{
+					{
+						File: atlasexec.File{
+							Name:    "20221108173626.sql",
+							Version: "20221108173626",
+						},
+						Start: must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.914578+03:00")),
+						End:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.940343+03:00")),
+						Applied: []string{
+							"CREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";",
+						},
+					},
+					{
+						File: atlasexec.File{
+							Name:    "20221108173658.sql",
+							Version: "20221108173658",
+						},
+						Start: must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.940343+03:00")),
+						End:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
+						Applied: []string{
+							"CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;",
+						},
+					},
+				},
+				Current: "20221108143624",
+				Target:  "20221108173658",
+				Start:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.909446+03:00")),
+				End:     must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
+			},
+			// language=markdown
+			expected: "Running `atlas migrate apply` with **testdata/migrations** Directory, on `sqlite://file?_fk=1&mode=memory`\n\n### Planned Migrations\nMigrating to version **20221108173658** from **20221108143624** (2 migrations in total):\n### ✅ Migration Succeeded\n\n- **54.297ms**\n- **2 migrations**\n- **2 sql statements**\n\n\n### Applied Migrations\n- **20221108173626.sql**\n  - **Execution Time:** 25.765ms\n  - **✅ Successfully Applied Statements:**\n    \n    - ```sql\n      CREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";\n      ```\n\n- **20221108173658.sql**\n  - **Execution Time:** 23.4ms\n  - **✅ Successfully Applied Statements:**\n    \n    - ```sql\n      CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n      ```\n",
+		},
+		{
+			name: "2 files, 1 with error",
+			payload: &atlasexec.MigrateApply{
+				Env: atlasexec.Env{
+					Driver: "mysql",
+					Dir:    "testdata/migrations",
+					URL: &sqlclient.URL{
+						URL: &url.URL{
+							Scheme:   "mysql",
+							Host:     "localhost:3306",
+							Path:     "/test",
+							RawQuery: "parseTime=true",
+						},
+						Schema: "test",
+					},
+				},
+				Pending: []atlasexec.File{
+					{
+						Name:    "20221108173626.sql",
+						Version: "20221108173626",
+					},
+					{
+						Name:    "20221108173658.sql",
+						Version: "20221108173658",
+					},
+				},
+				Applied: []*atlasexec.AppliedFile{
+					{
+						File: atlasexec.File{
+							Name:    "20221108173626.sql",
+							Version: "20221108173626",
+						},
+						Start: must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.914578+03:00")),
+						End:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.940343+03:00")),
+						Applied: []string{
+							"CREATE TABLE Persons ( PersonID int );",
+						},
+					},
+					{
+						File: atlasexec.File{
+							Name:    "20221108173658.sql",
+							Version: "20221108173658",
+						},
+						Start: must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.940343+03:00")),
+						End:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
+						Applied: []string{
+							"create Table Err?",
+						},
+						Error: &struct {
+							SQL   string
+							Error string
+						}{
+							SQL: "create Table Err?",
+							Error:  "Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
+						},
+					},
+				},
+				Current: "20221108143624",
+				Target:  "20221108173658",
+				Start:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.909446+03:00")),
+				End:     must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
+				Error: "sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
+			},
+			// language=markdown
+			expected: "Running `atlas migrate apply` with **testdata/migrations** Directory, on `mysql://localhost:3306/test?parseTime=true`\n\n### Planned Migrations\nMigrating to version **20221108173658** from **20221108143624** (2 migrations in total):\n### ❌ Migration Failed\n- **Error:** sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1\n\n- **54.297ms**\n- **1 migration ok, 1 with errors**\n- **1 sql statement ok, 1 with errors**\n\n\n### Applied Migrations\n- **20221108173626.sql**\n  - **Execution Time:** 25.765ms\n  - **✅ Successfully Applied Statements:**\n    \n    - ```sql\n      CREATE TABLE Persons ( PersonID int );\n      ```\n\n- **20221108173658.sql**\n  - **Execution Time:** 23.4ms\n  - **❌ Error:** Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1 on SQL: `create Table Err?`\n",
+		},
+		{
+			name: "no work migration",
+			payload: &atlasexec.MigrateApply{
+				Env: atlasexec.Env{
+					Driver: "mysql",
+					Dir:    "testdata/migrations",
+					URL: &sqlclient.URL{
+						URL: &url.URL{
+							Scheme:   "mysql",
+							Host:     "localhost:3306",
+							Path:     "/test",
+							RawQuery: "parseTime=true",
+						},
+						Schema: "test",
+					},
+				},
+				Current: "20240616130838",
+				Start:   must(time.Parse(time.RFC3339, "2024-06-16T16:09:01.683771+03:00")),
+				End:     must(time.Parse(time.RFC3339, "2024-06-16T16:09:01.683771+03:00")),
+			},
+			expected: "### Planned Migrations\n- **No migration files to execute.**\n### ✅ Migration Succeeded\n\n\n\n- **No migrations applied.**",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			require.NoError(t, applyComment.Execute(&buf, tt.payload))
+			require.Contains(t, buf.String(), tt.expected)
+		})
+	}
 }
 
 func generateHCL(t *testing.T, url, token string) string {

@@ -1,0 +1,41 @@
+Running `atlas migrate apply` with **{{- .Dir }}** Directory, on `{{- .URL.URL }}`
+
+### Planned Migrations
+{{- if .Pending }}
+Migrating to version **{{ .Target }}**{{ with .Current }} from **{{ . }}**{{ end }} ({{ len .Pending }} migrations in total):
+{{- else }}
+- **No migration files to execute.**
+{{- end }}
+
+{{- if .Error }}
+### ❌ Migration Failed
+- **Error:** {{ .Error }}
+{{- else }}
+### ✅ Migration Succeeded
+{{- end }}
+{{ if .Pending }}
+{{ .Summary  "" }}
+{{- end }}
+
+{{ if .Applied }}
+### Applied Migrations
+{{- range .Applied }}
+- **{{ .File.Name }}**
+  - **Execution Time:** {{ execTime .Start .End }}
+  {{- if .Error }}
+  - **❌ Error:** {{ .Error.Error }} on SQL: `{{ .Error.SQL }}`
+  {{- else }}
+  - **✅ Successfully Applied Statements:**
+    {{ range .Applied }}
+    - ```sql
+      {{ . }}
+      ```
+    {{- end }}
+  {{- if .Skipped }}
+  - **Skipped Statements:** {{ .Skipped }}
+  {{- end }}
+  {{- end }}
+{{ end }}
+{{- else }}
+- **No migrations applied.**
+{{- end }}
