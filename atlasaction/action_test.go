@@ -41,14 +41,11 @@ func TestMigrateApply(t *testing.T) {
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 
-		m, err := tt.outputs()
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]string{
-			"applied_count": "1",
-			"current":       "",
-			"pending_count": "1",
-			"target":        "20230922132634",
-		}, m)
+		require.Contains(t, string(c), "Migrating to version **20230922132634** (1 migrations in total):")
+		require.Contains(t, string(c), "### ✅ Migration Succeeded")
+		require.Contains(t, string(c), "- **1 sql statement**")
 	})
 	t.Run("dry-run", func(t *testing.T) {
 		tt := newT(t)
@@ -132,12 +129,11 @@ func TestMigrateDown(t *testing.T) {
 		// Ensure files are applied.
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]string{
-			"current":       "",
-			"target":        "3",
-			"pending_count": "3",
-			"applied_count": "3",
-		}, must(tt.outputs()))
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Contains(t, string(c), "Migrating to version **3** (3 migrations in total):")
+		require.Contains(t, string(c), "### ✅ Migration Succeeded")
+		require.Contains(t, string(c), "- **3 sql statements**")
 		tt.resetOut(t)
 		tt.setInput("dev-url", "sqlite://dev?mode=memory")
 		return tt
@@ -1357,8 +1353,8 @@ func TestApplyTemplateGeneration(t *testing.T) {
 							SQL   string
 							Error string
 						}{
-							SQL: "create Table Err?",
-							Error:  "Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
+							SQL:   "create Table Err?",
+							Error: "Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
 						},
 					},
 				},
@@ -1366,7 +1362,7 @@ func TestApplyTemplateGeneration(t *testing.T) {
 				Target:  "20221108173658",
 				Start:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.909446+03:00")),
 				End:     must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
-				Error: "sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
+				Error:   "sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
 			},
 			// language=markdown
 			expected: "Running `atlas migrate apply` with **testdata/migrations** Directory, on `mysql://localhost:3306/test?parseTime=true`\n\n### Migration Summary\nMigrating to version **20221108173658** from **20221108143624** (2 migrations in total):\n### ❌ Migration Failed\n- **Error:** sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1\n\n\n- **54.297ms**\n- **1 migration ok, 1 with errors**\n- **1 sql statement ok, 1 with errors**\n\n### Applied Migrations\n\n<table>\n    <tr>\n        <th>Status</th>\n        <th>File Name</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n    </tr>\n    <tr>\n        <td>✅ Succeeded</td>\n        <td>20221108173626.sql</td>\n        <td>1</td>\n        <td>25.765ms</td>\n    </tr>\n    <tr>\n        <td>❌ Failed</td>\n        <td>20221108173658.sql</td>\n        <td>1</td>\n        <td>23.4ms</td>\n    </tr>\n</table>\n\n<details>\n\n<summary><h3>SQL Statements</h3></summary>\n\n```sql\n\n-- File: 20221108173626.sql\nCREATE TABLE Persons ( PersonID int );\n\n-- File: 20221108173658.sql\n-- Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1\ncreate Table Err?\n```\n\n</details>",
@@ -1492,14 +1488,11 @@ func TestMigrateApplyCloud(t *testing.T) {
 		require.Contains(t, payloads[2], "mutation ReportMigration")
 		require.Contains(t, payloads[2], `"context":{"triggerType":"GITHUB_ACTION","triggerVersion":"v1.2.3"}`)
 
-		m, err := tt.outputs()
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]string{
-			"current":       "",
-			"applied_count": "1",
-			"pending_count": "1",
-			"target":        "20230922132634",
-		}, m)
+		require.Contains(t, string(c), "Migrating to version **20230922132634** (1 migrations in total):")
+		require.Contains(t, string(c), "### ✅ Migration Succeeded")
+		require.Contains(t, string(c), "- **1 sql statement**")
 	})
 	t.Run("no-env", func(t *testing.T) {
 		var payloads []string
@@ -1521,14 +1514,11 @@ func TestMigrateApplyCloud(t *testing.T) {
 		require.Contains(t, payloads[0], "query Bot")
 		require.Contains(t, payloads[1], "query dirState")
 
-		m, err := tt.outputs()
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]string{
-			"current":       "",
-			"applied_count": "1",
-			"pending_count": "1",
-			"target":        "20230922132634",
-		}, m)
+		require.Contains(t, string(c), "Migrating to version **20230922132634** (1 migrations in total):")
+		require.Contains(t, string(c), "### ✅ Migration Succeeded")
+		require.Contains(t, string(c), "- **1 sql statement**")
 	})
 }
 
