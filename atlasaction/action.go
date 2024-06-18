@@ -134,8 +134,8 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) err
 	run, err := client.MigrateApply(ctx, params)
 	if err != nil {
 		act.SetOutput("error", err.Error())
-		return err
 	}
+	fmt.Println("run is: ", run)
 	tctx, err := act.GetTriggerContext()
 	if err != nil {
 		return err
@@ -149,6 +149,9 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) err
 			},
 			Timeout: time.Second * 30,
 		},
+	}
+	if run == nil {
+		return nil
 	}
 	if err := ghClient.addApplySummary(act, run); err != nil {
 		return err
