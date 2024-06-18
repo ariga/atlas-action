@@ -1,72 +1,77 @@
-Running `atlas migrate apply` with **{{- .Dir }}** Directory, on `{{- .URL.URL }}`
-
-### Migration Summary
-
-{{- if .Pending }}
-Migrating to version **{{ .Target }}**{{ with .Current }} from **{{ . }}**{{ end }} ({{ len .Pending }} migrations in total):
-{{- else }}
-- **No migration files to execute.**
-{{- end }}
+---
 
 {{- if .Error }}
-### ❌ Migration Failed
-- **Error:** {{ .Error }}
-{{- else if .Pending }}
-### ✅ Migration Succeeded
+## ❌ Migration Failed
+{{- else }}
+## ✅ Migration Passed
 {{- end }}
 
-{{ if .Pending }}
-{{ .Summary "" }}
-{{- end }}
-
-{{- $dir := .Dir }}
-{{- if .Applied }}
-
-### Applied Migrations
+#### `atlas migrate apply` Summary:
 
 <table>
     <tr>
-        <th>Status</th>
-        <th>File Name</th>
-        <th>Executed Statements</th>
-        <th>Execution Time</th>
+        <th>Parameter</th>
+        <th>Details</th>
     </tr>
-    {{- range .Applied }}
     <tr>
-        <td>{{ if .Error }}❌ Failed{{ else }}✅ Succeeded{{ end }}</td>
-        <td>{{ .File.Name }}</td>
-        <td>{{ len .Applied }}</td>
-        <td>{{ execTime .Start .End }}</td>
+        <td>Migration Directory</td>
+        <td><code>{{ .Dir }}</code></td>
+    </tr>
+    <tr>
+        <td>Database URL</td>
+        <td><code>{{ .URL.URL }}</code></td>
+    </tr>
+    {{- if .Current }}
+    <tr>
+        <td>Migrate from Version</td>
+        <td><code>{{ .Current }}</code></td>
     </tr>
     {{- end }}
+    <tr>
+        <td>Migrate to Version</td>
+       <td>
+        <code>{{- if .Target }}{{ .Target }}{{- else }}{{ .Current }}{{- end }}</code>
+       </td>
+    </tr>
+    <tr>
+        <td>SQL Summary</td>
+        <td>{{ len .Applied }} migration file{{- if or (not .Applied) (gt (len .Applied) 1) }}s{{- end }}
+        {{- if sumAppliedStatements . }}, {{ sumAppliedStatements . }} statement{{- if gt (sumAppliedStatements .) 1 }}s{{- end }} passed {{- end }} {{- if .Error }}, 1 failed{{- end }}</td>
+    </tr>
+    <tr>
+        <td>Total Time</td>
+        <td>{{ execTime .Start .End }}</td>
+    </tr>
 </table>
 
-{{- end }}
+{{- range .Applied }}
 
-{{- if .Applied }}
+#### Version {{ .Name }}:
+<table>
+    <tr>
+        <th>Status</th>
+        <th>Executed Statements</th>
+        <th>Execution Time</th>
+        <th>Error</th>
+        <th>Error Statement</th>
+    </tr>
+    <tr>
+        <td>{{ if .Error }}❌{{ else }}✅{{ end }}</td>
+        <td>{{ len .Applied }}</td>
+        <td>{{ execTime .Start .End }}</td>
+        <td>{{ if .Error }}{{ .Error.Error }}{{ else }}-{{ end }}</td>
+        <td>{{ if .Error }}<details><summary>📄 View</summary><pre><code>{{ .Error.SQL }}</code></pre></details>{{ else }}-{{ end }}</td>
+    </tr>
+</table>
 
 <details>
-
-<summary><h3>SQL Statements</h3></summary>
+<summary>📄 View SQL Statements</summary>
 
 ```sql
 {{- range .Applied }}
-
--- File: {{ .File.Name }}
-
-{{- $err := .Error }}
-{{- range .Applied }}
-{{- if and $err ( eq $err.SQL . ) }}
--- {{ $err.Error }}
-{{- end }}
 {{ . }}
 {{- end }}
-
-{{- end }}
 ```
-
 </details>
-{{- end }}
 
----
-
+{{ end }}
