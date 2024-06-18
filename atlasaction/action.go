@@ -136,15 +136,28 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) err
 		act.SetOutput("error", err.Error())
 		return err
 	}
+	tctx, err := act.GetTriggerContext()
+	if err != nil {
+		return err
+	}
+	ghClient := githubAPI{
+		baseURL: tctx.SCM.APIURL,
+		repo:    tctx.Repo,
+		client: &http.Client{
+			Transport: &roundTripper{
+				authToken: os.Getenv("GITHUB_TOKEN"),
+			},
+			Timeout: time.Second * 30,
+		},
+	}
+	if err := ghClient.addApplySummary(act, run); err != nil {
+		return err
+	}
 	if run.Error != "" {
 		act.SetOutput("error", run.Error)
 		return errors.New(run.Error)
 	}
 	act.Infof(`"atlas migrate apply" completed successfully, applied to version %q`, run.Target)
-	act.SetOutput("current", run.Current)
-	act.SetOutput("target", run.Target)
-	act.SetOutput("pending_count", strconv.Itoa(len(run.Pending)))
-	act.SetOutput("applied_count", strconv.Itoa(len(run.Applied)))
 	return nil
 }
 
@@ -349,7 +362,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 			Timeout: time.Second * 30,
 		},
 	}
-	if err := ghClient.addSummary(act, &payload); err != nil {
+	if err := ghClient.addLintSummary(act, &payload); err != nil {
 		return err
 	}
 	if err := ghClient.addChecks(act, &payload); err != nil {
@@ -378,6 +391,18 @@ func hasComments(s *atlasexec.SummaryReport) bool {
 	return false
 }
 
+func execTime(start, end time.Time) string {
+	return end.Sub(start).String()
+}
+
+func appliedStmts(a *atlasexec.MigrateApply) int {
+	total := 0
+	for _, file := range a.Applied {
+		total += len(file.Applied)
+	}
+	return total
+}
+
 func fileDiagnosticCount(f *atlasexec.FileReport) int {
 	count := 0
 	for _, r := range f.Reports {
@@ -387,9 +412,11 @@ func fileDiagnosticCount(f *atlasexec.FileReport) int {
 }
 
 var (
-	//go:embed comment.tmpl
+	//go:embed comments/lint.tmpl
 	commentTmpl string
-	comment     = template.Must(
+	//go:embed comments/apply.tmpl
+	applyTmpl   string
+	lintComment = template.Must(
 		template.New("comment").
 			Funcs(template.FuncMap{
 				"hasComments":         hasComments,
@@ -397,14 +424,32 @@ var (
 			}).
 			Parse(commentTmpl),
 	)
+	applyComment = template.Must(
+		template.New("comment").
+			Funcs(template.FuncMap{
+				"execTime":     execTime,
+				"appliedStmts": appliedStmts,
+			}).
+			Parse(applyTmpl),
+	)
 )
 
-// addSummary writes a summary to the pull request. It adds a marker
+// addApplySummary to workflow run.
+func (g *githubAPI) addApplySummary(act Action, payload *atlasexec.MigrateApply) error {
+	var buf bytes.Buffer
+	if err := applyComment.Execute(&buf, &payload); err != nil {
+		return err
+	}
+	act.AddStepSummary(buf.String())
+	return nil
+}
+
+// addLintSummary writes a summary to the pull request. It adds a marker
 // HTML comment to the end of the comment body to identify the comment as one created by
 // this action.
-func (g *githubAPI) addSummary(act Action, payload *atlasexec.SummaryReport) error {
+func (g *githubAPI) addLintSummary(act Action, payload *atlasexec.SummaryReport) error {
 	var buf bytes.Buffer
-	if err := comment.Execute(&buf, &payload); err != nil {
+	if err := lintComment.Execute(&buf, &payload); err != nil {
 		return err
 	}
 	summary := buf.String()

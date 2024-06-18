@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
@@ -39,14 +41,11 @@ func TestMigrateApply(t *testing.T) {
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 
-		m, err := tt.outputs()
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]string{
-			"applied_count": "1",
-			"current":       "",
-			"pending_count": "1",
-			"target":        "20230922132634",
-		}, m)
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>20230922132634</code>")
+		require.Contains(t, string(c), "Migration Passed")
+		require.Contains(t, string(c), "1 migration file, 1 statement passed")
 	})
 	t.Run("dry-run", func(t *testing.T) {
 		tt := newT(t)
@@ -130,12 +129,11 @@ func TestMigrateDown(t *testing.T) {
 		// Ensure files are applied.
 		err := MigrateApply(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]string{
-			"current":       "",
-			"target":        "3",
-			"pending_count": "3",
-			"applied_count": "3",
-		}, must(tt.outputs()))
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>3</code>")
+		require.Contains(t, string(c), "Migration Passed")
+		require.Contains(t, string(c), "3 migration files, 3 statements passed")
 		tt.resetOut(t)
 		tt.setInput("dev-url", "sqlite://dev?mode=memory")
 		return tt
@@ -909,7 +907,7 @@ func TestMigrateLint(t *testing.T) {
 	})
 }
 
-func TestTemplateGeneration(t *testing.T) {
+func TestLintTemplateGeneration(t *testing.T) {
 	type env struct {
 		Driver string         `json:"Driver,omitempty"`
 		URL    *sqlclient.URL `json:"URL,omitempty"`
@@ -1233,11 +1231,170 @@ func TestTemplateGeneration(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			require.NoError(t, comment.Execute(&buf, tt.payload))
+			require.NoError(t, lintComment.Execute(&buf, tt.payload))
 			require.Contains(t, buf.String(), tt.expected)
 		})
 	}
+}
 
+func TestApplyTemplateGeneration(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		payload  *atlasexec.MigrateApply
+		expected string // expected output of the comment template
+	}{
+		{
+			name: "first apply, 2 files, 3 statements",
+			payload: &atlasexec.MigrateApply{
+				Env: atlasexec.Env{
+					Driver: "sqlite",
+					Dir:    "testdata/migrations",
+					URL: &sqlclient.URL{
+						URL: &url.URL{
+							Scheme:   "sqlite",
+							Host:     "file",
+							RawQuery: "_fk=1&mode=memory",
+						},
+						Schema: "main",
+					},
+				},
+				Pending: []atlasexec.File{
+					{
+						Name:    "20221108173626.sql",
+						Version: "20221108173626",
+					},
+					{
+						Name:    "20221108173658.sql",
+						Version: "20221108173658",
+					},
+				},
+				Applied: []*atlasexec.AppliedFile{
+					{
+						File: atlasexec.File{
+							Name:    "20221108173626.sql",
+							Version: "20221108173626",
+						},
+						Start: must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.914578+03:00")),
+						End:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.940343+03:00")),
+						Applied: []string{
+							"CREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";",
+							"CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;",
+						},
+					},
+					{
+						File: atlasexec.File{
+							Name:    "20221108173658.sql",
+							Version: "20221108173658",
+						},
+						Start: must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.940343+03:00")),
+						End:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
+						Applied: []string{
+							"CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;",
+						},
+					},
+				},
+				Target:  "20221108173658",
+				Start:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.909446+03:00")),
+				End:     must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
+			},
+			// language=markdown
+			expected: "---\n<h2>\n    <img height=\"17\" src=\"https://release.ariga.io/images/assets/success.svg\"/> Migration Passed\n</h2>\n\n#### `atlas migrate apply` Summary:\n\n<table>\n    <tr>\n        <th>Parameter</th>\n        <th>Details</th>\n    </tr>\n    <tr>\n        <td>Migration Directory</td>\n        <td><code>testdata/migrations</code></td>\n    </tr>\n    <tr>\n        <td>Database URL</td>\n        <td><code>sqlite://file?_fk=1&mode=memory</code></td>\n    </tr>\n    <tr>\n        <td>Migrate to Version</td>\n       <td>\n        <code>20221108173658</code>\n       </td>\n    </tr>\n    <tr>\n        <td>SQL Summary</td>\n        <td>2 migration files, 3 statements passed</td>\n    </tr>\n    <tr>\n        <td>Total Time</td>\n        <td>54.297ms</td>\n    </tr>\n</table>\n\n#### Version 20221108173626.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div align=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/success.svg\"/>\n        </div>\n        </td>\n        <td>2</td>\n        <td>25.765ms</td>\n        <td>-</td>\n        <td>-</td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\nCREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";\nCREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n```\n</details>\n\n\n\n#### Version 20221108173658.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div align=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/success.svg\"/>\n        </div>\n        </td>\n        <td>1</td>\n        <td>23.4ms</td>\n        <td>-</td>\n        <td>-</td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\nCREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n```\n</details>\n",
+		},
+		{
+			name: "2 files, 1 statement error",
+			payload: &atlasexec.MigrateApply{
+				Env: atlasexec.Env{
+					Driver: "mysql",
+					Dir:    "testdata/migrations",
+					URL: &sqlclient.URL{
+						URL: &url.URL{
+							Scheme:   "mysql",
+							Host:     "localhost:3306",
+							Path:     "/test",
+							RawQuery: "parseTime=true",
+						},
+						Schema: "test",
+					},
+				},
+				Pending: []atlasexec.File{
+					{
+						Name:    "20221108173626.sql",
+						Version: "20221108173626",
+					},
+					{
+						Name:    "20221108173658.sql",
+						Version: "20221108173658",
+					},
+				},
+				Applied: []*atlasexec.AppliedFile{
+					{
+						File: atlasexec.File{
+							Name:    "20221108173626.sql",
+							Version: "20221108173626",
+						},
+						Start: must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.914578+03:00")),
+						End:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.940343+03:00")),
+						Applied: []string{
+							"CREATE TABLE Persons ( PersonID int );",
+						},
+					},
+					{
+						File: atlasexec.File{
+							Name:    "20221108173658.sql",
+							Version: "20221108173658",
+						},
+						Start: must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.940343+03:00")),
+						End:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
+						Applied: []string{
+							"create Table Err?",
+						},
+						Error: &struct {
+							SQL   string
+							Error string
+						}{
+							SQL:   "create Table Err?",
+							Error: "Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
+						},
+					},
+				},
+				Current: "20221108143624",
+				Target:  "20221108173658",
+				Start:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.909446+03:00")),
+				End:     must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
+				Error:   "sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
+			},
+			// language=markdown
+			expected: "---\n<h2>\n    <img height=\"17\" src=\"https://release.ariga.io/images/assets/error.svg\"/> Migration Failed\n</h2>\n\n#### `atlas migrate apply` Summary:\n\n<table>\n    <tr>\n        <th>Parameter</th>\n        <th>Details</th>\n    </tr>\n    <tr>\n        <td>Migration Directory</td>\n        <td><code>testdata/migrations</code></td>\n    </tr>\n    <tr>\n        <td>Database URL</td>\n        <td><code>mysql://localhost:3306/test?parseTime=true</code></td>\n    </tr>\n    <tr>\n        <td>Migrate from Version</td>\n        <td><code>20221108143624</code></td>\n    </tr>\n    <tr>\n        <td>Migrate to Version</td>\n       <td>\n        <code>20221108173658</code>\n       </td>\n    </tr>\n    <tr>\n        <td>SQL Summary</td>\n        <td>2 migration files, 2 statements passed, 1 failed</td>\n    </tr>\n    <tr>\n        <td>Total Time</td>\n        <td>54.297ms</td>\n    </tr>\n</table>\n\n#### Version 20221108173626.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div align=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/success.svg\"/>\n        </div>\n        </td>\n        <td>1</td>\n        <td>25.765ms</td>\n        <td>-</td>\n        <td>-</td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\nCREATE TABLE Persons ( PersonID int );\n```\n</details>\n\n\n\n#### Version 20221108173658.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div justify-content=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/error.svg\"/>\n        </div>\n        </td>\n        <td>1</td>\n        <td>23.4ms</td>\n        <td>Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1</td>\n        <td><details><summary>📄 View</summary><pre><code>create Table Err?</code></pre></details></td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\ncreate Table Err?\n```\n</details>\n",
+		},
+		{
+			name: "no work migration",
+			payload: &atlasexec.MigrateApply{
+				Env: atlasexec.Env{
+					Driver: "mysql",
+					Dir:    "testdata/migrations",
+					URL: &sqlclient.URL{
+						URL: &url.URL{
+							Scheme:   "mysql",
+							Host:     "localhost:3306",
+							Path:     "/test",
+							RawQuery: "parseTime=true",
+						},
+						Schema: "test",
+					},
+				},
+				Current: "20240616130838",
+				Start:   must(time.Parse(time.RFC3339, "2024-06-16T16:09:01.683771+03:00")),
+				End:     must(time.Parse(time.RFC3339, "2024-06-16T16:09:01.689411+03:00")),
+			},
+			expected: "---\n<h2>\n    <img height=\"17\" src=\"https://release.ariga.io/images/assets/success.svg\"/> Migration Passed\n</h2>\n\n#### `atlas migrate apply` Summary:\n\n<table>\n    <tr>\n        <th>Parameter</th>\n        <th>Details</th>\n    </tr>\n    <tr>\n        <td>Migration Directory</td>\n        <td><code>testdata/migrations</code></td>\n    </tr>\n    <tr>\n        <td>Database URL</td>\n        <td><code>mysql://localhost:3306/test?parseTime=true</code></td>\n    </tr>\n    <tr>\n        <td>Migrate from Version</td>\n        <td><code>20240616130838</code></td>\n    </tr>\n    <tr>\n        <td>Migrate to Version</td>\n       <td>\n        <code>20240616130838</code>\n       </td>\n    </tr>\n    <tr>\n        <td>SQL Summary</td>\n        <td>0 migration files</td>\n    </tr>\n    <tr>\n        <td>Total Time</td>\n        <td>5.64ms</td>\n    </tr>\n</table>",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			require.NoError(t, applyComment.Execute(&buf, tt.payload))
+			require.Contains(t, buf.String(), tt.expected)
+		})
+	}
 }
 
 func generateHCL(t *testing.T, url, token string) string {
@@ -1330,14 +1487,11 @@ func TestMigrateApplyCloud(t *testing.T) {
 		require.Contains(t, payloads[2], "mutation ReportMigration")
 		require.Contains(t, payloads[2], `"context":{"triggerType":"GITHUB_ACTION","triggerVersion":"v1.2.3"}`)
 
-		m, err := tt.outputs()
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]string{
-			"current":       "",
-			"applied_count": "1",
-			"pending_count": "1",
-			"target":        "20230922132634",
-		}, m)
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>20230922132634</code>")
+		require.Contains(t, string(c), "Migration Passed")
+		require.Contains(t, string(c), "1 migration file, 1 statement passed")
 	})
 	t.Run("no-env", func(t *testing.T) {
 		var payloads []string
@@ -1359,14 +1513,11 @@ func TestMigrateApplyCloud(t *testing.T) {
 		require.Contains(t, payloads[0], "query Bot")
 		require.Contains(t, payloads[1], "query dirState")
 
-		m, err := tt.outputs()
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.EqualValues(t, map[string]string{
-			"current":       "",
-			"applied_count": "1",
-			"pending_count": "1",
-			"target":        "20230922132634",
-		}, m)
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>20230922132634</code>")
+		require.Contains(t, string(c), "Migration Passed")
+		require.Contains(t, string(c), "1 migration file, 1 statement passed")
 	})
 }
 

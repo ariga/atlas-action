@@ -1,0 +1,90 @@
+---
+
+{{- if .Error }}
+<h2>
+    <img height="17" src="https://release.ariga.io/images/assets/error.svg"/> Migration Failed
+</h2>
+{{- else }}
+<h2>
+    <img height="17" src="https://release.ariga.io/images/assets/success.svg"/> Migration Passed
+</h2>
+{{- end }}
+
+#### `atlas migrate apply` Summary:
+
+<table>
+    <tr>
+        <th>Parameter</th>
+        <th>Details</th>
+    </tr>
+    <tr>
+        <td>Migration Directory</td>
+        <td><code>{{ .Dir }}</code></td>
+    </tr>
+    <tr>
+        <td>Database URL</td>
+        <td><code>{{ .URL.URL }}</code></td>
+    </tr>
+    {{- if .Current }}
+    <tr>
+        <td>Migrate from Version</td>
+        <td><code>{{ .Current }}</code></td>
+    </tr>
+    {{- end }}
+    <tr>
+        <td>Migrate to Version</td>
+       <td>
+        <code>{{- if .Target }}{{ .Target }}{{- else }}{{ .Current }}{{- end }}</code>
+       </td>
+    </tr>
+    <tr>
+        <td>SQL Summary</td>
+        <td>{{ len .Applied }} migration file{{- if or (not .Applied) (gt (len .Applied) 1) }}s{{- end }}
+        {{- if appliedStmts . }}, {{ appliedStmts . }} statement{{- if gt (appliedStmts .) 1 }}s{{- end }} passed {{- end }} {{- if .Error }}, 1 failed{{- end }}</td>
+    </tr>
+    <tr>
+        <td>Total Time</td>
+        <td>{{ execTime .Start .End }}</td>
+    </tr>
+</table>
+
+{{- range .Applied }}
+
+#### Version {{ .Name }}:
+<table>
+    <tr>
+        <th>Status</th>
+        <th>Executed Statements</th>
+        <th>Execution Time</th>
+        <th>Error</th>
+        <th>Error Statement</th>
+    </tr>
+    <tr>
+        <td>{{ if .Error }}
+        <div justify-content="center">
+            <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
+        </div>
+        {{- else }}
+        <div align="center">
+            <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+        </div>
+        {{- end }}
+        </td>
+        <td>{{ len .Applied }}</td>
+        <td>{{ execTime .Start .End }}</td>
+        <td>{{ if .Error }}{{ .Error.Error }}{{ else }}-{{ end }}</td>
+        <td>{{ if .Error }}<details><summary>📄 View</summary><pre><code>{{ .Error.SQL }}</code></pre></details>{{ else }}-{{ end }}</td>
+    </tr>
+</table>
+
+<details>
+<summary>📄 View SQL Statements</summary>
+
+```sql
+{{- range .Applied }}
+{{ . }}
+{{- end }}
+```
+</details>
+
+{{ end }}
