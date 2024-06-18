@@ -1,9 +1,13 @@
 ---
 
 {{- if .Error }}
-## ❌ Migration Failed
+<h2>
+    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/> Migration Passed
+</h2>
 {{- else }}
-## ✅ Migration Passed
+<h2>
+    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/> Migration Passed
+</h2>
 {{- end }}
 
 #### `atlas migrate apply` Summary:
@@ -36,7 +40,7 @@
     <tr>
         <td>SQL Summary</td>
         <td>{{ len .Applied }} migration file{{- if or (not .Applied) (gt (len .Applied) 1) }}s{{- end }}
-        {{- if sumAppliedStatements . }}, {{ sumAppliedStatements . }} statement{{- if gt (sumAppliedStatements .) 1 }}s{{- end }} passed {{- end }} {{- if .Error }}, 1 failed{{- end }}</td>
+        {{- if appliedStmts . }}, {{ appliedStmts . }} statement{{- if gt (appliedStmts .) 1 }}s{{- end }} passed {{- end }} {{- if .Error }}, 1 failed{{- end }}</td>
     </tr>
     <tr>
         <td>Total Time</td>
@@ -56,7 +60,16 @@
         <th>Error Statement</th>
     </tr>
     <tr>
-        <td>{{ if .Error }}❌{{ else }}✅{{ end }}</td>
+        <td>{{ if .Error }}
+        <div justify-content="center">
+            <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
+        </div>
+        {{- else }}
+        <div align="center">
+            <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+        </div>
+        {{- end }}
+        </td>
         <td>{{ len .Applied }}</td>
         <td>{{ execTime .Start .End }}</td>
         <td>{{ if .Error }}{{ .Error.Error }}{{ else }}-{{ end }}</td>

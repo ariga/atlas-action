@@ -395,12 +395,12 @@ func execTime(start, end time.Time) string {
 	return end.Sub(start).String()
 }
 
-func sumAppliedStatements(a *atlasexec.MigrateApply) int{
-    total := 0
-    for _, file := range a.Applied {
-        total += len(file.Applied)
-    }
-    return total
+func appliedStmts(a *atlasexec.MigrateApply) int {
+	total := 0
+	for _, file := range a.Applied {
+		total += len(file.Applied)
+	}
+	return total
 }
 
 func fileDiagnosticCount(f *atlasexec.FileReport) int {
@@ -427,8 +427,8 @@ var (
 	applyComment = template.Must(
 		template.New("comment").
 			Funcs(template.FuncMap{
-				"execTime": execTime,
-				"sumAppliedStatements": sumAppliedStatements,
+				"execTime":     execTime,
+				"appliedStmts": appliedStmts,
 			}).
 			Parse(applyTmpl),
 	)
