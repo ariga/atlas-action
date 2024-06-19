@@ -289,9 +289,16 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act Action) erro
 		Env:       act.GetInput("env"),
 		Vars:      vars,
 	}
-	_, err = client.MigratePush(ctx, params)
-	if err != nil {
-		return fmt.Errorf("failed to push directory: %v", err)
+	switch latest := act.GetInput("latest"); latest {
+	case "false":
+	case "true":
+		// Push the "latest" tag.
+		_, err = client.MigratePush(ctx, params)
+		if err != nil {
+			return fmt.Errorf("failed to push directory: %v", err)
+		}
+	default:
+		return fmt.Errorf(`invalid value for input "latest": only "true" or "false" are allowed, got %q`, latest)
 	}
 	tag := act.GetInput("tag")
 	params.Tag = runContext.Commit
