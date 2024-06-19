@@ -47,6 +47,20 @@ func TestMigrateApply(t *testing.T) {
 		require.Contains(t, string(c), "Migration Passed")
 		require.Contains(t, string(c), "1 migration file, 1 statement passed")
 	})
+	t.Run("broken migration dir", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "file://testdata/broken/")
+		err := MigrateApply(context.Background(), tt.cli, tt.act)
+		require.EqualError(t, err, "sql/migrate: executing statement \"CREATE TABLE OrderDetails (\\n    OrderDetailID INTEGER PRIMARY KEY AUTOINCREMENT,\\n    OrderID INTEGER-\\n);\" from version \"20240619073319\": near \"-\": syntax error")
+
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>20240619073319</code>")
+		require.Contains(t, string(c), "Migration Failed")
+		require.Contains(t, string(c), "2 migration files, 3 statements passed, 1 failed")
+
+	})
 	t.Run("dry-run", func(t *testing.T) {
 		tt := newT(t)
 		tt.setInput("url", "sqlite://"+tt.db)
@@ -1293,9 +1307,9 @@ func TestApplyTemplateGeneration(t *testing.T) {
 						},
 					},
 				},
-				Target:  "20221108173658",
-				Start:   must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.909446+03:00")),
-				End:     must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
+				Target: "20221108173658",
+				Start:  must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.909446+03:00")),
+				End:    must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
 			},
 			// language=markdown
 			expected: "---\n<h2>\n    <img height=\"17\" src=\"https://release.ariga.io/images/assets/success.svg\"/> Migration Passed\n</h2>\n\n#### `atlas migrate apply` Summary:\n\n<table>\n    <tr>\n        <th>Parameter</th>\n        <th>Details</th>\n    </tr>\n    <tr>\n        <td>Migration Directory</td>\n        <td><code>testdata/migrations</code></td>\n    </tr>\n    <tr>\n        <td>Database URL</td>\n        <td><code>sqlite://file?_fk=1&mode=memory</code></td>\n    </tr>\n    <tr>\n        <td>Migrate to Version</td>\n       <td>\n        <code>20221108173658</code>\n       </td>\n    </tr>\n    <tr>\n        <td>SQL Summary</td>\n        <td>2 migration files, 3 statements passed</td>\n    </tr>\n    <tr>\n        <td>Total Time</td>\n        <td>54.297ms</td>\n    </tr>\n</table>\n\n#### Version 20221108173626.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div align=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/success.svg\"/>\n        </div>\n        </td>\n        <td>2</td>\n        <td>25.765ms</td>\n        <td>-</td>\n        <td>-</td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\nCREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";\nCREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n```\n</details>\n\n\n\n#### Version 20221108173658.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div align=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/success.svg\"/>\n        </div>\n        </td>\n        <td>1</td>\n        <td>23.4ms</td>\n        <td>-</td>\n        <td>-</td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\nCREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n```\n</details>\n",
@@ -1349,11 +1363,11 @@ func TestApplyTemplateGeneration(t *testing.T) {
 							"create Table Err?",
 						},
 						Error: &struct {
-							SQL   string
-							Error string
+							Stmt  string
+							Text string
 						}{
-							SQL:   "create Table Err?",
-							Error: "Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
+							Stmt:   "create Table Err?",
+							Text: "Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
 						},
 					},
 				},

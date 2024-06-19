@@ -72,8 +72,8 @@
         </td>
         <td>{{ len .Applied }}</td>
         <td>{{ execTime .Start .End }}</td>
-        <td>{{ if .Error }}{{ .Error.Error }}{{ else }}-{{ end }}</td>
-        <td>{{ if .Error }}<details><summary>📄 View</summary><pre><code>{{ .Error.SQL }}</code></pre></details>{{ else }}-{{ end }}</td>
+        <td>{{ if .Error }}{{ .Error.Text }}{{ else }}-{{ end }}</td>
+        <td>{{ if .Error }}<details><summary>📄 View</summary><pre><code>{{ .Error.Stmt }}</code></pre></details>{{ else }}-{{ end }}</td>
     </tr>
 </table>
 
