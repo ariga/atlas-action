@@ -291,7 +291,7 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act Action) erro
 	}
 	switch latest := act.GetInput("latest"); latest {
 	case "false":
-	case "true":
+	case "true", "":
 		// Push the "latest" tag.
 		_, err = client.MigratePush(ctx, params)
 		if err != nil {
