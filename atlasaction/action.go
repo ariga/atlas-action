@@ -395,7 +395,24 @@ func hasComments(s *atlasexec.SummaryReport) bool {
 			return true
 		}
 	}
+	for _, step := range s.Steps {
+		if stepHasComments(step) {
+			return true
+		}
+	}
 	return false
+}
+
+// Returns true if the step has diagnostics or comments.
+func stepHasComments(s *atlasexec.StepReport) bool {
+	// Checksum reported on altas.sum file, so no need to report it again.
+	if s.Error != "" && s.Error != "checksum mismatch" {
+		return true
+	}
+	if s.Result == nil {
+		return false
+	}
+	return s.Result.Error != "" || len(s.Result.Reports) > 0
 }
 
 func execTime(start, end time.Time) string {
@@ -427,6 +444,7 @@ var (
 		template.New("comment").
 			Funcs(template.FuncMap{
 				"hasComments":         hasComments,
+				"stepHasComments":     stepHasComments,
 				"fileDiagnosticCount": fileDiagnosticCount,
 			}).
 			Parse(commentTmpl),
