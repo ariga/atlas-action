@@ -263,6 +263,7 @@ func TestMigratePush(t *testing.T) {
 		tt.setInput("config", "file://testdata/config/broken.hcl")
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
+		tt.setInput("latest", "true")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, `"testdata/config/broken.hcl" was not found`)
 	})
@@ -271,6 +272,7 @@ func TestMigratePush(t *testing.T) {
 		tt.setInput("config", "file://testdata/config/atlas.hcl")
 		tt.setInput("env", "broken-env")
 		tt.setInput("dir-name", "test-dir")
+		tt.setInput("latest", "true")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, `env "broken-env" not defined in config file`)
 	})
@@ -278,9 +280,19 @@ func TestMigratePush(t *testing.T) {
 		tt := newT(t)
 		tt.setInput("dir", "file://some_broken_dir")
 		tt.setInput("dir-name", "test-dir")
+		tt.setInput("latest", "true")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, `sql/migrate: stat some_broken_dir: no such file or directory`)
+	})
+	t.Run("broken latest", func(t *testing.T) {
+		tt := newT(t)
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir")
+		tt.setInput("latest", "foo")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, `invalid value for input "latest": only "true" or "false" are allowed, got "foo"`)
 	})
 }
 
@@ -296,6 +308,7 @@ func TestMigratePushWithCloud(t *testing.T) {
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "broken-driver://")
+		tt.setInput("latest", "true")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, `unknown driver "broken-driver"`)
 	})
@@ -306,18 +319,53 @@ func TestMigratePushWithCloud(t *testing.T) {
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("tag", "invalid-character@")
+		tt.setInput("latest", "true")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, `tag must be lowercase alphanumeric`)
 	})
 	t.Run("tag", func(t *testing.T) {
 		tt := newT(t)
+		tt.cli, _ = atlasexec.NewClient("", "./mock-push.sh")
+		os.Remove("push-out.txt")
+		t.Cleanup(func() {
+			os.Remove("push-out.txt")
+		})
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("tag", "valid-tag-123")
+		tt.setInput("latest", "true")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
+		out, err := os.ReadFile("push-out.txt")
+		require.NoError(t, err)
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		require.Len(t, lines, 2)
+		require.Contains(t, lines[0], "test-dir")
+		require.NotContains(t, lines[0], "valid-tag-123")
+		require.Contains(t, lines[1], "test-dir:valid-tag-123")
+	})
+	t.Run("no latest", func(t *testing.T) {
+		tt := newT(t)
+		tt.cli, _ = atlasexec.NewClient("", "./mock-push.sh")
+		os.Remove("push-out.txt")
+		t.Cleanup(func() {
+			os.Remove("push-out.txt")
+		})
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("tag", "valid-tag-123")
+		tt.setInput("latest", "false")
+		err := MigratePush(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+		out, err := os.ReadFile("push-out.txt")
+		require.NoError(t, err)
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		require.Len(t, lines, 1)
+		require.Contains(t, lines[0], "test-dir:valid-tag-123")
 	})
 	t.Run("config", func(t *testing.T) {
 		tt := newT(t)
@@ -326,6 +374,7 @@ func TestMigratePushWithCloud(t *testing.T) {
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir-name", "test-dir")
+		tt.setInput("latest", "true")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.NoError(t, err)
 	})
@@ -335,6 +384,7 @@ func TestMigratePushWithCloud(t *testing.T) {
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-#dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("latest", "true")
 		err := MigratePush(context.Background(), tt.cli, tt.act)
 		require.ErrorContains(t, err, "slug must be lowercase alphanumeric")
 	})
@@ -388,6 +438,7 @@ func TestMigrateE2E(t *testing.T) {
 	tt.setInput("dir", "file://testdata/migrations")
 	tt.setInput("dir-name", "test-dir")
 	tt.setInput("dev-url", "sqlite://file?mode=memory")
+	tt.setInput("latest", "true")
 	tt.env["GITHUB_REPOSITORY"] = "repository"
 	tt.env["GITHUB_HEAD_REF"] = "testing-branch"
 	tt.env["GITHUB_REF_NAME"] = "refs/pulls/6/merge"
@@ -1363,10 +1414,10 @@ func TestApplyTemplateGeneration(t *testing.T) {
 							"create Table Err?",
 						},
 						Error: &struct {
-							Stmt  string
+							Stmt string
 							Text string
 						}{
-							Stmt:   "create Table Err?",
+							Stmt: "create Table Err?",
 							Text: "Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
 						},
 					},
@@ -1455,7 +1506,9 @@ env "test" {}
 }
 
 func (tt *test) setupConfigWithLogin(t *testing.T, url, token string) {
-	tt.setInput("config", generateHCL(t, url, token))
+	c := generateHCL(t, url, token)
+	tt.setInput("config", c)
+	tt.configUrl = c
 }
 
 func TestMigrateApplyCloud(t *testing.T) {
@@ -1552,11 +1605,12 @@ func sqlitedb(t *testing.T) string {
 }
 
 type test struct {
-	db  string
-	env map[string]string
-	out bytes.Buffer
-	cli *atlasexec.Client
-	act Action
+	db        string
+	env       map[string]string
+	out       bytes.Buffer
+	cli       *atlasexec.Client
+	act       Action
+	configUrl string
 }
 
 func newT(t *testing.T) *test {
