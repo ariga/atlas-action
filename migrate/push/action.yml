@@ -26,7 +26,6 @@ inputs:
     description: |
       If true, push also to the "latest" tag.
     required: false
-    default: true
   config:
     description: |
       The path to the Atlas configuration file. By default, Atlas will look for a file
