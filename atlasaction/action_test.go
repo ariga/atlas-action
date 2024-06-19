@@ -1054,6 +1054,12 @@ func TestLintTemplateGeneration(t *testing.T) {
 				Env: env{
 					Dir: "testdata/migrations",
 				},
+				Steps: []*atlasexec.StepReport{
+					{
+						Name: "Migration Integrity Check",
+						Text: "File atlas.sum is valid",
+					},
+				},
 				Files: []*atlasexec.FileReport{{
 					Name: "20230925192914.sql",
 					Reports: []sqlcheck.Report{
@@ -1232,6 +1238,13 @@ func TestLintTemplateGeneration(t *testing.T) {
 				Env: env{
 					Dir: "testdata/migrations",
 				},
+				Steps: []*atlasexec.StepReport{
+					{
+						Name:  "Migration Integrity Check",
+						Text:  "File atlas.sum is invalid",
+						Error: "checksum mismatch",
+					},
+				},
 				Files: []*atlasexec.FileReport{{
 					Name:  "20230925192914.sql",
 					Error: "checksum mismatch",
@@ -1283,6 +1296,91 @@ func TestLintTemplateGeneration(t *testing.T) {
             </td>
             <td>
                 checksum mismatch
+            </td>
+        </tr>
+    <td colspan="4">
+        <div align="center">
+            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
+        </div>
+    </td>
+    </tbody>
+</table>`,
+		},
+		{
+			name: "non linear history error",
+			payload: &atlasexec.SummaryReport{
+				URL: "https://migration-lint-report-url",
+				Env: env{
+					Dir: "testdata/migrations",
+				},
+				Steps: []*atlasexec.StepReport{
+					{
+						Name: "Migration Integrity Check",
+						Text: "File atlas.sum is valid",
+					},
+					{
+						Name: "Detected 1 non-additive change",
+						Text: "Pulling the the latest git changes might fix this warning",
+						Result: &atlasexec.FileReport{
+							Reports: []sqlcheck.Report{
+								{
+									Diagnostics: []sqlcheck.Diagnostic{
+										{
+											Pos:  0,
+											Text: "File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			// language=html
+			expected: `<table>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Step</th>
+            <th>Result</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                0 new migration files detected
+            </td>
+            <td>&nbsp;</td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
+                </div>
+            </td>
+            <td>
+                ERD and visual diff generated
+            </td>
+            <td>
+                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
+                </div>
+            </td>
+            <td>
+                Detected 1 non-additive change
+            </td>
+            <td>
+                File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted <br/>
             </td>
         </tr>
     <td colspan="4">

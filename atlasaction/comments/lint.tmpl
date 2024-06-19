@@ -51,7 +51,7 @@
         {{- end }}
     {{- if hasComments . }}
     {{- range $file := .Files }}
-    {{- $hasError := $file.Error }}
+        {{- $hasError := $file.Error }}
         <tr>
             <td>
                 {{- if $hasError }}
@@ -87,7 +87,40 @@
             {{- end }}
             </td>
         </tr>
+    {{- end }}
+
+    {{- range $step := .Steps }}
+        {{- if stepHasComments $step }}
+        <tr>
+            <td>
+                {{- $hasError := $step.Error }}
+                {{- if $hasError }}
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
+                </div>
+                {{- else }}
+                <div align="center">
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
+                </div>
+                {{- end }}
+            </td>
+            <td>
+                {{ $step.Name }}
+            </td>
+            <td>
+            {{- if $hasError }}
+                {{ $step.Error }}
+            {{- else if $step.Result }}
+                {{- range $step.Result.Reports }}
+                {{- range .Diagnostics }}
+                {{ .Text }} <br/>
+                {{- end }}
+                {{- end }}
+            {{- end }}
+            </td>
+        </tr>
         {{- end }}
+    {{- end }}
     {{- end }}
     <td colspan="4">
         <div align="center">
