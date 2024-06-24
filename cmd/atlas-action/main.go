@@ -20,6 +20,7 @@ const (
 	CmdMigrateLint  = "migrate/lint"
 	CmdMigrateApply = "migrate/apply"
 	CmdMigrateDown  = "migrate/down"
+	CmdMigrateTest  = "migrate/test"
 )
 
 var cli RunAction
@@ -84,6 +85,8 @@ func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action at
 		return atlasaction.MigratePush(ctx, client, action)
 	case CmdMigrateLint:
 		return atlasaction.MigrateLint(ctx, client, action)
+	case CmdMigrateTest:
+		return atlasaction.MigrateTest(ctx, client, action)
 	}
 	return fmt.Errorf("unknown action: %s", r.Action)
 }

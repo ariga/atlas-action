@@ -392,6 +392,31 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 	return nil
 }
 
+// MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
+func MigrateTest(ctx context.Context, client *atlasexec.Client, act Action) error {
+	var vars atlasexec.Vars
+	if v := act.GetInput("vars"); v != "" {
+		if err := json.Unmarshal([]byte(v), &vars); err != nil {
+			return fmt.Errorf("failed to parse vars: %w", err)
+		}
+	}
+	params := &atlasexec.MigrateTestParams{
+		DirURL:    act.GetInput("dir"),
+		DevURL:    act.GetInput("dev-url"),
+		Run:       act.GetInput("run"),
+		ConfigURL: act.GetInput("config"),
+		Env:       act.GetInput("env"),
+		Vars:      vars,
+	}
+	result, err := client.MigrateTest(ctx, params)
+	if err != nil {
+		return fmt.Errorf("`atlas migrate test` completed with errors:\n%s", err)
+	}
+	act.Infof("`atlas migrate test` completed successfully, no issues found")
+	act.Infof(result)
+	return nil
+}
+
 // Returns true if the summary report has diagnostics or errors.
 func hasComments(s *atlasexec.SummaryReport) bool {
 	for _, f := range s.Files {
