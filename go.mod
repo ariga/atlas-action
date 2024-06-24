@@ -6,7 +6,7 @@ toolchain go1.22.0
 
 require (
 	ariga.io/atlas v0.21.2-0.20240418081819-02b3f6239b04
-	ariga.io/atlas-go-sdk v0.5.6-0.20240619082333-a9fdd42c282f
+	ariga.io/atlas-go-sdk v0.5.7-0.20240621080352-37a79ac08f34
 	github.com/alecthomas/kong v0.8.0
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/mitchellh/mapstructure v1.1.2

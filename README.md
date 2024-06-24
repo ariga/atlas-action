@@ -16,6 +16,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)   | Lint migrations (required `atlas login` )               |
 | [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply) | Apply migrations to a database                          |
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)   | Revert migrations to a database                         |
+| [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)   | Test migrations on a database                           |
 
 ## Examples
 
@@ -289,6 +290,28 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `pending_count` - The number of migrations that will be applied.
 * `reverted_count` - The number of migrations that were reverted.
 * `url` - The URL of the plan to review and approve / reject.
+
+### `ariga/atlas-action/migrate/test`
+
+Test migrations on a database.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+* `dir` - The URL of the migration directory to apply.  For example: `atlas://dir-name` for cloud
+   based directories or `file://migrations` for local ones.
+* `run` - Filter tests to run by regexp. For example, `^test_.*` will only run tests that start with `test_`.
+  Default is to run all tests.
+* `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects). 
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+   For example: `'{"var1": "value1", "var2": "value2"}'`.
+* `working-directory` - The working directory to run from.  Defaults to project root.
 
 ### Legal 
 

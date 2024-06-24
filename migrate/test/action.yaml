@@ -1,0 +1,41 @@
+name: 'Migrate Test'
+description: 'CI for database schema changes with Atlas'
+branding:
+  icon: database
+author: 'Ariga'
+inputs:
+  dev-url:
+    description: |
+      The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+      Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+    required: false
+  dir:
+    description: |
+      The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
+      based directories or `file://migrations` for local ones.
+    required: false
+  run:
+    description: |
+      Filter tests to run by regexp. For example, `^test_.*` will only run tests that start with `test_`.
+      Default is to run all tests.
+    required: false
+  config:
+    description: |
+      The URL of the Atlas configuration file. By default, Atlas will look for a file
+      named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+      Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+    required: false
+  env:
+    description: The environment to use from the Atlas configuration file.  For example, `dev`.
+    required: false
+  working-directory:
+    description: Atlas working directory, default is project root
+    required: false
+  vars:
+    description: |
+      A JSON object containing variables to be used in the Atlas configuration file.
+      For example, `{"var1": "value1", "var2": "value2"}`.
+    required: false
+runs:
+  using: node20
+  main: dist/index.js

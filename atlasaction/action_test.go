@@ -382,6 +382,35 @@ func TestMigratePushWithCloud(t *testing.T) {
 	})
 }
 
+func TestMigrateTest(t *testing.T) {
+	t.Run("all inputs", func(t *testing.T) {
+		tt := newT(t)
+		tt.cli, _ = atlasexec.NewClient("", "./mock-atlas-test.sh")
+		os.Remove("test-out.txt")
+		t.Cleanup(func() {
+			os.Remove("test-out.txt")
+		})
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("run", "example")
+		tt.setInput("config", "file://testdata/config/atlas.hcl")
+		tt.setInput("env", "test")
+		tt.setInput("vars", `{"var1": "value1", "var2": "value2"}`)
+		err := MigrateTest(context.Background(), tt.cli, tt.act)
+		require.NoError(t, err)
+		out, err := os.ReadFile("test-out.txt")
+		require.NoError(t, err)
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		require.Len(t, lines, 1)
+		require.Contains(t, lines[0], "--env test")
+		require.Contains(t, lines[0], "--run example")
+		require.Contains(t, lines[0], "--var var1=value1")
+		require.Contains(t, lines[0], "--var var2=value2")
+		require.Contains(t, lines[0], "--dir file://testdata/migrations")
+		require.Contains(t, lines[0], "--dev-url sqlite://file?mode=memory")
+	})
+}
+
 func TestMigrateE2E(t *testing.T) {
 	type (
 		pushDir struct {

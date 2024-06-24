@@ -107,6 +107,31 @@ jobs:
           # Verifies that the output we got for lint tests are URLs as expected
           [[ "${{ steps.lint_success.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
           [[ "${{ steps.lint_failure.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
+      - id: test_success
+        uses: ./migrate/test
+        with:
+          dir: file://migrations
+          working-directory: atlasaction/testdata
+          dev-url: sqlite://file.db?mode=memory
+          run: "expected_success"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - id: test_failure
+        uses: ./migrate/test
+        continue-on-error: true
+        with:
+          working-directory: atlasaction/testdata
+          dir: file://migrations
+          dev-url: sqlite://file.db?mode=memory
+          run: "expected_failure"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - id: check-test-failure
+        if: steps.test_failure.outcome == 'success'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('expected test to fail, but it did not')
   migrate-down:
     runs-on: ubuntu-latest
     steps:
