@@ -50,45 +50,6 @@
         </tr>
         {{- end }}
     {{- if hasComments . }}
-    {{- range $file := .Files }}
-        {{- $hasError := $file.Error }}
-        <tr>
-            <td>
-                {{- if $hasError }}
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
-                </div>
-                {{- else }}
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
-                </div>
-                {{- end }}
-            </td>
-            <td>
-                Analyze {{ $file.Name }}
-             {{- if $hasError }}
-                <br/> Error was found
-            {{- else }}
-                {{- $diagnostocs := fileDiagnosticCount $file }}
-                {{- if gt $diagnostocs 0 }}
-                <br/>{{ $diagnostocs }} issue{{ if gt $diagnostocs 1 }}s{{ end }} {{ if gt $diagnostocs 1 }}were{{ else }}was{{ end }} found
-                {{- end }}
-            {{- end }}
-            </td>
-            <td>
-            {{- if $hasError }}
-                {{ $file.Error }}
-            {{- else }}
-                {{- range .Reports }}
-                {{- range .Diagnostics }}
-                {{ .Text }} <a href="https://atlasgo.io/lint/analyzers#{{ .Code }}" target="_blank">({{ .Code }})</a> <br/>
-                {{- end }}
-                {{- end }}
-            {{- end }}
-            </td>
-        </tr>
-    {{- end }}
-
     {{- range $step := .Steps }}
         {{- if stepHasComments $step }}
         <tr>
@@ -105,15 +66,15 @@
                 {{- end }}
             </td>
             <td>
-                {{ $step.Name }}
+                {{ $step.Name }} <br/> {{ $step.Text }}
             </td>
             <td>
-            {{- if $hasError }}
+            {{- if and $hasError (not $step.Result) }}
                 {{ $step.Error }}
             {{- else if $step.Result }}
                 {{- range $step.Result.Reports }}
                 {{- range .Diagnostics }}
-                {{ .Text }} <br/>
+                {{ .Text }} {{- if .Code }} <a href="https://atlasgo.io/lint/analyzers#{{ .Code }}" target="_blank">({{ .Code }})</a> {{- end }}<br/>
                 {{- end }}
                 {{- end }}
             {{- end }}
