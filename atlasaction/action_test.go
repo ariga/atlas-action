@@ -978,6 +978,16 @@ func TestLintTemplateGeneration(t *testing.T) {
 			name: "no errors",
 			payload: &atlasexec.SummaryReport{
 				URL: "https://migration-lint-report-url",
+				Steps: []*atlasexec.StepReport{
+					{
+						Name: "Migration Integrity Check",
+						Text: "File atlas.sum is valid",
+					},
+					{
+						Name: "Detect New Migration Files",
+						Text: "Found 1 new migration files (from 1 total)",
+					},
+				},
 				Env: env{
 					Dir: "testdata/migrations",
 				},
@@ -1050,6 +1060,33 @@ func TestLintTemplateGeneration(t *testing.T) {
 						Name: "Migration Integrity Check",
 						Text: "File atlas.sum is valid",
 					},
+					{
+						Name: "Detect New Migration Files",
+						Text: "Found 1 new migration files (from 1 total)",
+					},
+					{
+						Name: "Analyze 20230925192914.sql",
+						Text: "2 reports were found in analysis",
+						Result: &atlasexec.FileReport{
+							Name: "20230925192914.sql",
+							Text: "CREATE UNIQUE INDEX idx_unique_fullname ON Persons (FirstName, LastName);\nALTER TABLE Persons ADD City varchar(255) NOT NULL;\n",
+							Reports: []sqlcheck.Report{
+								{
+									Text: "data dependent changes detected",
+									Diagnostics: []sqlcheck.Diagnostic{
+										{
+											Text: "Adding a unique index \"idx_unique_fullname\" on table \"Persons\" might fail in case columns \"FirstName\", \"LastName\" contain duplicate entries",
+											Code: "MF101",
+										},
+										{
+											Text: "Adding a non-nullable \"varchar\" column \"City\" on table \"Persons\" without a default value implicitly sets existing rows with \"\"",
+											Code: "MY101",
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 				Files: []*atlasexec.FileReport{{
 					Name: "20230925192914.sql",
@@ -1110,12 +1147,11 @@ func TestLintTemplateGeneration(t *testing.T) {
                 </div>
             </td>
             <td>
-                Analyze 20230925192914.sql
-                <br/>2 issues were found
+                Analyze 20230925192914.sql <br/> 2 reports were found in analysis
             </td>
             <td>
-                Add unique index to existing column <a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a> <br/>
-                Adding a non-nullable column to a table without a DEFAULT <a href="https://atlasgo.io/lint/analyzers#MY101" target="_blank">(MY101)</a> <br/>
+                Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries <a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a><br/>
+                Adding a non-nullable "varchar" column "City" on table "Persons" without a default value implicitly sets existing rows with "" <a href="https://atlasgo.io/lint/analyzers#MY101" target="_blank">(MY101)</a><br/>
             </td>
         </tr>
     <td colspan="4">
@@ -1132,6 +1168,55 @@ func TestLintTemplateGeneration(t *testing.T) {
 				URL: "https://migration-lint-report-url",
 				Env: env{
 					Dir: "testdata/migrations",
+				},
+				Steps: []*atlasexec.StepReport{
+					{
+						Name: "Migration Integrity Check",
+						Text: "File atlas.sum is valid",
+					},
+					{
+						Name: "Detect New Migration Files",
+						Text: "Found 1 new migration files (from 1 total)",
+					},
+					{
+						Name: "Analyze 20230925192914.sql",
+						Text: "1 reports were found in analysis",
+						Result: &atlasexec.FileReport{
+							Name: "20230925192914.sql",
+							Text: "CREATE UNIQUE INDEX idx_unique_fullname ON Persons (FirstName, LastName);",
+							Reports: []sqlcheck.Report{
+								{
+									Text: "data dependent changes detected",
+									Diagnostics: []sqlcheck.Diagnostic{
+										{
+											Text: "Adding a unique index \"idx_unique_fullname\" on table \"Persons\" might fail in case columns \"FirstName\", \"LastName\" contain duplicate entries",
+											Code: "MF101",
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Name:  "Analyze 20240625104520_destructive.sql",
+						Text:  "1 reports were found in analysis",
+						Error: "Destructive changes detected",
+						Result: &atlasexec.FileReport{
+							Name: "20240625104520_destructive.sql",
+							Text: "DROP TABLE Persons;\n\n",
+							Reports: []sqlcheck.Report{
+								{
+									Text: "destructive changes detected",
+									Diagnostics: []sqlcheck.Diagnostic{
+										{
+											Text: "Dropping table \"Persons\"",
+											Code: "DS102",
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 				Files: []*atlasexec.FileReport{{
 					Name:  "20230925192914.sql",
@@ -1189,29 +1274,27 @@ func TestLintTemplateGeneration(t *testing.T) {
         <tr>
             <td>
                 <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
                 </div>
             </td>
             <td>
-                Analyze 20230925192914.sql
-                <br/> Error was found
+                Analyze 20230925192914.sql <br/> 1 reports were found in analysis
             </td>
             <td>
-                Destructive changes detected
+                Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries <a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a><br/>
             </td>
         </tr>
         <tr>
             <td>
                 <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
+                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
                 </div>
             </td>
             <td>
-                Analyze 20230925192915.sql
-                <br/>1 issue was found
+                Analyze 20240625104520_destructive.sql <br/> 1 reports were found in analysis
             </td>
             <td>
-                Missing the CONCURRENTLY in index creation <a href="https://atlasgo.io/lint/analyzers#PG101" target="_blank">(PG101)</a> <br/>
+                Dropping table "Persons" <a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/>
             </td>
         </tr>
     <td colspan="4">
@@ -1282,8 +1365,7 @@ func TestLintTemplateGeneration(t *testing.T) {
                 </div>
             </td>
             <td>
-                Analyze 20230925192914.sql
-                <br/> Error was found
+                Migration Integrity Check <br/> File atlas.sum is invalid
             </td>
             <td>
                 checksum mismatch
@@ -1295,7 +1377,8 @@ func TestLintTemplateGeneration(t *testing.T) {
         </div>
     </td>
     </tbody>
-</table>`,
+</table>
+`,
 		},
 		{
 			name: "non linear history error",
@@ -1368,10 +1451,10 @@ func TestLintTemplateGeneration(t *testing.T) {
                 </div>
             </td>
             <td>
-                Detected 1 non-additive change
+                Detected 1 non-additive change <br/> Pulling the the latest git changes might fix this warning
             </td>
             <td>
-                File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted <br/>
+                File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted<br/>
             </td>
         </tr>
     <td colspan="4">

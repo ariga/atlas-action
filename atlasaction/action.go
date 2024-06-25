@@ -412,8 +412,7 @@ func hasComments(s *atlasexec.SummaryReport) bool {
 
 // Returns true if the step has diagnostics or comments.
 func stepHasComments(s *atlasexec.StepReport) bool {
-	// Checksum reported on altas.sum file, so no need to report it again.
-	if s.Error != "" && s.Error != "checksum mismatch" {
+	if s.Error != "" {
 		return true
 	}
 	if s.Result == nil {
@@ -434,14 +433,6 @@ func appliedStmts(a *atlasexec.MigrateApply) int {
 	return total
 }
 
-func fileDiagnosticCount(f *atlasexec.FileReport) int {
-	count := 0
-	for _, r := range f.Reports {
-		count += len(r.Diagnostics)
-	}
-	return count
-}
-
 var (
 	//go:embed comments/lint.tmpl
 	commentTmpl string
@@ -450,9 +441,8 @@ var (
 	lintComment = template.Must(
 		template.New("comment").
 			Funcs(template.FuncMap{
-				"hasComments":         hasComments,
-				"stepHasComments":     stepHasComments,
-				"fileDiagnosticCount": fileDiagnosticCount,
+				"hasComments":     hasComments,
+				"stepHasComments": stepHasComments,
 			}).
 			Parse(commentTmpl),
 	)
