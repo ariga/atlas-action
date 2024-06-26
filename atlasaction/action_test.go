@@ -688,6 +688,65 @@ func TestMigrateLint(t *testing.T) {
 		require.Len(t, comments, 1)
 		require.Equal(t, "updated comment", comments[0].Body)
 	})
+	t.Run("lint summary - dropping column", func(t *testing.T) {
+		tt := newT(t)
+		var comments []pullRequestComment
+		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			var (
+				path   = request.URL.Path
+				method = request.Method
+			)
+			switch {
+			// List comments endpoint
+			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodGet:
+				b, err := json.Marshal(comments)
+				require.NoError(t, err)
+				_, err = writer.Write(b)
+				require.NoError(t, err)
+				return
+			// Create comment endpoint
+			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodPost:
+				var payload pullRequestComment
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+				payload.ID = 123
+				comments = append(comments, payload)
+				writer.WriteHeader(http.StatusCreated)
+				return
+			// Update comment endpoint
+			case path == "/repos/test-owner/test-repository/pulls/comments/123" && method == http.MethodPatch:
+				require.Len(t, comments, 1)
+				comments[0].Body = "updated comment"
+				return
+			// List pull request files endpoint
+			case path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
+				_, err := writer.Write([]byte(`[{"filename": "testdata/migrations_destructive/20230925192914.sql"}]`))
+				require.NoError(t, err)
+			default:
+				writer.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		tt.env["GITHUB_API_URL"] = ghMock.URL
+		tt.env["GITHUB_REPOSITORY"] = "test-owner/test-repository"
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("dir", "file://testdata/drop_column")
+		tt.setInput("dir-name", "test-dir-slug")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "https://migration-lint-report-url")
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		sum := string(c)
+		require.Contains(t, sum, "`atlas migrate lint` on <strong>testdata/drop_column</strong>\n")
+		require.Contains(t, sum, "2 new migration files detected")
+		require.Contains(t, sum, "1 reports were found in analysis")
+		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
+		out := tt.out.String()
+		require.Contains(t, out, "error file=testdata/drop_column/20240626085324_drop_col.sql")
+		require.Contains(t, out, "destructive changes detected")
+		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS103")
+		// There is no suggestion for dropping a column, so no comment should be created
+		require.Len(t, comments, 0)
+	})
 	t.Run("lint summary - lint error - working directory is set", func(t *testing.T) {
 		tt := newT(t)
 		// Same as the previous test but with working directory input set.
