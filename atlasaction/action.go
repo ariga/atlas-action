@@ -613,6 +613,9 @@ func (g *githubAPI) addSuggestions(act Action, payload *atlasexec.SummaryReport)
 		}
 		for _, report := range file.Reports {
 			for _, s := range report.SuggestedFixes {
+				if s.TextEdit == nil {
+					continue
+				}
 				footer := fmt.Sprintf("Ensure to run `atlas migrate hash --dir \"file://%s\"` after applying the suggested changes.", payload.Env.Dir)
 				body := fmt.Sprintf("%s\n```suggestion\n%s\n```\n%s", s.Message, s.TextEdit.NewText, footer)
 				if err := g.upsertSuggestion(filePath, body, s); err != nil {

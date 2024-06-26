@@ -688,7 +688,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Len(t, comments, 1)
 		require.Equal(t, "updated comment", comments[0].Body)
 	})
-	t.Run("lint summary - dropping column", func(t *testing.T) {
+	t.Run("lint summary - no text edit", func(t *testing.T) {
 		tt := newT(t)
 		var comments []pullRequestComment
 		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -719,7 +719,8 @@ func TestMigrateLint(t *testing.T) {
 				return
 			// List pull request files endpoint
 			case path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
-				_, err := writer.Write([]byte(`[{"filename": "testdata/migrations_destructive/20230925192914.sql"}]`))
+				// language=JSON
+				_, err := writer.Write([]byte(`[{"filename": "testdata/drop_column/20240626085256_init.sql"}, {"filename": "testdata/drop_column/20240626085324_drop_col.sql"}]`))
 				require.NoError(t, err)
 			default:
 				writer.WriteHeader(http.StatusNotFound)
@@ -744,7 +745,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, out, "error file=testdata/drop_column/20240626085324_drop_col.sql")
 		require.Contains(t, out, "destructive changes detected")
 		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS103")
-		// There is no suggestion for dropping a column, so no comment should be created
+		// There is no suggestion for dropping a column because there are 2 statements in the file
 		require.Len(t, comments, 0)
 	})
 	t.Run("lint summary - lint error - working directory is set", func(t *testing.T) {
