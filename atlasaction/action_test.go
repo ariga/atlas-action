@@ -1318,8 +1318,8 @@ func TestLintTemplateGeneration(t *testing.T) {
 					{
 						Name:  "Analyze 20240625104520_destructive.sql",
 						Text:  "1 reports were found in analysis",
-						Error: "Destructive changes detected",
 						Result: &atlasexec.FileReport{
+							Error: "Destructive changes detected",
 							Name: "20240625104520_destructive.sql",
 							Text: "DROP TABLE Persons;\n\n",
 							Reports: []sqlcheck.Report{

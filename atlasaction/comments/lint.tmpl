@@ -54,8 +54,7 @@
         {{- if stepHasComments $step }}
         <tr>
             <td>
-                {{- $hasError := $step.Error }}
-                {{- if $hasError }}
+                {{- if stepHasErrors $step }}
                 <div align="center">
                     <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
                 </div>
@@ -69,7 +68,7 @@
                 {{ $step.Name }} <br/> {{ $step.Text }}
             </td>
             <td>
-            {{- if and $hasError (not $step.Result) }}
+            {{- if and $step.Error (not $step.Result) }}
                 {{ $step.Error }}
             {{- else if $step.Result }}
                 {{- range $step.Result.Reports }}
