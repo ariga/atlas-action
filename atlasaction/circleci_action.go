@@ -101,17 +101,17 @@ const EOF = "\n"
 
 // Infof implements the Logger interface.
 func (o *circleCIOrb) Infof(msg string, args ...any) {
-	fmt.Fprintf(o.w, "Info: "+msg+EOF, args...)
+	fmt.Fprintf(o.w, msg+EOF, args...)
 }
 
 // Warningf implements the Logger interface.
 func (o *circleCIOrb) Warningf(msg string, args ...any) {
-	fmt.Fprintf(o.w, "Warning: "+msg+EOF, args...)
+	fmt.Fprintf(o.w, msg+EOF, args...)
 }
 
 // Errorf implements the Logger interface.
 func (o *circleCIOrb) Errorf(msg string, args ...any) {
-	fmt.Fprintf(o.w, "Error: "+msg+EOF, args...)
+	fmt.Fprintf(o.w, msg+EOF, args...)
 }
 
 // Fatalf implements the Logger interface.
