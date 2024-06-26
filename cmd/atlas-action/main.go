@@ -16,11 +16,14 @@ import (
 )
 
 const (
+	// Versioned workflow Commands
 	CmdMigratePush  = "migrate/push"
 	CmdMigrateLint  = "migrate/lint"
 	CmdMigrateApply = "migrate/apply"
 	CmdMigrateDown  = "migrate/down"
 	CmdMigrateTest  = "migrate/test"
+	// Declarative workflow Commands
+	CmdSchemaTest = "schema/test"
 )
 
 var cli RunAction
@@ -87,6 +90,8 @@ func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action at
 		return atlasaction.MigrateLint(ctx, client, action)
 	case CmdMigrateTest:
 		return atlasaction.MigrateTest(ctx, client, action)
+	case CmdSchemaTest:
+		return atlasaction.SchemaTest(ctx, client, action)
 	}
 	return fmt.Errorf("unknown action: %s", r.Action)
 }

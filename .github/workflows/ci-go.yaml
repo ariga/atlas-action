@@ -50,7 +50,7 @@ jobs:
           go-version-file: go.mod
       - name: Run tests
         run: go test -race ./...
-  integration-test:
+  integration-test-versioned:
     runs-on: ubuntu-latest
     steps:
       - uses: ariga/setup-atlas@v0
@@ -122,6 +122,44 @@ jobs:
         with:
           working-directory: atlasaction/testdata
           dir: file://migrations
+          dev-url: sqlite://file.db?mode=memory
+          run: "expected_failure"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - id: check-test-failure
+        if: steps.test_failure.outcome == 'success'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('expected test to fail, but it did not')
+  integration-test-declarative:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - id: test_success
+        uses: ./schema/test
+        with:
+          url: file://schema.hcl
+          working-directory: atlasaction/testdata
+          dev-url: sqlite://file.db?mode=memory
+          run: "expected_success"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - id: test_failure
+        uses: ./schema/test
+        continue-on-error: true
+        with:
+          working-directory: atlasaction/testdata
+          url: file://schema.hcl
           dev-url: sqlite://file.db?mode=memory
           run: "expected_failure"
         env:
