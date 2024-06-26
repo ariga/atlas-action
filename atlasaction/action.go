@@ -417,7 +417,7 @@ func MigrateTest(ctx context.Context, client *atlasexec.Client, act Action) erro
 	return nil
 }
 
-// MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
+// SchemaTest runs the GitHub Action for "ariga/atlas-action/schema/test"
 func SchemaTest(ctx context.Context, client *atlasexec.Client, act Action) error {
 	var vars atlasexec.Vars
 	if v := act.GetInput("vars"); v != "" {
