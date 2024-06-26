@@ -621,6 +621,9 @@ func (g *githubAPI) addSuggestions(act Action, payload *atlasexec.SummaryReport)
 			}
 			for _, d := range report.Diagnostics {
 				for _, s := range d.SuggestedFixes {
+					if s.TextEdit == nil {
+						continue
+					}
 					sevirity := "WARNING"
 					if file.Error != "" {
 						sevirity = "CAUTION"
