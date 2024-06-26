@@ -471,6 +471,16 @@ func stepHasComments(s *atlasexec.StepReport) bool {
 	return s.Result.Error != "" || len(s.Result.Reports) > 0
 }
 
+func stepHasErrors(s *atlasexec.StepReport) bool {
+	if s.Error != "" {
+		return true
+	}
+	if s.Result == nil {
+		return false
+	}
+	return s.Result.Error != ""
+}
+
 func execTime(start, end time.Time) string {
 	return end.Sub(start).String()
 }
@@ -493,6 +503,7 @@ var (
 			Funcs(template.FuncMap{
 				"hasComments":     hasComments,
 				"stepHasComments": stepHasComments,
+				"stepHasErrors":   stepHasErrors,
 			}).
 			Parse(commentTmpl),
 	)
