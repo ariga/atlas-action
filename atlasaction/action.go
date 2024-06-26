@@ -417,6 +417,31 @@ func MigrateTest(ctx context.Context, client *atlasexec.Client, act Action) erro
 	return nil
 }
 
+// SchemaTest runs the GitHub Action for "ariga/atlas-action/schema/test"
+func SchemaTest(ctx context.Context, client *atlasexec.Client, act Action) error {
+	var vars atlasexec.Vars
+	if v := act.GetInput("vars"); v != "" {
+		if err := json.Unmarshal([]byte(v), &vars); err != nil {
+			return fmt.Errorf("failed to parse vars: %w", err)
+		}
+	}
+	params := &atlasexec.SchemaTestParams{
+		URL:       act.GetInput("url"),
+		DevURL:    act.GetInput("dev-url"),
+		Run:       act.GetInput("run"),
+		ConfigURL: act.GetInput("config"),
+		Env:       act.GetInput("env"),
+		Vars:      vars,
+	}
+	result, err := client.SchemaTest(ctx, params)
+	if err != nil {
+		return fmt.Errorf("`atlas schema test` completed with errors:\n%s", err)
+	}
+	act.Infof("`atlas schema test` completed successfully, no issues found")
+	act.Infof(result)
+	return nil
+}
+
 // Returns true if the summary report has diagnostics or errors.
 func hasComments(s *atlasexec.SummaryReport) bool {
 	for _, f := range s.Files {
