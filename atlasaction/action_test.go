@@ -865,6 +865,74 @@ func TestMigrateLint(t *testing.T) {
 		require.Len(t, comments, 1)
 		require.Equal(t, "updated comment", comments[0].Body)
 	})
+	t.Run("lint summary - lint error - github api not working", func(t *testing.T) {
+		tt := newT(t)
+		require.NoError(t, os.Chdir("testdata"))
+		t.Cleanup(func() {
+			err := os.Chdir("..")
+			require.NoError(t, err)
+		})
+		tt.setInput("working-directory", "testdata")
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+			var query graphQLQuery
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&query))
+			switch {
+			case strings.Contains(query.Query, "mutation reportMigrationLint"):
+				_, _ = fmt.Fprintf(w, `{ "data": { "reportMigrationLint": { "url": "https://migration-lint-report-url" } } }`)
+			case strings.Contains(query.Query, "query dirs"):
+				dir, err := migrate.NewLocalDir("./migrations")
+				require.NoError(t, err)
+				ad, err := migrate.ArchiveDir(dir)
+				require.NoError(t, err)
+				var resp dirsQueryResponse
+				resp.Data.Dirs = []Dir{{
+					Name:    "test-dir-name",
+					Slug:    "test-dir-slug",
+					Content: base64.StdEncoding.EncodeToString(ad),
+				}, {
+					Name:    "other-dir-name",
+					Slug:    "other-dir-slug",
+					Content: base64.StdEncoding.EncodeToString(ad),
+				}}
+				st2bytes, err := json.Marshal(resp)
+				require.NoError(t, err)
+				_, _ = fmt.Fprint(w, string(st2bytes))
+			}
+		}))
+		var comments []pullRequestComment
+		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			var (
+				path   = request.URL.Path
+				method = request.Method
+			)
+			// List comments endpoint
+			if path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodGet {
+				// API is not working
+				writer.WriteHeader(http.StatusUnprocessableEntity)
+			}
+		}))
+		tt.env["GITHUB_API_URL"] = ghMock.URL
+		tt.env["GITHUB_REPOSITORY"] = "test-owner/test-repository"
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("dir", "file://migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		err := MigrateLint(context.Background(), tt.cli, tt.act)
+		require.ErrorContains(t, err, "https://migration-lint-report-url")
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		sum := string(c)
+		require.Contains(t, sum, "`atlas migrate lint` on <strong>migrations_destructive</strong>\n")
+		require.Contains(t, sum, "2 new migration files detected")
+		require.Contains(t, sum, "1 reports were found in analysis")
+		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
+		out := tt.out.String()
+		require.Contains(t, out, "error file=testdata/migrations_destructive/20230925192914.sql")
+		require.Contains(t, out, "destructive changes detected")
+		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS102")
+		require.Len(t, comments, 0)
+	})
 	t.Run("lint summary - lint error - push event", func(t *testing.T) {
 		tt := newT(t)
 		tt.env["GITHUB_EVENT_NAME"] = "push"
@@ -1316,12 +1384,12 @@ func TestLintTemplateGeneration(t *testing.T) {
 						},
 					},
 					{
-						Name:  "Analyze 20240625104520_destructive.sql",
-						Text:  "1 reports were found in analysis",
+						Name: "Analyze 20240625104520_destructive.sql",
+						Text: "1 reports were found in analysis",
 						Result: &atlasexec.FileReport{
 							Error: "Destructive changes detected",
-							Name: "20240625104520_destructive.sql",
-							Text: "DROP TABLE Persons;\n\n",
+							Name:  "20240625104520_destructive.sql",
+							Text:  "DROP TABLE Persons;\n\n",
 							Reports: []sqlcheck.Report{
 								{
 									Text: "destructive changes detected",

@@ -543,7 +543,8 @@ func (g *githubAPI) addLintSummary(act Action, payload *atlasexec.SummaryReport)
 	}
 	comments, err := g.getIssueComments()
 	if err != nil {
-		return err
+		act.Errorf("failed to get issue comments: %v", err)
+		return nil
 	}
 	marker := commentMarker(act.GetInput("dir-name"))
 	comment := struct {
@@ -560,9 +561,15 @@ func (g *githubAPI) addLintSummary(act Action, payload *atlasexec.SummaryReport)
 		return strings.Contains(c.Body, marker)
 	})
 	if found != -1 {
-		return g.updateIssueComment(comments[found].ID, r)
+		if err = g.updateIssueComment(comments[found].ID, r); err != nil {
+			act.Errorf("failed to update issue comment: %v", err)
+		}
+		return nil
 	}
-	return g.createIssueComment(r)
+	if err = g.createIssueComment(r); err != nil {
+		act.Errorf("failed to create issue comment: %v", err)
+	}
+	return nil
 }
 
 // addChecks runs annotations to the trigger event pull request for the given payload.
@@ -614,7 +621,8 @@ func (g *githubAPI) addSuggestions(act Action, payload *atlasexec.SummaryReport)
 	}
 	changedFiles, err := g.listPullRequestFiles()
 	if err != nil {
-		return err
+		act.Errorf("failed to list pull request files: %v", err)
+		return nil
 	}
 	for _, file := range payload.Files {
 		// Sending suggestions only for the files that are part of the PR.
@@ -630,7 +638,7 @@ func (g *githubAPI) addSuggestions(act Action, payload *atlasexec.SummaryReport)
 				footer := fmt.Sprintf("Ensure to run `atlas migrate hash --dir \"file://%s\"` after applying the suggested changes.", payload.Env.Dir)
 				body := fmt.Sprintf("%s\n```suggestion\n%s\n```\n%s", s.Message, s.TextEdit.NewText, footer)
 				if err := g.upsertSuggestion(filePath, body, s); err != nil {
-					return err
+					act.Errorf("failed to add suggestion: %v", err)
 				}
 			}
 			for _, d := range report.Diagnostics {
@@ -651,7 +659,7 @@ func (g *githubAPI) addSuggestions(act Action, payload *atlasexec.SummaryReport)
 					footer := fmt.Sprintf("Ensure to run `atlas migrate hash --dir \"file://%s\"` after applying the suggested changes.", payload.Env.Dir)
 					body := fmt.Sprintf("%s\n%s\n```suggestion\n%s\n```\n%s", title, s.Message, s.TextEdit.NewText, footer)
 					if err := g.upsertSuggestion(filePath, body, s); err != nil {
-						return err
+						act.Errorf("failed to upsert suggestion: %v", err)
 					}
 				}
 			}
