@@ -758,6 +758,10 @@ func (g *githubAPI) updateIssueComment(id int, content io.Reader) error {
 		return err
 	}
 	defer res.Body.Close()
+	// TODO: handle lines out of range of the diff.
+	if res.StatusCode == http.StatusUnprocessableEntity {
+		return nil
+	}
 	if res.StatusCode != http.StatusOK {
 		b, err := io.ReadAll(res.Body)
 		if err != nil {
@@ -813,6 +817,10 @@ func (g *githubAPI) upsertSuggestion(filePath, body string, suggestion sqlcheck.
 		return err
 	}
 	defer res.Body.Close()
+	// TODO: handle lines out of range of the diff.
+	if res.StatusCode == http.StatusUnprocessableEntity {
+		return nil
+	}
 	if res.StatusCode != http.StatusCreated {
 		b, err := io.ReadAll(res.Body)
 		if err != nil {
