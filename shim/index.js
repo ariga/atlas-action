@@ -34,7 +34,9 @@ module.exports = async function run(action) {
         const cacheVersion = `${semver.coerce(version).version}-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
         const url = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
         toolPath = toolCache.find('atlas-action', cacheVersion);
-        if (!toolPath) {
+        if (toolPath) {
+            core.addPath(toolPath);
+        } else {
             core.info(`Downloading atlas-action binary: ${url}`)
             // check if the binary is already in 'atlas-action' file
             if (fs.existsSync('atlas-action')) {
