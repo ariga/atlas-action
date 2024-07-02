@@ -27,37 +27,27 @@ module.exports = async function run(action) {
 
     core.info(`Using version ${version}`)
 
-    let toolPath;
     // Download the binary if not in local mode
     if (!isLocalMode) {
         // We only cache the binary between steps of a single run.
         const cacheVersion = `${semver.coerce(version).version}-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
         const url = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
-        toolPath = toolCache.find('atlas-action', cacheVersion);
-        if (toolPath) {
-            core.addPath(toolPath);
-        } else {
+        let toolPath = toolCache.find('atlas-action', cacheVersion);
+        if (!toolPath) {
             core.info(`Downloading atlas-action binary: ${url}`)
+            const downloadDest = path.join(process.cwd(), 'atlas-action');
             // check if the binary is already in 'atlas-action' file
-            if (fs.existsSync('atlas-action')) {
-                toolPath = 'atlas-action';
-            } else {
-                toolPath = await toolCache.downloadTool(url, 'atlas-action');
+            if (!fs.existsSync(downloadDest)) {
+                await toolCache.downloadTool(url, downloadDest);
+                fs.chmodSync(downloadDest, '700');
             }
-            let cachedToolPath = await toolCache.cacheFile(toolPath, 'atlas-action', 'atlas-action', cacheVersion);
-            core.addPath(cachedToolPath);
+            toolPath = await toolCache.cacheFile(downloadDest, 'atlas-action', 'atlas-action', cacheVersion);
         }
-        fs.chmodSync(toolPath, '700'); // Assuming the binary is directly within toolPath
+        core.addPath(toolPath);
     }
 
-    // Add tool to path if not in local mode
-    let mainCommand = 'atlas-action';
-    if (toolPath) {
-        mainCommand = path.join(process.cwd(), mainCommand);
-    }
     const args = ['--action', action];
-
-    const res = childProcess.spawnSync(mainCommand, args, {stdio: 'inherit'});
+    const res = childProcess.spawnSync("atlas-action", args, {stdio: 'inherit'});
 
     const exitCode = res.status;
     if (exitCode !== 0 || res.error) {
