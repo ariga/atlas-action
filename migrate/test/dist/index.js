@@ -10505,7 +10505,7 @@ module.exports = async function run(action) {
     // Add tool to path if not in local mode
     let mainCommand = 'atlas-action';
     if (toolPath) {
-        mainCommand = path.join(process.cwd(), mainCommand);
+        mainCommand = path.join(toolPath, mainCommand);
     }
     const args = ['--action', action];
 
