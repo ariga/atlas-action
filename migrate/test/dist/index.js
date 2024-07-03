@@ -10460,7 +10460,7 @@ const semver = __nccwpck_require__(1383);
 module.exports = async function run(action) {
     const binaryName = "atlas-action"
     // Check for local mode (for testing)
-    const isLocalMode = !(process.env.GITHUB_ACTION_REPOSITORY && process.env.GITHUB_ACTION_REPOSITORY.length > 0);
+    const isLocalMode = !(process.env.CI || process.env.GITHUB_ACTION_REPOSITORY && process.env.GITHUB_ACTION_REPOSITORY.length > 0);
     if (isLocalMode) {
         // In the local mode, the atlas-action binary is expected to be in the PATH
         core.info('Running in local mode')
@@ -10503,7 +10503,8 @@ module.exports = async function run(action) {
     if (status !== 0 || error) {
         core.error(error)
         core.setFailed(`The process exited with code ${status}`);
-        process.exit(status);
+        // Always exit with an error code to fail the action
+        process.exit(status || 1);
     }
 }
 
