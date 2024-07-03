@@ -8,7 +8,7 @@ const semver = require("semver");
 module.exports = async function run(action) {
     const binaryName = "atlas-action"
     // Check for local mode (for testing)
-    const isLocalMode = !(process.env.GITHUB_ACTION_REPOSITORY && process.env.GITHUB_ACTION_REPOSITORY.length > 0);
+    const isLocalMode = !(process.env.CI || process.env.GITHUB_ACTION_REPOSITORY && process.env.GITHUB_ACTION_REPOSITORY.length > 0);
     if (isLocalMode) {
         // In the local mode, the atlas-action binary is expected to be in the PATH
         core.info('Running in local mode')
