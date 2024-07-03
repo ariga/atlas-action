@@ -51,6 +51,7 @@ module.exports = async function run(action) {
     if (status !== 0 || error) {
         core.error(error)
         core.setFailed(`The process exited with code ${status}`);
-        process.exit(status);
+        // Always exit with an error code to fail the action
+        process.exit(status || 1);
     }
 }
