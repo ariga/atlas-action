@@ -132,13 +132,12 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) err
 		Vars: vars,
 	}
 	runs, err := client.MigrateApplySlice(ctx, params)
-	mae, ok := err.(*atlasexec.MigrateApplyError)
-	isApplyErr := err != nil && ok
-	if err != nil && !isApplyErr {
+	if mErr := (&atlasexec.MigrateApplyError{}); errors.As(err, &mErr) {
+		// If the error is a MigrateApplyError, we can still get the successful runs.
+		runs = mErr.Result
+	} else if err != nil {
 		act.SetOutput("error", err.Error())
 		return err
-	} else if isApplyErr {
-		runs = mae.Result
 	}
 	if len(runs) == 0 {
 		return nil
