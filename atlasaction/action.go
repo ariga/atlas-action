@@ -131,14 +131,16 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) err
 		},
 		Vars: vars,
 	}
-	run, err := client.MigrateApply(ctx, params)
-	mae, ok := err.(*atlasexec.MigrateApplyError)
-	isApplyErr := err != nil && ok
-	if err != nil && !isApplyErr {
+	runs, err := client.MigrateApplySlice(ctx, params)
+	if mErr := (&atlasexec.MigrateApplyError{}); errors.As(err, &mErr) {
+		// If the error is a MigrateApplyError, we can still get the successful runs.
+		runs = mErr.Result
+	} else if err != nil {
 		act.SetOutput("error", err.Error())
 		return err
-	} else if isApplyErr {
-		run = mae.Result[0]
+	}
+	if len(runs) == 0 {
+		return nil
 	}
 	tctx, err := act.GetTriggerContext()
 	if err != nil {
@@ -154,17 +156,16 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) err
 			Timeout: time.Second * 30,
 		},
 	}
-	if run == nil {
-		return nil
+	for _, run := range runs {
+		if err := ghClient.addApplySummary(act, run); err != nil {
+			return err
+		}
+		if run.Error != "" {
+			act.SetOutput("error", run.Error)
+			return errors.New(run.Error)
+		}
+		act.Infof(`"atlas migrate apply" completed successfully, applied to version %q`, run.Target)
 	}
-	if err := ghClient.addApplySummary(act, run); err != nil {
-		return err
-	}
-	if run.Error != "" {
-		act.SetOutput("error", run.Error)
-		return errors.New(run.Error)
-	}
-	act.Infof(`"atlas migrate apply" completed successfully, applied to version %q`, run.Target)
 	return nil
 }
 
