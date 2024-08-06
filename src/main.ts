@@ -42,7 +42,8 @@ export async function run(input: RunInput): Promise<AtlasResult | void> {
       const body = commentBody(res.cloudURL)
       if (input.opts.token && input.pr) {
         const client = new Octokit({ auth: input.opts.token })
-        await comment(client, input.pr, body, res.summary.Env.Dir)
+        // Use dir from input if provided, otherwise use the one from the summary.
+        await comment(client, input.pr, body, input.opts.dir || res.summary.Env.Dir)
       }
       await summary.write()
     }
