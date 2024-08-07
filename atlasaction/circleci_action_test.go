@@ -30,7 +30,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/repos/ariga/atlas-orb/pulls", r.URL.Path)
 		require.Equal(t, "GET", r.Method)
-		require.Equal(t, "state=open&head=main&sort=created&direction=desc&per_page=1&page=1", r.URL.RawQuery)
+		require.Equal(t, "state=open&head=ariga:main&sort=created&direction=desc&per_page=1&page=1", r.URL.RawQuery)
 		w.Write([]byte(`
 		[
 			{"number":1,"url":"https://api.github.com/repos/ariga/atlas-orb/pulls/9","head":{"sha":"1234567890"}},

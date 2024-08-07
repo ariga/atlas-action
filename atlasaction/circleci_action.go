@@ -143,12 +143,18 @@ func getGHPR(repo, branch string) (*PullRequest, error) {
 		},
 		Timeout: time.Second * 30,
 	}
-	// get open pull requests for the branch.
+	// Extract owner and repo from the GITHUB_REPOSITORY.
+	s := strings.Split(repo, "/")
+	if len(s) != 2 {
+		return nil, fmt.Errorf("GITHUB_REPOSITORY must be in the format of 'owner/repo'")
+	}
+	// Get open pull requests for the branch.
+	head := fmt.Sprintf("%s:%s", s[0], branch)
 	req, err := client.Get(
 		fmt.Sprintf("%s/repos/%s/pulls?state=open&head=%s&sort=created&direction=desc&per_page=1&page=1",
 			defaultGHApiUrl,
 			repo,
-			branch))
+			head))
 	if err != nil {
 		return nil, err
 	}
