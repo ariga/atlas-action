@@ -1177,7 +1177,7 @@ func TestLintTemplateGeneration(t *testing.T) {
 				Env: env{
 					Dir: "testdata/migrations",
 				},
-				Files: []*atlasexec.FileReport{{}},
+				Files: []*atlasexec.FileReport{{Name: "20230925192914.sql"}},
 			},
 			// language=html
 			expected: `<table>
@@ -1198,7 +1198,8 @@ func TestLintTemplateGeneration(t *testing.T) {
             <td>
                 1 new migration file detected
             </td>
-            <td>&nbsp;</td>
+            <td><ul><li>20230925192914.sql</li></ul>
+            </td>
         </tr>
         <tr>
             <td>
@@ -1311,7 +1312,8 @@ func TestLintTemplateGeneration(t *testing.T) {
             <td>
                 1 new migration file detected
             </td>
-            <td>&nbsp;</td>
+            <td><ul><li>20230925192914.sql</li></ul>
+            </td>
         </tr>
         <tr>
             <td>
@@ -1442,7 +1444,8 @@ func TestLintTemplateGeneration(t *testing.T) {
             <td>
                 2 new migration files detected
             </td>
-            <td>&nbsp;</td>
+            <td><ul><li>20230925192914.sql</li><li>20230925192915.sql</li></ul>
+            </td>
         </tr>
         <tr>
             <td>
@@ -1529,7 +1532,8 @@ func TestLintTemplateGeneration(t *testing.T) {
             <td>
                 1 new migration file detected
             </td>
-            <td>&nbsp;</td>
+            <td><ul><li>20230925192914.sql</li></ul>
+            </td>
         </tr>
         <tr>
             <td>
@@ -1613,9 +1617,10 @@ func TestLintTemplateGeneration(t *testing.T) {
                 </div>
             </td>
             <td>
-                0 new migration files detected
+                No migration files detected
             </td>
-            <td>&nbsp;</td>
+            <td>&nbsp;
+            </td>
         </tr>
         <tr>
             <td>

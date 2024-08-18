@@ -17,9 +17,10 @@
             </td>
             <td>
                 {{- $fileCount := len .Files }}
-                {{ $fileCount }} new migration file{{ if ne $fileCount 1 }}s{{ end }} detected
+                {{ if $fileCount }}{{ $fileCount }} new{{ else }}No{{ end }} migration file{{ if ne $fileCount 1 }}s{{ end }} detected
             </td>
-            <td>&nbsp;</td>
+            <td>{{ if not .Files }}&nbsp;{{ else }}<ul>{{ range .Files }}<li>{{ .Name }}</li>{{ end }}</ul>{{ end }}
+            </td>
         </tr>
         <tr>
             <td>
