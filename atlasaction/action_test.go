@@ -1198,7 +1198,7 @@ func TestLintTemplateGeneration(t *testing.T) {
             <td>
                 1 new migration file detected
             </td>
-            <td><ul><li>20230925192914.sql</li></ul>
+            <td>20230925192914.sql
             </td>
         </tr>
         <tr>
@@ -1312,7 +1312,7 @@ func TestLintTemplateGeneration(t *testing.T) {
             <td>
                 1 new migration file detected
             </td>
-            <td><ul><li>20230925192914.sql</li></ul>
+            <td>20230925192914.sql
             </td>
         </tr>
         <tr>
@@ -1444,7 +1444,7 @@ func TestLintTemplateGeneration(t *testing.T) {
             <td>
                 2 new migration files detected
             </td>
-            <td><ul><li>20230925192914.sql</li><li>20230925192915.sql</li></ul>
+            <td>20230925192914.sql<br/>20230925192915.sql
             </td>
         </tr>
         <tr>
@@ -1532,7 +1532,7 @@ func TestLintTemplateGeneration(t *testing.T) {
             <td>
                 1 new migration file detected
             </td>
-            <td><ul><li>20230925192914.sql</li></ul>
+            <td>20230925192914.sql
             </td>
         </tr>
         <tr>

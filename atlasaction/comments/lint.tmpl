@@ -19,7 +19,7 @@
                 {{- $fileCount := len .Files }}
                 {{ if $fileCount }}{{ $fileCount }} new{{ else }}No{{ end }} migration file{{ if ne $fileCount 1 }}s{{ end }} detected
             </td>
-            <td>{{ if not .Files }}&nbsp;{{ else }}<ul>{{ range .Files }}<li>{{ .Name }}</li>{{ end }}</ul>{{ end }}
+            <td>{{ if not .Files }}&nbsp;{{ else }}{{ range $i, $f := .Files }}{{ if $i }}<br/>{{ end }}{{ $f.Name }}{{ end }}{{ end }}
             </td>
         </tr>
         <tr>
