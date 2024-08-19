@@ -111,7 +111,7 @@ func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) err
 	if err != nil {
 		return fmt.Errorf(`invlid value for the "dry-run" input: %w`, err)
 	}
-	var vars atlasexec.Vars
+	var vars atlasexec.Vars2
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
 			return fmt.Errorf("failed to parse vars: %w", err)
@@ -178,7 +178,7 @@ const (
 
 // MigrateDown runs the GitHub Action for "ariga/atlas-action/migrate/down".
 func MigrateDown(ctx context.Context, client *atlasexec.Client, act Action) (err error) {
-	var vars atlasexec.Vars
+	var vars atlasexec.Vars2
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
 			return fmt.Errorf("failed to parse vars: %w", err)
@@ -275,7 +275,7 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act Action) erro
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
 	}
-	var vars atlasexec.Vars
+	var vars atlasexec.Vars2
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
 			return fmt.Errorf("failed to parse vars: %w", err)
@@ -327,7 +327,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 	var (
 		resp    bytes.Buffer
 		payload atlasexec.SummaryReport
-		vars    atlasexec.Vars
+		vars    atlasexec.Vars2
 	)
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
@@ -345,7 +345,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 		Web:       true,
 		Writer:    &resp,
 	})
-	isLintErr := err != nil && errors.Is(err, atlasexec.LintErr)
+	isLintErr := err != nil && errors.Is(err, atlasexec.ErrLint)
 	if err != nil && !isLintErr {
 		return err
 	}
@@ -395,7 +395,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 
 // MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
 func MigrateTest(ctx context.Context, client *atlasexec.Client, act Action) error {
-	var vars atlasexec.Vars
+	var vars atlasexec.Vars2
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
 			return fmt.Errorf("failed to parse vars: %w", err)
@@ -420,7 +420,7 @@ func MigrateTest(ctx context.Context, client *atlasexec.Client, act Action) erro
 
 // SchemaTest runs the GitHub Action for "ariga/atlas-action/schema/test"
 func SchemaTest(ctx context.Context, client *atlasexec.Client, act Action) error {
-	var vars atlasexec.Vars
+	var vars atlasexec.Vars2
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
 			return fmt.Errorf("failed to parse vars: %w", err)
