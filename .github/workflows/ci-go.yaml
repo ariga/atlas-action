@@ -17,7 +17,6 @@ jobs:
     - name: Install
       run: |
         npm i
-        npm i -g @vercel/ncc
         npm run shim
     - name: verify no git diff
       run: |
@@ -29,6 +28,8 @@ jobs:
         fi
   shim-e2e:
     runs-on: ubuntu-latest
+    env:
+      ATLAS_ACTION_LOCAL: 0 # Disable local mode
     steps:
       - uses: actions/checkout@v3
       - uses: ariga/setup-atlas@master
@@ -72,6 +73,8 @@ jobs:
         run: go test -race ./...
   migrate-test:
     runs-on: ubuntu-latest
+    env:
+      ATLAS_ACTION_LOCAL: 1
     steps:
       - uses: ariga/setup-atlas@v0
         with:
@@ -154,6 +157,8 @@ jobs:
             core.setFailed('expected test to fail, but it did not')
   schema-test:
     runs-on: ubuntu-latest
+    env:
+      ATLAS_ACTION_LOCAL: 1
     steps:
       - uses: ariga/setup-atlas@v0
         with:
@@ -192,6 +197,8 @@ jobs:
             core.setFailed('expected test to fail, but it did not')
   migrate-down:
     runs-on: ubuntu-latest
+    env:
+      ATLAS_ACTION_LOCAL: 1
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
