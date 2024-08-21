@@ -372,6 +372,12 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 	return nil
 }
 
+// SchemaPlan runs the GitHub Action for "ariga/atlas-action/schema/plan"
+func (a *Actions) SchemaPlan(ctx context.Context) error {
+	a.Infof("Hello world")
+	return nil
+}
+
 // WorkingDir returns the working directory for the action.
 func (a *Actions) WorkingDir() string {
 	return a.GetInput("working-directory")
