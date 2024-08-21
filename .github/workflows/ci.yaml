@@ -1,4 +1,4 @@
-name: Atlas Action Continuous Integration
+name: Action CI (Deprecated)
 on:
   push:
     branches:
@@ -21,27 +21,6 @@ jobs:
         with:
           dev-url: sqlite://test?mode=memory&cache=shared&_fk=1
           dir: ${{ matrix.directory }}
-  shim-e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ariga/setup-atlas@master
-        with:
-          cloud-token: ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
-      - name: "Run Migrate Lint"
-        uses: ./migrate/lint
-        with:
-          dir: file://atlasaction/testdata/migrations
-          dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: "Run Migrate Push"
-        uses: ./migrate/push
-        with:
-          dir: file://atlasaction/testdata/migrations
-          dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir
   code:
     runs-on: ubuntu-latest
     steps:
