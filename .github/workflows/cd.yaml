@@ -36,7 +36,7 @@ jobs:
           echo "BINARY_NAME=atlas-action-$VERSION" >> $GITHUB_ENV
       - name: Compile Go Binary
         run: |
-          go build -o $BINARY_NAME -ldflags "-X ariga.io/atlas-action/atlasaction.Version=${{ github.event.inputs.version || 'v1' }}" ./cmd/atlas-action
+          go build -o $BINARY_NAME -ldflags "-s -w -X ariga.io/atlas-action/atlasaction.Version=${{ github.event.inputs.version || 'v1' }}" ./cmd/atlas-action
         env:
           CGO_ENABLED: 0
       - name: Install Atlas
