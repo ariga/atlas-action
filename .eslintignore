@@ -1,4 +1,6 @@
 dist/
 lib/
 node_modules/
+migrate/*
+schema/*
 jest.config.js
