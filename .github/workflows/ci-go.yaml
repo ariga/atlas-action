@@ -12,8 +12,8 @@ jobs:
     - uses: actions/checkout@v3
     - uses: actions/setup-node@v3
       with:
-          node-version: 20.x
-          cache: 'npm'
+        node-version: 20.x
+        cache: 'npm'
     - name: Install
       run: |
         npm i
@@ -21,13 +21,33 @@ jobs:
         npm run shim
     - name: verify no git diff
       run: |
-          status=$(git status --porcelain)
-          if [ -n "$status" ]; then
-            echo "you need to run 'npm run shim' and commit the changes"
-            echo "$status"
-            exit 1
-          fi
-
+        status=$(git status --porcelain)
+        if [ -n "$status" ]; then
+          echo "you need to run 'npm run shim' and commit the changes"
+          echo "$status"
+          exit 1
+        fi
+  shim-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ariga/setup-atlas@master
+        with:
+          cloud-token: ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
+      - name: "Run Migrate Lint"
+        uses: ./migrate/lint
+        with:
+          dir: file://atlasaction/testdata/migrations
+          dev-url: sqlite://dev?mode=memory
+          dir-name: test-dir
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: "Run Migrate Push"
+        uses: ./migrate/push
+        with:
+          dir: file://atlasaction/testdata/migrations
+          dev-url: sqlite://dev?mode=memory
+          dir-name: test-dir
   golangci-lint:
     runs-on: ubuntu-latest
     steps:
@@ -50,7 +70,7 @@ jobs:
           go-version-file: go.mod
       - name: Run tests
         run: go test -race ./...
-  integration-test-versioned:
+  migrate-test:
     runs-on: ubuntu-latest
     steps:
       - uses: ariga/setup-atlas@v0
@@ -132,7 +152,7 @@ jobs:
         with:
           script: |
             core.setFailed('expected test to fail, but it did not')
-  integration-test-declarative:
+  schema-test:
     runs-on: ubuntu-latest
     steps:
       - uses: ariga/setup-atlas@v0
@@ -253,4 +273,3 @@ jobs:
           [[ "${{ steps.approved.outputs.reverted_count }}" = 1 ]]
           [[ "${{ steps.applied.outputs.planned_count }}" = 1 ]]
           [[ "${{ steps.applied.outputs.reverted_count }}" = 1 ]]
-          
