@@ -1,0 +1,19 @@
+### Atlas detected changes to the desired schema
+
+#### SQL Plan
+
+```sql
+{{ .Plan.File.Migration }}
+```
+
+#### Atlas lint results
+{{ template "lint-report" .Plan.Lint }}
+
+To edit this plan, follow these steps:
+
+- Run `atlas schema plan pull --url "{{ .Plan.File.URL }}" > {{ .Plan.File.Name }}.plan.hcl`
+- Modify the plan.
+- Push the plan using `atlas schema plan push --env {{ .EnvName }} --file {{ .Plan.File.Name }}.plan.hcl`
+{{- if .RerunCommand }}
+- Re-trigger this action using `{{ .RerunCommand }}`
+{{- end }}

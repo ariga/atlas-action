@@ -30,7 +30,9 @@ import (
 	"ariga.io/atlas/sql/sqlclient"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sethvargo/go-githubactions"
+	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 )
 
 func TestMigrateApply(t *testing.T) {
@@ -289,6 +291,26 @@ func (m *mockAtlas) MigrateTest(context.Context, *atlasexec.MigrateTestParams) (
 
 // SchemaTest implements AtlasExec.
 func (m *mockAtlas) SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error) {
+	panic("unimplemented")
+}
+
+// SchemaPlan implements AtlasExec.
+func (m *mockAtlas) SchemaPlan(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+	panic("unimplemented")
+}
+
+// SchemaPlanApprove implements AtlasExec.
+func (m *mockAtlas) SchemaPlanApprove(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error) {
+	panic("unimplemented")
+}
+
+// SchemaPlanLint implements AtlasExec.
+func (m *mockAtlas) SchemaPlanLint(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error) {
+	panic("unimplemented")
+}
+
+// SchemaPlanPull implements AtlasExec.
+func (m *mockAtlas) SchemaPlanPull(context.Context, *atlasexec.SchemaPlanPullParams) (string, error) {
 	panic("unimplemented")
 }
 
@@ -2151,4 +2173,29 @@ func must[T any](t T, err error) T {
 		panic(err)
 	}
 	return t
+}
+
+func Test_mergedPullRequest(t *testing.T) {
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Missing GITHUB_TOKEN")
+	}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &oauth2.Transport{
+			Source: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: token,
+			}),
+		},
+	}
+	c := &githubAPI{
+		client:  client,
+		gql:     githubv4.NewClient(client),
+		baseURL: defaultGHApiUrl,
+		repo:    "ariga/atlas-action",
+	}
+	pr, err := c.MergedPullRequest(context.Background(), "6850844a4bb6933f11ee941ca232fd636f35a35f")
+	require.NoError(t, err)
+	require.NotNil(t, pr)
+	require.Equal(t, 206, pr.Number)
 }

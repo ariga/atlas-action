@@ -36,12 +36,13 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 		return nil, err
 	}
 	tc := &TriggerContext{
-		SCM:     SCM{Type: atlasexec.SCMTypeGithub, APIURL: ctx.APIURL},
-		Repo:    ctx.Repository,
-		Branch:  ctx.HeadRef,
-		Commit:  ctx.SHA,
-		RepoURL: ev.Repository.URL,
-		Actor:   &Actor{Name: ctx.Actor, ID: ctx.ActorID},
+		SCM:      SCM{Type: atlasexec.SCMTypeGithub, APIURL: ctx.APIURL},
+		Repo:     ctx.Repository,
+		Branch:   ctx.HeadRef,
+		Commit:   ctx.SHA,
+		RepoURL:  ev.Repository.URL,
+		Actor:    &Actor{Name: ctx.Actor, ID: ctx.ActorID},
+		RerunCmd: fmt.Sprintf("gh run rerun %d", ctx.RunID),
 	}
 	if tc.Branch == "" {
 		// HeadRef will be empty for push events, so we use RefName instead.
