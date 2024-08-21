@@ -1,8 +1,0 @@
-<h1>Atlas Lint Report</h1>
-Analyzed <strong>../../ent/mig</strong><br><br>
-<table><tr><th>Status</th><th>Step</th><th>Result</th><th>Diagnostics</th></tr><tr><td><div align="center"><img src="https://release.ariga.io/images/assets/success.svg" /></div></td><td>Migration Integrity Check</td><td>File atlas.sum is valid</td><td></tr><tr><td><div align="center"><img src="https://release.ariga.io/images/assets/success.svg" /></div></td><td>Detect New Migration Files</td><td>Found 1 new migration files (from 1 total)</td><td></tr><tr><td><div align="center"><img src="https://release.ariga.io/images/assets/success.svg" /></div></td><td>Replay Migration Files</td><td>Loaded 1 changes on dev database</td><td></tr><tr><td><div align="center"><img src="https://release.ariga.io/images/assets/success.svg" /></div></td><td>Analyze 20221109094945.sql</td><td>0 reports were found in analysis</td><td></tr><tr><td><div align="center"><img src="https://release.ariga.io/images/assets/special-warning-icon.svg" /></div></td><td>Analyze Database Schema</td><td>1 reports were found in analysis</td><td>Cloud reports
-
-
-diag1 (<a href="https://atlasgo.io/lint/analyzers#code1">code1</a>)
-
-diag2 (<a href="https://atlasgo.io/lint/analyzers#code2">code2</a>)</td></tr></table>
