@@ -1,3 +1,1 @@
-const run = require('../../shim/index.js')
-
-run('schema/test')
+require('../../shim/index.js')('schema/test')

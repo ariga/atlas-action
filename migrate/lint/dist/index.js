@@ -10672,9 +10672,7 @@ module.exports = require("util");
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
-const run = __nccwpck_require__(5592)
-
-run('migrate/lint')
+__nccwpck_require__(5592)('migrate/lint')
 })();
 
 module.exports = __webpack_exports__;

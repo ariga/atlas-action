@@ -1,3 +1,1 @@
-const run = require('../../shim/index.js')
-
-run('migrate/push')
+require('../../shim/index.js')('migrate/push')
