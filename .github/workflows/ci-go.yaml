@@ -39,7 +39,7 @@ jobs:
         with:
           dir: file://atlasaction/testdata/migrations
           dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir
+          dir-name: test-dir-sqlite
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: "Run Migrate Push"
@@ -47,7 +47,7 @@ jobs:
         with:
           dir: file://atlasaction/testdata/migrations
           dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir
+          dir-name: test-dir-sqlite
   golangci-lint:
     runs-on: ubuntu-latest
     steps:

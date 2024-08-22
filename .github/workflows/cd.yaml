@@ -74,7 +74,7 @@ jobs:
           with: '{
             "dir": "file://atlasaction/testdata/migrations",
             "dev-url": "sqlite://dev?mode=memory",
-            "dir-name": "test-dir"
+            "dir-name": "test-dir-sqlite"
             }'
 
       - name: "Run Migrate Push"
@@ -82,7 +82,7 @@ jobs:
         with:
           uses: ariga/atlas-action/migrate/push@${{ github.event.inputs.version || 'v1' }}
           with: '{
-          "dir": "file://atlasaction/testdata/migrations",
-          "dev-url": "sqlite://dev?mode=memory",
-          "dir-name": "test-dir"
-          }'
+            "dir": "file://atlasaction/testdata/migrations",
+            "dev-url": "sqlite://dev?mode=memory",
+            "dir-name": "test-dir-sqlite"
+            }'
