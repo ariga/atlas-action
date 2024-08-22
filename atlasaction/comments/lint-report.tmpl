@@ -21,6 +21,7 @@
             <td>{{ if not .Files }}&nbsp;{{ else }}{{ range $i, $f := .Files }}{{ if $i }}<br/>{{ end }}{{ $f.Name }}{{ end }}{{ end }}
             </td>
         </tr>
+        {{- if .URL }}
         <tr>
             <td>
                 <div align="center">
@@ -34,6 +35,7 @@
                 <a href="{{ .URL }}#erd" target="_blank">View Visualization</a>
             </td>
         </tr>
+        {{- end }}
         {{- if not (hasComments .) }}
         <tr>
             <td>
@@ -45,7 +47,9 @@
                 No issues found
             </td>
             <td>
+                {{- if .URL }}
                 <a href="{{ .URL }}" target="_blank">View Report</a>
+                {{- end }}
             </td>
         </tr>
         {{- end }}
@@ -82,11 +86,13 @@
         {{- end }}
     {{- end }}
     {{- end }}
+    {{- if .URL }}
     <td colspan="4">
         <div align="center">
             Read the full linting report on <a href="{{ .URL }}" target="_blank">Atlas Cloud</a>
         </div>
     </td>
+    {{- end }}
     </tbody>
 </table>
 {{- end -}}
