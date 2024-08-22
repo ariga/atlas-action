@@ -1567,8 +1567,7 @@ func TestLintTemplateGeneration(t *testing.T) {
         </div>
     </td>
     </tbody>
-</table>
-`,
+</table>`,
 		},
 		{
 			name: "non linear history error",
@@ -1658,9 +1657,9 @@ func TestLintTemplateGeneration(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			require.NoError(t, lintComment.Execute(&buf, tt.payload))
-			require.Contains(t, buf.String(), tt.expected)
+			c, err := migrateLintComment(tt.payload)
+			require.NoError(t, err)
+			require.Contains(t, c, tt.expected)
 		})
 	}
 }
@@ -1818,9 +1817,9 @@ func TestApplyTemplateGeneration(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			require.NoError(t, applyComment.Execute(&buf, tt.payload))
-			require.Contains(t, buf.String(), tt.expected)
+			c, err := migrateApplyComment(tt.payload)
+			require.NoError(t, err)
+			require.Contains(t, c, tt.expected)
 		})
 	}
 }

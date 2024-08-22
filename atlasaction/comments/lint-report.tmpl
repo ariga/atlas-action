@@ -1,5 +1,4 @@
-`atlas migrate lint` on <strong>{{- .Env.Dir }}</strong>
-
+{{- define "lint-report" -}}
 <table>
     <thead>
         <tr>
@@ -90,3 +89,4 @@
     </td>
     </tbody>
 </table>
+{{- end -}}

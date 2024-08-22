@@ -7,7 +7,7 @@ package atlasaction
 import (
 	"bytes"
 	"context"
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -495,48 +495,47 @@ func appliedStmts(a *atlasexec.MigrateApply) int {
 }
 
 var (
-	//go:embed comments/lint.tmpl
-	commentTmpl string
-	//go:embed comments/apply.tmpl
-	applyTmpl   string
-	lintComment = template.Must(
-		template.New("comment").
+	//go:embed comments/*.tmpl
+	comments     embed.FS
+	commentsTmpl = template.Must(
+		template.New("comments").
 			Funcs(template.FuncMap{
+				"execTime":        execTime,
+				"appliedStmts":    appliedStmts,
 				"hasComments":     hasComments,
 				"stepHasComments": stepHasComments,
 				"stepHasErrors":   stepHasErrors,
 			}).
-			Parse(commentTmpl),
-	)
-	applyComment = template.Must(
-		template.New("comment").
-			Funcs(template.FuncMap{
-				"execTime":     execTime,
-				"appliedStmts": appliedStmts,
-			}).
-			Parse(applyTmpl),
+			ParseFS(comments, "comments/*.tmpl"),
 	)
 )
 
 // addApplySummary to workflow run.
 func (g *githubAPI) addApplySummary(act Action, payload *atlasexec.MigrateApply) error {
-	var buf bytes.Buffer
-	if err := applyComment.Execute(&buf, &payload); err != nil {
+	summary, err := migrateApplyComment(payload)
+	if err != nil {
 		return err
 	}
-	act.AddStepSummary(buf.String())
+	act.AddStepSummary(summary)
 	return nil
+}
+
+func migrateApplyComment(d *atlasexec.MigrateApply) (string, error) {
+	var buf bytes.Buffer
+	if err := commentsTmpl.ExecuteTemplate(&buf, "migrate-apply.tmpl", &d); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 // addLintSummary writes a summary to the pull request. It adds a marker
 // HTML comment to the end of the comment body to identify the comment as one created by
 // this action.
 func (g *githubAPI) addLintSummary(act Action, payload *atlasexec.SummaryReport) error {
-	var buf bytes.Buffer
-	if err := lintComment.Execute(&buf, &payload); err != nil {
+	summary, err := migrateLintComment(payload)
+	if err != nil {
 		return err
 	}
-	summary := buf.String()
 	act.AddStepSummary(summary)
 	prNumber := g.pr.Number
 	if prNumber == 0 {
@@ -571,6 +570,14 @@ func (g *githubAPI) addLintSummary(act Action, payload *atlasexec.SummaryReport)
 		act.Errorf("failed to create issue comment: %v", err)
 	}
 	return nil
+}
+
+func migrateLintComment(d *atlasexec.SummaryReport) (string, error) {
+	var buf bytes.Buffer
+	if err := commentsTmpl.ExecuteTemplate(&buf, "migrate-lint.tmpl", &d); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 // addChecks runs annotations to the trigger event pull request for the given payload.
