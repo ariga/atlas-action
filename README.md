@@ -118,7 +118,7 @@ jobs:
           fetch-depth: 0
       - uses: ariga/setup-atlas@v0
         with:
-          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - uses: ariga/atlas-action/migrate/lint@v1
         with:
           dir: 'file://migrations'
@@ -155,7 +155,7 @@ jobs:
           fetch-depth: 0
       - uses: ariga/setup-atlas@v0
         with:
-          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - uses: ariga/atlas-action/migrate/apply@v1
         with:
           url: 'mysql://user:${{ secrets.DB_PASSWORD }}@db.hostname.io:3306/db'
