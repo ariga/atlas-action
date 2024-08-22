@@ -34,13 +34,13 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ariga/setup-atlas@master
         with:
-          cloud-token: ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - name: "Run Migrate Lint"
         uses: ./migrate/lint
         with:
           dir: file://atlasaction/testdata/migrations
           dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir
+          dir-name: test-dir-sqlite
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: "Run Migrate Push"
@@ -48,7 +48,7 @@ jobs:
         with:
           dir: file://atlasaction/testdata/migrations
           dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir
+          dir-name: test-dir-sqlite
   golangci-lint:
     runs-on: ubuntu-latest
     steps:
@@ -78,7 +78,7 @@ jobs:
     steps:
       - uses: ariga/setup-atlas@v0
         with:
-          cloud-token: ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
@@ -162,7 +162,7 @@ jobs:
     steps:
       - uses: ariga/setup-atlas@v0
         with:
-          cloud-token: ${{ secrets.INTEGRATION_ATLAS_CLOUD_TOKEN }}
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
