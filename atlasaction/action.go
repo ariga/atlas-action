@@ -59,6 +59,22 @@ type Logger interface {
 	WithFieldsMap(map[string]string) Logger
 }
 
+// AtlasExec is the interface for the atlas exec client.
+type AtlasExec interface {
+	// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
+	MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error)
+	// MigrateDown runs the `migrate down` command.
+	MigrateDown(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
+	// MigrateLintError runs the `migrate lint` command and fails if there are lint errors.
+	MigrateLintError(context.Context, *atlasexec.MigrateLintParams) error
+	// MigratePush runs the `migrate push` command.
+	MigratePush(context.Context, *atlasexec.MigratePushParams) (string, error)
+	// MigrateTest runs the `migrate test` command.
+	MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error)
+	// SchemaTest runs the `schema test` command.
+	SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error)
+}
+
 // Context holds the context of the environment the action is running in.
 type TriggerContext struct {
 	// SCM is the source control management system.
@@ -100,7 +116,7 @@ type SCM struct {
 type Provider string
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
-func MigrateApply(ctx context.Context, client *atlasexec.Client, act Action) error {
+func MigrateApply(ctx context.Context, client AtlasExec, act Action) error {
 	dryRun, err := func() (bool, error) {
 		inp := act.GetInput("dry-run")
 		if inp == "" {
@@ -177,7 +193,7 @@ const (
 )
 
 // MigrateDown runs the GitHub Action for "ariga/atlas-action/migrate/down".
-func MigrateDown(ctx context.Context, client *atlasexec.Client, act Action) (err error) {
+func MigrateDown(ctx context.Context, client AtlasExec, act Action) (err error) {
 	var vars atlasexec.Vars2
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
@@ -270,7 +286,7 @@ func MigrateDown(ctx context.Context, client *atlasexec.Client, act Action) (err
 }
 
 // MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
-func MigratePush(ctx context.Context, client *atlasexec.Client, act Action) error {
+func MigratePush(ctx context.Context, client AtlasExec, act Action) error {
 	runContext, err := createRunContext(ctx, act)
 	if err != nil {
 		return fmt.Errorf("failed to read github metadata: %w", err)
@@ -316,7 +332,7 @@ func MigratePush(ctx context.Context, client *atlasexec.Client, act Action) erro
 }
 
 // MigrateLint runs the GitHub Action for "ariga/atlas-action/migrate/lint"
-func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) error {
+func MigrateLint(ctx context.Context, client AtlasExec, act Action) error {
 	if act.GetInput("dir-name") == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
@@ -394,7 +410,7 @@ func MigrateLint(ctx context.Context, client *atlasexec.Client, act Action) erro
 }
 
 // MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
-func MigrateTest(ctx context.Context, client *atlasexec.Client, act Action) error {
+func MigrateTest(ctx context.Context, client AtlasExec, act Action) error {
 	var vars atlasexec.Vars2
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
@@ -419,7 +435,7 @@ func MigrateTest(ctx context.Context, client *atlasexec.Client, act Action) erro
 }
 
 // SchemaTest runs the GitHub Action for "ariga/atlas-action/schema/test"
-func SchemaTest(ctx context.Context, client *atlasexec.Client, act Action) error {
+func SchemaTest(ctx context.Context, client AtlasExec, act Action) error {
 	var vars atlasexec.Vars2
 	if v := act.GetInput("vars"); v != "" {
 		if err := json.Unmarshal([]byte(v), &vars); err != nil {
