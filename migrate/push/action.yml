@@ -25,6 +25,7 @@ inputs:
   latest:
     description: |
       If true, push also to the "latest" tag.
+    default: "true"
     required: false
   config:
     description: |

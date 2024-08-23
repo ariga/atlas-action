@@ -30,6 +30,13 @@ import (
 // "-X 'ariga.io/atlas-action/atlasaction.Version=v0.1.2'"
 var Version string
 
+// Actions holds the runtime for the actions to run.
+// This helps to inject the runtime dependencies. Like the SCM client, Atlas client, etc.
+type Actions struct {
+	Action
+	Atlas AtlasExec
+}
+
 // Atlas action interface.
 type Action interface {
 	Logger
@@ -116,55 +123,36 @@ type SCM struct {
 type Provider string
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
-func MigrateApply(ctx context.Context, client AtlasExec, act Action) error {
-	dryRun, err := func() (bool, error) {
-		inp := act.GetInput("dry-run")
-		if inp == "" {
-			return false, nil
-		}
-		return strconv.ParseBool(inp)
-	}()
-	if err != nil {
-		return fmt.Errorf(`invlid value for the "dry-run" input: %w`, err)
-	}
-	var vars atlasexec.Vars2
-	if v := act.GetInput("vars"); v != "" {
-		if err := json.Unmarshal([]byte(v), &vars); err != nil {
-			return fmt.Errorf("failed to parse vars: %w", err)
-		}
-	}
+func (a *Actions) MigrateApply(ctx context.Context) error {
 	params := &atlasexec.MigrateApplyParams{
-		URL:             act.GetInput("url"),
-		DirURL:          act.GetInput("dir"),
-		ConfigURL:       act.GetInput("config"),
-		Env:             act.GetInput("env"),
-		DryRun:          dryRun,
-		TxMode:          act.GetInput("tx-mode"),  // Hidden param.
-		BaselineVersion: act.GetInput("baseline"), // Hidden param.
-		Context: &atlasexec.DeployRunContext{
-			TriggerType:    act.GetType(),
-			TriggerVersion: Version,
-		},
-		Vars: vars,
+		ConfigURL:       a.GetInput("config"),
+		Env:             a.GetInput("env"),
+		Vars:            a.GetVarsInput("vars"),
+		Context:         a.DeployRunContext(),
+		DirURL:          a.GetInput("dir"),
+		URL:             a.GetInput("url"),
+		DryRun:          a.GetBoolInput("dry-run"),
+		TxMode:          a.GetInput("tx-mode"),  // Hidden param.
+		BaselineVersion: a.GetInput("baseline"), // Hidden param.
 	}
-	runs, err := client.MigrateApplySlice(ctx, params)
+	runs, err := a.Atlas.MigrateApplySlice(ctx, params)
 	if mErr := (&atlasexec.MigrateApplyError{}); errors.As(err, &mErr) {
 		// If the error is a MigrateApplyError, we can still get the successful runs.
 		runs = mErr.Result
 	} else if err != nil {
-		act.SetOutput("error", err.Error())
+		a.SetOutput("error", err.Error())
 		return err
 	}
 	if len(runs) == 0 {
 		return nil
 	}
-	tctx, err := act.GetTriggerContext()
+	tc, err := a.GetTriggerContext()
 	if err != nil {
 		return err
 	}
 	ghClient := githubAPI{
-		baseURL: tctx.SCM.APIURL,
-		repo:    tctx.Repo,
+		baseURL: tc.SCM.APIURL,
+		repo:    tc.Repo,
 		client: &http.Client{
 			Transport: &roundTripper{
 				authToken: os.Getenv("GITHUB_TOKEN"),
@@ -173,14 +161,14 @@ func MigrateApply(ctx context.Context, client AtlasExec, act Action) error {
 		},
 	}
 	for _, run := range runs {
-		if err := ghClient.addApplySummary(act, run); err != nil {
+		if err := ghClient.addApplySummary(a, run); err != nil {
 			return err
 		}
 		if run.Error != "" {
-			act.SetOutput("error", run.Error)
+			a.SetOutput("error", run.Error)
 			return errors.New(run.Error)
 		}
-		act.Infof(`"atlas migrate apply" completed successfully, applied to version %q`, run.Target)
+		a.Infof(`"atlas migrate apply" completed successfully, applied to version %q`, run.Target)
 	}
 	return nil
 }
@@ -193,82 +181,53 @@ const (
 )
 
 // MigrateDown runs the GitHub Action for "ariga/atlas-action/migrate/down".
-func MigrateDown(ctx context.Context, client AtlasExec, act Action) (err error) {
-	var vars atlasexec.Vars2
-	if v := act.GetInput("vars"); v != "" {
-		if err := json.Unmarshal([]byte(v), &vars); err != nil {
-			return fmt.Errorf("failed to parse vars: %w", err)
-		}
-	}
-	var a uint64
-	if i := act.GetInput("amount"); i != "" {
-		a, err = strconv.ParseUint(act.GetInput("amount"), 10, 64)
-		if err != nil {
-			return fmt.Errorf("failed to parse amount: %w", err)
-		}
-	}
+func (a *Actions) MigrateDown(ctx context.Context) (err error) {
 	params := &atlasexec.MigrateDownParams{
-		URL:       act.GetInput("url"),
-		DevURL:    act.GetInput("dev-url"),
-		DirURL:    act.GetInput("dir"),
-		ConfigURL: act.GetInput("config"),
-		Env:       act.GetInput("env"),
-		ToVersion: act.GetInput("to-version"),
-		ToTag:     act.GetInput("to-tag"),
-		Amount:    a,
-		Context: &atlasexec.DeployRunContext{
-			TriggerType:    atlasexec.TriggerTypeGithubAction,
-			TriggerVersion: Version,
-		},
-		Vars: vars,
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		Context:   a.DeployRunContext(),
+		DevURL:    a.GetInput("dev-url"),
+		URL:       a.GetInput("url"),
+		DirURL:    a.GetInput("dir"),
+		ToVersion: a.GetInput("to-version"),
+		ToTag:     a.GetInput("to-tag"),
+		Amount:    a.GetUin64Input("amount"),
 	}
 	// Based on the retry configuration values, retry the action if there is an error.
 	var (
-		started  = time.Now()
-		interval = time.Second
-		timeout  time.Duration
+		interval = a.GetDurationInput("wait-interval")
+		timeout  = a.GetDurationInput("wait-timeout")
 	)
-	if v := act.GetInput("wait-interval"); v != "" {
-		interval, err = time.ParseDuration(v)
-		if err != nil {
-			return fmt.Errorf(`parsing "wait-interval": %w`, err)
-		}
+	if interval == 0 {
+		interval = time.Second // Default interval is 1 second.
 	}
-	if v := act.GetInput("wait-timeout"); v != "" {
-		timeout, err = time.ParseDuration(v)
+	var run *atlasexec.MigrateDown
+	for started, printed := time.Now(), false; ; {
+		run, err = a.Atlas.MigrateDown(ctx, params)
 		if err != nil {
-			return fmt.Errorf(`parsing "wait-timeout": %w`, err)
-		}
-	}
-	var (
-		run     *atlasexec.MigrateDown
-		printed bool
-	)
-	for {
-		run, err = client.MigrateDown(ctx, params)
-		if err != nil {
-			act.SetOutput("error", err.Error())
+			a.SetOutput("error", err.Error())
 			return err
 		}
 		if run.Error != "" {
-			act.SetOutput("error", run.Error)
+			a.SetOutput("error", run.Error)
 			return errors.New(run.Error)
 		}
 		// Break the loop if no wait / retry is configured.
 		if run.Status != StatePending || timeout == 0 || time.Since(started) >= timeout {
 			if timeout != 0 {
-				act.Warningf("plan has not been approved in configured waiting period, exiting")
+				a.Warningf("plan has not been approved in configured waiting period, exiting")
 			}
 			break
 		}
 		if !printed {
 			printed = true
-			act.Infof("plan approval pending, review here: %s", run.URL)
+			a.Infof("plan approval pending, review here: %s", run.URL)
 		}
 		time.Sleep(interval)
 	}
 	if run.URL != "" {
-		act.SetOutput("url", run.URL)
+		a.SetOutput("url", run.URL)
 	}
 	switch run.Status {
 	case StatePending:
@@ -276,88 +235,62 @@ func MigrateDown(ctx context.Context, client AtlasExec, act Action) (err error) 
 	case StateAborted:
 		return fmt.Errorf("plan rejected, review here: %s", run.URL)
 	case StateApplied, StateApproved:
-		act.Infof(`"atlas migrate down" completed successfully, downgraded to version %q`, run.Target)
-		act.SetOutput("current", run.Current)
-		act.SetOutput("target", run.Target)
-		act.SetOutput("planned_count", strconv.Itoa(len(run.Planned)))
-		act.SetOutput("reverted_count", strconv.Itoa(len(run.Reverted)))
+		a.Infof(`"atlas migrate down" completed successfully, downgraded to version %q`, run.Target)
+		a.SetOutput("current", run.Current)
+		a.SetOutput("target", run.Target)
+		a.SetOutput("planned_count", strconv.Itoa(len(run.Planned)))
+		a.SetOutput("reverted_count", strconv.Itoa(len(run.Reverted)))
 	}
 	return nil
 }
 
 // MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
-func MigratePush(ctx context.Context, client AtlasExec, act Action) error {
-	runContext, err := createRunContext(ctx, act)
-	if err != nil {
-		return fmt.Errorf("failed to read github metadata: %w", err)
-	}
-	var vars atlasexec.Vars2
-	if v := act.GetInput("vars"); v != "" {
-		if err := json.Unmarshal([]byte(v), &vars); err != nil {
-			return fmt.Errorf("failed to parse vars: %w", err)
-		}
-	}
+func (a *Actions) MigratePush(ctx context.Context) error {
 	params := &atlasexec.MigratePushParams{
-		Name:      act.GetInput("dir-name"),
-		DirURL:    act.GetInput("dir"),
-		DevURL:    act.GetInput("dev-url"),
-		Context:   runContext,
-		ConfigURL: act.GetInput("config"),
-		Env:       act.GetInput("env"),
-		Vars:      vars,
+		Name:      a.GetInput("dir-name"),
+		DirURL:    a.GetInput("dir"),
+		DevURL:    a.GetInput("dev-url"),
+		Context:   a.GetRunContext(ctx),
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
 	}
-	switch latest := act.GetInput("latest"); latest {
-	case "false":
-	case "true", "":
+	if a.GetBoolInput("latest") {
 		// Push the "latest" tag.
-		_, err = client.MigratePush(ctx, params)
+		_, err := a.Atlas.MigratePush(ctx, params)
 		if err != nil {
 			return fmt.Errorf("failed to push directory: %v", err)
 		}
-	default:
-		return fmt.Errorf(`invalid value for input "latest": only "true" or "false" are allowed, got %q`, latest)
 	}
-	tag := act.GetInput("tag")
-	params.Tag = runContext.Commit
-	if tag != "" {
-		params.Tag = tag
+	params.Tag = a.GetInput("tag")
+	if params.Tag == "" {
+		// If the tag is not provided, use the commit SHA.
+		params.Tag = params.Context.Commit
 	}
-	resp, err := client.MigratePush(ctx, params)
+	resp, err := a.Atlas.MigratePush(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to push dir tag: %w", err)
 	}
-	act.Infof(`"atlas migrate push" completed successfully, pushed dir %q to Atlas Cloud`, act.GetInput("dir-name"))
-	act.SetOutput("url", resp)
+	a.Infof(`"atlas migrate push" completed successfully, pushed dir %q to Atlas Cloud`, params.Name)
+	a.SetOutput("url", resp)
 	return nil
 }
 
 // MigrateLint runs the GitHub Action for "ariga/atlas-action/migrate/lint"
-func MigrateLint(ctx context.Context, client AtlasExec, act Action) error {
-	if act.GetInput("dir-name") == "" {
+func (a *Actions) MigrateLint(ctx context.Context) error {
+	dirName := a.GetInput("dir-name")
+	if dirName == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
-	runContext, err := createRunContext(ctx, act)
-	if err != nil {
-		return fmt.Errorf("failed to read github metadata: %w", err)
-	}
-	var (
-		resp    bytes.Buffer
-		payload atlasexec.SummaryReport
-		vars    atlasexec.Vars2
-	)
-	if v := act.GetInput("vars"); v != "" {
-		if err := json.Unmarshal([]byte(v), &vars); err != nil {
-			return fmt.Errorf("failed to parse vars: %w", err)
-		}
-	}
-	err = client.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
-		DevURL:    act.GetInput("dev-url"),
-		DirURL:    act.GetInput("dir"),
-		ConfigURL: act.GetInput("config"),
-		Env:       act.GetInput("env"),
-		Base:      "atlas://" + act.GetInput("dir-name"),
-		Context:   runContext,
-		Vars:      vars,
+	var resp bytes.Buffer
+	err := a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
+		DevURL:    a.GetInput("dev-url"),
+		DirURL:    a.GetInput("dir"),
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Base:      "atlas://" + dirName,
+		Context:   a.GetRunContext(ctx),
+		Vars:      a.GetVarsInput("vars"),
 		Web:       true,
 		Writer:    &resp,
 	})
@@ -365,13 +298,14 @@ func MigrateLint(ctx context.Context, client AtlasExec, act Action) error {
 	if err != nil && !isLintErr {
 		return err
 	}
+	var payload atlasexec.SummaryReport
 	if err := json.NewDecoder(&resp).Decode(&payload); err != nil {
 		return fmt.Errorf("decoding payload: %w", err)
 	}
 	if payload.URL != "" {
-		act.SetOutput("report-url", payload.URL)
+		a.SetOutput("report-url", payload.URL)
 	}
-	tctx, err := act.GetTriggerContext()
+	tctx, err := a.GetTriggerContext()
 	if err != nil {
 		return err
 	}
@@ -381,6 +315,9 @@ func MigrateLint(ctx context.Context, client AtlasExec, act Action) error {
 			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 		}
 		return nil
+	}
+	if err := addChecks(a, &payload); err != nil {
+		return err
 	}
 	ghClient := githubAPI{
 		baseURL: tctx.SCM.APIURL,
@@ -393,70 +330,139 @@ func MigrateLint(ctx context.Context, client AtlasExec, act Action) error {
 			Timeout: time.Second * 30,
 		},
 	}
-	if err := ghClient.addLintSummary(ctx, act, &payload); err != nil {
+	if err := ghClient.addLintSummary(ctx, a, &payload); err != nil {
 		return err
 	}
-	if err := addChecks(act, &payload); err != nil {
-		return err
-	}
-	if err := ghClient.addSuggestions(ctx, act, &payload); err != nil {
+	if err := ghClient.addSuggestions(ctx, a, &payload); err != nil {
 		return err
 	}
 	if isLintErr {
 		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 	}
-	act.Infof("`atlas migrate lint` completed successfully, no issues found")
+	a.Infof("`atlas migrate lint` completed successfully, no issues found")
 	return nil
 }
 
 // MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
-func MigrateTest(ctx context.Context, client AtlasExec, act Action) error {
-	var vars atlasexec.Vars2
-	if v := act.GetInput("vars"); v != "" {
-		if err := json.Unmarshal([]byte(v), &vars); err != nil {
-			return fmt.Errorf("failed to parse vars: %w", err)
-		}
-	}
-	params := &atlasexec.MigrateTestParams{
-		DirURL:    act.GetInput("dir"),
-		DevURL:    act.GetInput("dev-url"),
-		Run:       act.GetInput("run"),
-		ConfigURL: act.GetInput("config"),
-		Env:       act.GetInput("env"),
-		Vars:      vars,
-	}
-	result, err := client.MigrateTest(ctx, params)
+func (a *Actions) MigrateTest(ctx context.Context) error {
+	result, err := a.Atlas.MigrateTest(ctx, &atlasexec.MigrateTestParams{
+		DirURL:    a.GetInput("dir"),
+		DevURL:    a.GetInput("dev-url"),
+		Run:       a.GetInput("run"),
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+	})
 	if err != nil {
 		return fmt.Errorf("`atlas migrate test` completed with errors:\n%s", err)
 	}
-	act.Infof("`atlas migrate test` completed successfully, no issues found")
-	act.Infof(result)
+	a.Infof("`atlas migrate test` completed successfully, no issues found")
+	a.Infof(result)
 	return nil
 }
 
 // SchemaTest runs the GitHub Action for "ariga/atlas-action/schema/test"
-func SchemaTest(ctx context.Context, client AtlasExec, act Action) error {
-	var vars atlasexec.Vars2
-	if v := act.GetInput("vars"); v != "" {
-		if err := json.Unmarshal([]byte(v), &vars); err != nil {
-			return fmt.Errorf("failed to parse vars: %w", err)
-		}
-	}
-	params := &atlasexec.SchemaTestParams{
-		URL:       act.GetInput("url"),
-		DevURL:    act.GetInput("dev-url"),
-		Run:       act.GetInput("run"),
-		ConfigURL: act.GetInput("config"),
-		Env:       act.GetInput("env"),
-		Vars:      vars,
-	}
-	result, err := client.SchemaTest(ctx, params)
+func (a *Actions) SchemaTest(ctx context.Context) error {
+	result, err := a.Atlas.SchemaTest(ctx, &atlasexec.SchemaTestParams{
+		URL:       a.GetInput("url"),
+		DevURL:    a.GetInput("dev-url"),
+		Run:       a.GetInput("run"),
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+	})
 	if err != nil {
 		return fmt.Errorf("`atlas schema test` completed with errors:\n%s", err)
 	}
-	act.Infof("`atlas schema test` completed successfully, no issues found")
-	act.Infof(result)
+	a.Infof("`atlas schema test` completed successfully, no issues found")
+	a.Infof(result)
 	return nil
+}
+
+// GetBoolInput returns the boolean input with the given name.
+// The input should be a string representation of boolean. (e.g. "true" or "false")
+func (a *Actions) GetBoolInput(name string) bool {
+	if s := strings.TrimSpace(a.GetInput(name)); s != "" {
+		v, err := strconv.ParseBool(s)
+		if err == nil {
+			return v
+		}
+		// Exit the action if got invalid input.
+		a.Fatalf("the input %q got invalid value for boolean: %v", name, err)
+	}
+	return false
+}
+
+// GetUin64Input returns the uint64 input with the given name.
+// The input should be a string representation of uint64. (e.g. "123")
+func (a *Actions) GetUin64Input(name string) uint64 {
+	if s := strings.TrimSpace(a.GetInput(name)); s != "" {
+		v, err := strconv.ParseUint(s, 10, 64)
+		if err == nil {
+			return v
+		}
+		// Exit the action if got invalid input.
+		a.Fatalf("the input %q got invalid value for uint64: %v", name, err)
+	}
+	return 0
+}
+
+// GetDurationInput returns the duration input with the given name.
+// The input should be a string representation of time.Duration. (e.g. "1s")
+func (a *Actions) GetDurationInput(name string) time.Duration {
+	if s := strings.TrimSpace(a.GetInput(name)); s != "" {
+		v, err := time.ParseDuration(s)
+		if err == nil {
+			return v
+		}
+		// Exit the action if got invalid input.
+		a.Fatalf("the input %q got invalid value for duration: %v", name, err)
+	}
+	return 0
+}
+
+// GetVarsInput returns the vars input with the given name.
+// The input should be a JSON string.
+// Example:
+// ```yaml
+//
+//	input: |-
+//	  {
+//	    "key1": "value1",
+//	    "key2": "value2"
+//	  }
+//
+// ```
+func (a *Actions) GetVarsInput(name string) atlasexec.VarArgs {
+	if s := strings.TrimSpace(a.GetInput(name)); s != "" {
+		var v atlasexec.Vars2
+		err := json.Unmarshal([]byte(s), &v)
+		if err == nil {
+			return v
+		}
+		// Exit the action if got invalid input.
+		a.Fatalf("the input %q is not a valid JSON string: %v", name, err)
+	}
+	return nil
+}
+
+// GetRunContext returns the run context for the action.
+func (a *Actions) GetRunContext(ctx context.Context) *atlasexec.RunContext {
+	rc, err := createRunContext(ctx, a)
+	if err == nil {
+		return rc
+	}
+	// Exit the action if the context is not available.
+	a.Fatalf("failed to read github metadata: %v", err)
+	return nil
+}
+
+// DeployRunContext returns the run context for the `migrate/apply`, and `migrate/down` actions.
+func (a *Actions) DeployRunContext() *atlasexec.DeployRunContext {
+	return &atlasexec.DeployRunContext{
+		TriggerType:    a.GetType(),
+		TriggerVersion: Version,
+	}
 }
 
 // Returns true if the summary report has diagnostics or errors.

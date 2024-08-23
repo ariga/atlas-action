@@ -19,10 +19,10 @@ func TestRunAction_Run(t *testing.T) {
 	act := atlasaction.NewGHAction()
 
 	t.Run("fake", func(t *testing.T) {
-		r := &RunAction{
+		r := &RunActionCmd{
 			Action: "fake",
 		}
-		err := r.Run(context.Background(), client, act)
+		err := r.Run(context.Background(), &atlasaction.Actions{Action: act, Atlas: client})
 		require.EqualError(t, err, "unknown action: fake")
 	})
 }

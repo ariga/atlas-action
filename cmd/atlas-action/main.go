@@ -26,26 +26,24 @@ const (
 	CmdSchemaTest = "schema/test"
 )
 
-var cli RunAction
-
 func main() {
 	action, err := newAction()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to run action in the current environment: %s\n", err)
 		os.Exit(1)
 	}
-	c, err := atlasexec.NewClient("", "atlas")
+	atlas, err := atlasexec.NewClient("", "atlas")
 	if err != nil {
 		action.Fatalf("Failed to create client: %s", err)
 	}
-	ctx := context.Background()
 	cli := kong.Parse(
-		&cli,
-		kong.BindTo(ctx, (*context.Context)(nil)),
-		kong.Bind(c),
-		kong.BindTo(action, (*atlasaction.Action)(nil)),
+		&RunActionCmd{},
+		kong.BindTo(context.Background(), (*context.Context)(nil)),
 	)
-	if err := cli.Run(); err != nil {
+	if err := cli.Run(&atlasaction.Actions{
+		Action: action,
+		Atlas:  atlas,
+	}); err != nil {
 		if uerr := errors.Unwrap(err); uerr != nil {
 			err = uerr
 		}
@@ -63,37 +61,38 @@ func (v VersionFlag) BeforeReset(app *kong.Kong) error {
 	return err
 }
 
-// RunAction is a command to run one of the Atlas GitHub Actions.
-type RunAction struct {
+// RunActionCmd is a command to run one of the Atlas GitHub Actions.
+type RunActionCmd struct {
 	Action  string      `help:"Command to run" required:""`
 	Version VersionFlag `help:"Prints the version and exits"`
 }
 
-func (r *RunAction) Run(ctx context.Context, client *atlasexec.Client, action atlasaction.Action) error {
+func (r *RunActionCmd) Run(ctx context.Context, a *atlasaction.Actions) error {
 	_ = os.Setenv("ATLAS_ACTION_COMMAND", r.Action)
 	defer func() {
 		_ = os.Unsetenv("ATLAS_ACTION_COMMAND")
 	}()
-	if action.GetInput("working-directory") != "" {
-		if err := os.Chdir(action.GetInput("working-directory")); err != nil {
+	if a.GetInput("working-directory") != "" {
+		if err := os.Chdir(a.GetInput("working-directory")); err != nil {
 			return fmt.Errorf("failed to change working directory: %w", err)
 		}
 	}
 	switch r.Action {
 	case CmdMigrateApply:
-		return atlasaction.MigrateApply(ctx, client, action)
+		return a.MigrateApply(ctx)
 	case CmdMigrateDown:
-		return atlasaction.MigrateDown(ctx, client, action)
+		return a.MigrateDown(ctx)
 	case CmdMigratePush:
-		return atlasaction.MigratePush(ctx, client, action)
+		return a.MigratePush(ctx)
 	case CmdMigrateLint:
-		return atlasaction.MigrateLint(ctx, client, action)
+		return a.MigrateLint(ctx)
 	case CmdMigrateTest:
-		return atlasaction.MigrateTest(ctx, client, action)
+		return a.MigrateTest(ctx)
 	case CmdSchemaTest:
-		return atlasaction.SchemaTest(ctx, client, action)
+		return a.SchemaTest(ctx)
+	default:
+		return fmt.Errorf("unknown action: %s", r.Action)
 	}
-	return fmt.Errorf("unknown action: %s", r.Action)
 }
 
 // newAction creates a new atlasaction.Action based on the environment.
