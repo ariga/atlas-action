@@ -237,11 +237,15 @@ func (a *Actions) MigrateDown(ctx context.Context) (err error) {
 
 // MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
 func (a *Actions) MigratePush(ctx context.Context) error {
+	tc, err := a.GetTriggerContext()
+	if err != nil {
+		return err
+	}
 	params := &atlasexec.MigratePushParams{
 		Name:      a.GetInput("dir-name"),
 		DirURL:    a.GetInput("dir"),
 		DevURL:    a.GetInput("dev-url"),
-		Context:   a.GetRunContext(ctx),
+		Context:   a.GetRunContext(ctx, tc),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
@@ -273,14 +277,18 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if dirName == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
+	tc, err := a.GetTriggerContext()
+	if err != nil {
+		return err
+	}
 	var resp bytes.Buffer
-	err := a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
+	err = a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
 		DevURL:    a.GetInput("dev-url"),
 		DirURL:    a.GetInput("dir"),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Base:      "atlas://" + dirName,
-		Context:   a.GetRunContext(ctx),
+		Context:   a.GetRunContext(ctx, tc),
 		Vars:      a.GetVarsInput("vars"),
 		Web:       true,
 		Writer:    &resp,
@@ -296,9 +304,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if payload.URL != "" {
 		a.SetOutput("report-url", payload.URL)
 	}
-	switch tc, err := a.GetTriggerContext(); {
-	case err != nil:
-		return err
+	switch {
 	case tc.PullRequest == nil && isLintErr:
 		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 	case tc.PullRequest == nil:
@@ -427,14 +433,30 @@ func (a *Actions) GetVarsInput(name string) atlasexec.VarArgs {
 }
 
 // GetRunContext returns the run context for the action.
-func (a *Actions) GetRunContext(ctx context.Context) *atlasexec.RunContext {
-	rc, err := createRunContext(ctx, a)
-	if err == nil {
-		return rc
+func (a *Actions) GetRunContext(ctx context.Context, tc *TriggerContext) *atlasexec.RunContext {
+	// TODO: Add support for other action runtime contexts.
+	var actor struct {
+		Name string `env:"GITHUB_ACTOR"`
+		ID   string `env:"GITHUB_ACTOR_ID"`
 	}
-	// Exit the action if the context is not available.
-	a.Fatalf("failed to read github metadata: %v", err)
-	return nil
+	if err := envconfig.Process(ctx, &actor); err != nil {
+		a.Fatalf("failed to load actor: %v", err)
+		return nil
+	}
+	url := tc.RepoURL
+	if tc.PullRequest != nil {
+		url = tc.PullRequest.URL
+	}
+	return &atlasexec.RunContext{
+		Repo:     tc.Repo,
+		Branch:   tc.Branch,
+		Commit:   tc.Commit,
+		Path:     a.GetInput("dir"),
+		URL:      url,
+		Username: actor.Name,
+		UserID:   actor.ID,
+		SCMType:  string(tc.SCM.Provider),
+	}
 }
 
 // DeployRunContext returns the run context for the `migrate/apply`, and `migrate/down` actions.
@@ -987,37 +1009,6 @@ func (g *githubAPI) ownerRepo() (string, string, error) {
 		return "", "", fmt.Errorf("GITHUB_REPOSITORY must be in the format of 'owner/repo'")
 	}
 	return s[0], s[1], nil
-}
-
-// Actor Information about the actor that triggered the action.
-type Actor struct {
-	Name string `env:"GITHUB_ACTOR"`
-	ID   string `env:"GITHUB_ACTOR_ID"`
-}
-
-func createRunContext(ctx context.Context, act Action) (*atlasexec.RunContext, error) {
-	tctx, err := act.GetTriggerContext()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load action context: %w", err)
-	}
-	var a Actor
-	if err := envconfig.Process(ctx, &a); err != nil {
-		return nil, fmt.Errorf("failed to load actor: %w", err)
-	}
-	url := tctx.RepoURL
-	if tctx.PullRequest != nil {
-		url = tctx.PullRequest.URL
-	}
-	return &atlasexec.RunContext{
-		Repo:     tctx.Repo,
-		Branch:   tctx.Branch,
-		Commit:   tctx.Commit,
-		Path:     act.GetInput("dir"),
-		URL:      url,
-		Username: a.Name,
-		UserID:   a.ID,
-		SCMType:  string(tctx.SCM.Provider),
-	}, nil
 }
 
 // commentMarker creates a hidden marker to identify the comment as one created by this action.
