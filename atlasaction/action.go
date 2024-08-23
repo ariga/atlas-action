@@ -718,6 +718,8 @@ type (
 	}
 )
 
+const defaultGHApiUrl = "https://api.github.com"
+
 // RoundTrip implements http.RoundTripper.
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Add("Accept", "application/vnd.github+json")
@@ -932,6 +934,59 @@ func (g *githubAPI) listPullRequestFiles(ctx context.Context, pr *PullRequest) (
 		paths[i] = files[i].Name
 	}
 	return paths, nil
+}
+
+// openingPullRequest returns the latest open pull request for the given branch.
+func (g *githubAPI) openingPullRequest(ctx context.Context, branch string) (*PullRequest, error) {
+	owner, _, err := g.ownerRepo()
+	if err != nil {
+		return nil, err
+	}
+	// Get open pull requests for the branch.
+	url := fmt.Sprintf("%s/repos/%s/pulls?state=open&head=%s:%s&sort=created&direction=desc&per_page=1&page=1",
+		g.baseURL, g.repo, owner, branch)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := g.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling GitHub API: %w", err)
+	}
+	defer res.Body.Close()
+	switch buf, err := io.ReadAll(res.Body); {
+	case err != nil:
+		return nil, fmt.Errorf("error reading open pull requests: %w", err)
+	case res.StatusCode != http.StatusOK:
+		return nil, fmt.Errorf("unexpected status code: %d when calling GitHub API", res.StatusCode)
+	default:
+		var resp []struct {
+			Url    string `json:"url"`
+			Number int    `json:"number"`
+			Head   struct {
+				Sha string `json:"sha"`
+			} `json:"head"`
+		}
+		if err = json.Unmarshal(buf, &resp); err != nil {
+			return nil, err
+		}
+		if len(resp) == 0 {
+			return nil, nil
+		}
+		return &PullRequest{
+			Number: resp[0].Number,
+			URL:    resp[0].Url,
+			Commit: resp[0].Head.Sha,
+		}, nil
+	}
+}
+
+func (g *githubAPI) ownerRepo() (string, string, error) {
+	s := strings.Split(g.repo, "/")
+	if len(s) != 2 {
+		return "", "", fmt.Errorf("GITHUB_REPOSITORY must be in the format of 'owner/repo'")
+	}
+	return s[0], s[1], nil
 }
 
 // Actor Information about the actor that triggered the action.

@@ -38,7 +38,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 		]`))
 	}))
 	defer server.Close()
-	defaultGHApiUrl = server.URL
+	t.Setenv("GITHUB_API_URL", server.URL)
 	ctx, err = orb.GetTriggerContext()
 	require.NoError(t, err)
 	require.Equal(t, &PullRequest{

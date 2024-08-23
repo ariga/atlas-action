@@ -1,7 +1,7 @@
 package atlasaction
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,15 +12,12 @@ import (
 	"ariga.io/atlas-go-sdk/atlasexec"
 )
 
-var (
-	defaultGHApiUrl        = "https://api.github.com"
-	_               Action = (*circleCIOrb)(nil)
-)
-
 // circleciOrb is an implementation of the Action interface for GitHub Actions.
 type circleCIOrb struct {
 	w io.Writer
 }
+
+var _ Action = (*circleCIOrb)(nil)
 
 // New returns a new Action for GitHub Actions.
 func NewCircleCIOrb() Action {
@@ -61,15 +58,19 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		return nil, fmt.Errorf("missing CIRCLE_SHA1 environment variable")
 	}
 	// Detect SCM provider based on Token.
-	switch {
-	case os.Getenv("GITHUB_TOKEN") != "":
-		ctx.SCM.Provider = ProviderGithub
-		ctx.SCM.APIURL = defaultGHApiUrl
+	switch ghToken := os.Getenv("GITHUB_TOKEN"); {
+	case ghToken != "":
+		ctx.SCM = SCM{
+			Provider: ProviderGithub,
+			APIURL:   defaultGHApiUrl,
+		}
+		if v := os.Getenv("GITHUB_API_URL"); v != "" {
+			ctx.SCM.APIURL = v
+		}
 		// Used to change the location that the linting results are posted to.
 		// If GITHUB_REPOSITORY is not set, we default to the CIRCLE_PROJECT_REPONAME repo.
-		ghRepo := os.Getenv("GITHUB_REPOSITORY")
-		if ghRepo != "" {
-			ctx.Repo = ghRepo
+		if v := os.Getenv("GITHUB_REPOSITORY"); v != "" {
+			ctx.Repo = v
 		}
 		// CIRCLE_REPOSITORY_URL will be empty for some reason, causing ctx.RepoURL to be empty.
 		// In this case, we default to the GitHub Cloud URL.
@@ -87,8 +88,16 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 			return ctx, nil
 		}
 		// get open pull requests for the branch.
+		c := &githubAPI{
+			client: &http.Client{
+				Timeout:   time.Second * 30,
+				Transport: &roundTripper{authToken: ghToken},
+			},
+			baseURL: ctx.SCM.APIURL,
+			repo:    ctx.Repo,
+		}
 		var err error
-		ctx.PullRequest, err = getGHPR(ctx.Repo, ctx.Branch)
+		ctx.PullRequest, err = c.openingPullRequest(context.Background(), ctx.Branch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
 		}
@@ -129,59 +138,4 @@ func (a *circleCIOrb) WithFieldsMap(map[string]string) Logger {
 // AddStepSummary implements the Action interface.
 func (a *circleCIOrb) AddStepSummary(summary string) {
 	// unsupported
-}
-
-// getGHPR gets the newest open pull request for the branch.
-func getGHPR(repo, branch string) (*PullRequest, error) {
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		return nil, fmt.Errorf("missing GITHUB_TOKEN environment variable")
-	}
-	client := &http.Client{
-		Transport: &roundTripper{
-			authToken: token,
-		},
-		Timeout: time.Second * 30,
-	}
-	// Extract owner and repo from the GITHUB_REPOSITORY.
-	s := strings.Split(repo, "/")
-	if len(s) != 2 {
-		return nil, fmt.Errorf("GITHUB_REPOSITORY must be in the format of 'owner/repo'")
-	}
-	// Get open pull requests for the branch.
-	head := fmt.Sprintf("%s:%s", s[0], branch)
-	req, err := client.Get(
-		fmt.Sprintf("%s/repos/%s/pulls?state=open&head=%s&sort=created&direction=desc&per_page=1&page=1",
-			defaultGHApiUrl,
-			repo,
-			head))
-	if err != nil {
-		return nil, err
-	}
-	defer req.Body.Close()
-	buf, err := io.ReadAll(req.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading open pull requests: %w", err)
-	}
-	if req.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d when calling GitHub API", req.StatusCode)
-	}
-	var resp []struct {
-		Url    string `json:"url"`
-		Number int    `json:"number"`
-		Head   struct {
-			Sha string `json:"sha"`
-		} `json:"head"`
-	}
-	if err = json.Unmarshal(buf, &resp); err != nil {
-		return nil, err
-	}
-	if len(resp) == 0 {
-		return nil, nil
-	}
-	return &PullRequest{
-		Number: resp[0].Number,
-		URL:    resp[0].Url,
-		Commit: resp[0].Head.Sha,
-	}, nil
 }
