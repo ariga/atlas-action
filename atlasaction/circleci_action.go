@@ -97,7 +97,7 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 			repo:    ctx.Repo,
 		}
 		var err error
-		ctx.PullRequest, err = c.openingPullRequest(context.Background(), ctx.Branch)
+		ctx.PullRequest, err = c.OpeningPullRequest(context.Background(), ctx.Branch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
 		}
