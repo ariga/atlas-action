@@ -146,14 +146,12 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 	if len(runs) == 0 {
 		return nil
 	}
-	tc, err := a.GetTriggerContext()
-	if err != nil {
-		return err
-	}
-	c := a.GithubClient(tc.Repo, tc.SCM.APIURL)
 	for _, run := range runs {
-		if err := c.addApplySummary(a, run); err != nil {
-			return err
+		switch summary, err := migrateApplyComment(run); {
+		case err != nil:
+			a.Errorf("failed to create summary: %v", err)
+		default:
+			a.AddStepSummary(summary)
 		}
 		if run.Error != "" {
 			a.SetOutput("error", run.Error)
@@ -552,16 +550,6 @@ var (
 			ParseFS(comments, "comments/*.tmpl"),
 	)
 )
-
-// addApplySummary to workflow run.
-func (g *githubAPI) addApplySummary(act Action, payload *atlasexec.MigrateApply) error {
-	summary, err := migrateApplyComment(payload)
-	if err != nil {
-		return err
-	}
-	act.AddStepSummary(summary)
-	return nil
-}
 
 func migrateApplyComment(d *atlasexec.MigrateApply) (string, error) {
 	var buf bytes.Buffer
