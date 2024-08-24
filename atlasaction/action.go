@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
-	"ariga.io/atlas/sql/sqlcheck"
 	"github.com/sethvargo/go-envconfig"
 )
 
@@ -302,22 +301,39 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if payload.URL != "" {
 		a.SetOutput("report-url", payload.URL)
 	}
+	if err := a.addChecks(&payload); err != nil {
+		return err
+	}
+	summary, err := migrateLintComment(&payload)
+	if err != nil {
+		return err
+	}
+	a.AddStepSummary(summary)
 	switch {
 	case tc.PullRequest == nil && isLintErr:
 		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 	case tc.PullRequest == nil:
 		return nil
-	// In case of a pull request, we need to add checks and comments to the PR.
+	// In case of a pull request, we need to add comments and suggestion to the PR.
 	default:
-		if err := addChecks(a, &payload); err != nil {
-			return err
-		}
 		c := a.GithubClient(tc.Repo, tc.SCM.APIURL)
-		if err = c.addLintSummary(ctx, tc.PullRequest, a, &payload); err != nil {
-			return err
+		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
+			a.Errorf("failed to comment on the pull request: %v", err)
 		}
-		if err = c.addSuggestions(ctx, tc.PullRequest, a, &payload); err != nil {
-			return err
+		switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest); {
+		case err != nil:
+			a.Errorf("failed to list pull request files: %w", err)
+		default:
+			err = a.addSuggestions(&payload, func(s *Suggestion) error {
+				// Add suggestion only if the file is part of the pull request.
+				if slices.Contains(files, s.Path) {
+					return c.UpsertSuggestion(ctx, tc.PullRequest, s)
+				}
+				return nil
+			})
+			if err != nil {
+				a.Errorf("failed to add suggestion on the pull request: %v", err)
+			}
 		}
 		if isLintErr {
 			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
@@ -361,6 +377,11 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 	a.Infof("`atlas schema test` completed successfully, no issues found")
 	a.Infof(result)
 	return nil
+}
+
+// WorkingDir returns the working directory for the action.
+func (a *Actions) WorkingDir() string {
+	return a.GetInput("working-directory")
 }
 
 // GetBoolInput returns the boolean input with the given name.
@@ -484,6 +505,116 @@ func (a *Actions) GithubClient(repo, baseURL string) *githubAPI {
 	}
 }
 
+// addChecks runs annotations to the trigger event pull request for the given payload.
+func (a *Actions) addChecks(lint *atlasexec.SummaryReport) error {
+	// Get the directory path from the lint report.
+	dir := path.Join(a.WorkingDir(), lint.Env.Dir)
+	for _, file := range lint.Files {
+		filePath := path.Join(dir, file.Name)
+		if file.Error != "" && len(file.Reports) == 0 {
+			a.WithFieldsMap(map[string]string{
+				"file": filePath,
+				"line": "1",
+			}).Errorf(file.Error)
+			continue
+		}
+		for _, report := range file.Reports {
+			for _, diag := range report.Diagnostics {
+				msg := diag.Text
+				if diag.Code != "" {
+					msg = fmt.Sprintf("%v (%v)\n\nDetails: https://atlasgo.io/lint/analyzers#%v", msg, diag.Code, diag.Code)
+				}
+				lines := strings.Split(file.Text[:diag.Pos], "\n")
+				logger := a.WithFieldsMap(map[string]string{
+					"file":  filePath,
+					"line":  strconv.Itoa(max(1, len(lines))),
+					"title": report.Text,
+				})
+				if file.Error != "" {
+					logger.Errorf(msg)
+				} else {
+					logger.Warningf(msg)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+type Suggestion struct {
+	ID        string // Unique identifier for the suggestion.
+	Path      string // File path.
+	StartLine int    // Start line numbers for the suggestion.
+	Line      int    // End line number for the suggestion.
+	Comment   string // Comment body.
+}
+
+// addSuggestions returns the suggestions from the lint report.
+func (a *Actions) addSuggestions(lint *atlasexec.SummaryReport, fn func(*Suggestion) error) (err error) {
+	if !slices.ContainsFunc(lint.Files, func(f *atlasexec.FileReport) bool {
+		return len(f.Reports) > 0
+	}) {
+		// No reports to add suggestions.
+		return nil
+	}
+	dir := a.WorkingDir()
+	for _, file := range lint.Files {
+		filePath := path.Join(dir, lint.Env.Dir, file.Name)
+		for reportIdx, report := range file.Reports {
+			for _, f := range report.SuggestedFixes {
+				if f.TextEdit == nil {
+					continue
+				}
+				s := Suggestion{Path: filePath, ID: f.Message}
+				if f.TextEdit.End <= f.TextEdit.Line {
+					s.Line = f.TextEdit.Line
+				} else {
+					s.StartLine = f.TextEdit.Line
+					s.Line = f.TextEdit.End
+				}
+				s.Comment, err = renderTemplate("suggestion.tmpl", map[string]any{
+					"Fix": f,
+					"Dir": lint.Env.Dir,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to render suggestion: %w", err)
+				}
+				if err = fn(&s); err != nil {
+					return fmt.Errorf("failed to process suggestion: %w", err)
+				}
+			}
+			for diagIdx, d := range report.Diagnostics {
+				for _, f := range d.SuggestedFixes {
+					if f.TextEdit == nil {
+						continue
+					}
+					s := Suggestion{Path: filePath, ID: f.Message}
+					if f.TextEdit.End <= f.TextEdit.Line {
+						s.Line = f.TextEdit.Line
+					} else {
+						s.StartLine = f.TextEdit.Line
+						s.Line = f.TextEdit.End
+					}
+					s.Comment, err = renderTemplate("suggestion.tmpl", map[string]any{
+						"Fix":    f,
+						"Dir":    lint.Env.Dir,
+						"File":   file,
+						"Report": reportIdx,
+						"Diag":   diagIdx,
+					})
+					if err != nil {
+						return fmt.Errorf("failed to render suggestion: %w", err)
+					}
+					if err = fn(&s); err != nil {
+						return fmt.Errorf("failed to process suggestion: %w", err)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // Returns true if the summary report has diagnostics or errors.
 func hasComments(s *atlasexec.SummaryReport) bool {
 	for _, f := range s.Files {
@@ -551,150 +682,21 @@ var (
 	)
 )
 
-func migrateApplyComment(d *atlasexec.MigrateApply) (string, error) {
+// renderTemplate renders the given template with the data.
+func renderTemplate(name string, data any) (string, error) {
 	var buf bytes.Buffer
-	if err := commentsTmpl.ExecuteTemplate(&buf, "migrate-apply.tmpl", &d); err != nil {
+	if err := commentsTmpl.ExecuteTemplate(&buf, name, data); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
 }
 
-// addLintSummary writes a summary to the pull request. It adds a marker
-// HTML comment to the end of the comment body to identify the comment as one created by
-// this action.
-func (g *githubAPI) addLintSummary(ctx context.Context, pr *PullRequest, act Action, payload *atlasexec.SummaryReport) error {
-	summary, err := migrateLintComment(payload)
-	if err != nil {
-		return err
-	}
-	act.AddStepSummary(summary)
-	if pr == nil || pr.Number == 0 {
-		return nil
-	}
-	if err = g.upsertComment(ctx, pr, act.GetInput("dir-name"), summary); err != nil {
-		act.Errorf("failed to comment on the pull request: %v", err)
-	}
-	return nil
+func migrateApplyComment(d *atlasexec.MigrateApply) (string, error) {
+	return renderTemplate("migrate-apply.tmpl", d)
 }
 
 func migrateLintComment(d *atlasexec.SummaryReport) (string, error) {
-	var buf bytes.Buffer
-	if err := commentsTmpl.ExecuteTemplate(&buf, "migrate-lint.tmpl", &d); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
-
-func (g *githubAPI) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
-	comments, err := g.getIssueComments(ctx, pr)
-	if err != nil {
-		return err
-	}
-	var (
-		marker = commentMarker(id)
-		body   = strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment+"\n"+marker))
-	)
-	if found := slices.IndexFunc(comments, func(c githubIssueComment) bool {
-		return strings.Contains(c.Body, marker)
-	}); found != -1 {
-		return g.updateIssueComment(ctx, comments[found].ID, body)
-	}
-	return g.createIssueComment(ctx, pr, body)
-}
-
-// addChecks runs annotations to the trigger event pull request for the given payload.
-func addChecks(act Action, payload *atlasexec.SummaryReport) error {
-	dir := path.Join(act.GetInput("working-directory"), payload.Env.Dir)
-	for _, file := range payload.Files {
-		filePath := path.Join(dir, file.Name)
-		if file.Error != "" && len(file.Reports) == 0 {
-			act.WithFieldsMap(map[string]string{
-				"file": filePath,
-				"line": "1",
-			}).Errorf(file.Error)
-			continue
-		}
-		for _, report := range file.Reports {
-			for _, diag := range report.Diagnostics {
-				msg := diag.Text
-				if diag.Code != "" {
-					msg = fmt.Sprintf("%v (%v)\n\nDetails: https://atlasgo.io/lint/analyzers#%v", msg, diag.Code, diag.Code)
-				}
-				lines := strings.Split(file.Text[:diag.Pos], "\n")
-				logger := act.WithFieldsMap(map[string]string{
-					"file":  filePath,
-					"line":  strconv.Itoa(max(1, len(lines))),
-					"title": report.Text,
-				})
-				if file.Error != "" {
-					logger.Errorf(msg)
-				} else {
-					logger.Warningf(msg)
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// addSuggestions comments on the trigger event pull request for the given payload.
-func (g *githubAPI) addSuggestions(ctx context.Context, pr *PullRequest, act Action, payload *atlasexec.SummaryReport) error {
-	hasReport := false
-	for _, f := range payload.Files {
-		if len(f.Reports) > 0 {
-			hasReport = true
-			break
-		}
-	}
-	if !hasReport {
-		return nil
-	}
-	changedFiles, err := g.listPullRequestFiles(ctx, pr)
-	if err != nil {
-		act.Errorf("failed to list pull request files: %v", err)
-		return nil
-	}
-	for _, file := range payload.Files {
-		// Sending suggestions only for the files that are part of the PR.
-		filePath := path.Join(act.GetInput("working-directory"), payload.Env.Dir, file.Name)
-		if !slices.Contains(changedFiles, filePath) {
-			continue
-		}
-		for _, report := range file.Reports {
-			for _, s := range report.SuggestedFixes {
-				if s.TextEdit == nil {
-					continue
-				}
-				footer := fmt.Sprintf("Ensure to run `atlas migrate hash --dir \"file://%s\"` after applying the suggested changes.", payload.Env.Dir)
-				body := fmt.Sprintf("%s\n```suggestion\n%s\n```\n%s", s.Message, s.TextEdit.NewText, footer)
-				if err := g.upsertSuggestion(ctx, pr, filePath, body, s); err != nil {
-					act.Errorf("failed to add suggestion: %v", err)
-				}
-			}
-			for _, d := range report.Diagnostics {
-				for _, s := range d.SuggestedFixes {
-					if s.TextEdit == nil {
-						continue
-					}
-					severity := "WARNING"
-					if file.Error != "" {
-						severity = "CAUTION"
-					}
-					title := fmt.Sprintf("> [!%s]\n> **%s**\n> %s",
-						severity, report.Text, d.Text)
-					if d.Code != "" {
-						title = fmt.Sprintf("%v [%v](https://atlasgo.io/lint/analyzers#%v)\n", title, d.Code, d.Code)
-					}
-					footer := fmt.Sprintf("Ensure to run `atlas migrate hash --dir \"file://%s\"` after applying the suggested changes.", payload.Env.Dir)
-					body := fmt.Sprintf("%s\n%s\n```suggestion\n%s\n```\n%s", title, s.Message, s.TextEdit.NewText, footer)
-					if err := g.upsertSuggestion(ctx, pr, filePath, body, s); err != nil {
-						act.Errorf("failed to upsert suggestion: %v", err)
-					}
-				}
-			}
-		}
-	}
-	return nil
+	return renderTemplate("migrate-lint.tmpl", d)
 }
 
 type (
@@ -736,6 +738,23 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Add("Authorization", "Bearer "+r.authToken)
 	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
 	return http.DefaultTransport.RoundTrip(req)
+}
+
+func (g *githubAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	comments, err := g.getIssueComments(ctx, pr)
+	if err != nil {
+		return err
+	}
+	var (
+		marker = commentMarker(id)
+		body   = strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment+"\n"+marker))
+	)
+	if found := slices.IndexFunc(comments, func(c githubIssueComment) bool {
+		return strings.Contains(c.Body, marker)
+	}); found != -1 {
+		return g.updateIssueComment(ctx, comments[found].ID, body)
+	}
+	return g.createIssueComment(ctx, pr, body)
 }
 
 func (g *githubAPI) getIssueComments(ctx context.Context, pr *PullRequest) ([]githubIssueComment, error) {
@@ -806,10 +825,11 @@ func (g *githubAPI) updateIssueComment(ctx context.Context, id int, content io.R
 	return err
 }
 
-// upsertSuggestion creates or updates a suggestion review comment on trigger event pull request.
-func (g *githubAPI) upsertSuggestion(ctx context.Context, pr *PullRequest, filePath, body string, suggestion sqlcheck.SuggestedFix) error {
-	marker := commentMarker(suggestion.Message)
-	body = fmt.Sprintf("%s\n%s", body, marker)
+// UpsertSuggestion creates or updates a suggestion review comment on trigger event pull request.
+func (g *githubAPI) UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
+	marker := commentMarker(s.ID)
+	body := fmt.Sprintf("%s\n%s", s.Comment, marker)
+	// TODO: Listing the comments only once and updating the comment in the same call.
 	comments, err := g.listReviewComments(ctx, pr)
 	if err != nil {
 		return err
@@ -818,7 +838,7 @@ func (g *githubAPI) upsertSuggestion(ctx context.Context, pr *PullRequest, fileP
 	// If found, update the comment with the new suggestion.
 	// If not found, create a new suggestion comment.
 	found := slices.IndexFunc(comments, func(c pullRequestComment) bool {
-		return c.Path == filePath && strings.Contains(c.Body, marker)
+		return c.Path == s.Path && strings.Contains(c.Body, marker)
 	})
 	if found != -1 {
 		if err := g.updateReviewComment(ctx, comments[found].ID, body); err != nil {
@@ -826,18 +846,13 @@ func (g *githubAPI) upsertSuggestion(ctx context.Context, pr *PullRequest, fileP
 		}
 		return nil
 	}
-	prComment := pullRequestComment{
-		Body:     body,
-		Path:     filePath,
-		CommitID: pr.Commit,
-	}
-	if suggestion.TextEdit.End <= suggestion.TextEdit.Line {
-		prComment.Line = suggestion.TextEdit.Line
-	} else {
-		prComment.StartLine = suggestion.TextEdit.Line
-		prComment.Line = suggestion.TextEdit.End
-	}
-	buf, err := json.Marshal(prComment)
+	buf, err := json.Marshal(pullRequestComment{
+		Body:      body,
+		Path:      s.Path,
+		CommitID:  pr.Commit,
+		Line:      s.Line,
+		StartLine: s.StartLine,
+	})
 	if err != nil {
 		return err
 	}
@@ -916,8 +931,8 @@ func (g *githubAPI) updateReviewComment(ctx context.Context, id int, body string
 	return err
 }
 
-// listPullRequestFiles return paths of the files in the trigger event pull request.
-func (g *githubAPI) listPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error) {
+// ListPullRequestFiles return paths of the files in the trigger event pull request.
+func (g *githubAPI) ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error) {
 	url := fmt.Sprintf("%v/repos/%v/pulls/%v/files", g.baseURL, g.repo, pr.Number)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -946,8 +961,8 @@ func (g *githubAPI) listPullRequestFiles(ctx context.Context, pr *PullRequest) (
 	return paths, nil
 }
 
-// openingPullRequest returns the latest open pull request for the given branch.
-func (g *githubAPI) openingPullRequest(ctx context.Context, branch string) (*PullRequest, error) {
+// OpeningPullRequest returns the latest open pull request for the given branch.
+func (g *githubAPI) OpeningPullRequest(ctx context.Context, branch string) (*PullRequest, error) {
 	owner, _, err := g.ownerRepo()
 	if err != nil {
 		return nil, err

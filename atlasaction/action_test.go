@@ -992,9 +992,9 @@ func TestMigrateLint(t *testing.T) {
 		require.ErrorContains(t, err, "`atlas migrate lint` completed with errors, see report: https://migration-lint-report-url")
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		// Check there is no summary file created in case of non-pull request event
-		require.Empty(t, string(c))
-		require.Empty(t, tt.out.String())
+		// The summary should be create for push event
+		require.NotEmpty(t, string(c))
+		require.NotEmpty(t, tt.out.String())
 	})
 	t.Run("lint summary - with diagnostics file not included in the pull request", func(t *testing.T) {
 		tt := newT(t)
@@ -1148,7 +1148,7 @@ func TestMigrateLint(t *testing.T) {
 		// Run Lint while expecting no errors
 		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, 2, len(ghPayloads))
+		require.Equal(t, 3, len(ghPayloads))
 		found := slices.IndexFunc(ghPayloads, func(gh ghPayload) bool {
 			if gh.Method != http.MethodPost {
 				return false
@@ -1163,7 +1163,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dir", "file://testdata/migrations_destructive")
 		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
-		require.Equal(t, 7, len(ghPayloads))
+		require.Equal(t, 8, len(ghPayloads))
 		found = slices.IndexFunc(ghPayloads, func(gh ghPayload) bool {
 			if gh.Method != http.MethodPost {
 				return false
@@ -1178,7 +1178,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dir-name", "other-dir-slug")
 		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
-		require.Equal(t, 12, len(ghPayloads))
+		require.Equal(t, 13, len(ghPayloads))
 		found = slices.IndexFunc(ghPayloads, func(gh ghPayload) bool {
 			if gh.Method != http.MethodPatch {
 				return false
@@ -1192,7 +1192,7 @@ func TestMigrateLint(t *testing.T) {
 		// Run Lint with input errors, no calls to github api should be made
 		tt.setInput("dir-name", "fake-dir-name")
 		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
-		require.Equal(t, 12, len(ghPayloads))
+		require.Equal(t, 13, len(ghPayloads))
 		require.ErrorContains(t, err, `dir "fake-dir-name" not found`)
 	})
 }

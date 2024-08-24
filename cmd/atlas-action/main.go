@@ -72,8 +72,9 @@ func (r *RunActionCmd) Run(ctx context.Context, a *atlasaction.Actions) error {
 	defer func() {
 		_ = os.Unsetenv("ATLAS_ACTION_COMMAND")
 	}()
-	if a.GetInput("working-directory") != "" {
-		if err := os.Chdir(a.GetInput("working-directory")); err != nil {
+	// Set the working directory if provided.
+	if dir := a.WorkingDir(); dir != "" {
+		if err := os.Chdir(dir); err != nil {
 			return fmt.Errorf("failed to change working directory: %w", err)
 		}
 	}

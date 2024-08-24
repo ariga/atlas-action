@@ -1,0 +1,12 @@
+{{- with .File -}}
+{{- $report := index .Reports $.Report -}}
+> [!{{- if .Error }}CAUTION{{ else }}WARNING{{ end }}]
+> **{{ $report.Text }}**
+{{- $diag := index $report.Diagnostics $.Diag }}
+> {{ $diag.Text }}{{- if $diag.Code }} [{{ $diag.Code }}](https://atlasgo.io/lint/analyzers#{{ $diag.Code }}){{- end }}
+{{ end }}
+{{ .Fix.Message }}
+```suggestion
+{{ .Fix.TextEdit.NewText }}
+```
+Ensure to run `atlas migrate hash --dir "file://{{ .Dir }}"` after applying the suggested changes.
