@@ -278,8 +278,11 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var resp bytes.Buffer
-	err = a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
+	var (
+		resp      bytes.Buffer
+		isLintErr bool
+	)
+	switch err := a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
 		DevURL:    a.GetInput("dev-url"),
 		DirURL:    a.GetInput("dir"),
 		ConfigURL: a.GetInput("config"),
@@ -289,10 +292,11 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		Vars:      a.GetVarsInput("vars"),
 		Web:       true,
 		Writer:    &resp,
-	})
-	isLintErr := err != nil && errors.Is(err, atlasexec.ErrLint)
-	if err != nil && !isLintErr {
-		return err
+	}); {
+	case errors.Is(err, atlasexec.ErrLint):
+		isLintErr = true
+	case err != nil:
+		return err // Non-lint error.
 	}
 	var payload atlasexec.SummaryReport
 	if err := json.NewDecoder(&resp).Decode(&payload); err != nil {
