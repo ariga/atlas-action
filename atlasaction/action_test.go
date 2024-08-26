@@ -1228,7 +1228,8 @@ func TestLintTemplateGeneration(t *testing.T) {
 				Files: []*atlasexec.FileReport{{Name: "20230925192914.sql"}},
 			},
 			// language=html
-			expected: `<table>
+			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
+<table>
     <thead>
         <tr>
             <th>Status</th>
@@ -1342,7 +1343,8 @@ func TestLintTemplateGeneration(t *testing.T) {
 				}},
 			},
 			// language=html
-			expected: `<table>
+			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
+<table>
     <thead>
         <tr>
             <th>Status</th>
@@ -1386,6 +1388,7 @@ func TestLintTemplateGeneration(t *testing.T) {
                 Analyze 20230925192914.sql <br/> 2 reports were found in analysis
             </td>
             <td>
+                <b>Data dependent changes detected</b><br/>
                 Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries <a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a><br/>
                 Adding a non-nullable "varchar" column "City" on table "Persons" without a default value implicitly sets existing rows with "" <a href="https://atlasgo.io/lint/analyzers#MY101" target="_blank">(MY101)</a><br/>
             </td>
@@ -1474,7 +1477,8 @@ func TestLintTemplateGeneration(t *testing.T) {
 				},
 			},
 			// language=html
-			expected: `<table>
+			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
+<table>
     <thead>
         <tr>
             <th>Status</th>
@@ -1518,6 +1522,7 @@ func TestLintTemplateGeneration(t *testing.T) {
                 Analyze 20230925192914.sql <br/> 1 reports were found in analysis
             </td>
             <td>
+                <b>Data dependent changes detected</b><br/>
                 Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries <a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a><br/>
             </td>
         </tr>
@@ -1531,6 +1536,7 @@ func TestLintTemplateGeneration(t *testing.T) {
                 Analyze 20240625104520_destructive.sql <br/> 1 reports were found in analysis
             </td>
             <td>
+                <b>Destructive changes detected</b><br/>
                 Dropping table "Persons" <a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/>
             </td>
         </tr>
@@ -1562,7 +1568,8 @@ func TestLintTemplateGeneration(t *testing.T) {
 				}},
 			},
 			// language=html
-			expected: `<table>
+			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
+<table>
     <thead>
         <tr>
             <th>Status</th>
@@ -1648,7 +1655,8 @@ func TestLintTemplateGeneration(t *testing.T) {
 				},
 			},
 			// language=html
-			expected: `<table>
+			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
+<table>
     <thead>
         <tr>
             <th>Status</th>
@@ -1707,7 +1715,7 @@ func TestLintTemplateGeneration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c, err := migrateLintComment(tt.payload)
 			require.NoError(t, err)
-			require.Contains(t, c, tt.expected)
+			require.Equal(t, tt.expected, c)
 		})
 	}
 }

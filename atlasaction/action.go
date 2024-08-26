@@ -681,6 +681,12 @@ var (
 				"hasComments":     hasComments,
 				"stepHasComments": stepHasComments,
 				"stepHasErrors":   stepHasErrors,
+				"firstUpper": func(s string) string {
+					if s == "" {
+						return ""
+					}
+					return strings.ToUpper(s[:1]) + s[1:]
+				},
 			}).
 			ParseFS(comments, "comments/*.tmpl"),
 	)
