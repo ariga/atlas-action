@@ -76,8 +76,11 @@
                 {{ $step.Error }}
             {{- else if $step.Result }}
                 {{- range $step.Result.Reports }}
+                {{- if .Text }}
+                <b>{{ .Text | firstUpper }}</b><br/>
+                {{- end }}
                 {{- range .Diagnostics }}
-                {{ .Text }} {{- if .Code }} <a href="https://atlasgo.io/lint/analyzers#{{ .Code }}" target="_blank">({{ .Code }})</a> {{- end }}<br/>
+                {{ .Text }}{{- if .Code }} <a href="https://atlasgo.io/lint/analyzers#{{ .Code }}" target="_blank">({{ .Code }})</a>{{- end -}}<br/>
                 {{- end }}
                 {{- end }}
             {{- end }}
