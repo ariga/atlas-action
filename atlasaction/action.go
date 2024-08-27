@@ -25,15 +25,12 @@ import (
 	"github.com/sethvargo/go-envconfig"
 )
 
-// Version holds atlas-action version. When built with cloud packages should be set by build flag, e.g.
-// "-X 'ariga.io/atlas-action/atlasaction.Version=v0.1.2'"
-var Version string
-
 // Actions holds the runtime for the actions to run.
 // This helps to inject the runtime dependencies. Like the SCM client, Atlas client, etc.
 type Actions struct {
 	Action
-	Atlas AtlasExec
+	Version string
+	Atlas   AtlasExec
 }
 
 // Atlas action interface.
@@ -486,7 +483,7 @@ func (a *Actions) GetRunContext(ctx context.Context, tc *TriggerContext) *atlase
 func (a *Actions) DeployRunContext() *atlasexec.DeployRunContext {
 	return &atlasexec.DeployRunContext{
 		TriggerType:    a.GetType(),
-		TriggerVersion: Version,
+		TriggerVersion: a.Version,
 	}
 }
 

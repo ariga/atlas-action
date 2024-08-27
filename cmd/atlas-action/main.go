@@ -26,6 +26,15 @@ const (
 	CmdSchemaTest = "schema/test"
 )
 
+var (
+	// version holds atlas-action version. When built with cloud packages should be set by build flag, e.g.
+	// "-X 'main.version=v0.1.2'"
+	version string
+	// commit holds the git commit hash. When built with cloud packages should be set by build flag, e.g.
+	// "-X 'main.commit=abcdef1234'"
+	commit string = "dev"
+)
+
 func main() {
 	action, err := newAction()
 	if err != nil {
@@ -41,8 +50,9 @@ func main() {
 		kong.BindTo(context.Background(), (*context.Context)(nil)),
 	)
 	if err := cli.Run(&atlasaction.Actions{
-		Action: action,
-		Atlas:  atlas,
+		Action:  action,
+		Version: version,
+		Atlas:   atlas,
 	}); err != nil {
 		if uerr := errors.Unwrap(err); uerr != nil {
 			err = uerr
@@ -56,7 +66,7 @@ type VersionFlag bool
 
 // BeforeReset writes the version variable and terminates with a 0 exit status.
 func (v VersionFlag) BeforeReset(app *kong.Kong) error {
-	_, err := fmt.Fprintln(app.Stdout, atlasaction.Version)
+	_, err := fmt.Fprintf(app.Stdout, "%s-%s\n", version, commit)
 	app.Exit(0)
 	return err
 }

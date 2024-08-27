@@ -1950,7 +1950,6 @@ func TestMigrateApplyCloud(t *testing.T) {
 		}
 	}
 	t.Run("basic", func(t *testing.T) {
-		Version = "v1.2.3"
 		var payloads []string
 		srv := httptest.NewServer(handler(&payloads))
 		t.Cleanup(srv.Close)
@@ -1963,7 +1962,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
 		cfgURL := generateHCL(t, srv.URL, "token")
 		tt.setInput("config", cfgURL)
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&Actions{Action: tt.act, Atlas: tt.cli, Version: "v1.2.3"}).MigrateApply(context.Background())
 		require.NoError(t, err)
 
 		require.Len(t, payloads, 3)

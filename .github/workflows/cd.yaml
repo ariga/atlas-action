@@ -11,6 +11,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - 'v*'
 jobs:
   test:
     uses: ./.github/workflows/ci-go.yaml
@@ -19,6 +21,8 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
+      - name: Install Atlas
+        uses: ariga/setup-atlas@v0
       - name: Checkout code
         uses: actions/checkout@v3.0.2
         with:
@@ -30,42 +34,37 @@ jobs:
       - name: Set BINARY_NAME
         id: set_binary_name
         env:
-          VERSION: ${{ github.event.inputs.version || 'v1' }}
+          VERSION: ${{ github.event.inputs.version || github.ref_name }}
         run: |
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "BINARY_NAME=atlas-action-$VERSION" >> $GITHUB_ENV
       - name: Compile Go Binary
         run: |
-          go build -o $BINARY_NAME -ldflags "-s -w -X ariga.io/atlas-action/atlasaction.Version=${{ github.event.inputs.version || 'v1' }}" ./cmd/atlas-action
+          COMMIT=$(git rev-parse --short HEAD)
+          go build -o atlas-action -ldflags "-s -w -X main.version=$VERSION main.commit=$COMMIT" ./cmd/atlas-action
+          OUTPUT=$(./atlas-action --version)
+          [ $(echo $OUTPUT | grep -i "^$VERSION") ] && echo Version=$OUTPUT || (echo "unexpected output: $OUTPUT, expected: $VERSION"; exit 1)
         env:
           CGO_ENABLED: 0
-      - name: Install Atlas
-        uses: ariga/setup-atlas@v0
-
-      - name: Check version
-        run: |
-          OUTPUT=$(./$BINARY_NAME --version)
-          [ $(echo $OUTPUT | grep -i "^$VERSION") ] && echo Version=$OUTPUT || (echo "unexpected output: $OUTPUT, expected: $VERSION"; exit 1)
       - name: Configure AWS credentials
         run: |
           aws configure set aws_access_key_id ${{ secrets.RELEASE_AWS_ACCESS_KEY_ID }}
           aws configure set aws_secret_access_key ${{ secrets.RELEASE_AWS_SECRET_ACCESS_KEY }}
       - name: Upload binary to S3
+        run: |
+          aws s3 cp ./atlas-action s3://release.ariga.io/atlas-action/$BINARY_NAME
         env:
           AWS_REGION: us-east-1
-        run: |
-          aws s3 cp $BINARY_NAME s3://release.ariga.io/atlas-action/$BINARY_NAME
-
   # Run end-to-end test on the published binary.
   e2e-test:
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: ariga/setup-atlas@master
+      - uses: ariga/setup-atlas@v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - name: "Run Migrate Lint"
+      - name: Run Migrate Lint
         env:
           GITHUB_TOKEN: ${{ github.token }}
         uses: jenseng/dynamic-uses@v1
@@ -76,8 +75,7 @@ jobs:
             "dev-url": "sqlite://dev?mode=memory",
             "dir-name": "test-dir-sqlite"
             }'
-
-      - name: "Run Migrate Push"
+      - name: Run Migrate Push
         uses: jenseng/dynamic-uses@v1
         with:
           uses: ariga/atlas-action/migrate/push@${{ github.event.inputs.version || 'v1' }}
