@@ -41,7 +41,7 @@ jobs:
       - name: Compile Go Binary
         run: |
           COMMIT=$(git rev-parse --short HEAD)
-          go build -o atlas-action -ldflags "-s -w -X main.version=$VERSION main.commit=$COMMIT" ./cmd/atlas-action
+          go build -o atlas-action -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT" ./cmd/atlas-action
           OUTPUT=$(./atlas-action --version)
           [ $(echo $OUTPUT | grep -i "^$VERSION") ] && echo Version=$OUTPUT || (echo "unexpected output: $OUTPUT, expected: $VERSION"; exit 1)
         env:
