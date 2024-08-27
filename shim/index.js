@@ -3,7 +3,6 @@ const fs = require("fs");
 const path = require("path");
 const core = require("@actions/core");
 const toolCache = require("@actions/tool-cache");
-const semver = require("semver");
 
 module.exports = async function run(action) {
   const binaryName = "atlas-action";
@@ -13,21 +12,14 @@ module.exports = async function run(action) {
     core.info("Running in local mode");
   } else {
     // Download the binary if not in local mode
-    let version = "v1";
-    // Check for version number
-    if (process.env.GITHUB_ACTION_REF) {
-      if (process.env.GITHUB_ACTION_REF.startsWith("v")) {
-        version = process.env.GITHUB_ACTION_REF;
-      } else if (process.env.GITHUB_ACTION_REF !== "master") {
-        throw new Error(`Invalid version: ${process.env.GITHUB_ACTION_REF}`);
-      }
+    const version = process.env.GITHUB_ACTION_REF || "master";
+    if (!version.startsWith("v") && version !== "master") {
+      throw new Error(`Invalid version: ${version}`);
     }
     core.info(`Using version ${version}`);
     const toolName = "atlas-action";
     // We only cache the binary between steps of a single run.
-    const cacheVersion = `${semver.coerce(version).version}-${process.env.GITHUB_RUN_ID}-${
-      process.env.GITHUB_RUN_ATTEMPT
-    }`;
+    const cacheVersion = `${version}-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
     let toolPath = toolCache.find(toolName, cacheVersion);
     // Tool Path is the directory where the binary is located. If it is not found, download it.
     if (!toolPath || !fs.existsSync(path.join(toolPath, binaryName))) {
