@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
-	"github.com/sethvargo/go-envconfig"
+	"golang.org/x/oauth2"
 )
 
 // Actions holds the runtime for the actions to run.
@@ -64,6 +64,8 @@ type Logger interface {
 
 // AtlasExec is the interface for the atlas exec client.
 type AtlasExec interface {
+	// MigrateStatus runs the `migrate status` command.
+	MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
 	// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
 	MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error)
 	// MigrateDown runs the `migrate down` command.
@@ -80,43 +82,33 @@ type AtlasExec interface {
 
 // Context holds the context of the environment the action is running in.
 type TriggerContext struct {
-	// SCM is the source control management system.
-	SCM SCM
-	// Repo is the repository name. e.g. "ariga/atlas-action".
-	Repo string
-	// RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
-	RepoURL string
-	// Branch name.
-	Branch string
-	// Commit SHA.
-	Commit string
-	// PullRequest will be available if the event is "pull_request".
-	PullRequest *PullRequest
+	SCM         SCM          // SCM is the source control management system.
+	Repo        string       // Repo is the repository name. e.g. "ariga/atlas-action".
+	RepoURL     string       // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
+	Branch      string       // Branch name.
+	Commit      string       // Commit SHA.
+	PullRequest *PullRequest // PullRequest will be available if the event is "pull_request".
+	Actor       *Actor       // Actor is the user who triggered the action.
+}
+
+// Actor holds the actor information.
+type Actor struct {
+	Name string // Username of the actor.
+	ID   string // ID of the actor on the SCM.
 }
 
 // PullRequest holds the pull request information.
 type PullRequest struct {
-	// Pull Request Number
-	Number int
-	// URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
-	URL string
-	// Lastest commit SHA.
-	Commit string
+	Number int    // Pull Request Number
+	URL    string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
+	Commit string // Latest commit SHA.
 }
-
-// SCM Provider constants.
-const (
-	ProviderGithub Provider = "GITHUB"
-)
 
 // SCM holds the source control management system information.
 type SCM struct {
-	// Type of the SCM, e.g. "GITHUB" / "GITLAB" / "BITBUCKET".
-	Provider Provider
-	// APIURL is the base URL for the SCM API.
-	APIURL string
+	Type   atlasexec.SCMType // Type of the SCM, e.g. "GITHUB" / "GITLAB" / "BITBUCKET".
+	APIURL string            // APIURL is the base URL for the SCM API.
 }
-type Provider string
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func (a *Actions) MigrateApply(ctx context.Context) error {
@@ -454,29 +446,22 @@ func (a *Actions) GetVarsInput(name string) atlasexec.VarArgs {
 
 // GetRunContext returns the run context for the action.
 func (a *Actions) GetRunContext(ctx context.Context, tc *TriggerContext) *atlasexec.RunContext {
-	// TODO: Add support for other action runtime contexts.
-	var actor struct {
-		Name string `env:"GITHUB_ACTOR"`
-		ID   string `env:"GITHUB_ACTOR_ID"`
-	}
-	if err := envconfig.Process(ctx, &actor); err != nil {
-		a.Fatalf("failed to load actor: %v", err)
-		return nil
-	}
 	url := tc.RepoURL
 	if tc.PullRequest != nil {
 		url = tc.PullRequest.URL
 	}
-	return &atlasexec.RunContext{
-		Repo:     tc.Repo,
-		Branch:   tc.Branch,
-		Commit:   tc.Commit,
-		Path:     a.GetInput("dir"),
-		URL:      url,
-		Username: actor.Name,
-		UserID:   actor.ID,
-		SCMType:  string(tc.SCM.Provider),
+	rc := &atlasexec.RunContext{
+		Repo:    tc.Repo,
+		Branch:  tc.Branch,
+		Commit:  tc.Commit,
+		Path:    a.GetInput("dir"),
+		URL:     url,
+		SCMType: tc.SCM.Type,
 	}
+	if a := tc.Actor; a != nil {
+		rc.Username, rc.UserID = a.Name, a.ID
+	}
+	return rc
 }
 
 // DeployRunContext returns the run context for the `migrate/apply`, and `migrate/down` actions.
@@ -492,7 +477,12 @@ func (a *Actions) DeployRunContext() *atlasexec.DeployRunContext {
 func (a *Actions) GithubClient(repo, baseURL string) *githubAPI {
 	httpClient := &http.Client{Timeout: time.Second * 30}
 	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		httpClient.Transport = &roundTripper{authToken: token}
+		httpClient.Transport = &oauth2.Transport{
+			Base: http.DefaultTransport,
+			Source: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: token,
+			}),
+		}
 	} else {
 		a.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
 	}
@@ -730,22 +720,9 @@ type (
 		repo    string
 		client  *http.Client
 	}
-
-	// roundTripper is a http.RoundTripper that adds the Authorization header.
-	roundTripper struct {
-		authToken string
-	}
 )
 
 const defaultGHApiUrl = "https://api.github.com"
-
-// RoundTrip implements http.RoundTripper.
-func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Add("Accept", "application/vnd.github+json")
-	req.Header.Add("Authorization", "Bearer "+r.authToken)
-	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
-	return http.DefaultTransport.RoundTrip(req)
-}
 
 func (g *githubAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
 	comments, err := g.getIssueComments(ctx, pr)

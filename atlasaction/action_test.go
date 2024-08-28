@@ -262,6 +262,11 @@ type mockAtlas struct {
 
 var _ AtlasExec = (*mockAtlas)(nil)
 
+// MigrateStatus implements AtlasExec.
+func (m *mockAtlas) MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error) {
+	panic("unimplemented")
+}
+
 // MigrateApplySlice implements AtlasExec.
 func (m *mockAtlas) MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error) {
 	panic("unimplemented")
@@ -2025,7 +2030,7 @@ type test struct {
 	db        string
 	env       map[string]string
 	out       bytes.Buffer
-	cli       *atlasexec.Client
+	cli       AtlasExec
 	act       Action
 	configUrl string
 }

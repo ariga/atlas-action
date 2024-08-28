@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"golang.org/x/oauth2"
 )
 
 // circleciOrb is an implementation of the Action interface for GitHub Actions.
@@ -61,8 +62,8 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	switch ghToken := os.Getenv("GITHUB_TOKEN"); {
 	case ghToken != "":
 		ctx.SCM = SCM{
-			Provider: ProviderGithub,
-			APIURL:   defaultGHApiUrl,
+			Type:   atlasexec.SCMTypeGithub,
+			APIURL: defaultGHApiUrl,
 		}
 		if v := os.Getenv("GITHUB_API_URL"); v != "" {
 			ctx.SCM.APIURL = v
@@ -90,8 +91,12 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		// get open pull requests for the branch.
 		c := &githubAPI{
 			client: &http.Client{
-				Timeout:   time.Second * 30,
-				Transport: &roundTripper{authToken: ghToken},
+				Timeout: time.Second * 30,
+				Transport: &oauth2.Transport{
+					Source: oauth2.StaticTokenSource(&oauth2.Token{
+						AccessToken: ghToken,
+					}),
+				},
 			},
 			baseURL: ctx.SCM.APIURL,
 			repo:    ctx.Repo,

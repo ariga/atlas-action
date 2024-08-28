@@ -6,13 +6,13 @@ toolchain go1.22.0
 
 require (
 	ariga.io/atlas v0.21.2-0.20240418081819-02b3f6239b04
-	ariga.io/atlas-go-sdk v0.5.8-0.20240819044045-288f04d1cbd4
+	ariga.io/atlas-go-sdk v0.5.8-0.20240828110114-05cb5d04d1a9
 	github.com/alecthomas/kong v0.8.0
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/mitchellh/mapstructure v1.1.2
-	github.com/sethvargo/go-envconfig v0.9.0
-	github.com/sethvargo/go-githubactions v1.1.0
+	github.com/sethvargo/go-githubactions v1.3.0
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/oauth2 v0.22.0
 )
 
 require (
