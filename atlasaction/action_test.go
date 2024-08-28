@@ -262,6 +262,11 @@ type mockAtlas struct {
 
 var _ AtlasExec = (*mockAtlas)(nil)
 
+// MigrateStatus implements AtlasExec.
+func (m *mockAtlas) MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error) {
+	panic("unimplemented")
+}
+
 // MigrateApplySlice implements AtlasExec.
 func (m *mockAtlas) MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error) {
 	panic("unimplemented")
@@ -540,10 +545,8 @@ func TestMigrateE2E(t *testing.T) {
 	tt.env["GITHUB_HEAD_REF"] = "testing-branch"
 	tt.env["GITHUB_REF_NAME"] = "refs/pulls/6/merge"
 	tt.env["GITHUB_SHA"] = "sha1234"
-	err := os.Setenv("GITHUB_ACTOR", "test-user")
-	require.NoError(t, err)
-	err = os.Setenv("GITHUB_ACTOR_ID", "123")
-	require.NoError(t, err)
+	tt.env["GITHUB_ACTOR"] = "test-user"
+	tt.env["GITHUB_ACTOR_ID"] = "123"
 	tt.setEvent(t, `{
 			"pull_request": {
 				"html_url": "http://test"
@@ -559,6 +562,7 @@ func TestMigrateE2E(t *testing.T) {
 		UserID:   "123",
 		SCMType:  "GITHUB",
 	}
+	var err error
 	err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, 2, len(payloads))
@@ -2025,7 +2029,7 @@ type test struct {
 	db        string
 	env       map[string]string
 	out       bytes.Buffer
-	cli       *atlasexec.Client
+	cli       AtlasExec
 	act       Action
 	configUrl string
 }

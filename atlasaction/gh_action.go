@@ -31,41 +31,30 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	// HeadRef will be empty for push events, so we use RefName instead.
-	branch := ctx.HeadRef
-	if branch == "" {
-		branch = ctx.RefName
-	}
-	// SCM information.
-	scm := SCM{
-		Provider: ProviderGithub,
-		APIURL:   ctx.APIURL,
-	}
-	// Extract the event data to fill up Repo and PR information.
-	ghEvent, err := extractEvent(ctx.Event)
+	ev, err := extractEvent(ctx.Event)
 	if err != nil {
 		return nil, err
 	}
-	var repoURL string
-	if ghEvent.Repository.URL != "" {
-		repoURL = ghEvent.Repository.URL
+	tc := &TriggerContext{
+		SCM:     SCM{Type: atlasexec.SCMTypeGithub, APIURL: ctx.APIURL},
+		Repo:    ctx.Repository,
+		Branch:  ctx.HeadRef,
+		Commit:  ctx.SHA,
+		RepoURL: ev.Repository.URL,
+		Actor:   &Actor{Name: ctx.Actor, ID: ctx.ActorID},
 	}
-	var pr *PullRequest
+	if tc.Branch == "" {
+		// HeadRef will be empty for push events, so we use RefName instead.
+		tc.Branch = ctx.RefName
+	}
 	if ctx.EventName == "pull_request" {
-		pr = &PullRequest{
-			Number: ghEvent.PullRequest.Number,
-			URL:    ghEvent.PullRequest.URL,
-			Commit: ghEvent.PullRequest.Head.SHA,
+		tc.PullRequest = &PullRequest{
+			Number: ev.PullRequest.Number,
+			URL:    ev.PullRequest.URL,
+			Commit: ev.PullRequest.Head.SHA,
 		}
 	}
-	return &TriggerContext{
-		SCM:         scm,
-		Repo:        ctx.Repository,
-		RepoURL:     repoURL,
-		Branch:      branch,
-		Commit:      ctx.SHA,
-		PullRequest: pr,
-	}, nil
+	return tc, nil
 }
 
 // WithFieldsMap return a new Logger with the given fields.
