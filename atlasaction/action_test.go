@@ -32,9 +32,7 @@ import (
 	"ariga.io/atlas/sql/sqlclient"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sethvargo/go-githubactions"
-	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/oauth2"
 )
 
 func TestMigrateApply(t *testing.T) {
@@ -263,8 +261,8 @@ func TestMigrateDown(t *testing.T) {
 type mockAtlas struct {
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
+	schemaPlanList    func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
 	schemaPlanLint    func(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
-	schemaPlanPull    func(context.Context, *atlasexec.SchemaPlanPullParams) (string, error)
 	schemaPlanApprove func(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 }
 
@@ -305,6 +303,11 @@ func (m *mockAtlas) SchemaPlan(ctx context.Context, p *atlasexec.SchemaPlanParam
 	return m.schemaPlan(ctx, p)
 }
 
+// SchemaPlanList implements AtlasExec.
+func (m *mockAtlas) SchemaPlanList(ctx context.Context, p *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+	return m.schemaPlanList(ctx, p)
+}
+
 // SchemaPlanApprove implements AtlasExec.
 func (m *mockAtlas) SchemaPlanApprove(ctx context.Context, p *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error) {
 	return m.schemaPlanApprove(ctx, p)
@@ -313,11 +316,6 @@ func (m *mockAtlas) SchemaPlanApprove(ctx context.Context, p *atlasexec.SchemaPl
 // SchemaPlanLint implements AtlasExec.
 func (m *mockAtlas) SchemaPlanLint(ctx context.Context, p *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error) {
 	return m.schemaPlanLint(ctx, p)
-}
-
-// SchemaPlanPull implements AtlasExec.
-func (m *mockAtlas) SchemaPlanPull(ctx context.Context, p *atlasexec.SchemaPlanPullParams) (string, error) {
-	return m.schemaPlanPull(ctx, p)
 }
 
 func (m *mockAtlas) MigrateDown(ctx context.Context, params *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error) {
@@ -2181,61 +2179,18 @@ func must[T any](t T, err error) T {
 	return t
 }
 
-func Test_mergedPullRequest(t *testing.T) {
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		t.Skip("Missing GITHUB_TOKEN")
-	}
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &oauth2.Transport{
-			Source: oauth2.StaticTokenSource(&oauth2.Token{
-				AccessToken: token,
-			}),
-		},
-	}
-	c := &githubAPI{
-		client:  client,
-		gql:     githubv4.NewClient(client),
-		baseURL: defaultGHApiUrl,
-		repo:    "ariga/atlas-action",
-	}
-	pr, err := c.MergedPullRequest(context.Background(), "6850844a4bb6933f11ee941ca232fd636f35a35f")
-	require.NoError(t, err)
-	require.NotNil(t, pr)
-	require.Equal(t, 206, pr.Number)
-}
-
-func TestSchema_Plan(t *testing.T) {
+func TestSchemaPlan(t *testing.T) {
 	var (
-		graphqlCounter int
 		commentCounter int
 		commentEdited  int
-		noPullRequest  bool
 	)
 	h := http.NewServeMux()
-	h.HandleFunc("POST /graphql", func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
-		var req map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-		require.Equal(t, map[string]any{
-			"commit": "commit-id",
-			"name":   "atlas-action",
-			"owner":  "ariga",
-		}, req["variables"])
-		graphqlCounter++
-		if noPullRequest {
-			fmt.Fprint(w, `{"data":{"repository":{"object":{"associatedPullRequests":{"nodes":[]}}}}}`)
-			return
-		}
-		fmt.Fprint(w, `{"data":{"repository":{"object":{"associatedPullRequests":{"nodes":[{"number":1,"URL":"https://github.com/ariga/atlas-action/pull/1"}]}}}}}`)
-	})
 	h.HandleFunc("GET /repos/ariga/atlas-action/issues/1/comments", func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
 		if commentCounter == 0 {
 			fmt.Fprint(w, `[]`) // No comments
 		} else { // Existing comment
-			fmt.Fprintf(w, `[{"id":1,"body":"%s"}]`, commentMarker("ufnTS7NrAgkvQlxbpnSxj119MAPGNqVj0i3Eelv+iLc="))
+			fmt.Fprintf(w, `[{"id":1,"body":"%s"}]`, commentMarker("pr-1-Rl4lBdMk"))
 		}
 	})
 	h.HandleFunc("POST /repos/ariga/atlas-action/issues/1/comments", func(w http.ResponseWriter, r *http.Request) {
@@ -2254,17 +2209,16 @@ func TestSchema_Plan(t *testing.T) {
 	})
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	plan := &atlasexec.SchemaPlan{
-		Repo: "atlas-action",
-		File: &atlasexec.SchemaPlanFile{
-			FromHash: "ufnTS7NrAgkvQlxbpnSxj119MAPGNqVj0i3Eelv+iLc=", // Used as comment marker
-			ToHash:   "Rl4lBdMkvFoGQ4xu+3sYCeogTVnamJ7bmDoq9pMXcjw=", // Apart of the plan URL
-		},
-		Lint: &atlasexec.SummaryReport{
-			Files: []*atlasexec.FileReport{},
-		},
+	planFile := &atlasexec.SchemaPlanFile{
+		Name:     "pr-1-Rl4lBdMk",
+		FromHash: "ufnTS7NrAgkvQlxbpnSxj119MAPGNqVj0i3Eelv+iLc=", // Used as comment marker
+		ToHash:   "Rl4lBdMkvFoGQ4xu+3sYCeogTVnamJ7bmDoq9pMXcjw=",
+		URL:      "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+		Link:     "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+		Status:   "PENDING",
 	}
-	var planErr, pullErr, approveErr error
+	var planFiles []atlasexec.SchemaPlanFile
+	var planErr, approveErr error
 	m := &mockAtlas{
 		schemaPlan: func(_ context.Context, p *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
 			// Common input checks
@@ -2274,14 +2228,14 @@ func TestSchema_Plan(t *testing.T) {
 			if planErr != nil {
 				return nil, planErr
 			}
-			return plan, nil
+			return &atlasexec.SchemaPlan{
+				Repo: "atlas-action",
+				File: planFile,
+				Lint: &atlasexec.SummaryReport{Files: []*atlasexec.FileReport{}},
+			}, nil
 		},
-		schemaPlanPull: func(_ context.Context, p *atlasexec.SchemaPlanPullParams) (string, error) {
-			// Common input checks
-			require.Equal(t, "file://atlas.hcl", p.ConfigURL)
-			require.Equal(t, "test", p.Env)
-			require.Equal(t, "atlas://atlas-action/plans/pr-1-Rl4lBdMk", p.URL)
-			return "", pullErr
+		schemaPlanList: func(_ context.Context, p *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+			return planFiles, nil
 		},
 		schemaPlanLint: func(_ context.Context, p *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error) {
 			// Common input checks
@@ -2289,7 +2243,11 @@ func TestSchema_Plan(t *testing.T) {
 			require.Equal(t, "test", p.Env)
 			require.Equal(t, "", p.Repo) // No repo, provided by atlas.hcl
 			require.Equal(t, "atlas://atlas-action/plans/pr-1-Rl4lBdMk", p.File)
-			return plan, nil
+			return &atlasexec.SchemaPlan{
+				Repo: "atlas-action",
+				File: planFile,
+				Lint: &atlasexec.SummaryReport{Files: []*atlasexec.FileReport{}},
+			}, nil
 		},
 		schemaPlanApprove: func(_ context.Context, p *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error) {
 			require.Equal(t, "file://atlas.hcl", p.ConfigURL)
@@ -2335,57 +2293,81 @@ func TestSchema_Plan(t *testing.T) {
 		},
 	}
 	ctx := context.Background()
+	// Multiple plans will fail with an error
+	planFiles = []atlasexec.SchemaPlanFile{*planFile, *planFile}
+	act.resetOutputs()
+	require.ErrorContains(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx), "found multiple schema plans, please approve or delete the existing plans")
+	require.Len(t, act.summary, 0, "Expected 1 summary")
+	require.Equal(t, 0, commentCounter, "No more comments generated")
+	require.Equal(t, 0, commentEdited, "No comment should be edited")
+
 	// No changes
 	planErr = errors.New("The current state is synced with the desired state, no changes to be made")
+	planFiles = nil
+	act.resetOutputs()
 	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
-	require.Len(t, act.summary, 0, "no summaries generated")
-	require.Equal(t, 0, commentCounter, "expected 1 comment generated")
+	require.Len(t, act.summary, 0, "No summaries generated")
+	require.Equal(t, 0, commentCounter, "Expected 1 comment generated")
 	require.Equal(t, 0, commentEdited, "No comment should be edited")
 
 	// No existing plan
 	planErr = nil
-	pullErr = errors.New(`plan "pr-1-Rl4lBdMk" was not found`)
+	planFiles = nil
+	act.resetOutputs()
 	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
-	require.Len(t, act.summary, 1, "expected 1 summary")
-	require.Equal(t, 1, commentCounter, "expected 1 comment generated")
+	require.Len(t, act.summary, 1, "Expected 1 summary")
+	require.Equal(t, 1, commentCounter, "Expected 1 comment generated")
 	require.Equal(t, 0, commentEdited, "No comment should be edited")
+	require.EqualValues(t, map[string]string{
+		"plan":   "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+		"status": "PENDING",
+		"link":   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+	}, act.output, "expected output with plan URL")
 
 	// Existing plan
-	pullErr = nil
+	planFiles = []atlasexec.SchemaPlanFile{*planFile}
+	act.resetOutputs()
 	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
-	require.Len(t, act.summary, 2, "expected 2 summaries")
+	require.Len(t, act.summary, 2, "Expected 2 summaries")
 	require.Equal(t, 1, commentCounter, "No more comments generated")
 	require.Equal(t, 1, commentEdited, "Expected comment to be edited")
+	require.EqualValues(t, map[string]string{
+		"plan":   "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+		"status": "PENDING",
+		"link":   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+	}, act.output, "expected output with plan URL")
 
 	// Trigger with no pull request, master branch
 	act.trigger.PullRequest = nil
 	act.trigger.Branch = "master"
+	act.resetOutputs()
 	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
-	require.Len(t, act.summary, 2, "no more summaries generated")
+	require.Len(t, act.summary, 2, "No more summaries generated")
 	require.Equal(t, 1, commentCounter, "No more comments generated")
 	require.Equal(t, 1, commentEdited, "No comment should be edited")
+	require.EqualValues(t, map[string]string{
+		"plan":   "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+		"status": "APPROVED",
+		"link":   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+	}, act.output, "expected output with plan URL")
 
 	// No pending plan
-	approveErr = errors.New(`plan "pr-1-Rl4lBdMk" was not found`)
+	planFiles = nil
+	act.resetOutputs()
 	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
-	require.Len(t, act.summary, 2, "no more summaries generated")
+	require.Len(t, act.summary, 2, "No more summaries generated")
 	require.Equal(t, 1, commentCounter, "No more comments generated")
 	require.Equal(t, 1, commentEdited, "No comment should be edited")
-
-	// No pull request found for commit
-	noPullRequest = true
-	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
-	require.Len(t, act.summary, 2, "no more summaries generated")
-	require.Equal(t, 1, commentCounter, "No more comments generated")
-	require.Equal(t, 1, commentEdited, "No comment should be edited")
+	require.EqualValues(t, map[string]string{}, act.output, "expected output with plan URL")
 
 	// Check all logs output
-	require.Equal(t, `time=NOW level=INFO msg="Schema plan completed successfully, no changes to be made"
-time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-Rl4lBdMk\""
+	require.Equal(t, `time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="The current state is synced with the desired state, no changes to be made"
+time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-ufnTS7Nr\""
 time=NOW level=INFO msg="Schema plan already exists, linting the plan \"pr-1-Rl4lBdMk\""
 time=NOW level=INFO msg="Schema plan approved successfully: https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk"
-time=NOW level=INFO msg="Schema plan does not exist \"pr-1-Rl4lBdMk\""
-time=NOW level=INFO msg="No merged pull request found for commit \"commit-id\", skip the approval"
+time=NOW level=INFO msg="No schema plan found"
 `, out.String())
 }
 
@@ -2399,6 +2381,10 @@ type mockAction struct {
 }
 
 var _ Action = (*mockAction)(nil)
+
+func (m *mockAction) resetOutputs() {
+	m.output = map[string]string{}
+}
 
 // GetType implements Action.
 func (m *mockAction) GetType() atlasexec.TriggerType {

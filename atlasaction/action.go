@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"slices"
@@ -23,7 +22,6 @@ import (
 	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
-	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
 )
 
@@ -82,10 +80,10 @@ type AtlasExec interface {
 	SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error)
 	// SchemaPlan runs the `schema plan` command.
 	SchemaPlan(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
+	// SchemaPlanList runs the `schema plan list` command.
+	SchemaPlanList(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
 	// SchemaPlanLint runs the `schema plan lint` command.
 	SchemaPlanLint(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
-	// SchemaPlanPull runs the `schema plan pull` command.
-	SchemaPlanPull(context.Context, *atlasexec.SchemaPlanPullParams) (string, error)
 	// SchemaPlanApprove runs the `schema plan approve` command.
 	SchemaPlanApprove(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 }
@@ -393,122 +391,123 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to get the trigger context: %w", err)
 	}
-	params := &atlasexec.SchemaPlanParams{
+	var plan *atlasexec.SchemaPlan
+	params := &atlasexec.SchemaPlanListParams{
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
 		Context:   a.GetRunContext(ctx, tc),
 		DevURL:    a.GetInput("dev-url"),
 		From:      a.GetArrayInput("from"),
+		To:        a.GetArrayInput("to"),
+		Pending:   true,
 	}
-	params.DryRun = true // Dry-run to get the desired hash
-	plan, err := a.Atlas.SchemaPlan(ctx, params)
-	switch {
-	case err != nil && strings.Contains(err.Error(), "The current state is synced with the desired state, no changes to be made"):
-		a.Infof("Schema plan completed successfully, no changes to be made")
-		return nil
+	switch planFiles, err := a.Atlas.SchemaPlanList(ctx, params); {
 	case err != nil:
-		return fmt.Errorf("Unable to calculate the plan: %w", err)
-	}
-	switch {
-	case tc.PullRequest != nil:
-		if params.Name == "" {
-			// The user did not provide a name.
-			// Generate unique name base on the PR number
-			params.Name = fmt.Sprintf("pr-%d-%.8s", tc.PullRequest.Number, plan.File.ToHash)
+		return fmt.Errorf("failed to list schema plans: %w", err)
+	// Multiple existing plans.
+	case len(planFiles) > 1:
+		for _, f := range planFiles {
+			a.Infof("Found schema plan: %s", f.URL)
 		}
-		planURL, err := atlasURL(plan.Repo, "plans", params.Name)
-		if err != nil {
-			return fmt.Errorf("failed to generate plan URL: %w", err)
-		}
-		// Check if the plan already exists
-		switch _, err = a.Atlas.SchemaPlanPull(ctx, &atlasexec.SchemaPlanPullParams{
-			ConfigURL: params.ConfigURL,
-			Env:       params.Env,
-			Vars:      params.Vars,
-			URL:       planURL,
-		}); {
-		// There is a plan
-		case err == nil:
-			a.Infof("Schema plan already exists, linting the plan %q", params.Name)
-			plan, err = a.Atlas.SchemaPlanLint(ctx, &atlasexec.SchemaPlanLintParams{
-				ConfigURL: params.ConfigURL,
-				Env:       params.Env,
-				Vars:      params.Vars,
-				Context:   params.Context,
-				DevURL:    params.DevURL,
-				From:      params.From,
-				To:        params.To,
-				Repo:      params.Repo,
-				File:      planURL,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to get the schema plan: %w", err)
-			}
-			// FIXME(giautm): Remove this workaround after fixing the schema URL issue.
-			plan.File.URL = planURL
-		// The plan does not exist
-		case strings.Contains(err.Error(), fmt.Sprintf("plan %q was not found", params.Name)):
-			a.Infof("Schema plan does not exist, creating a new one with name %q", params.Name)
-			params.DryRun = false // Disable dry-run
-			params.Pending = true // Submit as pending
-			plan, err = a.Atlas.SchemaPlan(ctx, params)
-			if err != nil {
-				return fmt.Errorf("failed to save schema plan: %w", err)
-			}
-		// Unknown error
-		default:
-			return err
-		}
-		summary, err := schemaPlanComment(plan, params.Env, tc.RerunCmd)
-		if err != nil {
-			return fmt.Errorf("failed to generate schema plan comment: %w", err)
-		}
-		a.AddStepSummary(summary)
-		// Comment on the PR
-		err = a.GithubClient(tc.Repo, tc.SCM.APIURL).
-			UpsertComment(ctx, tc.PullRequest, plan.File.FromHash, summary)
-		if err != nil {
-			a.Errorf("failed to comment on the pull request: %v", err)
-		}
+		// There are existing plans.
+		return fmt.Errorf("found multiple schema plans, please approve or delete the existing plans")
+	// Branch context with no plan
+	case tc.PullRequest == nil && len(planFiles) == 0:
+		a.Infof("No schema plan found")
 		return nil
-	default:
-		if params.Name == "" {
-			// The user did not provide a name.
-			// Generate unique name base on the PR number
-			c := a.GithubClient(tc.Repo, tc.SCM.APIURL)
-			switch pr, err := c.MergedPullRequest(ctx, tc.Commit); {
-			case err != nil:
-				return fmt.Errorf("failed to get the merged pull request: %w", err)
-			case pr != nil:
-				params.Name = fmt.Sprintf("pr-%d-%.8s", pr.Number, plan.File.ToHash)
-			default:
-				a.Infof("No merged pull request found for commit %q, skip the approval", tc.Commit)
-				return nil
-			}
-		}
-		planURL, err := atlasURL(plan.Repo, "plans", params.Name)
-		if err != nil {
-			return fmt.Errorf("failed to generate plan URL: %w", err)
-		}
-		// Approve the plan if it exist.
-		switch result, err := a.Atlas.SchemaPlanApprove(ctx, &atlasexec.SchemaPlanApproveParams{
+	// Branch context with pending plan
+	case tc.PullRequest == nil && len(planFiles) == 1:
+		result, err := a.Atlas.SchemaPlanApprove(ctx, &atlasexec.SchemaPlanApproveParams{
 			ConfigURL: params.ConfigURL,
 			Env:       params.Env,
 			Vars:      params.Vars,
-			URL:       planURL,
-		}); {
-		// Successfully approved the plan.
-		case err == nil && result.Status == StateApproved:
-			a.Infof("Schema plan approved successfully: %s", result.Link)
-		case err == nil:
-			a.Errorf("Schema plan got unexpected status %q: %s", result.Status, result.Link)
-		// The plan does not exist.
-		case strings.Contains(err.Error(), fmt.Sprintf("plan %q was not found", params.Name)):
-			a.Infof("Schema plan does not exist %q", params.Name)
-		default:
+			URL:       planFiles[0].URL,
+		})
+		if err != nil {
 			return fmt.Errorf("failed to approve the schema plan: %w", err)
 		}
+		// Successfully approved the plan.
+		a.Infof("Schema plan approved successfully: %s", result.Link)
+		a.SetOutput("link", result.Link)
+		a.SetOutput("plan", result.URL)
+		a.SetOutput("status", result.Status)
+		return nil
+	// PR context and existing plan
+	case tc.PullRequest != nil && len(planFiles) == 1:
+		a.Infof("Schema plan already exists, linting the plan %q", planFiles[0].Name)
+		plan, err = a.Atlas.SchemaPlanLint(ctx, &atlasexec.SchemaPlanLintParams{
+			ConfigURL: params.ConfigURL,
+			Env:       params.Env,
+			Vars:      params.Vars,
+			Context:   params.Context,
+			DevURL:    params.DevURL,
+			From:      params.From,
+			To:        params.To,
+			Repo:      params.Repo,
+			File:      planFiles[0].URL,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get the schema plan: %w", err)
+		}
+		// FIXME(giautm): Remove this workaround after fixing the schema URL issue.
+		plan.File.URL = planFiles[0].URL
+		plan.File.Link = planFiles[0].Link
+		plan.File.Status = "PENDING"
+	// PR context and no existing plan
+	case tc.PullRequest != nil && len(planFiles) == 0:
+		name := a.GetInput("name")
+	runPlan:
+		// Dry run if the name is not provided.
+		dryRun := name == ""
+		if !dryRun {
+			a.Infof("Schema plan does not exist, creating a new one with name %q", name)
+		}
+		switch plan, err = a.Atlas.SchemaPlan(ctx, &atlasexec.SchemaPlanParams{
+			ConfigURL: params.ConfigURL,
+			Env:       params.Env,
+			Vars:      params.Vars,
+			Context:   params.Context,
+			DevURL:    params.DevURL,
+			From:      params.From,
+			To:        params.To,
+			Repo:      params.Repo,
+			Name:      name,
+			DryRun:    dryRun,
+			Pending:   !dryRun,
+		}); {
+		// The schema plan is already in sync.
+		case err != nil && strings.Contains(err.Error(), "The current state is synced with the desired state, no changes to be made"):
+			// No thing to do.
+			a.Infof("The current state is synced with the desired state, no changes to be made")
+			return nil
+		case err != nil:
+			return fmt.Errorf("failed to save schema plan: %w", err)
+		case dryRun:
+			// Save the plan with the generated name.
+			name = fmt.Sprintf("pr-%d-%.8s", tc.PullRequest.Number, plan.File.FromHash)
+			goto runPlan
+		}
+	default:
+		return fmt.Errorf("unexpected context, please contact the atlas team")
+	}
+	// Set the output values from the schema plan.
+	a.SetOutput("link", plan.File.Link)
+	a.SetOutput("plan", plan.File.URL)
+	a.SetOutput("status", plan.File.Status)
+	// Report the schema plan to the user and add a comment to the PR.
+	summary, err := schemaPlanComment(plan, params.Env, tc.RerunCmd)
+	if err != nil {
+		return fmt.Errorf("failed to generate schema plan comment: %w", err)
+	}
+	a.AddStepSummary(summary)
+	// Comment on the PR
+	err = a.GithubClient(tc.Repo, tc.SCM.APIURL).
+		UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
+	if err != nil {
+		// Don't fail the action if the comment fails.
+		// It may be due to the missing permissions.
+		a.Errorf("failed to comment on the pull request: %v", err)
 	}
 	return nil
 }
@@ -650,15 +649,10 @@ func (a *Actions) GithubClient(repo, baseURL string) *githubAPI {
 	if baseURL == "" {
 		baseURL = defaultGHApiUrl
 	}
-	gqlEndpoint, err := url.JoinPath(baseURL, "graphql")
-	if err != nil {
-		a.Fatalf("failed to generate GraphQL endpoint for GitHub: %v", err)
-	}
 	return &githubAPI{
 		baseURL: baseURL,
 		repo:    repo,
 		client:  httpClient,
-		gql:     githubv4.NewEnterpriseClient(gqlEndpoint, httpClient),
 	}
 }
 
@@ -795,10 +789,6 @@ func schemaPlanComment(payload *atlasexec.SchemaPlan, envName, rerun string) (st
 	return buf.String(), nil
 }
 
-func atlasURL(elem ...string) (string, error) {
-	return url.JoinPath("atlas://", elem...)
-}
-
 // Returns true if the summary report has diagnostics or errors.
 func hasComments(s *atlasexec.SummaryReport) bool {
 	for _, f := range s.Files {
@@ -912,7 +902,6 @@ type (
 		baseURL string
 		repo    string
 		client  *http.Client
-		gql     *githubv4.Client
 	}
 )
 
@@ -933,42 +922,6 @@ func (g *githubAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comm
 		return g.updateIssueComment(ctx, comments[found].ID, body)
 	}
 	return g.createIssueComment(ctx, pr, body)
-}
-
-func (g *githubAPI) MergedPullRequest(ctx context.Context, commitID string) (*PullRequest, error) {
-	owner, repo, err := g.ownerRepo()
-	if err != nil {
-		return nil, err
-	}
-	var resp struct {
-		Repository struct {
-			Object struct {
-				Commit struct {
-					AssociatedPullRequests struct {
-						Nodes []struct {
-							Number int
-							URL    string
-						}
-					} `graphql:"associatedPullRequests(first: 1)"`
-				} `graphql:"... on Commit"`
-			} `graphql:"object(expression: $commit)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
-	}
-	err = g.gql.Query(ctx, &resp, map[string]any{
-		"owner":  githubv4.String(owner),
-		"name":   githubv4.String(repo),
-		"commit": githubv4.String(commitID),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if prs := resp.Repository.Object.Commit.AssociatedPullRequests.Nodes; len(prs) > 0 {
-		return &PullRequest{
-			Number: prs[0].Number,
-			URL:    prs[0].URL,
-		}, nil
-	}
-	return nil, nil
 }
 
 func (g *githubAPI) getIssueComments(ctx context.Context, pr *PullRequest) ([]githubIssueComment, error) {
