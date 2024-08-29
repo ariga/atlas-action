@@ -62,4 +62,4 @@ outputs:
     description: If given, the URL for reviewing the revert plan.
 runs:
   using: node20
-  main: dist/index.js
+  main: index.js

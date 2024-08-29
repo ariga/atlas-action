@@ -7,7 +7,7 @@
     "format": "prettier --write shim/*.js",
     "format-check": "prettier --check shim/*.js",
     "lint": "eslint shim/*.js",
-    "shim": "scripts/shim_build.sh",
+    "shim": "ncc build shim -o shim/dist",
     "all": "npm run format && npm run lint && npm run shim"
   },
   "repository": {

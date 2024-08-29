@@ -43,4 +43,4 @@ outputs:
     description: The number of migrations that were applied.
 runs:
   using: node20
-  main: dist/index.js
+  main: index.js
