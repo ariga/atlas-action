@@ -76,6 +76,8 @@ type AtlasExec interface {
 	MigratePush(context.Context, *atlasexec.MigratePushParams) (string, error)
 	// MigrateTest runs the `migrate test` command.
 	MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error)
+	// SchemaPush runs the `schema push` command.
+	SchemaPush(context.Context, *atlasexec.SchemaPushParams) (string, error)
 	// SchemaTest runs the `schema test` command.
 	SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error)
 	// SchemaPlan runs the `schema plan` command.
@@ -360,6 +362,43 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 	}
 	a.Infof("`atlas migrate test` completed successfully, no issues found")
 	a.Infof(result)
+	return nil
+}
+
+// SchemaPush runs the GitHub Action for "ariga/atlas-action/schema/push"
+func (a *Actions) SchemaPush(ctx context.Context) error {
+	tc, err := a.GetTriggerContext()
+	if err != nil {
+		return err
+	}
+	params := &atlasexec.SchemaPushParams{
+		Repo:        a.GetInput("schema-name"),
+		Description: a.GetInput("description"),
+		Version:     a.GetInput("version"),
+		DevURL:      a.GetInput("dev-url"),
+		Context:     a.GetRunContext(ctx, tc),
+		ConfigURL:   a.GetInput("config"),
+		Env:         a.GetInput("env"),
+		Vars:        a.GetVarsInput("vars"),
+	}
+	if a.GetBoolInput("latest") {
+		// Push the "latest" tag.
+		_, err := a.Atlas.SchemaPush(ctx, params)
+		if err != nil {
+			return fmt.Errorf("failed to push schema: %v", err)
+		}
+	}
+	params.Tag = a.GetInput("tag")
+	if params.Tag == "" {
+		// If the tag is not provided, use the commit SHA.
+		params.Tag = params.Context.Commit
+	}
+	resp, err := a.Atlas.SchemaPush(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to push schema tag: %w", err)
+	}
+	a.Infof(`"atlas schema push" completed successfully to: %s`, resp)
+	a.SetOutput("url", resp)
 	return nil
 }
 

@@ -1,0 +1,1 @@
+require('../../shim/index.js')('schema/push')

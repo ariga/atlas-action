@@ -23,6 +23,7 @@ const (
 	CmdMigrateDown  = "migrate/down"
 	CmdMigrateTest  = "migrate/test"
 	// Declarative workflow Commands
+	CmdSchemaPush = "schema/push"
 	CmdSchemaTest = "schema/test"
 	CmdSchemaPlan = "schema/plan"
 )
@@ -100,6 +101,8 @@ func (r *RunActionCmd) Run(ctx context.Context, a *atlasaction.Actions) error {
 		return a.MigrateLint(ctx)
 	case CmdMigrateTest:
 		return a.MigrateTest(ctx)
+	case CmdSchemaPush:
+		return a.SchemaPush(ctx)
 	case CmdSchemaTest:
 		return a.SchemaTest(ctx)
 	case CmdSchemaPlan:
