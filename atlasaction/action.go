@@ -78,6 +78,14 @@ type AtlasExec interface {
 	MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error)
 	// SchemaTest runs the `schema test` command.
 	SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error)
+	// SchemaPlan runs the `schema plan` command.
+	SchemaPlan(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
+	// SchemaPlanList runs the `schema plan list` command.
+	SchemaPlanList(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
+	// SchemaPlanLint runs the `schema plan lint` command.
+	SchemaPlanLint(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
+	// SchemaPlanApprove runs the `schema plan approve` command.
+	SchemaPlanApprove(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 }
 
 // Context holds the context of the environment the action is running in.
@@ -89,6 +97,7 @@ type TriggerContext struct {
 	Commit      string       // Commit SHA.
 	PullRequest *PullRequest // PullRequest will be available if the event is "pull_request".
 	Actor       *Actor       // Actor is the user who triggered the action.
+	RerunCmd    string       // RerunCmd is the command to rerun the action.
 }
 
 // Actor holds the actor information.
@@ -372,6 +381,137 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 	return nil
 }
 
+// SchemaPlan runs the GitHub Action for "ariga/atlas-action/schema/plan"
+func (a *Actions) SchemaPlan(ctx context.Context) error {
+	err := a.RequiredInputs("config", "env", "from")
+	if err != nil {
+		return err
+	}
+	tc, err := a.GetTriggerContext()
+	if err != nil {
+		return fmt.Errorf("unable to get the trigger context: %w", err)
+	}
+	var plan *atlasexec.SchemaPlan
+	params := &atlasexec.SchemaPlanListParams{
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		Context:   a.GetRunContext(ctx, tc),
+		DevURL:    a.GetInput("dev-url"),
+		From:      a.GetArrayInput("from"),
+		To:        a.GetArrayInput("to"),
+		Pending:   true,
+	}
+	switch planFiles, err := a.Atlas.SchemaPlanList(ctx, params); {
+	case err != nil:
+		return fmt.Errorf("failed to list schema plans: %w", err)
+	// Multiple existing plans.
+	case len(planFiles) > 1:
+		for _, f := range planFiles {
+			a.Infof("Found schema plan: %s", f.URL)
+		}
+		// There are existing plans.
+		return fmt.Errorf("found multiple schema plans, please approve or delete the existing plans")
+	// Branch context with no plan
+	case tc.PullRequest == nil && len(planFiles) == 0:
+		a.Infof("No schema plan found")
+		return nil
+	// Branch context with pending plan
+	case tc.PullRequest == nil && len(planFiles) == 1:
+		result, err := a.Atlas.SchemaPlanApprove(ctx, &atlasexec.SchemaPlanApproveParams{
+			ConfigURL: params.ConfigURL,
+			Env:       params.Env,
+			Vars:      params.Vars,
+			URL:       planFiles[0].URL,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to approve the schema plan: %w", err)
+		}
+		// Successfully approved the plan.
+		a.Infof("Schema plan approved successfully: %s", result.Link)
+		a.SetOutput("link", result.Link)
+		a.SetOutput("plan", result.URL)
+		a.SetOutput("status", result.Status)
+		return nil
+	// PR context and existing plan
+	case tc.PullRequest != nil && len(planFiles) == 1:
+		a.Infof("Schema plan already exists, linting the plan %q", planFiles[0].Name)
+		plan, err = a.Atlas.SchemaPlanLint(ctx, &atlasexec.SchemaPlanLintParams{
+			ConfigURL: params.ConfigURL,
+			Env:       params.Env,
+			Vars:      params.Vars,
+			Context:   params.Context,
+			DevURL:    params.DevURL,
+			From:      params.From,
+			To:        params.To,
+			Repo:      params.Repo,
+			File:      planFiles[0].URL,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get the schema plan: %w", err)
+		}
+		// FIXME(giautm): Remove this workaround after fixing the schema URL issue.
+		plan.File.URL = planFiles[0].URL
+		plan.File.Link = planFiles[0].Link
+		plan.File.Status = "PENDING"
+	// PR context and no existing plan
+	case tc.PullRequest != nil && len(planFiles) == 0:
+		name := a.GetInput("name")
+	runPlan:
+		// Dry run if the name is not provided.
+		dryRun := name == ""
+		if !dryRun {
+			a.Infof("Schema plan does not exist, creating a new one with name %q", name)
+		}
+		switch plan, err = a.Atlas.SchemaPlan(ctx, &atlasexec.SchemaPlanParams{
+			ConfigURL: params.ConfigURL,
+			Env:       params.Env,
+			Vars:      params.Vars,
+			Context:   params.Context,
+			DevURL:    params.DevURL,
+			From:      params.From,
+			To:        params.To,
+			Repo:      params.Repo,
+			Name:      name,
+			DryRun:    dryRun,
+			Pending:   !dryRun,
+		}); {
+		// The schema plan is already in sync.
+		case err != nil && strings.Contains(err.Error(), "The current state is synced with the desired state, no changes to be made"):
+			// No thing to do.
+			a.Infof("The current state is synced with the desired state, no changes to be made")
+			return nil
+		case err != nil:
+			return fmt.Errorf("failed to save schema plan: %w", err)
+		case dryRun:
+			// Save the plan with the generated name.
+			name = fmt.Sprintf("pr-%d-%.8s", tc.PullRequest.Number, plan.File.FromHash)
+			goto runPlan
+		}
+	default:
+		return fmt.Errorf("unexpected context, please contact the atlas team")
+	}
+	// Set the output values from the schema plan.
+	a.SetOutput("link", plan.File.Link)
+	a.SetOutput("plan", plan.File.URL)
+	a.SetOutput("status", plan.File.Status)
+	// Report the schema plan to the user and add a comment to the PR.
+	summary, err := schemaPlanComment(plan, params.Env, tc.RerunCmd)
+	if err != nil {
+		return fmt.Errorf("failed to generate schema plan comment: %w", err)
+	}
+	a.AddStepSummary(summary)
+	// Comment on the PR
+	err = a.GithubClient(tc.Repo, tc.SCM.APIURL).
+		UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
+	if err != nil {
+		// Don't fail the action if the comment fails.
+		// It may be due to the missing permissions.
+		a.Errorf("failed to comment on the pull request: %v", err)
+	}
+	return nil
+}
+
 // WorkingDir returns the working directory for the action.
 func (a *Actions) WorkingDir() string {
 	return a.GetInput("working-directory")
@@ -444,6 +584,26 @@ func (a *Actions) GetVarsInput(name string) atlasexec.VarArgs {
 	return nil
 }
 
+// GetArrayInput returns the array input with the given name.
+// The input should be a string with new line separated values.
+// Example:
+// ```yaml
+//
+//	input: |-
+//	  value1
+//	  value2
+//
+// ```
+func (a *Actions) GetArrayInput(name string) []string {
+	vars := strings.Split(a.GetInput(name), "\n")
+	for i, v := range vars {
+		vars[i] = strings.TrimSpace(v)
+	}
+	return slices.DeleteFunc(vars, func(s string) bool {
+		return s == ""
+	})
+}
+
 // GetRunContext returns the run context for the action.
 func (a *Actions) GetRunContext(ctx context.Context, tc *TriggerContext) *atlasexec.RunContext {
 	url := tc.RepoURL
@@ -494,6 +654,16 @@ func (a *Actions) GithubClient(repo, baseURL string) *githubAPI {
 		repo:    repo,
 		client:  httpClient,
 	}
+}
+
+// RequiredInputs returns an error if any of the given inputs are missing.
+func (a *Actions) RequiredInputs(input ...string) error {
+	for _, in := range input {
+		if strings.TrimSpace(a.GetInput(in)) == "" {
+			return fmt.Errorf("required input %q is missing", in)
+		}
+	}
+	return nil
 }
 
 // addChecks runs annotations to the trigger event pull request for the given payload.
@@ -604,6 +774,19 @@ func (a *Actions) addSuggestions(lint *atlasexec.SummaryReport, fn func(*Suggest
 		}
 	}
 	return nil
+}
+
+func schemaPlanComment(payload *atlasexec.SchemaPlan, envName, rerun string) (string, error) {
+	data := map[string]any{
+		"Plan":         payload,
+		"EnvName":      envName,
+		"RerunCommand": rerun,
+	}
+	var buf bytes.Buffer
+	if err := commentsTmpl.ExecuteTemplate(&buf, "schema-plan.tmpl", data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 // Returns true if the summary report has diagnostics or errors.

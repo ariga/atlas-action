@@ -24,6 +24,7 @@ const (
 	CmdMigrateTest  = "migrate/test"
 	// Declarative workflow Commands
 	CmdSchemaTest = "schema/test"
+	CmdSchemaPlan = "schema/plan"
 )
 
 var (
@@ -101,6 +102,8 @@ func (r *RunActionCmd) Run(ctx context.Context, a *atlasaction.Actions) error {
 		return a.MigrateTest(ctx)
 	case CmdSchemaTest:
 		return a.SchemaTest(ctx)
+	case CmdSchemaPlan:
+		return a.SchemaPlan(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", r.Action)
 	}

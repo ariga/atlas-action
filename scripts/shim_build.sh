@@ -4,3 +4,4 @@ ncc build migrate/lint/index.js -o migrate/lint/dist
 ncc build migrate/down/index.js -o migrate/down/dist
 ncc build migrate/test/index.js -o migrate/test/dist
 ncc build schema/test/index.js -o schema/test/dist
+ncc build schema/plan/index.js -o schema/plan/dist

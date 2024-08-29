@@ -10,8 +10,10 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -257,7 +259,11 @@ func TestMigrateDown(t *testing.T) {
 }
 
 type mockAtlas struct {
-	migrateDown func(ctx context.Context, params *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
+	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
+	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
+	schemaPlanList    func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
+	schemaPlanLint    func(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
+	schemaPlanApprove func(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 }
 
 var _ AtlasExec = (*mockAtlas)(nil)
@@ -290,6 +296,26 @@ func (m *mockAtlas) MigrateTest(context.Context, *atlasexec.MigrateTestParams) (
 // SchemaTest implements AtlasExec.
 func (m *mockAtlas) SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error) {
 	panic("unimplemented")
+}
+
+// SchemaPlan implements AtlasExec.
+func (m *mockAtlas) SchemaPlan(ctx context.Context, p *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+	return m.schemaPlan(ctx, p)
+}
+
+// SchemaPlanList implements AtlasExec.
+func (m *mockAtlas) SchemaPlanList(ctx context.Context, p *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+	return m.schemaPlanList(ctx, p)
+}
+
+// SchemaPlanApprove implements AtlasExec.
+func (m *mockAtlas) SchemaPlanApprove(ctx context.Context, p *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error) {
+	return m.schemaPlanApprove(ctx, p)
+}
+
+// SchemaPlanLint implements AtlasExec.
+func (m *mockAtlas) SchemaPlanLint(ctx context.Context, p *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error) {
+	return m.schemaPlanLint(ctx, p)
 }
 
 func (m *mockAtlas) MigrateDown(ctx context.Context, params *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error) {
@@ -2151,4 +2177,273 @@ func must[T any](t T, err error) T {
 		panic(err)
 	}
 	return t
+}
+
+func TestSchemaPlan(t *testing.T) {
+	var (
+		commentCounter int
+		commentEdited  int
+	)
+	h := http.NewServeMux()
+	h.HandleFunc("GET /repos/ariga/atlas-action/issues/1/comments", func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+		if commentCounter == 0 {
+			fmt.Fprint(w, `[]`) // No comments
+		} else { // Existing comment
+			fmt.Fprintf(w, `[{"id":1,"body":"%s"}]`, commentMarker("pr-1-Rl4lBdMk"))
+		}
+	})
+	h.HandleFunc("POST /repos/ariga/atlas-action/issues/1/comments", func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+		commentCounter++
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{}`)
+	})
+	h.HandleFunc("PATCH /repos/ariga/atlas-action/issues/comments/1", func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+		commentEdited++
+		fmt.Fprint(w, `{}`)
+	})
+	h.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL)
+	})
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	planFile := &atlasexec.SchemaPlanFile{
+		Name:     "pr-1-Rl4lBdMk",
+		FromHash: "ufnTS7NrAgkvQlxbpnSxj119MAPGNqVj0i3Eelv+iLc=", // Used as comment marker
+		ToHash:   "Rl4lBdMkvFoGQ4xu+3sYCeogTVnamJ7bmDoq9pMXcjw=",
+		URL:      "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+		Link:     "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+		Status:   "PENDING",
+	}
+	var planFiles []atlasexec.SchemaPlanFile
+	var planErr, approveErr error
+	m := &mockAtlas{
+		schemaPlan: func(_ context.Context, p *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+			// Common input checks
+			require.Equal(t, "file://atlas.hcl", p.ConfigURL)
+			require.Equal(t, "test", p.Env)
+			require.Equal(t, "", p.Repo) // No repo, provided by atlas.hcl
+			if planErr != nil {
+				return nil, planErr
+			}
+			return &atlasexec.SchemaPlan{
+				Repo: "atlas-action",
+				File: planFile,
+				Lint: &atlasexec.SummaryReport{Files: []*atlasexec.FileReport{}},
+			}, nil
+		},
+		schemaPlanList: func(_ context.Context, p *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+			return planFiles, nil
+		},
+		schemaPlanLint: func(_ context.Context, p *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error) {
+			// Common input checks
+			require.Equal(t, "file://atlas.hcl", p.ConfigURL)
+			require.Equal(t, "test", p.Env)
+			require.Equal(t, "", p.Repo) // No repo, provided by atlas.hcl
+			require.Equal(t, "atlas://atlas-action/plans/pr-1-Rl4lBdMk", p.File)
+			return &atlasexec.SchemaPlan{
+				Repo: "atlas-action",
+				File: planFile,
+				Lint: &atlasexec.SummaryReport{Files: []*atlasexec.FileReport{}},
+			}, nil
+		},
+		schemaPlanApprove: func(_ context.Context, p *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error) {
+			require.Equal(t, "file://atlas.hcl", p.ConfigURL)
+			require.Equal(t, "atlas://atlas-action/plans/pr-1-Rl4lBdMk", p.URL)
+			if approveErr != nil {
+				return nil, approveErr
+			}
+			return &atlasexec.SchemaPlanApprove{
+				URL:    "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+				Link:   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+				Status: "APPROVED",
+			}, nil
+		},
+	}
+	t.Setenv("GITHUB_TOKEN", "token")
+	out := &bytes.Buffer{}
+	act := &mockAction{
+		inputs: map[string]string{
+			// "schema-name": "atlas://atlas-action",
+			"from":   "sqlite://file?_fk=1&mode=memory",
+			"config": "file://atlas.hcl",
+			"env":    "test",
+		},
+		logger: slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				if a.Key == slog.TimeKey {
+					return slog.String(slog.TimeKey, "NOW") // Fake time
+				}
+				return a
+			},
+		})),
+		trigger: &TriggerContext{
+			SCM:     SCM{Type: atlasexec.SCMTypeGithub, APIURL: srv.URL},
+			Repo:    "ariga/atlas-action",
+			RepoURL: "https://github.com/ariga/atlas-action",
+			Branch:  "g/feature-1",
+			Commit:  "commit-id",
+			PullRequest: &PullRequest{
+				Number: 1,
+				URL:    "https://github.com/ariga/atlas-action/pull/1",
+				Commit: "commit-id",
+			},
+		},
+	}
+	ctx := context.Background()
+	// Multiple plans will fail with an error
+	planFiles = []atlasexec.SchemaPlanFile{*planFile, *planFile}
+	act.resetOutputs()
+	require.ErrorContains(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx), "found multiple schema plans, please approve or delete the existing plans")
+	require.Len(t, act.summary, 0, "Expected 1 summary")
+	require.Equal(t, 0, commentCounter, "No more comments generated")
+	require.Equal(t, 0, commentEdited, "No comment should be edited")
+
+	// No changes
+	planErr = errors.New("The current state is synced with the desired state, no changes to be made")
+	planFiles = nil
+	act.resetOutputs()
+	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.Len(t, act.summary, 0, "No summaries generated")
+	require.Equal(t, 0, commentCounter, "Expected 1 comment generated")
+	require.Equal(t, 0, commentEdited, "No comment should be edited")
+
+	// No existing plan
+	planErr = nil
+	planFiles = nil
+	act.resetOutputs()
+	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.Len(t, act.summary, 1, "Expected 1 summary")
+	require.Equal(t, 1, commentCounter, "Expected 1 comment generated")
+	require.Equal(t, 0, commentEdited, "No comment should be edited")
+	require.EqualValues(t, map[string]string{
+		"plan":   "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+		"status": "PENDING",
+		"link":   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+	}, act.output, "expected output with plan URL")
+
+	// Existing plan
+	planFiles = []atlasexec.SchemaPlanFile{*planFile}
+	act.resetOutputs()
+	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.Len(t, act.summary, 2, "Expected 2 summaries")
+	require.Equal(t, 1, commentCounter, "No more comments generated")
+	require.Equal(t, 1, commentEdited, "Expected comment to be edited")
+	require.EqualValues(t, map[string]string{
+		"plan":   "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+		"status": "PENDING",
+		"link":   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+	}, act.output, "expected output with plan URL")
+
+	// Trigger with no pull request, master branch
+	act.trigger.PullRequest = nil
+	act.trigger.Branch = "master"
+	act.resetOutputs()
+	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.Len(t, act.summary, 2, "No more summaries generated")
+	require.Equal(t, 1, commentCounter, "No more comments generated")
+	require.Equal(t, 1, commentEdited, "No comment should be edited")
+	require.EqualValues(t, map[string]string{
+		"plan":   "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+		"status": "APPROVED",
+		"link":   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+	}, act.output, "expected output with plan URL")
+
+	// No pending plan
+	planFiles = nil
+	act.resetOutputs()
+	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.Len(t, act.summary, 2, "No more summaries generated")
+	require.Equal(t, 1, commentCounter, "No more comments generated")
+	require.Equal(t, 1, commentEdited, "No comment should be edited")
+	require.EqualValues(t, map[string]string{}, act.output, "expected output with plan URL")
+
+	// Check all logs output
+	require.Equal(t, `time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="The current state is synced with the desired state, no changes to be made"
+time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-ufnTS7Nr\""
+time=NOW level=INFO msg="Schema plan already exists, linting the plan \"pr-1-Rl4lBdMk\""
+time=NOW level=INFO msg="Schema plan approved successfully: https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="No schema plan found"
+`, out.String())
+}
+
+type mockAction struct {
+	trigger *TriggerContext   // trigger context
+	inputs  map[string]string // input values
+	output  map[string]string // step's output
+	summary []string          // step summaries
+	logger  *slog.Logger      // logger
+	fatal   bool              // fatal called
+}
+
+var _ Action = (*mockAction)(nil)
+
+func (m *mockAction) resetOutputs() {
+	m.output = map[string]string{}
+}
+
+// GetType implements Action.
+func (m *mockAction) GetType() atlasexec.TriggerType {
+	return atlasexec.TriggerTypeGithubAction
+}
+
+// GetTriggerContext implements Action.
+func (m *mockAction) GetTriggerContext() (*TriggerContext, error) {
+	return m.trigger, nil
+}
+
+// GetInput implements Action.
+func (m *mockAction) GetInput(name string) string {
+	return m.inputs[name]
+}
+
+// SetOutput implements Action.
+func (m *mockAction) SetOutput(name, value string) {
+	m.output[name] = value
+}
+
+// AddStepSummary implements Action.
+func (m *mockAction) AddStepSummary(s string) {
+	m.summary = append(m.summary, s)
+}
+
+// Infof implements Action.
+func (m *mockAction) Infof(msg string, args ...interface{}) {
+	m.logger.Info(fmt.Sprintf(msg, args...))
+}
+
+// Warningf implements Action.
+func (m *mockAction) Warningf(msg string, args ...interface{}) {
+	m.logger.Warn(fmt.Sprintf(msg, args...))
+}
+
+// Errorf implements Action.
+func (m *mockAction) Errorf(msg string, args ...interface{}) {
+	m.logger.Error(fmt.Sprintf(msg, args...))
+}
+
+// Fatalf implements Action.
+func (m *mockAction) Fatalf(msg string, args ...interface{}) {
+	m.Errorf(msg, args...)
+	m.fatal = true // Mark fatal called
+}
+
+// WithFieldsMap implements Action.
+func (m *mockAction) WithFieldsMap(args map[string]string) Logger {
+	argPairs := make([]any, 0, len(args)*2)
+	for k, v := range args {
+		argPairs = append(argPairs, k, v)
+	}
+	return &mockAction{
+		inputs:  m.inputs,
+		trigger: m.trigger,
+		output:  m.output,
+		summary: m.summary,
+		fatal:   m.fatal,
+		logger:  m.logger.With(argPairs...),
+	}
 }
