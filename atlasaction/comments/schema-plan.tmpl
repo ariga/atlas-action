@@ -9,7 +9,9 @@
 #### Atlas lint results
 {{ template "lint-report" .Plan.Lint }}
 
-To edit this plan, follow these steps:
+---
+<details>
+<summary>To edit this plan, follow these steps</summary>
 
 - Run `atlas schema plan pull --url "{{ .Plan.File.URL }}" > {{ .Plan.File.Name }}.plan.hcl`
 - Modify the plan.
@@ -17,3 +19,4 @@ To edit this plan, follow these steps:
 {{- if .RerunCommand }}
 - Re-trigger this action using `{{ .RerunCommand }}`
 {{- end }}
+</details>
