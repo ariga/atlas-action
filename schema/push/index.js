@@ -1,1 +1,1 @@
-require('../../shim/index.js')('schema/push')
+require('../../shim/dist')('schema/push')

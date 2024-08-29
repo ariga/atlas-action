@@ -48,4 +48,4 @@ outputs:
     description: The status of the plan. (ig. `PENDING`, `APPROVED`)
 runs:
   using: node20
-  main: dist/index.js
+  main: index.js

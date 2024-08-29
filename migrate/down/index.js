@@ -1,1 +1,1 @@
-require('../../shim/index.js')('migrate/down')
+require('../../shim/dist')('migrate/down')
