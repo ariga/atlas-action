@@ -260,6 +260,7 @@ func TestMigrateDown(t *testing.T) {
 
 type mockAtlas struct {
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
+	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (string, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
 	schemaPlanList    func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
 	schemaPlanLint    func(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
@@ -291,6 +292,11 @@ func (m *mockAtlas) MigratePush(context.Context, *atlasexec.MigratePushParams) (
 // MigrateTest implements AtlasExec.
 func (m *mockAtlas) MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error) {
 	panic("unimplemented")
+}
+
+// SchemaPush implements AtlasExec.
+func (m *mockAtlas) SchemaPush(ctx context.Context, p *atlasexec.SchemaPushParams) (string, error) {
+	return m.schemaPush(ctx, p)
 }
 
 // SchemaTest implements AtlasExec.
