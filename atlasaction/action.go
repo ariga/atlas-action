@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
 )
 
@@ -606,6 +607,11 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 		return fmt.Errorf("unable to get the trigger context: %w", err)
 	case tc.PullRequest != nil:
 		return fmt.Errorf("the action should be run in a branch context")
+	default:
+		// Check the approval checks for the schema plan.
+		if err = a.ApprovalChecks(ctx, tc); err != nil {
+			return err
+		}
 	}
 	params := &atlasexec.SchemaPlanApproveParams{
 		ConfigURL: a.GetInput("config"),
@@ -690,6 +696,37 @@ func (a *Actions) SchemaApply(ctx context.Context) error {
 		a.SetOutput("error", err.Error())
 		return err
 	}
+	return nil
+}
+
+// ApprovalChecks checks the approval checks for the schema plan.
+// It will fail the action if the approval checks are not satisfied.
+func (a *Actions) ApprovalChecks(ctx context.Context, tc *TriggerContext) error {
+	if !a.GetBoolInput("require-approval") {
+		return nil
+	}
+	triggerComment := "/approved"
+	approvers := a.GetArrayInput("approvers")
+	c := a.GithubClient(tc.Repo, tc.SCM.APIURL)
+	pr, err := c.MergedPullRequest(ctx, tc.Commit)
+	if err != nil {
+		return fmt.Errorf("failed to get the pull request: %w", err)
+	}
+	comments, err := c.getIssueComments(ctx, pr)
+	if err != nil {
+		return fmt.Errorf("failed to get the pull request comments: %w", err)
+	}
+	approved := slices.IndexFunc(comments, func(c githubIssueComment) bool {
+		if c.AuthorHasAccess() && c.HasCommand(triggerComment) {
+			return len(approvers) == 0 || slices.Contains(approvers, c.Author())
+		}
+		return false
+	})
+	if approved == -1 {
+		a.Errorf("Please comment %q on the pull request to approve the action: %s", triggerComment, pr.URL)
+		return errors.New("Approval checks failed")
+	}
+	a.Infof("The action approved by %q", comments[approved].Author())
 	return nil
 }
 
@@ -1053,10 +1090,15 @@ func RenderTemplate(name string, data any) (string, error) {
 
 type (
 	githubIssueComment struct {
-		ID   int    `json:"id"`
-		Body string `json:"body"`
+		ID                int        `json:"id"`
+		Body              string     `json:"body"`
+		AuthorAssociation string     `json:"author_association"`
+		User              githubUser `json:"user"`
 	}
-
+	githubUser struct {
+		ID    int    `json:"id"`
+		Login string `json:"login"`
+	}
 	pullRequestComment struct {
 		ID        int    `json:"id,omitempty"`
 		Body      string `json:"body"`
@@ -1074,10 +1116,47 @@ type (
 		baseURL string
 		repo    string
 		client  *http.Client
+		gql     *githubv4.Client
 	}
 )
 
 const defaultGHApiUrl = "https://api.github.com"
+
+func (g *githubAPI) MergedPullRequest(ctx context.Context, commitID string) (*PullRequest, error) {
+	owner, repo, err := g.ownerRepo()
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		Repository struct {
+			Object struct {
+				Commit struct {
+					AssociatedPullRequests struct {
+						Nodes []struct {
+							Number int
+							URL    string
+						}
+					} `graphql:"associatedPullRequests(first: 1)"`
+				} `graphql:"... on Commit"`
+			} `graphql:"object(expression: $commit)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	err = g.gql.Query(ctx, &resp, map[string]any{
+		"owner":  githubv4.String(owner),
+		"name":   githubv4.String(repo),
+		"commit": githubv4.String(commitID),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if prs := resp.Repository.Object.Commit.AssociatedPullRequests.Nodes; len(prs) > 0 {
+		return &PullRequest{
+			Number: prs[0].Number,
+			URL:    prs[0].URL,
+		}, nil
+	}
+	return nil, nil
+}
 
 func (g *githubAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
 	comments, err := g.getIssueComments(ctx, pr)
@@ -1351,6 +1430,21 @@ func (g *githubAPI) ownerRepo() (string, string, error) {
 		return "", "", fmt.Errorf("GITHUB_REPOSITORY must be in the format of 'owner/repo'")
 	}
 	return s[0], s[1], nil
+}
+
+// AuthorHasAccess returns true if the author has write access to the repository.
+func (c githubIssueComment) AuthorHasAccess() bool {
+	return slices.Contains([]string{"OWNER", "MEMBER", "COLLABORATOR"}, c.AuthorAssociation)
+}
+
+// Author returns the author of the comment.
+func (c githubIssueComment) Author() string {
+	return c.User.Login
+}
+
+// HasCommand returns true if the comment has the given command.
+func (c githubIssueComment) HasCommand(cmd string) bool {
+	return strings.Contains(c.Body, cmd)
 }
 
 // commentMarker creates a hidden marker to identify the comment as one created by this action.

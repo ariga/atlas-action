@@ -41,6 +41,15 @@ inputs:
     description: |
       URL(s) of the desired schema state.
     required: false
+  require-approval:
+    description: |
+      Whether to require approval before applying the plan. By default, Atlas will not require approval.
+    default: 'false'
+    required: false
+  approvers:
+    description: |
+      A list of approvers for the plan. By default, all users with write access to the repository are approvers.
+    required: false
 outputs:
   plan:
     description: The plan to be applied or generated. (ig. `atlas://<schema>/plans/<id>`)
