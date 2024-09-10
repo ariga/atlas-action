@@ -422,7 +422,7 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 
 // SchemaPlan runs the GitHub Action for "ariga/atlas-action/schema/plan"
 func (a *Actions) SchemaPlan(ctx context.Context) error {
-	err := a.RequiredInputs("config", "env", "from")
+	err := a.RequiredInputs("config", "env")
 	if err != nil {
 		return err
 	}

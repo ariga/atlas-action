@@ -7,7 +7,7 @@ inputs:
   from:
     description: |
       URL(s) of the current schema state.
-    required: true
+    required: false
   to:
     description: |
       URL(s) of the desired schema state.
