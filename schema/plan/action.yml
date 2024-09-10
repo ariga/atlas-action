@@ -4,13 +4,8 @@ branding:
   icon: database
 author: 'Ariga'
 inputs:
-  from:
-    description: |
-      URL(s) of the current schema state.
-    required: true
-  to:
-    description: |
-      URL(s) of the desired schema state.
+  working-directory:
+    description: Atlas working directory, default is project root
     required: false
   config:
     description: |
@@ -22,9 +17,6 @@ inputs:
   env:
     description: The environment to use from the Atlas configuration file. For example, `dev`.
     required: false
-  working-directory:
-    description: Atlas working directory, default is project root
-    required: false
   vars:
     description: |
       A JSON object containing variables to be used in the Atlas configuration file.
@@ -34,6 +26,14 @@ inputs:
     description: |
       The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
       Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+    required: false
+  from:
+    description: |
+      URL(s) of the current schema state.
+    required: false
+  to:
+    description: |
+      URL(s) of the desired schema state.
     required: false
   name:
     description: |
