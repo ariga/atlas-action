@@ -15,7 +15,7 @@
 
 - Run `atlas schema plan pull --url "{{ .Plan.File.URL }}" > {{ .Plan.File.Name }}.plan.hcl`
 - Modify the plan.
-- Push the plan using `atlas schema plan push --env {{ .EnvName }} --file {{ .Plan.File.Name }}.plan.hcl`
+- Push the plan using `atlas schema plan push --pending --env {{ .EnvName }} --file {{ .Plan.File.Name }}.plan.hcl`
 {{- if .RerunCommand }}
 - Re-trigger this action using `{{ .RerunCommand }}`
 {{- end }}
