@@ -1,88 +1,78 @@
-{{- if .Error }}
+{{- block "migrate-header" . -}}
 <h2>
-    <img height="17" src="https://release.ariga.io/images/assets/error.svg"/> Migration Failed
+{{- if .Error -}}
+{{- assetsImage "error.svg" | image "22px" }} Migration Failed
+{{- else -}}
+{{- assetsImage "success.svg" | image "22px" }} Migration Passed
+{{- end -}}
 </h2>
-{{- else }}
-<h2>
-    <img height="17" src="https://release.ariga.io/images/assets/success.svg"/> Migration Passed
-</h2>
-{{- end }}
-
-#### `atlas migrate apply` Summary:
-
+{{- end -}}
+<h4><code>atlas migrate apply</code> Summary:</h4>
 <table>
-    <tr>
-        <th>Parameter</th>
-        <th>Details</th>
-    </tr>
-    <tr>
-        <td>Migration Directory</td>
-        <td><code>{{ .Dir }}</code></td>
-    </tr>
-    <tr>
-        <td>Database URL</td>
-        <td><code>{{ .URL.URL }}</code></td>
-    </tr>
-    {{- if .Current }}
-    <tr>
-        <td>Migrate from Version</td>
-        <td><code>{{ .Current }}</code></td>
-    </tr>
-    {{- end }}
-    <tr>
-        <td>Migrate to Version</td>
-       <td>
-        <code>{{- if .Target }}{{ .Target }}{{- else }}{{ .Current }}{{- end }}</code>
-       </td>
-    </tr>
-    <tr>
-        <td>SQL Summary</td>
-        <td>{{ len .Applied }} migration file{{- if or (not .Applied) (gt (len .Applied) 1) }}s{{- end }}
-        {{- if appliedStmts . }}, {{ appliedStmts . }} statement{{- if gt (appliedStmts .) 1 }}s{{- end }} passed {{- end }} {{- if .Error }}, 1 failed{{- end }}</td>
-    </tr>
-    <tr>
-        <td>Total Time</td>
-        <td>{{ execTime .Start .End }}</td>
-    </tr>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Migration Directory</td>
+    <td><code>{{ .Dir }}</code></td>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>{{ .URL.URL }}</code></td>
+  </tr>
+  {{- with .Current }}
+  <tr>
+    <td>Migrate from Version</td>
+    <td><code>{{ . }}</code></td>
+  </tr>
+  {{- end }}
+  <tr>
+    <td>Migrate to Version</td>
+    <td>
+      <code>{{- if .Target }}{{ .Target }}{{- else }}{{ .Current }}{{- end }}</code>
+    </td>
+  </tr>
+  <tr>
+    <td>SQL Summary</td>
+    <td>{{ len .Applied }} migration file{{- if or (not .Applied) (gt (len .Applied) 1) }}s{{- end }}
+    {{- if appliedStmts . }}, {{ appliedStmts . }} statement{{- if gt (appliedStmts .) 1 }}s{{- end }} passed {{- end }} {{- if .Error }}, 1 failed{{- end }}</td>
+  </tr>
+  <tr>
+    <td>Total Time</td>
+    <td>{{ execTime .Start .End }}</td>
+  </tr>
 </table>
-
-{{- range .Applied }}
-
-#### Version {{ .Name }}:
+{{- range .Applied -}}
+{{- block "applied-file" . -}}
+<h4>Version {{ .Name }}:</h4>
 <table>
-    <tr>
-        <th>Status</th>
-        <th>Executed Statements</th>
-        <th>Execution Time</th>
-        <th>Error</th>
-        <th>Error Statement</th>
-    </tr>
-    <tr>
-        <td>{{ if .Error }}
-        <div justify-content="center">
-            <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
-        </div>
-        {{- else }}
-        <div align="center">
-            <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-        </div>
-        {{- end }}
-        </td>
-        <td>{{ len .Applied }}</td>
-        <td>{{ execTime .Start .End }}</td>
-        <td>{{ if .Error }}{{ .Error.Text }}{{ else }}-{{ end }}</td>
-        <td>{{ if .Error }}<details><summary>📄 View</summary><pre><code>{{ .Error.Stmt }}</code></pre></details>{{ else }}-{{ end }}</td>
-    </tr>
+  <tr>
+    <th>Status</th>
+    <th>Executed Statements</th>
+    <th>Execution Time</th>
+    <th>Error</th>
+    <th>Error Statement</th>
+  </tr>
+  <tr>
+    <td>
+      <div align="center">
+      {{- if .Error -}}
+      {{- assetsImage "error.svg" | image "20px" -}}
+      {{- else -}}
+      {{- assetsImage "success.svg" | image "20px" -}}
+      {{- end -}}
+      </div>
+    </td>
+    <td>{{ len .Applied }}</td>
+    <td>{{ execTime .Start .End }}</td>
+{{- with .Error -}}
+    <td>{{- .Text -}}</td><td>{{- .Stmt | codeblock "sql" | details "📄 View" -}}</td>
+{{- else -}}
+    <td>-</td><td>-</td>
+{{- end -}}
+  </tr>
 </table>
-
-<details>
-<summary>📄 View SQL Statements</summary>
-
-```sql
-{{- range .Applied }}
-{{ . }}
-{{- end }}
-```
-</details>
-
-{{ end }}
+{{- end -}}
+{{- join .Applied "\n" | codeblock "sql" | details "📄 View SQL Statements" -}}
+{{- end -}}
