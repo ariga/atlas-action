@@ -13,12 +13,26 @@
         <div align="center">{{- assetsImage "success.svg" | image "20px" -}}</div>
       </td>
       <td>
-        {{- $fileCount := len .Files }}
-        {{ if $fileCount }}{{ $fileCount }} new{{ else }}No{{ end }} migration file{{ if ne $fileCount 1 }}s{{ end }} detected
+        {{- $fileCount := len .Files -}}
+        {{- if eq $fileCount 1 -}}
+          1 new migration file detected
+        {{- else if $fileCount -}}
+          {{- $fileCount }} new migration files detected
+        {{- else -}}
+          No migration files detected
+        {{- end -}}
       </td>
-      <td>{{- if not .Files }}&nbsp;{{ else }}{{ range $i, $f := .Files }}{{ if $i }}<br/>{{ end }}{{ $f.Name }}{{- end -}}{{- end -}}</td>
+      <td>
+        {{- with .Files -}}
+          {{- range $i, $f := . -}}
+            {{- if $i -}}<br/>{{- end -}}{{- $f.Name -}}
+          {{- end -}}
+        {{- else -}}
+          &nbsp;
+        {{- end -}}
+      </td>
     </tr>
-{{- with .URL }}
+{{- with .URL -}}
     <tr>
       <td>
         <div align="center">{{ assetsImage "success.svg" | image "20px" }}</div>
@@ -28,34 +42,18 @@
         {{- printf "%s#erd" . | link "View Visualization" -}}
       </td>
     </tr>
-{{- end }}
-{{- if not (hasComments .) }}
+{{- end -}}
+{{- with (.Steps | filterIssues) -}}
+  {{- range $step := . -}}
     <tr>
+      <td><div align="center">{{- $step | issueIcon | assetsImage | image "20px" -}}</div></td>
+      <td>{{- $step.Name -}}<br/>{{- $step.Text -}}</td>
       <td>
-        <div align="center">
-        {{- assetsImage "success.svg" | image "20px" -}}
-        </div>
-      </td>
-      <td>No issues found</td>
-      <td>{{- with .URL }}{{ . | link "View Report" }}{{- end -}}</td>
-    </tr>
-{{- end }}
-{{- if hasComments . -}}
-  {{- range $step := .Steps -}}
-    {{- if stepHasComments $step -}}
-    <tr><td><div align="center">
-      {{- if stepHasErrors $step -}}
-          {{- assetsImage "error.svg" | image "20px" -}}
-      {{- else -}}
-          {{- assetsImage "warning.svg" | image "20px" -}}
-        </div>
-      {{- end -}}
-      </td><td>{{ $step.Name }}<br/>{{ $step.Text }}</td><td>
       {{- if and $step.Error (not $step.Result) -}}
         {{- $step.Error -}}
       {{- else if $step.Result -}}
         {{- range $step.Result.Reports -}}
-          {{- with .Text }}<b>{{ . | firstUpper }}</b><br/>{{- end -}}
+          {{- with .Text -}}<b>{{ . | firstUpper }}</b><br/>{{- end -}}
           {{- range .Diagnostics -}}
             {{- .Text -}}
             {{- with .Code -}}
@@ -65,13 +63,23 @@
           {{- end -}}
         {{- end -}}
       {{- end -}}
-      </td></tr>
-    {{- end -}}
+      </td>
+    </tr>
   {{- end -}}
-{{- end }}
-{{- with .URL -}}
-    <tr><td colspan="4"><div align="center">Read the full linting report on {{ . | link "Atlas Cloud" -}}
-        </div></td></tr>
+{{- else -}}
+    <tr>
+      <td>
+        <div align="center">
+        {{- assetsImage "success.svg" | image "20px" -}}
+        </div>
+      </td>
+      <td>No issues found</td>
+      <td>{{- with .URL }}{{ . | link "View Report" }}{{- end -}}</td>
+    </tr>
 {{- end -}}
-  </tbody></table>
+{{- with .URL -}}
+    <tr><td colspan="4"><div align="center">Read the full linting report on {{ . | link "Atlas Cloud" -}}</div></td></tr>
+{{- end -}}
+  </tbody>
+</table>
 {{- end -}}

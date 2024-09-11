@@ -829,45 +829,6 @@ func schemaPlanComment(payload *atlasexec.SchemaPlan, envName, rerun string) (st
 	return buf.String(), nil
 }
 
-// Returns true if the summary report has diagnostics or errors.
-func hasComments(s *atlasexec.SummaryReport) bool {
-	for _, f := range s.Files {
-		if f.Error != "" {
-			return true
-		}
-		if len(f.Reports) > 0 {
-			return true
-		}
-	}
-	for _, step := range s.Steps {
-		if stepHasComments(step) {
-			return true
-		}
-	}
-	return false
-}
-
-// Returns true if the step has diagnostics or comments.
-func stepHasComments(s *atlasexec.StepReport) bool {
-	if s.Error != "" {
-		return true
-	}
-	if s.Result == nil {
-		return false
-	}
-	return s.Result.Error != "" || len(s.Result.Reports) > 0
-}
-
-func stepHasErrors(s *atlasexec.StepReport) bool {
-	if s.Error != "" {
-		return true
-	}
-	if s.Result == nil {
-		return false
-	}
-	return s.Result.Error != ""
-}
-
 func execTime(start, end time.Time) string {
 	return end.Sub(start).String()
 }
@@ -886,11 +847,27 @@ var (
 	commentsTmpl = template.Must(
 		template.New("comments").
 			Funcs(template.FuncMap{
-				"execTime":        execTime,
-				"appliedStmts":    appliedStmts,
-				"hasComments":     hasComments,
-				"stepHasComments": stepHasComments,
-				"stepHasErrors":   stepHasErrors,
+				"execTime":     execTime,
+				"appliedStmts": appliedStmts,
+				"filterIssues": func(steps []*atlasexec.StepReport) []*atlasexec.StepReport {
+					result := make([]*atlasexec.StepReport, 0, len(steps))
+					for _, s := range steps {
+						switch {
+						case s.Error != "":
+							result = append(result, s)
+						case s.Result == nil: // No result.
+						case s.Result.Error != "" || len(s.Result.Reports) > 0:
+							result = append(result, s)
+						}
+					}
+					return result
+				},
+				"issueIcon": func(s *atlasexec.StepReport) string {
+					if s.Error != "" || (s.Result != nil && s.Result.Error != "") {
+						return "error.svg"
+					}
+					return "warning.svg"
+				},
 				"firstUpper": func(s string) string {
 					if s == "" {
 						return ""
