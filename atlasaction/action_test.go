@@ -45,7 +45,7 @@ func TestMigrateApply(t *testing.T) {
 
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>20230922132634</code>")
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n    <td>\n      <code>20230922132634</code>")
 		require.Contains(t, string(c), "Migration Passed")
 		require.Contains(t, string(c), "1 migration file, 1 statement passed")
 	})
@@ -58,7 +58,7 @@ func TestMigrateApply(t *testing.T) {
 
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>20240619073319</code>")
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n    <td>\n      <code>20240619073319</code>")
 		require.Contains(t, string(c), "Migration Failed")
 		require.Contains(t, string(c), "2 migration files, 3 statements passed, 1 failed")
 
@@ -147,7 +147,7 @@ func TestMigrateDown(t *testing.T) {
 		require.NoError(t, err)
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>3</code>")
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n    <td>\n      <code>3</code>")
 		require.Contains(t, string(c), "Migration Passed")
 		require.Contains(t, string(c), "3 migration files, 3 statements passed")
 		tt.resetOut(t)
@@ -738,7 +738,7 @@ func TestMigrateLint(t *testing.T) {
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
 		sum := string(c)
-		require.Contains(t, sum, "`atlas migrate lint` on <strong>testdata/migrations_destructive</strong>\n")
+		require.Contains(t, sum, "<code>atlas migrate lint</code> on <strong>testdata/migrations_destructive</strong>")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 reports were found in analysis")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
@@ -821,7 +821,7 @@ func TestMigrateLint(t *testing.T) {
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
 		sum := string(c)
-		require.Contains(t, sum, "`atlas migrate lint` on <strong>testdata/drop_column</strong>\n")
+		require.Contains(t, sum, "<code>atlas migrate lint</code> on <strong>testdata/drop_column</strong>")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 reports were found in analysis")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
@@ -915,7 +915,7 @@ func TestMigrateLint(t *testing.T) {
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
 		sum := string(c)
-		require.Contains(t, sum, "`atlas migrate lint` on <strong>migrations_destructive</strong>\n")
+		require.Contains(t, sum, "<code>atlas migrate lint</code> on <strong>migrations_destructive</strong>")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 reports were found in analysis")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
@@ -1007,7 +1007,7 @@ func TestMigrateLint(t *testing.T) {
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
 		sum := string(c)
-		require.Contains(t, sum, "`atlas migrate lint` on <strong>migrations_destructive</strong>\n")
+		require.Contains(t, sum, "<code>atlas migrate lint</code> on <strong>migrations_destructive</strong>")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 reports were found in analysis")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
@@ -1075,7 +1075,7 @@ func TestMigrateLint(t *testing.T) {
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
 		sum := string(c)
-		require.Contains(t, sum, "`atlas migrate lint` on <strong>testdata/diagnostics</strong>\n")
+		require.Contains(t, sum, "<code>atlas migrate lint</code> on <strong>testdata/diagnostics</strong>")
 		require.Contains(t, sum, "2 new migration files detected")
 		require.Contains(t, sum, "1 reports were found in analysis")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
@@ -1097,7 +1097,7 @@ func TestMigrateLint(t *testing.T) {
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
 		sum := string(c)
-		require.Contains(t, sum, "`atlas migrate lint` on <strong>testdata/migrations</strong>\n")
+		require.Contains(t, sum, "<code>atlas migrate lint</code> on <strong>testdata/migrations</strong>")
 		require.Contains(t, sum, "1 new migration file detected")
 		require.Contains(t, sum, "No issues found")
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
@@ -1264,61 +1264,7 @@ func TestLintTemplateGeneration(t *testing.T) {
 				Files: []*atlasexec.FileReport{{Name: "20230925192914.sql"}},
 			},
 			// language=html
-			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
-<table>
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>Step</th>
-            <th>Result</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                1 new migration file detected
-            </td>
-            <td>20230925192914.sql
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                ERD and visual diff generated
-            </td>
-            <td>
-                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                No issues found
-            </td>
-            <td>
-                <a href="https://migration-lint-report-url" target="_blank">View Report</a>
-            </td>
-        </tr>
-    <td colspan="4">
-        <div align="center">
-            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
-        </div>
-    </td>
-    </tbody>
-</table>`,
+			expected: "<code>atlas migrate lint</code> on <strong>testdata/migrations</strong><table>\n  <thead>\n    <tr>\n      <th>Status</th>\n      <th>Step</th>\n      <th>Result</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>\n        1 new migration file detected\n      </td>\n      <td>20230925192914.sql</td>\n    </tr>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>ERD and visual diff generated</td>\n      <td><a href=\"https://migration-lint-report-url#erd\" target=\"_blank\">View Visualization</a></td>\n    </tr>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>No issues found</td>\n      <td><a href=\"https://migration-lint-report-url\" target=\"_blank\">View Report</a></td>\n    </tr><tr><td colspan=\"4\"><div align=\"center\">Read the full linting report on <a href=\"https://migration-lint-report-url\" target=\"_blank\">Atlas Cloud</a></div></td></tr></tbody></table>",
 		},
 		{
 			name: "file with 2 issues",
@@ -1379,63 +1325,7 @@ func TestLintTemplateGeneration(t *testing.T) {
 				}},
 			},
 			// language=html
-			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
-<table>
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>Step</th>
-            <th>Result</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                1 new migration file detected
-            </td>
-            <td>20230925192914.sql
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                ERD and visual diff generated
-            </td>
-            <td>
-                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
-                </div>
-            </td>
-            <td>
-                Analyze 20230925192914.sql <br/> 2 reports were found in analysis
-            </td>
-            <td>
-                <b>Data dependent changes detected</b><br/>
-                Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries <a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a><br/>
-                Adding a non-nullable "varchar" column "City" on table "Persons" without a default value implicitly sets existing rows with "" <a href="https://atlasgo.io/lint/analyzers#MY101" target="_blank">(MY101)</a><br/>
-            </td>
-        </tr>
-    <td colspan="4">
-        <div align="center">
-            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
-        </div>
-    </td>
-    </tbody>
-</table>`,
+			expected: "<code>atlas migrate lint</code> on <strong>testdata/migrations</strong><table>\n  <thead>\n    <tr>\n      <th>Status</th>\n      <th>Step</th>\n      <th>Result</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>\n        1 new migration file detected\n      </td>\n      <td>20230925192914.sql</td>\n    </tr>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>ERD and visual diff generated</td>\n      <td><a href=\"https://migration-lint-report-url#erd\" target=\"_blank\">View Visualization</a></td>\n    </tr><tr><td><div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/warning.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/warning.svg?v=1\"/></picture></div></td><td>Analyze 20230925192914.sql<br/>2 reports were found in analysis</td><td><b>Data dependent changes detected</b><br/>Adding a unique index \"idx_unique_fullname\" on table \"Persons\" might fail in case columns \"FirstName\", \"LastName\" contain duplicate entries&nbsp;<a href=\"https://atlasgo.io/lint/analyzers#MF101\" target=\"_blank\">(MF101)</a><br/>Adding a non-nullable \"varchar\" column \"City\" on table \"Persons\" without a default value implicitly sets existing rows with \"\"&nbsp;<a href=\"https://atlasgo.io/lint/analyzers#MY101\" target=\"_blank\">(MY101)</a><br/></td></tr><tr><td colspan=\"4\"><div align=\"center\">Read the full linting report on <a href=\"https://migration-lint-report-url\" target=\"_blank\">Atlas Cloud</a></div></td></tr></tbody></table>",
 		},
 		{
 			name: "2 files, 1 with error, 1 with issue",
@@ -1513,76 +1403,7 @@ func TestLintTemplateGeneration(t *testing.T) {
 				},
 			},
 			// language=html
-			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
-<table>
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>Step</th>
-            <th>Result</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                2 new migration files detected
-            </td>
-            <td>20230925192914.sql<br/>20230925192915.sql
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                ERD and visual diff generated
-            </td>
-            <td>
-                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
-                </div>
-            </td>
-            <td>
-                Analyze 20230925192914.sql <br/> 1 reports were found in analysis
-            </td>
-            <td>
-                <b>Data dependent changes detected</b><br/>
-                Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries <a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a><br/>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
-                </div>
-            </td>
-            <td>
-                Analyze 20240625104520_destructive.sql <br/> 1 reports were found in analysis
-            </td>
-            <td>
-                <b>Destructive changes detected</b><br/>
-                Dropping table "Persons" <a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/>
-            </td>
-        </tr>
-    <td colspan="4">
-        <div align="center">
-            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
-        </div>
-    </td>
-    </tbody>
-</table>`,
+			expected: "<code>atlas migrate lint</code> on <strong>testdata/migrations</strong><table>\n  <thead>\n    <tr>\n      <th>Status</th>\n      <th>Step</th>\n      <th>Result</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>\n        2 new migration files detected\n      </td>\n      <td>20230925192914.sql<br/>20230925192915.sql</td>\n    </tr>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>ERD and visual diff generated</td>\n      <td><a href=\"https://migration-lint-report-url#erd\" target=\"_blank\">View Visualization</a></td>\n    </tr><tr><td><div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/warning.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/warning.svg?v=1\"/></picture></div></td><td>Analyze 20230925192914.sql<br/>1 reports were found in analysis</td><td><b>Data dependent changes detected</b><br/>Adding a unique index \"idx_unique_fullname\" on table \"Persons\" might fail in case columns \"FirstName\", \"LastName\" contain duplicate entries&nbsp;<a href=\"https://atlasgo.io/lint/analyzers#MF101\" target=\"_blank\">(MF101)</a><br/></td></tr><tr><td><div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/error.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/error.svg?v=1\"/></picture></td><td>Analyze 20240625104520_destructive.sql<br/>1 reports were found in analysis</td><td><b>Destructive changes detected</b><br/>Dropping table \"Persons\"&nbsp;<a href=\"https://atlasgo.io/lint/analyzers#DS102\" target=\"_blank\">(DS102)</a><br/></td></tr><tr><td colspan=\"4\"><div align=\"center\">Read the full linting report on <a href=\"https://migration-lint-report-url\" target=\"_blank\">Atlas Cloud</a></div></td></tr></tbody></table>",
 		},
 		{
 			name: "1 checksum error",
@@ -1604,61 +1425,7 @@ func TestLintTemplateGeneration(t *testing.T) {
 				}},
 			},
 			// language=html
-			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
-<table>
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>Step</th>
-            <th>Result</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                1 new migration file detected
-            </td>
-            <td>20230925192914.sql
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                ERD and visual diff generated
-            </td>
-            <td>
-                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/error.svg"/>
-                </div>
-            </td>
-            <td>
-                Migration Integrity Check <br/> File atlas.sum is invalid
-            </td>
-            <td>
-                checksum mismatch
-            </td>
-        </tr>
-    <td colspan="4">
-        <div align="center">
-            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
-        </div>
-    </td>
-    </tbody>
-</table>`,
+			expected: "<code>atlas migrate lint</code> on <strong>testdata/migrations</strong><table>\n  <thead>\n    <tr>\n      <th>Status</th>\n      <th>Step</th>\n      <th>Result</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>\n        1 new migration file detected\n      </td>\n      <td>20230925192914.sql</td>\n    </tr>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>ERD and visual diff generated</td>\n      <td><a href=\"https://migration-lint-report-url#erd\" target=\"_blank\">View Visualization</a></td>\n    </tr><tr><td><div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/error.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/error.svg?v=1\"/></picture></td><td>Migration Integrity Check<br/>File atlas.sum is invalid</td><td>checksum mismatch</td></tr><tr><td colspan=\"4\"><div align=\"center\">Read the full linting report on <a href=\"https://migration-lint-report-url\" target=\"_blank\">Atlas Cloud</a></div></td></tr></tbody></table>",
 		},
 		{
 			name: "non linear history error",
@@ -1691,61 +1458,7 @@ func TestLintTemplateGeneration(t *testing.T) {
 				},
 			},
 			// language=html
-			expected: "`atlas migrate lint`" + ` on <strong>testdata/migrations</strong>
-<table>
-    <thead>
-        <tr>
-            <th>Status</th>
-            <th>Step</th>
-            <th>Result</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                No migration files detected
-            </td>
-            <td>&nbsp;
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/success.svg"/>
-                </div>
-            </td>
-            <td>
-                ERD and visual diff generated
-            </td>
-            <td>
-                <a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div align="center">
-                    <img width="20px" height="21px" src="https://release.ariga.io/images/assets/warning.svg"/>
-                </div>
-            </td>
-            <td>
-                Detected 1 non-additive change <br/> Pulling the the latest git changes might fix this warning
-            </td>
-            <td>
-                File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted<br/>
-            </td>
-        </tr>
-    <td colspan="4">
-        <div align="center">
-            Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a>
-        </div>
-    </td>
-    </tbody>
-</table>`,
+			expected: "<code>atlas migrate lint</code> on <strong>testdata/migrations</strong><table>\n  <thead>\n    <tr>\n      <th>Status</th>\n      <th>Step</th>\n      <th>Result</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>\n        No migration files detected\n      </td>\n      <td>&nbsp;</td>\n    </tr>\n    <tr>\n      <td>\n        <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n      </td>\n      <td>ERD and visual diff generated</td>\n      <td><a href=\"https://migration-lint-report-url#erd\" target=\"_blank\">View Visualization</a></td>\n    </tr><tr><td><div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/warning.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/warning.svg?v=1\"/></picture></div></td><td>Detected 1 non-additive change<br/>Pulling the the latest git changes might fix this warning</td><td>File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted<br/></td></tr><tr><td colspan=\"4\"><div align=\"center\">Read the full linting report on <a href=\"https://migration-lint-report-url\" target=\"_blank\">Atlas Cloud</a></div></td></tr></tbody></table>",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1817,7 +1530,7 @@ func TestApplyTemplateGeneration(t *testing.T) {
 				End:    must(time.Parse(time.RFC3339, "2024-06-16T15:27:38.963743+03:00")),
 			},
 			// language=markdown
-			expected: "<h2>\n    <img height=\"17\" src=\"https://release.ariga.io/images/assets/success.svg\"/> Migration Passed\n</h2>\n\n#### `atlas migrate apply` Summary:\n\n<table>\n    <tr>\n        <th>Parameter</th>\n        <th>Details</th>\n    </tr>\n    <tr>\n        <td>Migration Directory</td>\n        <td><code>testdata/migrations</code></td>\n    </tr>\n    <tr>\n        <td>Database URL</td>\n        <td><code>sqlite://file?_fk=1&mode=memory</code></td>\n    </tr>\n    <tr>\n        <td>Migrate to Version</td>\n       <td>\n        <code>20221108173658</code>\n       </td>\n    </tr>\n    <tr>\n        <td>SQL Summary</td>\n        <td>2 migration files, 3 statements passed</td>\n    </tr>\n    <tr>\n        <td>Total Time</td>\n        <td>54.297ms</td>\n    </tr>\n</table>\n\n#### Version 20221108173626.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div align=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/success.svg\"/>\n        </div>\n        </td>\n        <td>2</td>\n        <td>25.765ms</td>\n        <td>-</td>\n        <td>-</td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\nCREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";\nCREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n```\n</details>\n\n\n\n#### Version 20221108173658.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div align=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/success.svg\"/>\n        </div>\n        </td>\n        <td>1</td>\n        <td>23.4ms</td>\n        <td>-</td>\n        <td>-</td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\nCREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\n```\n</details>\n",
+			expected: "<h2><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"22px\" height=\"22px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture> Migration Passed</h2><h4><code>atlas migrate apply</code> Summary:</h4>\n<table>\n  <tr>\n    <th>Parameter</th>\n    <th>Details</th>\n  </tr>\n  <tr>\n    <td>Migration Directory</td>\n    <td><code>testdata/migrations</code></td>\n  </tr>\n  <tr>\n    <td>Database URL</td>\n    <td><code>sqlite://file?_fk=1&mode=memory</code></td>\n  </tr>\n  <tr>\n    <td>Migrate to Version</td>\n    <td>\n      <code>20221108173658</code>\n    </td>\n  </tr>\n  <tr>\n    <td>SQL Summary</td>\n    <td>2 migration files, 3 statements passed</td>\n  </tr>\n  <tr>\n    <td>Total Time</td>\n    <td>54.297ms</td>\n  </tr>\n</table><h4>Version 20221108173626.sql:</h4>\n<table>\n  <tr>\n    <th>Status</th>\n    <th>Executed Statements</th>\n    <th>Execution Time</th>\n    <th>Error</th>\n    <th>Error Statement</th>\n  </tr>\n  <tr>\n    <td>\n      <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n    </td>\n    <td>2</td>\n    <td>25.765ms</td><td>-</td><td>-</td></tr>\n</table><details><summary>📄 View SQL Statements</summary><pre lang=\"sql\"><code>CREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";\nCREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;</code></pre></details><h4>Version 20221108173658.sql:</h4>\n<table>\n  <tr>\n    <th>Status</th>\n    <th>Executed Statements</th>\n    <th>Execution Time</th>\n    <th>Error</th>\n    <th>Error Statement</th>\n  </tr>\n  <tr>\n    <td>\n      <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n    </td>\n    <td>1</td>\n    <td>23.4ms</td><td>-</td><td>-</td></tr>\n</table><details><summary>📄 View SQL Statements</summary><pre lang=\"sql\"><code>CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;</code></pre></details>",
 		},
 		{
 			name: "2 files, 1 statement error",
@@ -1883,7 +1596,7 @@ func TestApplyTemplateGeneration(t *testing.T) {
 				Error:   "sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1",
 			},
 			// language=markdown
-			expected: "<h2>\n    <img height=\"17\" src=\"https://release.ariga.io/images/assets/error.svg\"/> Migration Failed\n</h2>\n\n#### `atlas migrate apply` Summary:\n\n<table>\n    <tr>\n        <th>Parameter</th>\n        <th>Details</th>\n    </tr>\n    <tr>\n        <td>Migration Directory</td>\n        <td><code>testdata/migrations</code></td>\n    </tr>\n    <tr>\n        <td>Database URL</td>\n        <td><code>mysql://localhost:3306/test?parseTime=true</code></td>\n    </tr>\n    <tr>\n        <td>Migrate from Version</td>\n        <td><code>20221108143624</code></td>\n    </tr>\n    <tr>\n        <td>Migrate to Version</td>\n       <td>\n        <code>20221108173658</code>\n       </td>\n    </tr>\n    <tr>\n        <td>SQL Summary</td>\n        <td>2 migration files, 2 statements passed, 1 failed</td>\n    </tr>\n    <tr>\n        <td>Total Time</td>\n        <td>54.297ms</td>\n    </tr>\n</table>\n\n#### Version 20221108173626.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div align=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/success.svg\"/>\n        </div>\n        </td>\n        <td>1</td>\n        <td>25.765ms</td>\n        <td>-</td>\n        <td>-</td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\nCREATE TABLE Persons ( PersonID int );\n```\n</details>\n\n\n\n#### Version 20221108173658.sql:\n<table>\n    <tr>\n        <th>Status</th>\n        <th>Executed Statements</th>\n        <th>Execution Time</th>\n        <th>Error</th>\n        <th>Error Statement</th>\n    </tr>\n    <tr>\n        <td>\n        <div justify-content=\"center\">\n            <img width=\"20px\" height=\"21px\" src=\"https://release.ariga.io/images/assets/error.svg\"/>\n        </div>\n        </td>\n        <td>1</td>\n        <td>23.4ms</td>\n        <td>Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1</td>\n        <td><details><summary>📄 View</summary><pre><code>create Table Err?</code></pre></details></td>\n    </tr>\n</table>\n\n<details>\n<summary>📄 View SQL Statements</summary>\n\n```sql\ncreate Table Err?\n```\n</details>\n",
+			expected: "<h2><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/error.svg?v=1\"><img width=\"22px\" height=\"22px\" src=\"https://release.ariga.io/images/assets/error.svg?v=1\"/></picture> Migration Failed</h2><h4><code>atlas migrate apply</code> Summary:</h4>\n<table>\n  <tr>\n    <th>Parameter</th>\n    <th>Details</th>\n  </tr>\n  <tr>\n    <td>Migration Directory</td>\n    <td><code>testdata/migrations</code></td>\n  </tr>\n  <tr>\n    <td>Database URL</td>\n    <td><code>mysql://localhost:3306/test?parseTime=true</code></td>\n  </tr>\n  <tr>\n    <td>Migrate from Version</td>\n    <td><code>20221108143624</code></td>\n  </tr>\n  <tr>\n    <td>Migrate to Version</td>\n    <td>\n      <code>20221108173658</code>\n    </td>\n  </tr>\n  <tr>\n    <td>SQL Summary</td>\n    <td>2 migration files, 2 statements passed, 1 failed</td>\n  </tr>\n  <tr>\n    <td>Total Time</td>\n    <td>54.297ms</td>\n  </tr>\n</table><h4>Version 20221108173626.sql:</h4>\n<table>\n  <tr>\n    <th>Status</th>\n    <th>Executed Statements</th>\n    <th>Execution Time</th>\n    <th>Error</th>\n    <th>Error Statement</th>\n  </tr>\n  <tr>\n    <td>\n      <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture></div>\n    </td>\n    <td>1</td>\n    <td>25.765ms</td><td>-</td><td>-</td></tr>\n</table><details><summary>📄 View SQL Statements</summary><pre lang=\"sql\"><code>CREATE TABLE Persons ( PersonID int );</code></pre></details><h4>Version 20221108173658.sql:</h4>\n<table>\n  <tr>\n    <th>Status</th>\n    <th>Executed Statements</th>\n    <th>Execution Time</th>\n    <th>Error</th>\n    <th>Error Statement</th>\n  </tr>\n  <tr>\n    <td>\n      <div align=\"center\"><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/error.svg?v=1\"><img width=\"20px\" height=\"20px\" src=\"https://release.ariga.io/images/assets/error.svg?v=1\"/></picture></div>\n    </td>\n    <td>1</td>\n    <td>23.4ms</td><td>Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1</td><td><details><summary>📄 View</summary><pre lang=\"sql\"><code>create Table Err?</code></pre></details></td></tr>\n</table><details><summary>📄 View SQL Statements</summary><pre lang=\"sql\"><code>create Table Err?</code></pre></details>",
 		},
 		{
 			name: "no work migration",
@@ -1905,13 +1618,13 @@ func TestApplyTemplateGeneration(t *testing.T) {
 				Start:   must(time.Parse(time.RFC3339, "2024-06-16T16:09:01.683771+03:00")),
 				End:     must(time.Parse(time.RFC3339, "2024-06-16T16:09:01.689411+03:00")),
 			},
-			expected: "<h2>\n    <img height=\"17\" src=\"https://release.ariga.io/images/assets/success.svg\"/> Migration Passed\n</h2>\n\n#### `atlas migrate apply` Summary:\n\n<table>\n    <tr>\n        <th>Parameter</th>\n        <th>Details</th>\n    </tr>\n    <tr>\n        <td>Migration Directory</td>\n        <td><code>testdata/migrations</code></td>\n    </tr>\n    <tr>\n        <td>Database URL</td>\n        <td><code>mysql://localhost:3306/test?parseTime=true</code></td>\n    </tr>\n    <tr>\n        <td>Migrate from Version</td>\n        <td><code>20240616130838</code></td>\n    </tr>\n    <tr>\n        <td>Migrate to Version</td>\n       <td>\n        <code>20240616130838</code>\n       </td>\n    </tr>\n    <tr>\n        <td>SQL Summary</td>\n        <td>0 migration files</td>\n    </tr>\n    <tr>\n        <td>Total Time</td>\n        <td>5.64ms</td>\n    </tr>\n</table>",
+			expected: "<h2><picture><source media=\"(prefers-color-scheme: light)\" srcset=\"https://release.ariga.io/images/assets/success.svg?v=1\"><img width=\"22px\" height=\"22px\" src=\"https://release.ariga.io/images/assets/success.svg?v=1\"/></picture> Migration Passed</h2><h4><code>atlas migrate apply</code> Summary:</h4>\n<table>\n  <tr>\n    <th>Parameter</th>\n    <th>Details</th>\n  </tr>\n  <tr>\n    <td>Migration Directory</td>\n    <td><code>testdata/migrations</code></td>\n  </tr>\n  <tr>\n    <td>Database URL</td>\n    <td><code>mysql://localhost:3306/test?parseTime=true</code></td>\n  </tr>\n  <tr>\n    <td>Migrate from Version</td>\n    <td><code>20240616130838</code></td>\n  </tr>\n  <tr>\n    <td>Migrate to Version</td>\n    <td>\n      <code>20240616130838</code>\n    </td>\n  </tr>\n  <tr>\n    <td>SQL Summary</td>\n    <td>0 migration files</td>\n  </tr>\n  <tr>\n    <td>Total Time</td>\n    <td>5.64ms</td>\n  </tr>\n</table>",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			c, err := migrateApplyComment(tt.payload)
 			require.NoError(t, err)
-			require.Contains(t, c, tt.expected)
+			require.Equal(t, tt.expected, c)
 		})
 	}
 }
@@ -2009,7 +1722,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>20230922132634</code>")
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n    <td>\n      <code>20230922132634</code>")
 		require.Contains(t, string(c), "Migration Passed")
 		require.Contains(t, string(c), "1 migration file, 1 statement passed")
 	})
@@ -2035,7 +1748,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
-		require.Contains(t, string(c), "<td>Migrate to Version</td>\n       <td>\n        <code>20230922132634</code>")
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n    <td>\n      <code>20230922132634</code>")
 		require.Contains(t, string(c), "Migration Passed")
 		require.Contains(t, string(c), "1 migration file, 1 statement passed")
 	})

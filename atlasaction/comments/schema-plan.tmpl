@@ -1,22 +1,17 @@
-### Atlas detected changes to the desired schema
-
-#### SQL Plan
-
-```sql
-{{ .Plan.File.Migration }}
-```
-
-#### Atlas lint results
-{{ template "lint-report" .Plan.Lint }}
-
----
+<h3>Atlas detected changes to the desired schema</h3>
+<h4>SQL Plan</h4>
+{{- .Plan.File.Migration | codeblock "sql" -}}
+<h4>Atlas lint results</h4>
+{{- template "lint-report" .Plan.Lint -}}
+<hr>
 <details>
-<summary>To edit this plan, follow these steps</summary>
-
-- Run `atlas schema plan pull --url "{{ .Plan.File.URL }}" > {{ .Plan.File.Name }}.plan.hcl`
-- Modify the plan.
-- Push the plan using `atlas schema plan push --pending --env {{ .EnvName }} --file {{ .Plan.File.Name }}.plan.hcl`
-{{- if .RerunCommand }}
-- Re-trigger this action using `{{ .RerunCommand }}`
-{{- end }}
+  <summary>To edit this plan, follow these steps</summary>
+  <ol>
+    <li>Run <code>atlas schema plan pull --url "{{ .Plan.File.URL }}" > {{ .Plan.File.Name }}.plan.hcl</code></li>
+    <li>Modify the plan.</li>
+    <li>Push the plan using <code>atlas schema plan push --pending --env {{ .EnvName }} --file {{ .Plan.File.Name }}.plan.hcl</code></li>
+  {{- if .RerunCommand -}}
+    <li>Re-trigger this action using <code>{{ .RerunCommand }}</code></li>
+  {{- end -}}
+  </ol>
 </details>
