@@ -35,8 +35,13 @@
   </tr>
   <tr>
     <td>SQL Summary</td>
-    <td>{{ len .Applied }} migration file{{- if or (not .Applied) (gt (len .Applied) 1) }}s{{- end }}
-    {{- if appliedStmts . }}, {{ appliedStmts . }} statement{{- if gt (appliedStmts .) 1 }}s{{- end }} passed {{- end }} {{- if .Error }}, 1 failed{{- end }}</td>
+    <td>
+      {{- len .Applied }} migration file{{- if or (not .Applied) (gt (len .Applied) 1) }}s{{- end -}}
+      {{- with (appliedStmts .) -}}
+      , {{ . }} statement{{- if gt . 1 }}s{{- end }} passed
+      {{- end -}}
+      {{- if .Error -}}, 1 failed{{- end -}}
+    </td>
   </tr>
   <tr>
     <td>Total Time</td>
