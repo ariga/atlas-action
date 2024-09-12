@@ -1,15 +1,21 @@
-package atlasaction
+// Copyright 2021-present The Atlas Authors. All rights reserved.
+// This source code is licensed under the Apache 2.0 license found
+// in the LICENSE file in the root directory of this source tree.
+
+package atlasaction_test
 
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
+	"ariga.io/atlas-action/atlasaction"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
-	orb := NewCircleCIOrb()
+	orb := atlasaction.NewCircleCIOrb(os.Getenv, os.Stdout)
 	_, err := orb.GetTriggerContext()
 	require.EqualError(t, err, "missing CIRCLE_PROJECT_REPONAME environment variable")
 	t.Setenv("CIRCLE_PROJECT_REPONAME", "atlas-orb")
@@ -18,7 +24,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	t.Setenv("CIRCLE_SHA1", "1234567890")
 	ctx, err := orb.GetTriggerContext()
 	require.NoError(t, err)
-	require.Equal(t, &TriggerContext{
+	require.Equal(t, &atlasaction.TriggerContext{
 		Repo:   "atlas-orb",
 		Commit: "1234567890",
 	}, ctx)
@@ -41,7 +47,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", server.URL)
 	ctx, err = orb.GetTriggerContext()
 	require.NoError(t, err)
-	require.Equal(t, &PullRequest{
+	require.Equal(t, &atlasaction.PullRequest{
 		Number: 1,
 		URL:    "https://api.github.com/repos/ariga/atlas-orb/pulls/9",
 		Commit: "1234567890",

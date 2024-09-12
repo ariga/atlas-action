@@ -122,6 +122,69 @@ type SCM struct {
 	APIURL string            // APIURL is the base URL for the SCM API.
 }
 
+// New creates a new Actions based on the environment.
+func New(getenv func(string) string, w io.Writer) (*Actions, error) {
+	a, err := newAction(getenv, w)
+	if err != nil {
+		return nil, err
+	}
+	return &Actions{Action: a}, nil
+}
+
+// New creates a new Action based on the environment.
+func newAction(getenv func(string) string, w io.Writer) (Action, error) {
+	if getenv("GITHUB_ACTIONS") == "true" {
+		return NewGHAction(getenv, w), nil
+	}
+	if getenv("CIRCLECI") == "true" {
+		return NewCircleCIOrb(getenv, w), nil
+	}
+	return nil, errors.New("unsupported environment")
+}
+
+const (
+	// Versioned workflow Commands
+	CmdMigratePush  = "migrate/push"
+	CmdMigrateLint  = "migrate/lint"
+	CmdMigrateApply = "migrate/apply"
+	CmdMigrateDown  = "migrate/down"
+	CmdMigrateTest  = "migrate/test"
+	// Declarative workflow Commands
+	CmdSchemaPush = "schema/push"
+	CmdSchemaTest = "schema/test"
+	CmdSchemaPlan = "schema/plan"
+)
+
+// Run runs the action based on the command name.
+func (a *Actions) Run(ctx context.Context, act string) error {
+	// Set the working directory if provided.
+	if dir := a.WorkingDir(); dir != "" {
+		if err := os.Chdir(dir); err != nil {
+			return fmt.Errorf("failed to change working directory: %w", err)
+		}
+	}
+	switch act {
+	case CmdMigrateApply:
+		return a.MigrateApply(ctx)
+	case CmdMigrateDown:
+		return a.MigrateDown(ctx)
+	case CmdMigratePush:
+		return a.MigratePush(ctx)
+	case CmdMigrateLint:
+		return a.MigrateLint(ctx)
+	case CmdMigrateTest:
+		return a.MigrateTest(ctx)
+	case CmdSchemaPush:
+		return a.SchemaPush(ctx)
+	case CmdSchemaTest:
+		return a.SchemaTest(ctx)
+	case CmdSchemaPlan:
+		return a.SchemaPlan(ctx)
+	default:
+		return fmt.Errorf("unknown action: %s", act)
+	}
+}
+
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func (a *Actions) MigrateApply(ctx context.Context) error {
 	params := &atlasexec.MigrateApplyParams{
@@ -147,7 +210,7 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		return nil
 	}
 	for _, run := range runs {
-		switch summary, err := migrateApplyComment(run); {
+		switch summary, err := RenderTemplate("migrate-apply.tmpl", run); {
 		case err != nil:
 			a.Errorf("failed to create summary: %v", err)
 		default:
@@ -309,7 +372,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if err := a.addChecks(&payload); err != nil {
 		return err
 	}
-	summary, err := migrateLintComment(&payload)
+	summary, err := RenderTemplate("migrate-lint.tmpl", &payload)
 	if err != nil {
 		return err
 	}
@@ -773,7 +836,7 @@ func (a *Actions) addSuggestions(lint *atlasexec.SummaryReport, fn func(*Suggest
 					s.StartLine = f.TextEdit.Line
 					s.Line = f.TextEdit.End
 				}
-				s.Comment, err = renderTemplate("suggestion.tmpl", map[string]any{
+				s.Comment, err = RenderTemplate("suggestion.tmpl", map[string]any{
 					"Fix": f,
 					"Dir": lint.Env.Dir,
 				})
@@ -796,7 +859,7 @@ func (a *Actions) addSuggestions(lint *atlasexec.SummaryReport, fn func(*Suggest
 						s.StartLine = f.TextEdit.Line
 						s.Line = f.TextEdit.End
 					}
-					s.Comment, err = renderTemplate("suggestion.tmpl", map[string]any{
+					s.Comment, err = RenderTemplate("suggestion.tmpl", map[string]any{
 						"Fix":    f,
 						"Dir":    lint.Env.Dir,
 						"File":   file,
@@ -914,21 +977,13 @@ var (
 	)
 )
 
-// renderTemplate renders the given template with the data.
-func renderTemplate(name string, data any) (string, error) {
+// RenderTemplate renders the given template with the data.
+func RenderTemplate(name string, data any) (string, error) {
 	var buf bytes.Buffer
 	if err := commentsTmpl.ExecuteTemplate(&buf, name, data); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
-}
-
-func migrateApplyComment(d *atlasexec.MigrateApply) (string, error) {
-	return renderTemplate("migrate-apply.tmpl", d)
-}
-
-func migrateLintComment(d *atlasexec.SummaryReport) (string, error) {
-	return renderTemplate("migrate-lint.tmpl", d)
 }
 
 type (

@@ -1,7 +1,12 @@
+// Copyright 2021-present The Atlas Authors. All rights reserved.
+// This source code is licensed under the Apache 2.0 license found
+// in the LICENSE file in the root directory of this source tree.
+
 package atlasaction
 
 import (
 	"fmt"
+	"io"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/mitchellh/mapstructure"
@@ -16,8 +21,13 @@ type ghAction struct {
 }
 
 // New returns a new Action for GitHub Actions.
-func NewGHAction(otps ...githubactions.Option) Action {
-	return &ghAction{githubactions.New(otps...)}
+func NewGHAction(getenv func(string) string, w io.Writer) *ghAction {
+	return &ghAction{
+		githubactions.New(
+			githubactions.WithGetenv(getenv),
+			githubactions.WithWriter(w),
+		),
+	}
 }
 
 // GetType implements the Action interface.
