@@ -326,6 +326,12 @@ func (m *mockAtlas) SchemaPlanLint(ctx context.Context, p *atlasexec.SchemaPlanL
 	return m.schemaPlanLint(ctx, p)
 }
 
+// SchemaPlanStatus implements AtlasExec.
+func (m *mockAtlas) SchemaApplySlice(ctx context.Context, params *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error) {
+	panic("unimplemented")
+}
+
+// MigrateDown implements AtlasExec.
 func (m *mockAtlas) MigrateDown(ctx context.Context, params *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error) {
 	return m.migrateDown(ctx, params)
 }

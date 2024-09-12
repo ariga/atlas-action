@@ -89,6 +89,8 @@ type AtlasExec interface {
 	SchemaPlanLint(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
 	// SchemaPlanApprove runs the `schema plan approve` command.
 	SchemaPlanApprove(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
+	// SchemaApplySlice runs the `schema apply` command.
+	SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error)
 }
 
 // Context holds the context of the environment the action is running in.
@@ -150,9 +152,10 @@ const (
 	CmdMigrateDown  = "migrate/down"
 	CmdMigrateTest  = "migrate/test"
 	// Declarative workflow Commands
-	CmdSchemaPush = "schema/push"
-	CmdSchemaTest = "schema/test"
-	CmdSchemaPlan = "schema/plan"
+	CmdSchemaPush  = "schema/push"
+	CmdSchemaTest  = "schema/test"
+	CmdSchemaPlan  = "schema/plan"
+	CmdSchemaApply = "schema/apply"
 )
 
 // Run runs the action based on the command name.
@@ -180,6 +183,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.SchemaTest(ctx)
 	case CmdSchemaPlan:
 		return a.SchemaPlan(ctx)
+	case CmdSchemaApply:
+		return a.SchemaApply(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", act)
 	}
@@ -611,6 +616,47 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		// Don't fail the action if the comment fails.
 		// It may be due to the missing permissions.
 		a.Errorf("failed to comment on the pull request: %v", err)
+	}
+	return nil
+}
+
+// SchemaApply runs the GitHub Action for "ariga/atlas-action/schema/apply"
+func (a *Actions) SchemaApply(ctx context.Context) error {
+	params := &atlasexec.SchemaApplyParams{
+		ConfigURL:   a.GetInput("config"),
+		Env:         a.GetInput("env"),
+		Vars:        a.GetVarsInput("vars"),
+		URL:         a.GetInput("url"),
+		To:          a.GetInput("to"),
+		DryRun:      a.GetBoolInput("dry-run"),
+		AutoApprove: a.GetBoolInput("auto-approve"),
+		PlanURL:     a.GetInput("plan"),
+		TxMode:      a.GetInput("tx-mode"), // Hidden param.
+	}
+	results, err := a.Atlas.SchemaApplySlice(ctx, params)
+	// Any errors will print at the end of execution.
+	if mErr := (&atlasexec.SchemaApplyError{}); errors.As(err, &mErr) {
+		// If the error is a SchemaApplyError, we can still get the successful runs.
+		results = mErr.Result
+	}
+	for _, result := range results {
+		switch summary, err := RenderTemplate("schema-apply.tmpl", result); {
+		case err != nil:
+			a.Errorf("failed to create summary: %v", err)
+		default:
+			a.AddStepSummary(summary)
+		}
+		if result.Error != "" {
+			a.SetOutput("error", result.Error)
+			return errors.New(result.Error)
+		}
+		a.Infof(`"atlas schema apply" completed successfully on the target %q`, result.URL)
+	}
+	// We generate summary for the successful runs.
+	// Then fail the action if there is an error.
+	if err != nil {
+		a.SetOutput("error", err.Error())
+		return err
 	}
 	return nil
 }

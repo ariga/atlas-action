@@ -298,7 +298,7 @@ jobs:
       - id: sanity
         uses: ./schema/push
         with:
-          working-directory: atlasaction/testdata/plan
+          working-directory: atlasaction/testdata/schema-apply/legacy
           env: test
   schema-plan:
     runs-on: ubuntu-latest
@@ -318,9 +318,53 @@ jobs:
       - id: sanity
         uses: ./schema/plan
         with:
-          working-directory: atlasaction/testdata/plan
+          working-directory: atlasaction/testdata/schema-apply/legacy
           env: test
           from: |-
             env://url
         env:
           GITHUB_TOKEN: ${{ github.token }}
+  schema-apply:
+    runs-on: ubuntu-latest
+    env:
+      ATLAS_ACTION_LOCAL: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - directory: lint-review
+          - directory: on-the-fly
+            auto-approve: "true"
+          - directory: remote-repo
+            plan: "atlas://atlas-action/plans/20240910183610"
+            to: "atlas://atlas-action?tag=e2e"
+          - directory: local-plan
+            plan: "file://20240910173744.plan.hcl"
+          - directory: multiple-envs
+            plan: "file://20240910173744.plan.hcl"
+          - directory: legacy
+            atlas: 'v0.27.0'
+            auto-approve: "true"
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+          version: ${{ matrix.test.atlas }}
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - name: Apply changes
+        continue-on-error: true
+        uses: ./schema/apply
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          working-directory: atlasaction/testdata/schema-apply/${{ matrix.test.directory }}
+          env: test
+          plan: ${{ matrix.test.plan }}
+          to: ${{ matrix.test.to }}
+          auto-approve: ${{ matrix.test.auto-approve }}
