@@ -1,3 +1,7 @@
+// Copyright 2021-present The Atlas Authors. All rights reserved.
+// This source code is licensed under the Apache 2.0 license found
+// in the LICENSE file in the root directory of this source tree.
+
 package atlasaction
 
 import (
@@ -15,16 +19,15 @@ import (
 
 // circleciOrb is an implementation of the Action interface for GitHub Actions.
 type circleCIOrb struct {
-	w io.Writer
+	w      io.Writer
+	getenv func(string) string
 }
 
 var _ Action = (*circleCIOrb)(nil)
 
 // New returns a new Action for GitHub Actions.
-func NewCircleCIOrb() Action {
-	return &circleCIOrb{
-		w: os.Stdout,
-	}
+func NewCircleCIOrb(getenv func(string) string, w io.Writer) Action {
+	return &circleCIOrb{getenv: getenv, w: w}
 }
 
 // GetType implements the Action interface.
@@ -38,7 +41,7 @@ func (a *circleCIOrb) GetInput(name string) string {
 	e = strings.ReplaceAll(e, "-", "_")
 	e = strings.ToUpper(e)
 	e = "INPUT_" + e
-	return strings.TrimSpace(os.Getenv(e))
+	return strings.TrimSpace(a.getenv(e))
 }
 
 // SetOutput implements the Action interface.
@@ -50,27 +53,27 @@ func (a *circleCIOrb) SetOutput(name, value string) {
 // https://circleci.com/docs/variables/#built-in-environment-variables
 func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	ctx := &TriggerContext{}
-	if ctx.Repo = os.Getenv("CIRCLE_PROJECT_REPONAME"); ctx.Repo == "" {
+	if ctx.Repo = a.getenv("CIRCLE_PROJECT_REPONAME"); ctx.Repo == "" {
 		return nil, fmt.Errorf("missing CIRCLE_PROJECT_REPONAME environment variable")
 	}
-	ctx.RepoURL = os.Getenv("CIRCLE_REPOSITORY_URL")
-	ctx.Branch = os.Getenv("CIRCLE_BRANCH")
-	if ctx.Commit = os.Getenv("CIRCLE_SHA1"); ctx.Commit == "" {
+	ctx.RepoURL = a.getenv("CIRCLE_REPOSITORY_URL")
+	ctx.Branch = a.getenv("CIRCLE_BRANCH")
+	if ctx.Commit = a.getenv("CIRCLE_SHA1"); ctx.Commit == "" {
 		return nil, fmt.Errorf("missing CIRCLE_SHA1 environment variable")
 	}
 	// Detect SCM provider based on Token.
-	switch ghToken := os.Getenv("GITHUB_TOKEN"); {
+	switch ghToken := a.getenv("GITHUB_TOKEN"); {
 	case ghToken != "":
 		ctx.SCM = SCM{
 			Type:   atlasexec.SCMTypeGithub,
 			APIURL: defaultGHApiUrl,
 		}
-		if v := os.Getenv("GITHUB_API_URL"); v != "" {
+		if v := a.getenv("GITHUB_API_URL"); v != "" {
 			ctx.SCM.APIURL = v
 		}
 		// Used to change the location that the linting results are posted to.
 		// If GITHUB_REPOSITORY is not set, we default to the CIRCLE_PROJECT_REPONAME repo.
-		if v := os.Getenv("GITHUB_REPOSITORY"); v != "" {
+		if v := a.getenv("GITHUB_REPOSITORY"); v != "" {
 			ctx.Repo = v
 		}
 		// CIRCLE_REPOSITORY_URL will be empty for some reason, causing ctx.RepoURL to be empty.
@@ -81,7 +84,7 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		// CIRCLE_BRANCH will be empty when the event is triggered by a tag.
 		// In this case, we can use CIRCLE_TAG as the branch.
 		if ctx.Branch == "" {
-			tag := os.Getenv("CIRCLE_TAG")
+			tag := a.getenv("CIRCLE_TAG")
 			if tag == "" {
 				return nil, fmt.Errorf("cannot determine branch due to missing CIRCLE_BRANCH and CIRCLE_TAG environment variables")
 			}

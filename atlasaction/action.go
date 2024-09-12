@@ -147,7 +147,7 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		return nil
 	}
 	for _, run := range runs {
-		switch summary, err := migrateApplyComment(run); {
+		switch summary, err := RenderTemplate("migrate-apply.tmpl", run); {
 		case err != nil:
 			a.Errorf("failed to create summary: %v", err)
 		default:
@@ -309,7 +309,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if err := a.addChecks(&payload); err != nil {
 		return err
 	}
-	summary, err := migrateLintComment(&payload)
+	summary, err := RenderTemplate("migrate-lint.tmpl", &payload)
 	if err != nil {
 		return err
 	}
@@ -773,7 +773,7 @@ func (a *Actions) addSuggestions(lint *atlasexec.SummaryReport, fn func(*Suggest
 					s.StartLine = f.TextEdit.Line
 					s.Line = f.TextEdit.End
 				}
-				s.Comment, err = renderTemplate("suggestion.tmpl", map[string]any{
+				s.Comment, err = RenderTemplate("suggestion.tmpl", map[string]any{
 					"Fix": f,
 					"Dir": lint.Env.Dir,
 				})
@@ -796,7 +796,7 @@ func (a *Actions) addSuggestions(lint *atlasexec.SummaryReport, fn func(*Suggest
 						s.StartLine = f.TextEdit.Line
 						s.Line = f.TextEdit.End
 					}
-					s.Comment, err = renderTemplate("suggestion.tmpl", map[string]any{
+					s.Comment, err = RenderTemplate("suggestion.tmpl", map[string]any{
 						"Fix":    f,
 						"Dir":    lint.Env.Dir,
 						"File":   file,
@@ -914,21 +914,13 @@ var (
 	)
 )
 
-// renderTemplate renders the given template with the data.
-func renderTemplate(name string, data any) (string, error) {
+// RenderTemplate renders the given template with the data.
+func RenderTemplate(name string, data any) (string, error) {
 	var buf bytes.Buffer
 	if err := commentsTmpl.ExecuteTemplate(&buf, name, data); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
-}
-
-func migrateApplyComment(d *atlasexec.MigrateApply) (string, error) {
-	return renderTemplate("migrate-apply.tmpl", d)
-}
-
-func migrateLintComment(d *atlasexec.SummaryReport) (string, error) {
-	return renderTemplate("migrate-lint.tmpl", d)
 }
 
 type (

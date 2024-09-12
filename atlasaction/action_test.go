@@ -2,7 +2,7 @@
 // This source code is licensed under the Apache 2.0 license found
 // in the LICENSE file in the root directory of this source tree.
 
-package atlasaction
+package atlasaction_test
 
 import (
 	"bytes"
@@ -26,21 +26,21 @@ import (
 	"testing"
 	"time"
 
+	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
 	"ariga.io/atlas/sql/sqlcheck"
 	"ariga.io/atlas/sql/sqlclient"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/sethvargo/go-githubactions"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMigrateApply(t *testing.T) {
 	t.Run("local dir", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/migrations/")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		require.NoError(t, err)
 
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
@@ -50,10 +50,10 @@ func TestMigrateApply(t *testing.T) {
 		require.Contains(t, string(c), "1 migration file, 1 statement passed")
 	})
 	t.Run("broken migration dir", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/broken/")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		require.EqualError(t, err, "sql/migrate: executing statement \"CREATE TABLE OrderDetails (\\n    OrderDetailID INTEGER PRIMARY KEY AUTOINCREMENT,\\n    OrderID INTEGER-\\n);\" from version \"20240619073319\": near \"-\": syntax error")
 
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
@@ -64,11 +64,11 @@ func TestMigrateApply(t *testing.T) {
 
 	})
 	t.Run("dry-run", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/migrations/")
 		tt.setInput("dry-run", "true")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		require.NoError(t, err)
 		stat, err := tt.cli.MigrateStatus(context.Background(), &atlasexec.MigrateStatusParams{
 			URL:    "sqlite://" + tt.db,
@@ -78,11 +78,11 @@ func TestMigrateApply(t *testing.T) {
 		require.Empty(t, stat.Applied)
 	})
 	t.Run("dry-run false", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/migrations/")
 		tt.setInput("dry-run", "false")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		require.NoError(t, err)
 		stat, err := tt.cli.MigrateStatus(context.Background(), &atlasexec.MigrateStatusParams{
 			URL:    "sqlite://" + tt.db,
@@ -92,11 +92,11 @@ func TestMigrateApply(t *testing.T) {
 		require.Len(t, stat.Applied, 1)
 	})
 	t.Run("tx-mode", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/migrations/")
 		tt.setInput("tx-mode", "fake")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 
 		// The error here proves that the tx-mode was passed to atlasexec, which
 		// is what we want to test.
@@ -107,11 +107,11 @@ func TestMigrateApply(t *testing.T) {
 		require.Contains(t, m["error"], exp)
 	})
 	t.Run("baseline", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/migrations/")
 		tt.setInput("baseline", "111_fake")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		// The error here proves that the baseline was passed to atlasexec, which
 		// is what we want to test.
 		exp := `Error: baseline version "111_fake" not found`
@@ -123,27 +123,27 @@ func TestMigrateApply(t *testing.T) {
 		}, m)
 	})
 	t.Run("config-broken", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("config", "file://testdata/config/broken.hcl")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		require.ErrorContains(t, err, `"testdata/config/broken.hcl" was not found`)
 	})
 	t.Run("config", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("config", "file://testdata/config/atlas.hcl")
 		tt.setInput("env", "test")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		require.NoError(t, err)
 	})
 }
 
 func TestMigrateDown(t *testing.T) {
 	setup := func(t *testing.T) *test {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/down/")
 		// Ensure files are applied.
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		require.NoError(t, err)
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
@@ -157,7 +157,7 @@ func TestMigrateDown(t *testing.T) {
 
 	t.Run("down 1 file (default)", func(t *testing.T) {
 		tt := setup(t)
-		require.NoError(t, (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()))
+		require.NoError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()))
 		require.EqualValues(t, map[string]string{
 			"current":        "3",
 			"target":         "2",
@@ -169,7 +169,7 @@ func TestMigrateDown(t *testing.T) {
 	t.Run("down two files", func(t *testing.T) {
 		tt := setup(t)
 		tt.setInput("amount", "2")
-		require.NoError(t, (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()))
+		require.NoError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()))
 		require.EqualValues(t, map[string]string{
 			"current":        "3",
 			"target":         "1",
@@ -182,7 +182,7 @@ func TestMigrateDown(t *testing.T) {
 		t.Run("1", func(t *testing.T) {
 			tt := setup(t)
 			tt.setInput("to-version", "1")
-			require.NoError(t, (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()))
+			require.NoError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()))
 			require.EqualValues(t, map[string]string{
 				"current":        "3",
 				"target":         "1",
@@ -193,7 +193,7 @@ func TestMigrateDown(t *testing.T) {
 		t.Run("2", func(t *testing.T) {
 			tt := setup(t)
 			tt.setInput("to-version", "2")
-			require.NoError(t, (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()))
+			require.NoError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()))
 			require.EqualValues(t, map[string]string{
 				"current":        "3",
 				"target":         "2",
@@ -213,7 +213,7 @@ func TestMigrateDown(t *testing.T) {
 		}))
 		t.Setenv("TEST_STDOUT", string(st))
 		tt.setInput("env", "test")
-		require.EqualError(t, (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()), "plan approval pending, review here: URL")
+		require.EqualError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()), "plan approval pending, review here: URL")
 		require.EqualValues(t, map[string]string{"url": "URL"}, must(tt.outputs()))
 	})
 
@@ -228,7 +228,7 @@ func TestMigrateDown(t *testing.T) {
 		t.Setenv("TEST_STDOUT", string(st))
 		t.Setenv("TEST_EXIT_CODE", "1")
 		tt.setInput("env", "test")
-		require.EqualError(t, (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()), "plan rejected, review here: URL")
+		require.EqualError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()), "plan rejected, review here: URL")
 		require.EqualValues(t, map[string]string{"url": "URL"}, must(tt.outputs()))
 	})
 
@@ -241,7 +241,7 @@ func TestMigrateDown(t *testing.T) {
 		// Considering we are waiting 1 second between attempts (~0 seconds per attempt)
 		// and a maximum of 2 second to wait, expect at least 3 retries (1 immediate, 2 retries).
 		counter := 0
-		actions := &Actions{
+		actions := &atlasaction.Actions{
 			Action: tt.act,
 			Atlas: &mockAtlas{
 				migrateDown: func(ctx context.Context, params *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error) {
@@ -267,7 +267,7 @@ type mockAtlas struct {
 	schemaPlanApprove func(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 }
 
-var _ AtlasExec = (*mockAtlas)(nil)
+var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
 
 // MigrateStatus implements AtlasExec.
 func (m *mockAtlas) MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error) {
@@ -330,38 +330,38 @@ func (m *mockAtlas) MigrateDown(ctx context.Context, params *atlasexec.MigrateDo
 
 func TestMigratePush(t *testing.T) {
 	t.Run("config-broken", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("config", "file://testdata/config/broken.hcl")
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 		require.ErrorContains(t, err, `"testdata/config/broken.hcl" was not found`)
 	})
 	t.Run("env-broken", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("config", "file://testdata/config/atlas.hcl")
 		tt.setInput("env", "broken-env")
 		tt.setInput("dir-name", "test-dir")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 		require.ErrorContains(t, err, `env "broken-env" not defined in config file`)
 	})
 	t.Run("broken dir", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("dir", "file://some_broken_dir")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 		require.ErrorContains(t, err, `sql/migrate: stat some_broken_dir: no such file or directory`)
 	})
 	t.Run("broken latest", func(t *testing.T) {
 		if os.Getenv("BE_CRASHER") == "1" {
 			// Reset the output to stdout
-			tt := newT(t, githubactions.WithWriter(os.Stdout))
+			tt := newT(t, os.Stdout)
 			tt.setInput("dir", "file://testdata/migrations")
 			tt.setInput("dir-name", "test-dir")
 			tt.setInput("latest", "foo")
 			tt.setInput("dev-url", "sqlite://file?mode=memory")
-			_ = (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+			_ = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 			return
 		}
 		var out bytes.Buffer
@@ -383,26 +383,26 @@ func TestMigratePushWithCloud(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	t.Run("dev-url broken", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "broken-driver://")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 		require.ErrorContains(t, err, `unknown driver "broken-driver"`)
 	})
 	t.Run("invalid tag", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("tag", "invalid-character@")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 		require.ErrorContains(t, err, `tag must be lowercase alphanumeric`)
 	})
 	t.Run("tag", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.cli, _ = atlasexec.NewClient("", "./mock-push.sh")
 		os.Remove("push-out.txt")
 		t.Cleanup(func() {
@@ -414,7 +414,7 @@ func TestMigratePushWithCloud(t *testing.T) {
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("tag", "valid-tag-123")
 		tt.setInput("latest", "true")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 		require.NoError(t, err)
 		out, err := os.ReadFile("push-out.txt")
 		require.NoError(t, err)
@@ -425,7 +425,7 @@ func TestMigratePushWithCloud(t *testing.T) {
 		require.Contains(t, lines[1], "test-dir:valid-tag-123")
 	})
 	t.Run("no latest", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.cli, _ = atlasexec.NewClient("", "./mock-push.sh")
 		os.Remove("push-out.txt")
 		t.Cleanup(func() {
@@ -437,7 +437,7 @@ func TestMigratePushWithCloud(t *testing.T) {
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("tag", "valid-tag-123")
 		tt.setInput("latest", "false")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 		require.NoError(t, err)
 		out, err := os.ReadFile("push-out.txt")
 		require.NoError(t, err)
@@ -446,29 +446,29 @@ func TestMigratePushWithCloud(t *testing.T) {
 		require.Contains(t, lines[0], "test-dir:valid-tag-123")
 	})
 	t.Run("config", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("env", "test")
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir-name", "test-dir")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 		require.NoError(t, err)
 	})
 	t.Run("dir-name invalid characters", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-#dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 		require.ErrorContains(t, err, "slug must be lowercase alphanumeric")
 	})
 }
 
 func TestMigrateTest(t *testing.T) {
 	t.Run("all inputs", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.cli, _ = atlasexec.NewClient("", "./mock-atlas-test.sh")
 		os.Remove("test-out.txt")
 		t.Cleanup(func() {
@@ -480,7 +480,7 @@ func TestMigrateTest(t *testing.T) {
 		tt.setInput("config", "file://testdata/config/atlas.hcl")
 		tt.setInput("env", "test")
 		tt.setInput("vars", `{"var1": "value1", "var2": "value2"}`)
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateTest(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateTest(context.Background())
 		require.NoError(t, err)
 		out, err := os.ReadFile("test-out.txt")
 		require.NoError(t, err)
@@ -497,7 +497,7 @@ func TestMigrateTest(t *testing.T) {
 
 func TestSchemaTest(t *testing.T) {
 	t.Run("all inputs", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.cli, _ = atlasexec.NewClient("", "./mock-atlas-test.sh")
 		os.Remove("test-out.txt")
 		t.Cleanup(func() {
@@ -509,7 +509,7 @@ func TestSchemaTest(t *testing.T) {
 		tt.setInput("config", "file://testdata/config/atlas.hcl")
 		tt.setInput("env", "test")
 		tt.setInput("vars", `{"var1": "value1", "var2": "value2"}`)
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).SchemaTest(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).SchemaTest(context.Background())
 		require.NoError(t, err)
 		out, err := os.ReadFile("test-out.txt")
 		require.NoError(t, err)
@@ -567,7 +567,7 @@ func TestMigrateE2E(t *testing.T) {
 		}
 	}))
 	t.Cleanup(srv.Close)
-	tt := newT(t)
+	tt := newT(t, nil)
 	tt.setupConfigWithLogin(t, srv.URL, token)
 	tt.setInput("dir", "file://testdata/migrations")
 	tt.setInput("dir-name", "test-dir")
@@ -595,7 +595,7 @@ func TestMigrateE2E(t *testing.T) {
 		SCMType:  "GITHUB",
 	}
 	var err error
-	err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+	err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, 2, len(payloads))
 	require.Equal(t, "test-dir", payloads[0].SyncDir.Slug)
@@ -603,7 +603,7 @@ func TestMigrateE2E(t *testing.T) {
 	require.Equal(t, payloads[1].PushDir.Tag, "sha1234")
 	require.Equal(t, payloads[1].PushDir.Slug, "test-dir")
 	tt.env["GITHUB_HEAD_REF"] = ""
-	err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+	err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
 	require.Equal(t, 4, len(payloads))
 	expected.Branch = tt.env["GITHUB_REF_NAME"]
 	require.Equal(t, expected, payloads[2].SyncDir.Context)
@@ -658,41 +658,41 @@ func TestMigrateLint(t *testing.T) {
 		}
 	}))
 	t.Run("lint - missing dev-url", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "required flag(s) \"dev-url\" not set")
 	})
 	t.Run("lint - missing dir", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "stat migrations: no such file or directory")
 	})
 	t.Run("lint - bad dir name", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "missing required parameter dir-name")
 		tt.setInput("dir-name", "fake-dir-name")
-		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, `dir "fake-dir-name" not found`)
 		tt.setInput("dir-name", "atlas://test-dir-slug") // user must not add atlas://
-		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, `slug must be lowercase alphanumeric and may contain /.-_`)
 		out, err := tt.outputs()
 		require.NoError(t, err)
 		require.Equal(t, 0, len(out))
 	})
 	t.Run("lint summary - lint error", func(t *testing.T) {
-		tt := newT(t)
-		var comments []pullRequestComment
+		tt := newT(t, nil)
+		var comments []map[string]any
 		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			var (
 				path   = request.URL.Path
@@ -708,16 +708,16 @@ func TestMigrateLint(t *testing.T) {
 				return
 			// Create comment endpoint
 			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodPost:
-				var payload pullRequestComment
+				var payload map[string]any
 				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
-				payload.ID = 123
+				payload["id"] = 123
 				comments = append(comments, payload)
 				writer.WriteHeader(http.StatusCreated)
 				return
 			// Update comment endpoint
 			case path == "/repos/test-owner/test-repository/pulls/comments/123" && method == http.MethodPatch:
 				require.Len(t, comments, 1)
-				comments[0].Body = "updated comment"
+				comments[0]["body"] = "updated comment"
 				return
 			// List pull request files endpoint
 			case path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
@@ -733,7 +733,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://testdata/migrations_destructive")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
@@ -747,7 +747,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, out, "destructive changes detected")
 		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS102")
 		require.Len(t, comments, 1)
-		require.Equal(t, "testdata/migrations_destructive/20230925192914.sql", comments[0].Path)
+		require.Equal(t, "testdata/migrations_destructive/20230925192914.sql", comments[0]["path"])
 		require.Equal(t, "> [!CAUTION]\n"+
 			"> **destructive changes detected**\n"+
 			"> Dropping table \"t1\" [DS102](https://atlasgo.io/lint/analyzers#DS102)\n\n"+
@@ -764,17 +764,17 @@ func TestMigrateLint(t *testing.T) {
 			"drop table t1;\n"+
 			"```\n"+
 			"Ensure to run `atlas migrate hash --dir \"file://testdata/migrations_destructive\"` after applying the suggested changes.\n"+
-			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->", comments[0].Body)
-		require.Equal(t, 1, comments[0].Line)
+			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->", comments[0]["body"])
+		require.Equal(t, float64(1), comments[0]["line"])
 		// Run Lint against a directory that has an existing suggestion comment, expecting a PATCH of the comment
-		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		require.Len(t, comments, 1)
-		require.Equal(t, "updated comment", comments[0].Body)
+		require.Equal(t, "updated comment", comments[0]["body"])
 	})
 	t.Run("lint summary - no text edit", func(t *testing.T) {
-		tt := newT(t)
-		var comments []pullRequestComment
+		tt := newT(t, nil)
+		var comments []map[string]any
 		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			var (
 				path   = request.URL.Path
@@ -790,16 +790,16 @@ func TestMigrateLint(t *testing.T) {
 				return
 			// Create comment endpoint
 			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodPost:
-				var payload pullRequestComment
+				var payload map[string]any
 				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
-				payload.ID = 123
+				payload["id"] = 123
 				comments = append(comments, payload)
 				writer.WriteHeader(http.StatusCreated)
 				return
 			// Update comment endpoint
 			case path == "/repos/test-owner/test-repository/pulls/comments/123" && method == http.MethodPatch:
 				require.Len(t, comments, 1)
-				comments[0].Body = "updated comment"
+				comments[0]["body"] = "updated comment"
 				return
 			// List pull request files endpoint
 			case path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
@@ -816,7 +816,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://testdata/drop_column")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
@@ -833,7 +833,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Len(t, comments, 0)
 	})
 	t.Run("lint summary - lint error - working directory is set", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		// Same as the previous test but with working directory input set.
 		require.NoError(t, os.Chdir("testdata"))
 		t.Cleanup(func() {
@@ -869,7 +869,7 @@ func TestMigrateLint(t *testing.T) {
 			}
 		}))
 
-		var comments []pullRequestComment
+		var comments []map[string]any
 		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			var (
 				path   = request.URL.Path
@@ -885,16 +885,16 @@ func TestMigrateLint(t *testing.T) {
 				return
 			// Create comment endpoint
 			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodPost:
-				var payload pullRequestComment
+				var payload map[string]any
 				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
-				payload.ID = 123
+				payload["id"] = 123
 				comments = append(comments, payload)
 				writer.WriteHeader(http.StatusCreated)
 				return
 			// Update comment endpoint
 			case path == "/repos/test-owner/test-repository/pulls/comments/123" && method == http.MethodPatch:
 				require.Len(t, comments, 1)
-				comments[0].Body = "updated comment"
+				comments[0]["body"] = "updated comment"
 				return
 			// List pull request files endpoint
 			case path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
@@ -910,7 +910,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://migrations_destructive")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
@@ -924,7 +924,7 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, out, "destructive changes detected")
 		require.Contains(t, out, "Details: https://atlasgo.io/lint/analyzers#DS102")
 		require.Len(t, comments, 1)
-		require.Equal(t, "testdata/migrations_destructive/20230925192914.sql", comments[0].Path)
+		require.Equal(t, "testdata/migrations_destructive/20230925192914.sql", comments[0]["path"])
 		require.Equal(t, "> [!CAUTION]\n"+
 			"> **destructive changes detected**\n"+
 			"> Dropping table \"t1\" [DS102](https://atlasgo.io/lint/analyzers#DS102)\n\n"+
@@ -941,16 +941,16 @@ func TestMigrateLint(t *testing.T) {
 			"drop table t1;\n"+
 			"```\n"+
 			"Ensure to run `atlas migrate hash --dir \"file://migrations_destructive\"` after applying the suggested changes.\n"+
-			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->", comments[0].Body)
-		require.Equal(t, 1, comments[0].Line)
+			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->", comments[0]["body"])
+		require.Equal(t, float64(1), comments[0]["line"])
 		// Run Lint against a directory that has an existing suggestion comment, expecting a PATCH of the comment
-		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		require.Len(t, comments, 1)
-		require.Equal(t, "updated comment", comments[0].Body)
+		require.Equal(t, "updated comment", comments[0]["body"])
 	})
 	t.Run("lint summary - lint error - github api not working", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		require.NoError(t, os.Chdir("testdata"))
 		t.Cleanup(func() {
 			err := os.Chdir("..")
@@ -984,7 +984,7 @@ func TestMigrateLint(t *testing.T) {
 				_, _ = fmt.Fprint(w, string(st2bytes))
 			}
 		}))
-		var comments []pullRequestComment
+		var comments []any
 		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			var (
 				path   = request.URL.Path
@@ -1002,7 +1002,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://migrations_destructive")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
@@ -1018,13 +1018,13 @@ func TestMigrateLint(t *testing.T) {
 		require.Len(t, comments, 0)
 	})
 	t.Run("lint summary - lint error - push event", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.env["GITHUB_EVENT_NAME"] = "push"
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://testdata/migrations_destructive")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "`atlas migrate lint` completed with errors, see report: https://migration-lint-report-url")
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
@@ -1033,8 +1033,8 @@ func TestMigrateLint(t *testing.T) {
 		require.NotEmpty(t, tt.out.String())
 	})
 	t.Run("lint summary - with diagnostics file not included in the pull request", func(t *testing.T) {
-		tt := newT(t)
-		var comments []pullRequestComment
+		tt := newT(t, nil)
+		var comments []map[string]any
 		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			var (
 				path   = request.URL.Path
@@ -1050,9 +1050,9 @@ func TestMigrateLint(t *testing.T) {
 				return
 			// Create comment endpoint
 			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodPost:
-				var payload pullRequestComment
+				var payload map[string]any
 				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
-				payload.ID = 123
+				payload["id"] = 123
 				comments = append(comments, payload)
 				writer.WriteHeader(http.StatusCreated)
 				return
@@ -1070,7 +1070,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://testdata/diagnostics")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.NoError(t, err)
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
@@ -1087,12 +1087,12 @@ func TestMigrateLint(t *testing.T) {
 		require.Len(t, comments, 0)
 	})
 	t.Run("lint summary - lint success", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setupConfigWithLogin(t, srv.URL, token)
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.NoError(t, err)
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
@@ -1103,18 +1103,18 @@ func TestMigrateLint(t *testing.T) {
 		require.Contains(t, sum, `<a href="https://migration-lint-report-url" target="_blank">`)
 	})
 	t.Run("lint summary - lint success - vars input", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		cfgURL := generateHCLWithVars(t)
 		tt.setInput("config", cfgURL)
 		tt.setInput("vars", fmt.Sprintf(`{"token":"%s", "url":"%s"}`, token, srv.URL))
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir-slug")
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.NoError(t, err)
 	})
 	t.Run("lint comment", func(t *testing.T) {
-		tt := newT(t)
+		tt := newT(t, nil)
 		type ghPayload struct {
 			Body   string
 			URL    string
@@ -1182,7 +1182,7 @@ func TestMigrateLint(t *testing.T) {
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir-slug")
 		// Run Lint while expecting no errors
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, 3, len(ghPayloads))
 		found := slices.IndexFunc(ghPayloads, func(gh ghPayload) bool {
@@ -1197,7 +1197,7 @@ func TestMigrateLint(t *testing.T) {
 		require.NotEqual(t, -1, found)
 		// Run Lint but this time with lint errors expected
 		tt.setInput("dir", "file://testdata/migrations_destructive")
-		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		require.Equal(t, 8, len(ghPayloads))
 		found = slices.IndexFunc(ghPayloads, func(gh ghPayload) bool {
@@ -1212,7 +1212,7 @@ func TestMigrateLint(t *testing.T) {
 		require.NotEqual(t, -1, found)
 		// Run Lint against a directory that has an existing comment, expecting a PATCH
 		tt.setInput("dir-name", "other-dir-slug")
-		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.ErrorContains(t, err, "https://migration-lint-report-url")
 		require.Equal(t, 13, len(ghPayloads))
 		found = slices.IndexFunc(ghPayloads, func(gh ghPayload) bool {
@@ -1227,7 +1227,7 @@ func TestMigrateLint(t *testing.T) {
 		require.NotEqual(t, -1, found)
 		// Run Lint with input errors, no calls to github api should be made
 		tt.setInput("dir-name", "fake-dir-name")
-		err = (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
+		err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateLint(context.Background())
 		require.Equal(t, 13, len(ghPayloads))
 		require.ErrorContains(t, err, `dir "fake-dir-name" not found`)
 	})
@@ -1462,7 +1462,7 @@ func TestLintTemplateGeneration(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := migrateLintComment(tt.payload)
+			c, err := atlasaction.RenderTemplate("migrate-lint.tmpl", tt.payload)
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, c)
 		})
@@ -1622,7 +1622,7 @@ func TestApplyTemplateGeneration(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := migrateApplyComment(tt.payload)
+			c, err := atlasaction.RenderTemplate("migrate-apply.tmpl", tt.payload)
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, c)
 		})
@@ -1703,7 +1703,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		srv := httptest.NewServer(handler(&payloads))
 		t.Cleanup(srv.Close)
 
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "atlas://cloud-project")
 		tt.setInput("env", "test")
@@ -1711,7 +1711,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
 		cfgURL := generateHCL(t, srv.URL, "token")
 		tt.setInput("config", cfgURL)
-		err := (&Actions{Action: tt.act, Atlas: tt.cli, Version: "v1.2.3"}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli, Version: "v1.2.3"}).MigrateApply(context.Background())
 		require.NoError(t, err)
 
 		require.Len(t, payloads, 3)
@@ -1731,7 +1731,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		srv := httptest.NewServer(handler(&payloads))
 		t.Cleanup(srv.Close)
 
-		tt := newT(t)
+		tt := newT(t, nil)
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "atlas://cloud-project")
 
@@ -1739,7 +1739,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		cfgURL := generateHCL(t, srv.URL, "token")
 		tt.setInput("config", cfgURL)
 
-		err := (&Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		require.NoError(t, err)
 
 		require.Len(t, payloads, 2)
@@ -1774,12 +1774,12 @@ type test struct {
 	db        string
 	env       map[string]string
 	out       bytes.Buffer
-	cli       AtlasExec
-	act       Action
+	cli       atlasaction.AtlasExec
+	act       atlasaction.Action
 	configUrl string
 }
 
-func newT(t *testing.T, opts ...githubactions.Option) *test {
+func newT(t *testing.T, w io.Writer) *test {
 	outputFile, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer outputFile.Close()
@@ -1799,13 +1799,10 @@ func newT(t *testing.T, opts ...githubactions.Option) *test {
 		},
 	}
 	tt.setEvent(t, `{}`)
-	opts = append([]githubactions.Option{
-		githubactions.WithGetenv(func(key string) string {
-			return tt.env[key]
-		}),
-		githubactions.WithWriter(&tt.out),
-	}, opts...)
-	tt.act = NewGHAction(opts...)
+	if w == nil {
+		w = &tt.out
+	}
+	tt.act = atlasaction.NewGHAction(func(key string) string { return tt.env[key] }, w)
 	cli, err := atlasexec.NewClient("", "atlas")
 	require.NoError(t, err)
 	tt.cli = cli
@@ -1858,7 +1855,7 @@ func (tt *test) resetOut(t *testing.T) {
 }
 
 func TestParseGitHubOutputFile(t *testing.T) {
-	tt := newT(t)
+	tt := newT(t, nil)
 	tt.act.SetOutput("foo", "bar")
 	tt.act.SetOutput("baz", "qux")
 	out, err := tt.outputs()
@@ -1870,7 +1867,7 @@ func TestParseGitHubOutputFile(t *testing.T) {
 }
 
 func TestSetInput(t *testing.T) {
-	tt := newT(t)
+	tt := newT(t, nil)
 	tt.setInput("hello-world", "greetings")
 	tt.setInput("goodbye-friends", "farewell")
 
@@ -1909,7 +1906,7 @@ func TestSchemaPlan(t *testing.T) {
 		if commentCounter == 0 {
 			fmt.Fprint(w, `[]`) // No comments
 		} else { // Existing comment
-			fmt.Fprintf(w, `[{"id":1,"body":"%s"}]`, commentMarker("pr-1-Rl4lBdMk"))
+			fmt.Fprintf(w, `[{"id":1,"body":"<!-- generated by ariga/atlas-action for %v -->"}]`, "pr-1-Rl4lBdMk")
 		}
 	})
 	h.HandleFunc("POST /repos/ariga/atlas-action/issues/1/comments", func(w http.ResponseWriter, r *http.Request) {
@@ -1998,13 +1995,13 @@ func TestSchemaPlan(t *testing.T) {
 				return a
 			},
 		})),
-		trigger: &TriggerContext{
-			SCM:     SCM{Type: atlasexec.SCMTypeGithub, APIURL: srv.URL},
+		trigger: &atlasaction.TriggerContext{
+			SCM:     atlasaction.SCM{Type: atlasexec.SCMTypeGithub, APIURL: srv.URL},
 			Repo:    "ariga/atlas-action",
 			RepoURL: "https://github.com/ariga/atlas-action",
 			Branch:  "g/feature-1",
 			Commit:  "commit-id",
-			PullRequest: &PullRequest{
+			PullRequest: &atlasaction.PullRequest{
 				Number: 1,
 				URL:    "https://github.com/ariga/atlas-action/pull/1",
 				Commit: "commit-id",
@@ -2015,7 +2012,7 @@ func TestSchemaPlan(t *testing.T) {
 	// Multiple plans will fail with an error
 	planFiles = []atlasexec.SchemaPlanFile{*planFile, *planFile}
 	act.resetOutputs()
-	require.ErrorContains(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx), "found multiple schema plans, please approve or delete the existing plans")
+	require.ErrorContains(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx), "found multiple schema plans, please approve or delete the existing plans")
 	require.Len(t, act.summary, 0, "Expected 1 summary")
 	require.Equal(t, 0, commentCounter, "No more comments generated")
 	require.Equal(t, 0, commentEdited, "No comment should be edited")
@@ -2024,7 +2021,7 @@ func TestSchemaPlan(t *testing.T) {
 	planErr = errors.New("The current state is synced with the desired state, no changes to be made")
 	planFiles = nil
 	act.resetOutputs()
-	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
 	require.Len(t, act.summary, 0, "No summaries generated")
 	require.Equal(t, 0, commentCounter, "Expected 1 comment generated")
 	require.Equal(t, 0, commentEdited, "No comment should be edited")
@@ -2033,7 +2030,7 @@ func TestSchemaPlan(t *testing.T) {
 	planErr = nil
 	planFiles = nil
 	act.resetOutputs()
-	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
 	require.Len(t, act.summary, 1, "Expected 1 summary")
 	require.Equal(t, 1, commentCounter, "Expected 1 comment generated")
 	require.Equal(t, 0, commentEdited, "No comment should be edited")
@@ -2046,7 +2043,7 @@ func TestSchemaPlan(t *testing.T) {
 	// Existing plan
 	planFiles = []atlasexec.SchemaPlanFile{*planFile}
 	act.resetOutputs()
-	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
 	require.Len(t, act.summary, 2, "Expected 2 summaries")
 	require.Equal(t, 1, commentCounter, "No more comments generated")
 	require.Equal(t, 1, commentEdited, "Expected comment to be edited")
@@ -2060,7 +2057,7 @@ func TestSchemaPlan(t *testing.T) {
 	act.trigger.PullRequest = nil
 	act.trigger.Branch = "master"
 	act.resetOutputs()
-	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
 	require.Len(t, act.summary, 2, "No more summaries generated")
 	require.Equal(t, 1, commentCounter, "No more comments generated")
 	require.Equal(t, 1, commentEdited, "No comment should be edited")
@@ -2073,7 +2070,7 @@ func TestSchemaPlan(t *testing.T) {
 	// No pending plan
 	planFiles = nil
 	act.resetOutputs()
-	require.NoError(t, (&Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
 	require.Len(t, act.summary, 2, "No more summaries generated")
 	require.Equal(t, 1, commentCounter, "No more comments generated")
 	require.Equal(t, 1, commentEdited, "No comment should be edited")
@@ -2091,15 +2088,15 @@ time=NOW level=INFO msg="No schema plan found"
 }
 
 type mockAction struct {
-	trigger *TriggerContext   // trigger context
-	inputs  map[string]string // input values
-	output  map[string]string // step's output
-	summary []string          // step summaries
-	logger  *slog.Logger      // logger
-	fatal   bool              // fatal called
+	trigger *atlasaction.TriggerContext // trigger context
+	inputs  map[string]string           // input values
+	output  map[string]string           // step's output
+	summary []string                    // step summaries
+	logger  *slog.Logger                // logger
+	fatal   bool                        // fatal called
 }
 
-var _ Action = (*mockAction)(nil)
+var _ atlasaction.Action = (*mockAction)(nil)
 
 func (m *mockAction) resetOutputs() {
 	m.output = map[string]string{}
@@ -2111,7 +2108,7 @@ func (m *mockAction) GetType() atlasexec.TriggerType {
 }
 
 // GetTriggerContext implements Action.
-func (m *mockAction) GetTriggerContext() (*TriggerContext, error) {
+func (m *mockAction) GetTriggerContext() (*atlasaction.TriggerContext, error) {
 	return m.trigger, nil
 }
 
@@ -2152,7 +2149,7 @@ func (m *mockAction) Fatalf(msg string, args ...interface{}) {
 }
 
 // WithFieldsMap implements Action.
-func (m *mockAction) WithFieldsMap(args map[string]string) Logger {
+func (m *mockAction) WithFieldsMap(args map[string]string) atlasaction.Logger {
 	argPairs := make([]any, 0, len(args)*2)
 	for k, v := range args {
 		argPairs = append(argPairs, k, v)

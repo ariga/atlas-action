@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"ariga.io/atlas-action/atlasaction"
@@ -38,7 +39,7 @@ var (
 )
 
 func main() {
-	action, err := newAction()
+	action, err := newAction(os.Getenv, os.Stdout)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to run action in the current environment: %s\n", err)
 		os.Exit(1)
@@ -113,12 +114,12 @@ func (r *RunActionCmd) Run(ctx context.Context, a *atlasaction.Actions) error {
 }
 
 // newAction creates a new atlasaction.Action based on the environment.
-func newAction() (atlasaction.Action, error) {
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		return atlasaction.NewGHAction(), nil
+func newAction(getenv func(string) string, w io.Writer) (atlasaction.Action, error) {
+	if getenv("GITHUB_ACTIONS") == "true" {
+		return atlasaction.NewGHAction(getenv, w), nil
 	}
-	if os.Getenv("CIRCLECI") == "true" {
-		return atlasaction.NewCircleCIOrb(), nil
+	if getenv("CIRCLECI") == "true" {
+		return atlasaction.NewCircleCIOrb(getenv, w), nil
 	}
 	return nil, errors.New("unsupported environment")
 }

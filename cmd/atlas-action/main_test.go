@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"ariga.io/atlas-action/atlasaction"
@@ -16,8 +17,7 @@ import (
 func TestRunAction_Run(t *testing.T) {
 	client, err := atlasexec.NewClient("", "atlas")
 	require.NoError(t, err)
-	act := atlasaction.NewGHAction()
-
+	act := atlasaction.NewGHAction(os.Getenv, os.Stdout)
 	t.Run("fake", func(t *testing.T) {
 		r := &RunActionCmd{
 			Action: "fake",
