@@ -8,25 +8,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/alecthomas/kong"
-)
-
-const (
-	// Versioned workflow Commands
-	CmdMigratePush  = "migrate/push"
-	CmdMigrateLint  = "migrate/lint"
-	CmdMigrateApply = "migrate/apply"
-	CmdMigrateDown  = "migrate/down"
-	CmdMigrateTest  = "migrate/test"
-	// Declarative workflow Commands
-	CmdSchemaPush = "schema/push"
-	CmdSchemaTest = "schema/test"
-	CmdSchemaPlan = "schema/plan"
 )
 
 var (
@@ -39,28 +25,25 @@ var (
 )
 
 func main() {
-	action, err := newAction(os.Getenv, os.Stdout)
+	act, err := atlasaction.New(os.Getenv, os.Stdout)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to run action in the current environment: %s\n", err)
 		os.Exit(1)
 	}
-	atlas, err := atlasexec.NewClient("", "atlas")
+	act.Atlas, err = atlasexec.NewClient("", "atlas")
 	if err != nil {
-		action.Fatalf("Failed to create client: %s", err)
+		act.Fatalf("Failed to create client: %s", err)
 	}
+	act.Version = version
 	cli := kong.Parse(
 		&RunActionCmd{},
 		kong.BindTo(context.Background(), (*context.Context)(nil)),
 	)
-	if err := cli.Run(&atlasaction.Actions{
-		Action:  action,
-		Version: version,
-		Atlas:   atlas,
-	}); err != nil {
+	if err := cli.Run(act); err != nil {
 		if uerr := errors.Unwrap(err); uerr != nil {
 			err = uerr
 		}
-		action.Fatalf(err.Error())
+		act.Fatalf(err.Error())
 	}
 }
 
@@ -85,41 +68,5 @@ func (r *RunActionCmd) Run(ctx context.Context, a *atlasaction.Actions) error {
 	defer func() {
 		_ = os.Unsetenv("ATLAS_ACTION_COMMAND")
 	}()
-	// Set the working directory if provided.
-	if dir := a.WorkingDir(); dir != "" {
-		if err := os.Chdir(dir); err != nil {
-			return fmt.Errorf("failed to change working directory: %w", err)
-		}
-	}
-	switch r.Action {
-	case CmdMigrateApply:
-		return a.MigrateApply(ctx)
-	case CmdMigrateDown:
-		return a.MigrateDown(ctx)
-	case CmdMigratePush:
-		return a.MigratePush(ctx)
-	case CmdMigrateLint:
-		return a.MigrateLint(ctx)
-	case CmdMigrateTest:
-		return a.MigrateTest(ctx)
-	case CmdSchemaPush:
-		return a.SchemaPush(ctx)
-	case CmdSchemaTest:
-		return a.SchemaTest(ctx)
-	case CmdSchemaPlan:
-		return a.SchemaPlan(ctx)
-	default:
-		return fmt.Errorf("unknown action: %s", r.Action)
-	}
-}
-
-// newAction creates a new atlasaction.Action based on the environment.
-func newAction(getenv func(string) string, w io.Writer) (atlasaction.Action, error) {
-	if getenv("GITHUB_ACTIONS") == "true" {
-		return atlasaction.NewGHAction(getenv, w), nil
-	}
-	if getenv("CIRCLECI") == "true" {
-		return atlasaction.NewCircleCIOrb(getenv, w), nil
-	}
-	return nil, errors.New("unsupported environment")
+	return a.Run(ctx, r.Action)
 }
