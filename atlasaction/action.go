@@ -862,11 +862,8 @@ var (
 					}
 					return result
 				},
-				"issueIcon": func(s *atlasexec.StepReport) string {
-					if s.Error != "" || (s.Result != nil && s.Result.Error != "") {
-						return "error.svg"
-					}
-					return "warning.svg"
+				"stepIsError": func(s *atlasexec.StepReport) bool {
+					return s.Error != "" || (s.Result != nil && s.Result.Error != "")
 				},
 				"firstUpper": func(s string) string {
 					if s == "" {

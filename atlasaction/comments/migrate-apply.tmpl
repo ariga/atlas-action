@@ -30,7 +30,7 @@
   <tr>
     <td>Migrate to Version</td>
     <td>
-      <code>{{- if .Target }}{{ .Target }}{{- else }}{{ .Current }}{{- end }}</code>
+      <code>{{- or .Target .Current -}}</code>
     </td>
   </tr>
   <tr>
@@ -60,15 +60,7 @@
     <th>Error Statement</th>
   </tr>
   <tr>
-    <td>
-      <div align="center">
-      {{- if .Error -}}
-      {{- assetsImage "error.svg" | image "20px" -}}
-      {{- else -}}
-      {{- assetsImage "success.svg" | image "20px" -}}
-      {{- end -}}
-      </div>
-    </td>
+    {{- template "lint-check" (or (and .Error "error.svg") "success.svg") -}}
     <td>{{ len .Applied }}</td>
     <td>{{ execTime .Start .End }}</td>
 {{- with .Error -}}
