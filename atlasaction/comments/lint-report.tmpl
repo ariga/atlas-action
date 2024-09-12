@@ -9,34 +9,32 @@
   </thead>
   <tbody>
     <tr>
-      <td>
-        <div align="center">{{- assetsImage "success.svg" | image "20px" -}}</div>
-      </td>
+  {{- block "lint-first-step" . -}}
+    {{- template "lint-check" "success.svg" -}}
       <td>
         {{- $fileCount := len .Files -}}
         {{- if eq $fileCount 1 -}}
-          1 new migration file detected
+        1 new migration file detected
         {{- else if $fileCount -}}
-          {{- $fileCount }} new migration files detected
+        {{- $fileCount }} new migration files detected
         {{- else -}}
-          No migration files detected
+        No migration files detected
         {{- end -}}
       </td>
       <td>
         {{- with .Files -}}
           {{- range $i, $f := . -}}
-            {{- if $i -}}<br/>{{- end -}}{{- $f.Name -}}
+          {{- if $i -}}<br/>{{- end -}}{{- $f.Name -}}
           {{- end -}}
         {{- else -}}
           &nbsp;
         {{- end -}}
       </td>
+  {{- end -}}
     </tr>
 {{- with .URL -}}
     <tr>
-      <td>
-        <div align="center">{{ assetsImage "success.svg" | image "20px" }}</div>
-      </td>
+      {{- template "lint-check" "success.svg" -}}
       <td>ERD and visual diff generated</td>
       <td>
         {{- printf "%s#erd" . | link "View Visualization" -}}
@@ -46,7 +44,7 @@
 {{- with (.Steps | filterIssues) -}}
   {{- range $step := . -}}
     <tr>
-      <td><div align="center">{{- $step | issueIcon | assetsImage | image "20px" -}}</div></td>
+      {{- template "lint-check" (or (and ($step | stepIsError) "error.svg") "warning.svg") -}}
       <td>{{- $step.Name -}}<br/>{{- $step.Text -}}</td>
       <td>
       {{- if and $step.Error (not $step.Result) -}}
@@ -68,11 +66,7 @@
   {{- end -}}
 {{- else -}}
     <tr>
-      <td>
-        <div align="center">
-        {{- assetsImage "success.svg" | image "20px" -}}
-        </div>
-      </td>
+      {{- template "lint-check" "success.svg" -}}
       <td>No issues found</td>
       <td>{{- with .URL }}{{ . | link "View Report" }}{{- end -}}</td>
     </tr>
@@ -82,4 +76,7 @@
 {{- end -}}
   </tbody>
 </table>
+{{- end -}}
+{{- define "lint-check" -}}
+<td><div align="center">{{- assetsImage . | image "20px" -}}</div></td>
 {{- end -}}
