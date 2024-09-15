@@ -32,6 +32,8 @@ import (
 	"ariga.io/atlas/sql/sqlcheck"
 	"ariga.io/atlas/sql/sqlclient"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/rogpeppe/go-internal/diff"
+	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"
 )
 
@@ -2162,4 +2164,138 @@ func (m *mockAction) WithFieldsMap(args map[string]string) atlasaction.Logger {
 		fatal:   m.fatal,
 		logger:  m.logger.With(argPairs...),
 	}
+}
+
+func TestGitHubActions(t *testing.T) {
+	var (
+		actions = "actions"
+		output  = filepath.Join(actions, "output.txt")
+		summary = filepath.Join(actions, "summary.txt")
+	)
+	testscript.Run(t, testscript.Params{
+		Dir: filepath.Join("testdata", "github"),
+		Setup: func(e *testscript.Env) (err error) {
+			dir := filepath.Join(e.WorkDir, actions)
+			if err := os.Mkdir(dir, 0700); err != nil {
+				return err
+			}
+			e.Setenv("GITHUB_ACTIONS", "true")
+			e.Setenv("GITHUB_ENV", filepath.Join(dir, "env.txt"))
+			e.Setenv("GITHUB_OUTPUT", filepath.Join(dir, "output.txt"))
+			e.Setenv("GITHUB_STEP_SUMMARY", filepath.Join(dir, "summary.txt"))
+			c, err := atlasexec.NewClient(e.WorkDir, "atlas")
+			if err != nil {
+				return err
+			}
+			// Create a new actions for each test.
+			e.Values[atlasKey{}] = &atlasClient{c}
+			return nil
+		},
+		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
+			"atlas-action": atlasAction,
+			"mock-atlas":   mockAtlasOutput,
+			"summary": func(ts *testscript.TestScript, neg bool, args []string) {
+				if len(args) == 0 {
+					_, err := os.Stat(ts.MkAbs(summary))
+					if neg {
+						if !os.IsNotExist(err) {
+							ts.Fatalf("expected no summary, but got some")
+						}
+						return
+					}
+					if err != nil {
+						ts.Fatalf("expected summary, but got none")
+						return
+					}
+					return
+				}
+				cmpFiles(ts, neg, args[0], summary)
+			},
+			"output": func(ts *testscript.TestScript, neg bool, args []string) {
+				if len(args) == 0 {
+					_, err := os.Stat(ts.MkAbs(output))
+					if neg {
+						if !os.IsNotExist(err) {
+							ts.Fatalf("expected no output, but got some")
+						}
+						return
+					}
+					if err != nil {
+						ts.Fatalf("expected output, but got none")
+						return
+					}
+					return
+				}
+				cmpFiles(ts, neg, args[0], output)
+			},
+		},
+	})
+}
+
+type (
+	atlasKey    struct{}
+	atlasClient struct {
+		atlasaction.AtlasExec
+	}
+)
+
+func atlasAction(ts *testscript.TestScript, neg bool, args []string) {
+	if len(args) != 1 {
+		ts.Fatalf("usage: atlas-action <action>")
+	}
+	client, ok := ts.Value(atlasKey{}).(*atlasClient)
+	if !ok || client == nil {
+		ts.Fatalf("client not found")
+	}
+	// The action need to be create for each call to read correct inputs
+	act, err := atlasaction.New(ts.Getenv, ts.Stdout())
+	ts.Check(err)
+	act.Atlas = client.AtlasExec
+	act.Version = "testscript"
+	// Run the action!
+	switch err := act.Run(context.Background(), args[0]); {
+	case !neg:
+		ts.Check(err)
+	case err == nil:
+		ts.Fatalf("expected fail")
+	case neg:
+		// Print the error to asserting on the testscript
+		fmt.Fprint(ts.Stderr(), err.Error())
+	}
+}
+
+func mockAtlasOutput(ts *testscript.TestScript, neg bool, args []string) {
+	if len(args) != 1 {
+		ts.Fatalf("usage: mock-atlas <dir>")
+	}
+	client, ok := ts.Value(atlasKey{}).(*atlasClient)
+	if !ok || client == nil {
+		ts.Fatalf("client not found")
+	}
+	m, err := atlasexec.NewClient("", "./mock-atlas.sh")
+	ts.Check(err)
+	ts.Check(m.SetEnv(map[string]string{
+		"TEST_BATCH": args[0],
+	}))
+	// Replace the atlas client with a mock client.
+	client.AtlasExec = m
+}
+
+func cmpFiles(ts *testscript.TestScript, neg bool, name1, name2 string) {
+	text1 := ts.ReadFile(name1)
+	data, err := os.ReadFile(ts.MkAbs(name2))
+	ts.Check(err)
+	eq := text1 == string(data)
+	if neg {
+		if eq {
+			ts.Fatalf("%s and %s do not differ", name1, name2)
+		}
+		return // they differ, as expected
+	}
+	if eq {
+		return // they are equal, as expected
+	}
+	unifiedDiff := diff.Diff(name1, []byte(text1), name2, data)
+	ts.Logf("%s", unifiedDiff)
+	ts.Fatalf("%s and %s differ", name1, name2)
 }
