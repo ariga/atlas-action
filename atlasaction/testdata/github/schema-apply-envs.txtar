@@ -1,0 +1,136 @@
+# Mock the atlas command outputs
+mock-atlas $WORK/schema-apply
+# Setup the action input variables
+env INPUT_ENV=test
+env INPUT_PLAN=file://20240910173744.plan.hcl
+# Run the action
+! atlas-action schema/apply
+stdout '"atlas schema apply" completed successfully on the target "sqlite://local-bu.db"'
+stdout '"atlas schema apply" completed successfully on the target "sqlite://local-pi.db"'
+stdout '"atlas schema apply" completed successfully on the target "sqlite://local-su.db"'
+
+summary summary.html
+output output.txt
+
+-- schema-apply/1/args --
+schema apply --format {{ json . }} --env test --plan file://20240910173744.plan.hcl
+-- schema-apply/1/stderr --
+Abort: The plan "From" hash does not match the current state hash (passed with --from):
+
+  - iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE= (plan value)
+  + R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o= (current hash)
+
+-- schema-apply/1/stdout --
+{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local-bu.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"},"Start":"2024-09-12T21:31:20.339663+07:00","End":"2024-09-12T21:31:20.351603+07:00","Applied":{"Name":"20240910173744.sql","Version":"20240910173744","Start":"2024-09-12T21:31:20.350607+07:00","End":"2024-09-12T21:31:20.351228+07:00","Applied":["ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;"]},"Plan":{"Env":{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local-bu.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"}},"File":{"Name":"20240910173744","FromHash":"iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE=","ToHash":"Cp8xCVYilZuwULkggsfJLqIQHaxYcg/IpU+kgjVUBA4=","Migration":"-- Add column \"c2\" to table: \"t4\"\nALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;\n","URL":"file://20240910173744.plan.hcl"}},"Changes":{"Applied":["ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;"]}}
+{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local-pi.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"},"Start":"2024-09-12T21:31:20.354074+07:00","End":"2024-09-12T21:31:20.35764+07:00","Applied":{"Name":"20240910173744.sql","Version":"20240910173744","Start":"2024-09-12T21:31:20.356221+07:00","End":"2024-09-12T21:31:20.356755+07:00","Applied":["ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;"]},"Plan":{"Env":{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local-pi.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"}},"File":{"Name":"20240910173744","FromHash":"iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE=","ToHash":"Cp8xCVYilZuwULkggsfJLqIQHaxYcg/IpU+kgjVUBA4=","Migration":"-- Add column \"c2\" to table: \"t4\"\nALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;\n","URL":"file://20240910173744.plan.hcl"}},"Changes":{"Applied":["ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;"]}}
+{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local-su.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"},"Start":"2024-09-12T21:31:20.360863+07:00","End":"2024-09-12T21:31:20.368395+07:00","Applied":{"Name":"20240910173744.sql","Version":"20240910173744","Start":"2024-09-12T21:31:20.364331+07:00","End":"2024-09-12T21:31:20.365086+07:00","Applied":["ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;"]},"Plan":{"Env":{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local-su.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"}},"File":{"Name":"20240910173744","FromHash":"iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE=","ToHash":"Cp8xCVYilZuwULkggsfJLqIQHaxYcg/IpU+kgjVUBA4=","Migration":"-- Add column \"c2\" to table: \"t4\"\nALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;\n","URL":"file://20240910173744.plan.hcl"}},"Changes":{"Applied":["ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;"]}}
+-- output.txt --
+error<<_GitHubActionsFileCommandDelimeter_
+Abort: The plan "From" hash does not match the current state hash (passed with --from): - iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE= (plan value) + R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o= (current hash)
+_GitHubActionsFileCommandDelimeter_
+-- summary.html --
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> Migration Passed</h2><h4><code>atlas schema apply</code> Summary:</h4><table>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://local-bu.db</code></td>
+  </tr><tr>
+    <td>Plan Name</td>
+    <td><code>20240910173744</code></td>
+  </tr>
+  <tr>
+    <td>From Hash</td>
+    <td><code>iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE=</code></td>
+  </tr>
+  <tr>
+    <td>To Hash</td>
+    <td><code>Cp8xCVYilZuwULkggsfJLqIQHaxYcg/IpU+kgjVUBA4=</code></td>
+  </tr><tr>
+    <td>Plan URL</td>
+    <td><code>file://20240910173744.plan.hcl</code></td>
+  </tr><tr>
+    <td>Total Time</td>
+    <td>11.94ms</td>
+  </tr></table><h4>Version 20240910173744.sql:</h4>
+<table>
+  <tr>
+    <th>Status</th>
+    <th>Executed Statements</th>
+    <th>Execution Time</th>
+    <th>Error</th>
+    <th>Error Statement</th>
+  </tr>
+  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
+    <td>621µs</td><td>-</td><td>-</td></tr>
+</table><details><summary>📄 View Pre-planned SQL Statements</summary><pre lang="sql"><code>-- Add column "c2" to table: "t4"
+ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;
+</code></pre></details>
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> Migration Passed</h2><h4><code>atlas schema apply</code> Summary:</h4><table>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://local-pi.db</code></td>
+  </tr><tr>
+    <td>Plan Name</td>
+    <td><code>20240910173744</code></td>
+  </tr>
+  <tr>
+    <td>From Hash</td>
+    <td><code>iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE=</code></td>
+  </tr>
+  <tr>
+    <td>To Hash</td>
+    <td><code>Cp8xCVYilZuwULkggsfJLqIQHaxYcg/IpU+kgjVUBA4=</code></td>
+  </tr><tr>
+    <td>Plan URL</td>
+    <td><code>file://20240910173744.plan.hcl</code></td>
+  </tr><tr>
+    <td>Total Time</td>
+    <td>3.566ms</td>
+  </tr></table><h4>Version 20240910173744.sql:</h4>
+<table>
+  <tr>
+    <th>Status</th>
+    <th>Executed Statements</th>
+    <th>Execution Time</th>
+    <th>Error</th>
+    <th>Error Statement</th>
+  </tr>
+  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
+    <td>534µs</td><td>-</td><td>-</td></tr>
+</table><details><summary>📄 View Pre-planned SQL Statements</summary><pre lang="sql"><code>-- Add column "c2" to table: "t4"
+ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;
+</code></pre></details>
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> Migration Passed</h2><h4><code>atlas schema apply</code> Summary:</h4><table>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://local-su.db</code></td>
+  </tr><tr>
+    <td>Plan Name</td>
+    <td><code>20240910173744</code></td>
+  </tr>
+  <tr>
+    <td>From Hash</td>
+    <td><code>iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE=</code></td>
+  </tr>
+  <tr>
+    <td>To Hash</td>
+    <td><code>Cp8xCVYilZuwULkggsfJLqIQHaxYcg/IpU+kgjVUBA4=</code></td>
+  </tr><tr>
+    <td>Plan URL</td>
+    <td><code>file://20240910173744.plan.hcl</code></td>
+  </tr><tr>
+    <td>Total Time</td>
+    <td>7.532ms</td>
+  </tr></table><h4>Version 20240910173744.sql:</h4>
+<table>
+  <tr>
+    <th>Status</th>
+    <th>Executed Statements</th>
+    <th>Execution Time</th>
+    <th>Error</th>
+    <th>Error Statement</th>
+  </tr>
+  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
+    <td>755µs</td><td>-</td><td>-</td></tr>
+</table><details><summary>📄 View Pre-planned SQL Statements</summary><pre lang="sql"><code>-- Add column "c2" to table: "t4"
+ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;
+</code></pre></details>
