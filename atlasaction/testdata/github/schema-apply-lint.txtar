@@ -2,7 +2,6 @@
 mock-atlas $WORK/schema-apply
 # Setup the action input variables
 env INPUT_ENV=test
-env INPUT_AUTO-APPROVE=true
 # Run the action
 ! atlas-action schema/apply
 
@@ -10,11 +9,9 @@ summary summary.html
 output output.txt
 
 -- schema-apply/1/args --
-schema apply --format {{ json . }} --env test --auto-approve
--- schema-apply/1/stderr --
-Rejected by review policy: errors or warnings were found
+schema apply --format {{ json . }} --env test
 -- schema-apply/1/stdout --
-{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"},"Start":"2024-09-12T17:47:58.815235+07:00","End":"0001-01-01T00:00:00Z","Error":"Rejected by review policy: errors or warnings were found","Plan":{"Env":{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"}},"Lint":{"Env":{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"file","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"mode=memory","Fragment":"","RawFragment":"","Schema":"main"}},"Schema":{},"Steps":[{"Name":"Analyze 20240912104758.sql","Text":"1 reports were found in analysis","Result":{"Name":"20240912104758.sql","Text":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Drop \"t4\" table\nDROP TABLE `t4`;\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Reports":[{"Text":"destructive changes detected","Diagnostics":[{"Pos":101,"Text":"Dropping table \"t4\"","Code":"DS102","SuggestedFixes":[{"Message":"Add a pre-migration check to ensure table \"t4\" is empty before dropping it"}]}]}],"Error":"destructive changes detected"}}],"Files":[{"Name":"20240912104758.sql","Text":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Drop \"t4\" table\nDROP TABLE `t4`;\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Reports":[{"Text":"destructive changes detected","Diagnostics":[{"Pos":101,"Text":"Dropping table \"t4\"","Code":"DS102","SuggestedFixes":[{"Message":"Add a pre-migration check to ensure table \"t4\" is empty before dropping it"}]}]}],"Error":"destructive changes detected"}]},"File":{"Name":"20240912104758","FromHash":"iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE=","ToHash":"Rl4lBdMkvFoGQ4xu+3sYCeogTVnamJ7bmDoq9pMXcjw=","Migration":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Drop \"t4\" table\nDROP TABLE `t4`;\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n"}},"Changes":{}}
+{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"},"Start":"2024-09-18T11:25:21.64465+07:00","End":"0001-01-01T00:00:00Z","Error":"Rejected by review policy: errors or warnings were found","Plan":{"Env":{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"}},"Lint":{"Env":{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"file","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"mode=memory","Fragment":"","RawFragment":"","Schema":"main"}},"Schema":{},"Steps":[{"Name":"Analyze 20240918042521.sql","Text":"1 reports were found in analysis","Result":{"Name":"20240918042521.sql","Text":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Drop \"t4\" table\nDROP TABLE `t4`;\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Reports":[{"Text":"destructive changes detected","Diagnostics":[{"Pos":101,"Text":"Dropping table \"t4\"","Code":"DS102","SuggestedFixes":[{"Message":"Add a pre-migration check to ensure table \"t4\" is empty before dropping it"}]}]}],"Error":"destructive changes detected"}}],"Files":[{"Name":"20240918042521.sql","Text":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Drop \"t4\" table\nDROP TABLE `t4`;\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Reports":[{"Text":"destructive changes detected","Diagnostics":[{"Pos":101,"Text":"Dropping table \"t4\"","Code":"DS102","SuggestedFixes":[{"Message":"Add a pre-migration check to ensure table \"t4\" is empty before dropping it"}]}]}],"Error":"destructive changes detected"}]},"File":{"Name":"20240918042521","FromHash":"iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE=","ToHash":"Rl4lBdMkvFoGQ4xu+3sYCeogTVnamJ7bmDoq9pMXcjw=","Migration":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Drop \"t4\" table\nDROP TABLE `t4`;\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Stmts":[{"Pos":55,"Text":"PRAGMA foreign_keys = off;","Comments":["-- Disable the enforcement of foreign-keys constraints\n"]},{"Pos":101,"Text":"DROP TABLE `t4`;","Comments":["-- Drop \"t4\" table\n"]},{"Pos":177,"Text":"PRAGMA foreign_keys = on;","Comments":["-- Enable back the enforcement of foreign-keys constraints\n"]}]}},"Changes":{}}
 -- output.txt --
 error<<_GitHubActionsFileCommandDelimeter_
 Rejected by review policy: errors or warnings were found
@@ -26,7 +23,7 @@ _GitHubActionsFileCommandDelimeter_
     <td><code>sqlite://local.db</code></td>
   </tr><tr>
     <td>Plan Name</td>
-    <td><code>20240912104758</code></td>
+    <td><code>20240918042521</code></td>
   </tr>
   <tr>
     <td>From Hash</td>
@@ -50,8 +47,7 @@ PRAGMA foreign_keys = on;
     </tr>
   </thead>
   <tbody>
-    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1 new migration file detected</td>
-      <td>20240912104758.sql</td></tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td><td>Analyze 20240912104758.sql<br/>1 reports were found in analysis</td>
+    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>Detect schema changes</td><td>3 new statements detected</td>
+    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td><td>Analyze 20240918042521.sql<br/>1 reports were found in analysis</td>
       <td><b>Destructive changes detected</b><br/>Dropping table "t4"&nbsp;<a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/></td>
-    </tr></tbody>
-</table>
+    </tr></tbody></table>

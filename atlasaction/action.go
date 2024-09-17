@@ -604,7 +604,11 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	a.SetOutput("plan", plan.File.URL)
 	a.SetOutput("status", plan.File.Status)
 	// Report the schema plan to the user and add a comment to the PR.
-	summary, err := schemaPlanComment(plan, params.Env, tc.RerunCmd)
+	summary, err := RenderTemplate("schema-plan.tmpl", map[string]any{
+		"Plan":         plan,
+		"EnvName":      params.Env,
+		"RerunCommand": tc.RerunCmd,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to generate schema plan comment: %w", err)
 	}
@@ -923,19 +927,6 @@ func (a *Actions) addSuggestions(lint *atlasexec.SummaryReport, fn func(*Suggest
 		}
 	}
 	return nil
-}
-
-func schemaPlanComment(payload *atlasexec.SchemaPlan, envName, rerun string) (string, error) {
-	data := map[string]any{
-		"Plan":         payload,
-		"EnvName":      envName,
-		"RerunCommand": rerun,
-	}
-	var buf bytes.Buffer
-	if err := commentsTmpl.ExecuteTemplate(&buf, "schema-plan.tmpl", data); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
 }
 
 func execTime(start, end time.Time) string {

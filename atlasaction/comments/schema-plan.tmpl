@@ -2,7 +2,7 @@
 <h4>SQL Plan</h4>
 {{- .Plan.File.Migration | codeblock "sql" -}}
 <h4>Atlas lint results</h4>
-{{- template "lint-report" .Plan.Lint -}}
+{{- template "schema-lint" . -}}
 <hr>
 <details>
   <summary>📝 To edit this plan, follow these steps</summary>
@@ -15,3 +15,31 @@
   {{- end -}}
   </ol>
 </details>
+{{- define "schema-lint" -}}
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+  {{- template "lint-check" "success.svg" -}}
+  {{- with .Plan.File -}}
+      <td>Detect schema changes</td><td>
+        {{- $stmtCount := len .Stmts -}}
+        {{- if eq $stmtCount 1 -}}
+        1 new statement file detected
+        {{- else if $stmtCount -}}
+        {{- $stmtCount }} new statements detected
+        {{- else -}}
+        No statements detected
+        {{- end -}}
+      </td>
+    </tr>
+  {{- end -}}
+  {{- template "lint-report" .Plan.Lint -}}
+  </tbody></table>
+{{- end -}}

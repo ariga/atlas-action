@@ -1,2 +1,33 @@
-<code>atlas migrate lint</code> on <strong>{{- .Env.Dir }}</strong>
+<code>atlas migrate lint</code> on <strong>{{- .Env.Dir }}</strong><table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+{{- template "lint-check" "success.svg" -}}
+      <td>
+        {{- $fileCount := len .Files -}}
+        {{- if eq $fileCount 1 -}}
+        1 new migration file detected
+        {{- else if $fileCount -}}
+        {{- $fileCount }} new migration files detected
+        {{- else -}}
+        No migration files detected
+        {{- end -}}
+      </td>
+      <td>
+        {{- with .Files -}}
+          {{- range $i, $f := . -}}
+          {{- if $i -}}<br/>{{- end -}}{{- $f.Name -}}
+          {{- end -}}
+        {{- else -}}
+          &nbsp;
+        {{- end -}}
+      </td>
+    </tr>
 {{- template "lint-report" . -}}
+  </body></table>

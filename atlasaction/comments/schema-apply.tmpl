@@ -52,7 +52,7 @@
   {{- .File.Migration | codeblock "sql" | details (printf "📄 View %s Statements" $kind) -}}
   {{- with .Lint -}}
 <h4>Atlas lint results</h4>
-    {{- template "lint-report" . -}}
+    {{- template "schema-lint" $ -}}
   {{- end -}}
 {{/* Fallback to the old output */}}
 {{- else with .Changes -}}
