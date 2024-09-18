@@ -1,0 +1,53 @@
+name: 'Schema Plan Approve'
+description: 'Approve a migration plan by its URL'
+branding:
+  icon: database
+author: 'Ariga'
+inputs:
+  working-directory:
+    description: Atlas working directory, default is project root
+    required: false
+  config:
+    description: |
+      The URL of the Atlas configuration file. By default, Atlas will look for a file
+      named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+      Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+    required: false
+  env:
+    description: The environment to use from the Atlas configuration file. For example, `dev`.
+    required: false
+  vars:
+    description: |
+      A JSON object containing variables to be used in the Atlas configuration file.
+      For example, `{"var1": "value1", "var2": "value2"}`.
+    required: false
+  dev-url:
+    description: |
+      The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+      Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+    required: false
+  plan:
+    description: |
+      The URL of the plan to be approved. For example, `atlas://<schema>/plans/<id>`.
+    required: false
+  schema-name:
+    description: The name (slug) of the project in Atlas Cloud.
+    required: false
+  from:
+    description: |
+      URL(s) of the current schema state.
+    required: false
+  to:
+    description: |
+      URL(s) of the desired schema state.
+    required: false
+outputs:
+  plan:
+    description: The plan to be applied or generated. (ig. `atlas://<schema>/plans/<id>`)
+  link: # id of the output
+    description: Link to the schema plan on Atlas.
+  status:
+    description: The status of the plan. (ig. `PENDING`, `APPROVED`)
+runs:
+  using: node20
+  main: index.js

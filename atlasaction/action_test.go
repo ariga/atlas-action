@@ -2061,14 +2061,88 @@ func TestSchemaPlan(t *testing.T) {
 		"link":   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
 	}, act.output, "expected output with plan URL")
 
+	// Check all logs output
+	require.Equal(t, `time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="The current state is synced with the desired state, no changes to be made"
+time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-ufnTS7Nr\""
+time=NOW level=INFO msg="Schema plan already exists, linting the plan \"pr-1-Rl4lBdMk\""
+`, out.String())
+}
+
+func TestSchemaPlanApprove(t *testing.T) {
+	h := http.NewServeMux()
+	h.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL)
+	})
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	planFile := &atlasexec.SchemaPlanFile{
+		Name:     "pr-1-Rl4lBdMk",
+		FromHash: "ufnTS7NrAgkvQlxbpnSxj119MAPGNqVj0i3Eelv+iLc=", // Used as comment marker
+		ToHash:   "Rl4lBdMkvFoGQ4xu+3sYCeogTVnamJ7bmDoq9pMXcjw=",
+		URL:      "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+		Link:     "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+		Status:   "PENDING",
+	}
+	var planFiles []atlasexec.SchemaPlanFile
+	var approveErr error
+	m := &mockAtlas{
+		schemaPlanList: func(_ context.Context, p *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+			return planFiles, nil
+		},
+		schemaPlanApprove: func(_ context.Context, p *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error) {
+			require.Equal(t, "file://atlas.hcl", p.ConfigURL)
+			require.Equal(t, "atlas://atlas-action/plans/pr-1-Rl4lBdMk", p.URL)
+			if approveErr != nil {
+				return nil, approveErr
+			}
+			return &atlasexec.SchemaPlanApprove{
+				URL:    "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
+				Link:   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
+				Status: "APPROVED",
+			}, nil
+		},
+	}
+	t.Setenv("GITHUB_TOKEN", "token")
+	out := &bytes.Buffer{}
+	act := &mockAction{
+		inputs: map[string]string{
+			// "schema-name": "atlas://atlas-action",
+			"from":   "sqlite://file?_fk=1&mode=memory",
+			"config": "file://atlas.hcl",
+			"env":    "test",
+		},
+		logger: slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				if a.Key == slog.TimeKey {
+					return slog.String(slog.TimeKey, "NOW") // Fake time
+				}
+				return a
+			},
+		})),
+		trigger: &atlasaction.TriggerContext{
+			SCM:     atlasaction.SCM{Type: atlasexec.SCMTypeGithub, APIURL: srv.URL},
+			Repo:    "ariga/atlas-action",
+			RepoURL: "https://github.com/ariga/atlas-action",
+			Branch:  "g/feature-1",
+			Commit:  "commit-id",
+		},
+	}
+	ctx := context.Background()
+	// Multiple plans will fail with an error
+	planFiles = []atlasexec.SchemaPlanFile{*planFile, *planFile}
+	act.resetOutputs()
+	require.ErrorContains(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlanApprove(ctx), "found multiple schema plans, please approve or delete the existing plans")
+	require.Len(t, act.summary, 0, "Expected 1 summary")
+
 	// Trigger with no pull request, master branch
+	planFiles = []atlasexec.SchemaPlanFile{*planFile}
 	act.trigger.PullRequest = nil
 	act.trigger.Branch = "master"
 	act.resetOutputs()
-	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
-	require.Len(t, act.summary, 2, "No more summaries generated")
-	require.Equal(t, 1, commentCounter, "No more comments generated")
-	require.Equal(t, 1, commentEdited, "No comment should be edited")
+	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlanApprove(ctx))
+	require.Len(t, act.summary, 0, "No more summaries generated")
 	require.EqualValues(t, map[string]string{
 		"plan":   "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
 		"status": "APPROVED",
@@ -2078,19 +2152,17 @@ func TestSchemaPlan(t *testing.T) {
 	// No pending plan
 	planFiles = nil
 	act.resetOutputs()
-	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
-	require.Len(t, act.summary, 2, "No more summaries generated")
-	require.Equal(t, 1, commentCounter, "No more comments generated")
-	require.Equal(t, 1, commentEdited, "No comment should be edited")
+	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlanApprove(ctx))
+	require.Len(t, act.summary, 0, "No more summaries generated")
 	require.EqualValues(t, map[string]string{}, act.output, "expected output with plan URL")
 
 	// Check all logs output
-	require.Equal(t, `time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
+	require.Equal(t, `time=NOW level=INFO msg="No plan URL provided, searching for the pending plan"
 time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
-time=NOW level=INFO msg="The current state is synced with the desired state, no changes to be made"
-time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-ufnTS7Nr\""
-time=NOW level=INFO msg="Schema plan already exists, linting the plan \"pr-1-Rl4lBdMk\""
+time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="No plan URL provided, searching for the pending plan"
 time=NOW level=INFO msg="Schema plan approved successfully: https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="No plan URL provided, searching for the pending plan"
 time=NOW level=INFO msg="No schema plan found"
 `, out.String())
 }
