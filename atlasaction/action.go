@@ -491,10 +491,6 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 
 // SchemaPlan runs the GitHub Action for "ariga/atlas-action/schema/plan"
 func (a *Actions) SchemaPlan(ctx context.Context) error {
-	err := a.RequiredInputs("config", "env")
-	if err != nil {
-		return err
-	}
 	tc, err := a.GetTriggerContext()
 	if err != nil {
 		return fmt.Errorf("unable to get the trigger context: %w", err)
@@ -505,6 +501,7 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
 		Context:   a.GetRunContext(ctx, tc),
+		Repo:      a.GetInput("schema-name"),
 		DevURL:    a.GetInput("dev-url"),
 		From:      a.GetArrayInput("from"),
 		To:        a.GetArrayInput("to"),

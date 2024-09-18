@@ -4,13 +4,8 @@ branding:
   icon: database
 author: 'Ariga'
 inputs:
-  url:
-    description: "The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`."
-    required: false
-  dir:
-    description: |
-      The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
-      based directories or `file://migrations` for local ones.
+  working-directory:
+    description: Atlas working directory, default is project root.
     required: false
   config:
     description: |
@@ -18,13 +13,26 @@ inputs:
       named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
       Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
     required: false
+  env:
+    description: The environment to use from the Atlas configuration file.  For example, `dev`.
+    required: false
+  vars:
+    description: |
+      A JSON object containing variables to be used in the Atlas configuration file.
+      For example, `{"var1": "value1", "var2": "value2"}`.
+    required: false
   dev-url:
     description: |
       The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
       Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
     required: true
-  env:
-    description: The environment to use from the Atlas configuration file.  For example, `dev`.
+  url:
+    description: "The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`."
+    required: false
+  dir:
+    description: |
+      The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
+      based directories or `file://migrations` for local ones.
     required: false
   amount:
     description: The amount of applied migrations to revert. Mutually exclusive with `to-tag` and `to-version`.
@@ -35,19 +43,11 @@ inputs:
   to-tag:
     description: The tag to revert to. Mutually exclusive with `amount` and `to-version`.
     required: false
-  working-directory:
-    description: Atlas working directory, default is project root.
-    required: false
   wait-interval:
     description: Time in seconds between different migrate down attempts.
     default: 1s
   wait-timeout:
     description: Time after which no other retry attempt is made and the action exits.
-    required: false
-  vars:
-    description: |
-      A JSON object containing variables to be used in the Atlas configuration file.
-      For example, `{"var1": "value1", "var2": "value2"}`.
     required: false
 outputs:
   current:

@@ -36,6 +36,9 @@ inputs:
     description: Automatically approve and apply changes. Either "true" or "false".
     required: false
     default: "false"
+outputs:
+  error:
+    description: The error message if the action fails.
 runs:
   using: node20
   main: index.js

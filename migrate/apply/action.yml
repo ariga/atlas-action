@@ -4,13 +4,8 @@ branding:
   icon: database
 author: 'Ariga'
 inputs:
-  url:
-    description: "The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`."
-    required: false
-  dir:
-    description: |
-      The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
-      based directories or `file://migrations` for local ones.
+  working-directory:
+    description: Atlas working directory, default is project root
     required: false
   config:
     description: |
@@ -21,16 +16,21 @@ inputs:
   env:
     description: The environment to use from the Atlas configuration file.  For example, `dev`.
     required: false
-  dry-run:
-    description: Print SQL without executing it. Either "true" or "false".
-    required: false
-  working-directory:
-    description: Atlas working directory, default is project root
-    required: false
   vars:
     description: |
       A JSON object containing variables to be used in the Atlas configuration file.
       For example, `{"var1": "value1", "var2": "value2"}`.
+    required: false
+  url:
+    description: "The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`."
+    required: false
+  dir:
+    description: |
+      The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
+      based directories or `file://migrations` for local ones.
+    required: false
+  dry-run:
+    description: Print SQL without executing it. Either "true" or "false".
     required: false
 outputs:
   current:

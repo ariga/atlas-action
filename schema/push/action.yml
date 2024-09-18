@@ -1,9 +1,31 @@
 name: "Schema Push"
-description: "Push the schema changes to Atlas Cloud."
+description: "Push a schema version with an optional tag to Atlas"
 branding:
   icon: database
 author: "Ariga"
 inputs:
+  working-directory:
+    description: Atlas working directory, default is project root
+    required: false
+  config:
+    description: |
+      The path to the Atlas configuration file. By default, Atlas will look for a file
+      named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+      Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+    required: false
+  env:
+    description: The environment to use from the Atlas configuration file. For example, `dev`.
+    required: false
+  vars:
+    description: |
+      A JSON object containing variables to be used in the Atlas configuration file.
+      For example, `{"var1": "value1", "var2": "value2"}`.
+    required: false
+  dev-url:
+    description: |
+      The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+      Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+    required: false
   schema-name:
     description: The name (slug) of the project in Atlas Cloud.
     required: false
@@ -12,11 +34,6 @@ inputs:
     required: false
   version:
     description: The version of the schema changes.
-    required: false
-  dev-url:
-    description: |
-      The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
-      Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
     required: false
   tag:
     description: |
@@ -28,23 +45,9 @@ inputs:
       If true, push also to the "latest" tag.
     default: "true"
     required: false
-  config:
-    description: |
-      The path to the Atlas configuration file. By default, Atlas will look for a file
-      named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
-      Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-    required: false
-  env:
-    description: The environment to use from the Atlas configuration file. For example, `dev`.
-    required: false
-  working-directory:
-    description: Atlas working directory, default is project root
-    required: false
-  vars:
-    description: |
-      A JSON object containing variables to be used in the Atlas configuration file.
-      For example, `{"var1": "value1", "var2": "value2"}`.
-    required: false
+outputs:
+  url:
+    description: The URL of the pushed schema version.
 runs:
   using: node20
   main: index.js
