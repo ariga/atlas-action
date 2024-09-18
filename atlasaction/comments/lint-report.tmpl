@@ -1,37 +1,4 @@
 {{- define "lint-report" -}}
-<table>
-  <thead>
-    <tr>
-      <th>Status</th>
-      <th>Step</th>
-      <th>Result</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-  {{- block "lint-first-step" . -}}
-    {{- template "lint-check" "success.svg" -}}
-      <td>
-        {{- $fileCount := len .Files -}}
-        {{- if eq $fileCount 1 -}}
-        1 new migration file detected
-        {{- else if $fileCount -}}
-        {{- $fileCount }} new migration files detected
-        {{- else -}}
-        No migration files detected
-        {{- end -}}
-      </td>
-      <td>
-        {{- with .Files -}}
-          {{- range $i, $f := . -}}
-          {{- if $i -}}<br/>{{- end -}}{{- $f.Name -}}
-          {{- end -}}
-        {{- else -}}
-          &nbsp;
-        {{- end -}}
-      </td>
-  {{- end -}}
-    </tr>
 {{- with .URL -}}
     <tr>
       {{- template "lint-check" "success.svg" -}}
@@ -74,8 +41,6 @@
 {{- with .URL -}}
     <tr><td colspan="4"><div align="center">Read the full linting report on {{ . | link "Atlas Cloud" -}}</div></td></tr>
 {{- end -}}
-  </tbody>
-</table>
 {{- end -}}
 {{- define "lint-check" -}}
 <td><div align="center">{{- assetsImage . | image "20px" -}}</div></td>
