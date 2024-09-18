@@ -1,21 +1,11 @@
 name: 'Schema Test'
-description: 'CI for database schema changes with Atlas'
+description: 'Run schema tests against the desired schema'
 branding:
   icon: database
 author: 'Ariga'
 inputs:
-  url:
-    description: "The desired schema URL(s) to test"
-    required: false
-  dev-url:
-    description: |
-      The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
-      Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
-    required: false
-  run:
-    description: |
-      Filter tests to run by regexp. For example, `^test_.*` will only run tests that start with `test_`.
-      Default is to run all tests.
+  working-directory:
+    description: Atlas working directory, default is project root
     required: false
   config:
     description: |
@@ -26,13 +16,23 @@ inputs:
   env:
     description: The environment to use from the Atlas configuration file.  For example, `dev`.
     required: false
-  working-directory:
-    description: Atlas working directory, default is project root
-    required: false
   vars:
     description: |
       A JSON object containing variables to be used in the Atlas configuration file.
       For example, `{"var1": "value1", "var2": "value2"}`.
+    required: false
+  dev-url:
+    description: |
+      The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+      Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+    required: false
+  url:
+    description: "The desired schema URL(s) to test"
+    required: false
+  run:
+    description: |
+      Filter tests to run by regexp. For example, `^test_.*` will only run tests that start with `test_`.
+      Default is to run all tests.
     required: false
 runs:
   using: node20
