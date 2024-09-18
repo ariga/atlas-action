@@ -9,15 +9,18 @@ To learn more about the recommended way to build workflows, read our guide on
 
 ## Actions
 
-| Action                                                             | Description                                             |
-|--------------------------------------------------------------------|---------------------------------------------------------|
-| [ariga/setup-atlas](#arigasetup-atlas)                             | Setup the Atlas CLI and optionally login to Atlas Cloud |
-| [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)   | Push migrations to Atlas Cloud                          |
-| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)   | Lint migrations (required `atlas login` )               |
-| [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply) | Apply migrations to a database                          |
-| [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)   | Revert migrations to a database                         |
-| [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)   | Test migrations on a database                           |
-| [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)     | Test schema on a database                               |
+| Action                                                             | Description                                                 |
+|--------------------------------------------------------------------|-------------------------------------------------------------|
+| [ariga/setup-atlas](#arigasetup-atlas)                             | Setup the Atlas CLI and optionally login to Atlas Cloud     |
+| [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)   | Push migrations to Atlas Cloud                              |
+| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)   | Lint migrations (required `atlas login`)                    |
+| [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply) | Apply migrations to a database                              |
+| [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)   | Revert migrations to a database                             |
+| [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)   | Test migrations on a database                               |
+| [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)     | Push schema to Atlas Cloud (required `atlas login`)         |
+| [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)     | Generate plan for schema migration (required `atlas login`) |
+| [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply)   | Apply schema changes to target database                     |
+| [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)     | Test schema on a database                                   |
 
 ## Examples
 
@@ -303,7 +306,7 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
   Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 * `dir` - The URL of the migration directory to apply.  For example: `atlas://dir-name` for cloud
-   based directories or `file://migrations` for local ones.
+  based directories or `file://migrations` for local ones.
 * `run` - Filter tests to run by regexp. For example, `^test_.*` will only run tests that start with `test_`.
   Default is to run all tests.
 * `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
@@ -314,9 +317,109 @@ All inputs are optional as they may be specified in the Atlas configuration file
    For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
 
+### `ariga/atlas-action/schema/push`
+
+Push a schema version with an optional tag to Atlas.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `working-directory` - The working directory to run from.  Defaults to project root.
+* `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects). 
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+  For example: `'{"var1": "value1", "var2": "value2"}'`.
+* `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+* `schema-name` - The name (slug) of the project in Atlas Cloud.
+* `description` - The description of the schema changes.
+* `version` - The version of the schema changes.
+* `tag` - The tag to apply to the pushed schema. By default the current git commit hash is used.
+* `latest` - Whether to implicitly push the "latest" tag. True by default.
+
+### `ariga/atlas-action/schema/plan`
+
+Generate new plan for the schema changes or run linting on the existing plan.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `working-directory` - The working directory to run from.  Defaults to project root.
+* `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+  For example: `'{"var1": "value1", "var2": "value2"}'`.
+* `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+* `schema-name` - The name (slug) of the project in Atlas Cloud.
+* `from` - URL(s) of the current schema state. For example: `env://url`.
+* `to` - URL(s) of the desired schema state. For example: `atlas://awesome-project?tag=v1`.
+* `name` - The name of the plan. By default, Atlas will generate a name based on the schema changes.
+
+#### Outputs
+
+* `plan` - The plan to be applied or generated. (ig. `atlas://<schema>/plans/<id>`)
+* `link` - Link to the schema plan on Atlas.
+* `status` - The status of the plan. (ig. `PENDING`, `APPROVED`)
+
+### `ariga/atlas-action/schema/plan/approve`
+
+The action approves the schema plan provided by the `plan` input. If no plan is provided, the action will
+search for the plan in the Atlas Cloud that is in the `PENDING` state and approve it.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `working-directory` - The working directory to run from.  Defaults to project root.
+* `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+  For example: `'{"var1": "value1", "var2": "value2"}'`.
+* `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+* `plan` - The plan to approve. (ig. `atlas://<schema>/plans/<id>`)
+* `schema-name` - The name (slug) of the project in Atlas Cloud.
+* `from` - URL(s) of the current schema state. For example: `env://url`.
+* `to` - URL(s) of the desired schema state. For example: `atlas://awesome-project?tag=v1`.
+
+#### Outputs
+
+* `plan` - The plan to be applied or generated. (ig. `atlas://<schema>/plans/<id>`)
+* `link` - Link to the schema plan on Atlas.
+* `status` - The status of the plan. (ig. `PENDING`, `APPROVED`)
+
+### `ariga/atlas-action/schema/apply`
+
+Apply schema changes to target database.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `working-directory` - The working directory to run from.  Defaults to project root.
+* `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects). 
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+   For example: `'{"var1": "value1", "var2": "value2"}'`.
+* `to` - URL(s) of the desired schema state. For example: `file://schema.hcl`.
+* `plan` - The plan to apply. (ig. `atlas://<schema>/plans/<id>`)
+* `dry-run` - Print SQL without executing it. Either `true` or `false`. Defaults to `false`
+* `auto-approve` - Automatically approve and apply changes. Either `true` or `false`. Defaults to `false`
+
 ### `ariga/atlas-action/schema/test`
 
-Test schema on a database.
+Run schema tests against the desired schema.
 
 #### Inputs
 
