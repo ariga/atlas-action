@@ -31,7 +31,7 @@
       <td>Detect schema changes</td><td>
         {{- $stmtCount := len .Stmts -}}
         {{- if eq $stmtCount 1 -}}
-        1 new statement file detected
+        1 new statement detected
         {{- else if $stmtCount -}}
         {{- $stmtCount }} new statements detected
         {{- else -}}
