@@ -152,10 +152,11 @@ const (
 	CmdMigrateDown  = "migrate/down"
 	CmdMigrateTest  = "migrate/test"
 	// Declarative workflow Commands
-	CmdSchemaPush  = "schema/push"
-	CmdSchemaTest  = "schema/test"
-	CmdSchemaPlan  = "schema/plan"
-	CmdSchemaApply = "schema/apply"
+	CmdSchemaPush        = "schema/push"
+	CmdSchemaTest        = "schema/test"
+	CmdSchemaPlan        = "schema/plan"
+	CmdSchemaPlanApprove = "schema/plan/approve"
+	CmdSchemaApply       = "schema/apply"
 )
 
 // Run runs the action based on the command name.
@@ -183,6 +184,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.SchemaTest(ctx)
 	case CmdSchemaPlan:
 		return a.SchemaPlan(ctx)
+	case CmdSchemaPlanApprove:
+		return a.SchemaPlanApprove(ctx)
 	case CmdSchemaApply:
 		return a.SchemaApply(ctx)
 	default:
@@ -492,8 +495,11 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 // SchemaPlan runs the GitHub Action for "ariga/atlas-action/schema/plan"
 func (a *Actions) SchemaPlan(ctx context.Context) error {
 	tc, err := a.GetTriggerContext()
-	if err != nil {
+	switch {
+	case err != nil:
 		return fmt.Errorf("unable to get the trigger context: %w", err)
+	case tc.PullRequest == nil:
+		return fmt.Errorf("the action should be run in a pull request context")
 	}
 	var plan *atlasexec.SchemaPlan
 	params := &atlasexec.SchemaPlanListParams{
@@ -510,36 +516,7 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	switch planFiles, err := a.Atlas.SchemaPlanList(ctx, params); {
 	case err != nil:
 		return fmt.Errorf("failed to list schema plans: %w", err)
-	// Multiple existing plans.
-	case len(planFiles) > 1:
-		for _, f := range planFiles {
-			a.Infof("Found schema plan: %s", f.URL)
-		}
-		// There are existing plans.
-		return fmt.Errorf("found multiple schema plans, please approve or delete the existing plans")
-	// Branch context with no plan
-	case tc.PullRequest == nil && len(planFiles) == 0:
-		a.Infof("No schema plan found")
-		return nil
-	// Branch context with pending plan
-	case tc.PullRequest == nil && len(planFiles) == 1:
-		result, err := a.Atlas.SchemaPlanApprove(ctx, &atlasexec.SchemaPlanApproveParams{
-			ConfigURL: params.ConfigURL,
-			Env:       params.Env,
-			Vars:      params.Vars,
-			URL:       planFiles[0].URL,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to approve the schema plan: %w", err)
-		}
-		// Successfully approved the plan.
-		a.Infof("Schema plan approved successfully: %s", result.Link)
-		a.SetOutput("link", result.Link)
-		a.SetOutput("plan", result.URL)
-		a.SetOutput("status", result.Status)
-		return nil
-	// PR context and existing plan
-	case tc.PullRequest != nil && len(planFiles) == 1:
+	case len(planFiles) == 1:
 		a.Infof("Schema plan already exists, linting the plan %q", planFiles[0].Name)
 		plan, err = a.Atlas.SchemaPlanLint(ctx, &atlasexec.SchemaPlanLintParams{
 			ConfigURL: params.ConfigURL,
@@ -555,12 +532,7 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to get the schema plan: %w", err)
 		}
-		// FIXME(giautm): Remove this workaround after fixing the schema URL issue.
-		plan.File.URL = planFiles[0].URL
-		plan.File.Link = planFiles[0].Link
-		plan.File.Status = "PENDING"
-	// PR context and no existing plan
-	case tc.PullRequest != nil && len(planFiles) == 0:
+	case len(planFiles) == 0:
 		name := a.GetInput("name")
 	runPlan:
 		// Dry run if the name is not provided.
@@ -594,7 +566,10 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 			goto runPlan
 		}
 	default:
-		return fmt.Errorf("unexpected context, please contact the atlas team")
+		for _, f := range planFiles {
+			a.Infof("Found schema plan: %s", f.URL)
+		}
+		return fmt.Errorf("found multiple schema plans, please approve or delete the existing plans")
 	}
 	// Set the output values from the schema plan.
 	a.SetOutput("link", plan.File.Link)
@@ -618,6 +593,60 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		// It may be due to the missing permissions.
 		a.Errorf("failed to comment on the pull request: %v", err)
 	}
+	return nil
+}
+
+// SchemaPlanApprove runs the GitHub Action for "ariga/atlas-action/schema/plan/approve"
+func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
+	tc, err := a.GetTriggerContext()
+	switch {
+	case err != nil:
+		return fmt.Errorf("unable to get the trigger context: %w", err)
+	case tc.PullRequest != nil:
+		return fmt.Errorf("the action should be run in a branch context")
+	}
+	params := &atlasexec.SchemaPlanApproveParams{
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		URL:       a.GetInput("plan"),
+	}
+	if params.URL == "" {
+		a.Infof("No plan URL provided, searching for the pending plan")
+		switch planFiles, err := a.Atlas.SchemaPlanList(ctx, &atlasexec.SchemaPlanListParams{
+			ConfigURL: params.ConfigURL,
+			Env:       params.Env,
+			Vars:      params.Vars,
+			Context:   a.GetRunContext(ctx, tc),
+			Repo:      a.GetInput("schema-name"),
+			DevURL:    a.GetInput("dev-url"),
+			From:      a.GetArrayInput("from"),
+			To:        a.GetArrayInput("to"),
+			Pending:   true,
+		}); {
+		case err != nil:
+			return fmt.Errorf("failed to list schema plans: %w", err)
+		case len(planFiles) == 1:
+			params.URL = planFiles[0].URL
+		case len(planFiles) == 0:
+			a.Infof("No schema plan found")
+			return nil
+		default:
+			for _, f := range planFiles {
+				a.Infof("Found schema plan: %s", f.URL)
+			}
+			return fmt.Errorf("found multiple schema plans, please approve or delete the existing plans")
+		}
+	}
+	result, err := a.Atlas.SchemaPlanApprove(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to approve the schema plan: %w", err)
+	}
+	// Successfully approved the plan.
+	a.Infof("Schema plan approved successfully: %s", result.Link)
+	a.SetOutput("link", result.Link)
+	a.SetOutput("plan", result.URL)
+	a.SetOutput("status", result.Status)
 	return nil
 }
 
