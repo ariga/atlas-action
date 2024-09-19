@@ -304,6 +304,7 @@ jobs:
           env: test
   schema-plan:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
@@ -319,6 +320,31 @@ jobs:
           CGO_ENABLED: 0
       - id: sanity
         uses: ./schema/plan
+        with:
+          working-directory: atlasaction/testdata/schema-apply/legacy
+          env: test
+          from: |-
+            env://url
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+  schema-plan-approve:
+    runs-on: ubuntu-latest
+    env:
+      ATLAS_ACTION_LOCAL: 1
+    if: ${{ github.event_name == 'push' }}
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - id: sanity
+        uses: ./schema/plan/approve
         with:
           working-directory: atlasaction/testdata/schema-apply/legacy
           env: test
