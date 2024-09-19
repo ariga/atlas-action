@@ -46,6 +46,10 @@ inputs:
     default: "true"
     required: false
 outputs:
+  link:
+    description: Link to the schema version on Atlas.
+  slug:
+    description: The slug of the pushed schema version.
   url:
     description: The URL of the pushed schema version.
 runs:
