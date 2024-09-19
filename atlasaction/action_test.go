@@ -262,7 +262,7 @@ func TestMigrateDown(t *testing.T) {
 
 type mockAtlas struct {
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
-	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (string, error)
+	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
 	schemaPlanList    func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
 	schemaPlanLint    func(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
@@ -297,7 +297,7 @@ func (m *mockAtlas) MigrateTest(context.Context, *atlasexec.MigrateTestParams) (
 }
 
 // SchemaPush implements AtlasExec.
-func (m *mockAtlas) SchemaPush(ctx context.Context, p *atlasexec.SchemaPushParams) (string, error) {
+func (m *mockAtlas) SchemaPush(ctx context.Context, p *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error) {
 	return m.schemaPush(ctx, p)
 }
 

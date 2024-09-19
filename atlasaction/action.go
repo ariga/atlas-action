@@ -78,7 +78,7 @@ type AtlasExec interface {
 	// MigrateTest runs the `migrate test` command.
 	MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error)
 	// SchemaPush runs the `schema push` command.
-	SchemaPush(context.Context, *atlasexec.SchemaPushParams) (string, error)
+	SchemaPush(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	// SchemaTest runs the `schema test` command.
 	SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error)
 	// SchemaPlan runs the `schema plan` command.
@@ -452,15 +452,8 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 		ConfigURL:   a.GetInput("config"),
 		Env:         a.GetInput("env"),
 		Vars:        a.GetVarsInput("vars"),
+		Tag:         a.GetInput("tag"),
 	}
-	if a.GetBoolInput("latest") {
-		// Push the "latest" tag.
-		_, err := a.Atlas.SchemaPush(ctx, params)
-		if err != nil {
-			return fmt.Errorf("failed to push schema: %v", err)
-		}
-	}
-	params.Tag = a.GetInput("tag")
 	if params.Tag == "" {
 		// If the tag is not provided, use the commit SHA.
 		params.Tag = params.Context.Commit
@@ -469,8 +462,17 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to push schema tag: %w", err)
 	}
+	if a.GetBoolInput("latest") {
+		// Push the "latest" tag.
+		params.Tag = "latest"
+		if _, err := a.Atlas.SchemaPush(ctx, params); err != nil {
+			return fmt.Errorf("failed to push schema for latest tag: %v", err)
+		}
+	}
 	a.Infof(`"atlas schema push" completed successfully to: %s`, resp)
-	a.SetOutput("url", resp)
+	a.SetOutput("link", resp.Link)
+	a.SetOutput("slug", resp.Slug)
+	a.SetOutput("url", resp.URL)
 	return nil
 }
 
