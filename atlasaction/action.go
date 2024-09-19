@@ -469,7 +469,7 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 			return fmt.Errorf("failed to push schema for latest tag: %v", err)
 		}
 	}
-	a.Infof(`"atlas schema push" completed successfully to: %s`, resp)
+	a.Infof(`"atlas schema push" completed successfully to: %s`, resp.Link)
 	a.SetOutput("link", resp.Link)
 	a.SetOutput("slug", resp.Slug)
 	a.SetOutput("url", resp.URL)
