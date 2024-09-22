@@ -658,6 +658,7 @@ func (a *Actions) SchemaApply(ctx context.Context) error {
 		ConfigURL:   a.GetInput("config"),
 		Env:         a.GetInput("env"),
 		Vars:        a.GetVarsInput("vars"),
+		DevURL:      a.GetInput("dev-url"),
 		URL:         a.GetInput("url"),
 		To:          a.GetInput("to"),
 		DryRun:      a.GetBoolInput("dry-run"),
