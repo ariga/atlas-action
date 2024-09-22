@@ -21,6 +21,11 @@ inputs:
       A JSON object containing variables to be used in the Atlas configuration file.
       For example, `{"var1": "value1", "var2": "value2"}`.
     required: false
+  dev-url:
+    description: |
+      The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+      Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+    required: false
   to:
     description: |
       URL(s) of the desired schema state.
