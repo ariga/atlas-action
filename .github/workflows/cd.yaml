@@ -43,7 +43,7 @@ jobs:
           COMMIT=$(git rev-parse --short HEAD)
           go build -o atlas-action -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT" ./cmd/atlas-action
           OUTPUT=$(./atlas-action --version)
-          [ $(echo $OUTPUT | grep -i "^$VERSION") ] && echo Version=$OUTPUT || (echo "unexpected output: $OUTPUT, expected: $VERSION"; exit 1)
+          [ $(echo $OUTPUT | grep -i "^atlas-action version $VERSION-$COMMIT") ] && echo Version=$OUTPUT || (echo "unexpected output: $OUTPUT, expected: atlas-action version $VERSION-$COMMIT"; exit 1)
         env:
           CGO_ENABLED: 0
       - name: Configure AWS credentials
