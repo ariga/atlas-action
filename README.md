@@ -412,6 +412,8 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
 * `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
    For example: `'{"var1": "value1", "var2": "value2"}'`.
+* `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 * `to` - URL(s) of the desired schema state. For example: `file://schema.hcl`.
 * `plan` - The plan to apply. (ig. `atlas://<schema>/plans/<id>`)
 * `dry-run` - Print SQL without executing it. Either `true` or `false`. Defaults to `false`
