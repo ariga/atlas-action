@@ -31,7 +31,7 @@ inputs:
       URL(s) of the desired schema state.
     required: false
   plan:
-    description: The plan to apply. (ig. `atlas://<schema>/plans/<id>`)
+    description: The plan to apply. For example, `atlas://<schema>/plans/<id>`.
     required: false
   dry-run:
     description: Print SQL without executing it. Either "true" or "false".
