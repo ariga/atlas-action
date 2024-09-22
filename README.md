@@ -9,15 +9,19 @@ To learn more about the recommended way to build workflows, read our guide on
 
 ## Actions
 
-| Action                                                             | Description                                             |
-|--------------------------------------------------------------------|---------------------------------------------------------|
-| [ariga/setup-atlas](#arigasetup-atlas)                             | Setup the Atlas CLI and optionally login to Atlas Cloud |
-| [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)   | Push migrations to Atlas Cloud                          |
-| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)   | Lint migrations (required `atlas login` )               |
-| [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply) | Apply migrations to a database                          |
-| [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)   | Revert migrations to a database                         |
-| [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)   | Test migrations on a database                           |
-| [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)     | Test schema on a database                               |
+| Action                                                                        | Description                                             |
+|-------------------------------------------------------------------------------|---------------------------------------------------------|
+| [ariga/setup-atlas](#arigasetup-atlas)                                        | Setup the Atlas CLI and optionally login to Atlas Cloud |
+| [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)              | Push migrations to Atlas Registry                       |
+| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)              | Lint migrations (required `atlas login` )               |
+| [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply)            | Apply migrations to a database                          |
+| [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Revert migrations to a database                         |
+| [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                           |
+| [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                               |
+| [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema to Atlas Registry                         |
+| [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for the schema transition  |
+| [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a declarative migration plan                    |
+| [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaplan)               | Apply a declarative migrations to a database            |
 
 ## Examples
 
