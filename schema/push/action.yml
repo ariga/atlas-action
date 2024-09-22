@@ -27,7 +27,9 @@ inputs:
       Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
     required: false
   schema-name:
-    description: The name (slug) of the project in Atlas Cloud.
+    description: |
+      The name (slug) of the schema repository in Atlas Registry.
+      Read more in Atlas website: https://atlasgo.io/registry.
     required: false
   description:
     description: The description of the schema changes.
@@ -37,8 +39,7 @@ inputs:
     required: false
   tag:
     description: |
-      The tag to apply to the pushed migration directory. By default the
-      current git commit hash is used.
+      The tag to apply to the pushed schema. By default, the current git commit hash is used.
     required: false
   latest:
     description: |

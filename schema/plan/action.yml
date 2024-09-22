@@ -47,7 +47,7 @@ outputs:
   link: # id of the output
     description: Link to the schema plan on Atlas.
   status:
-    description: The status of the plan. (ig. `PENDING`, `APPROVED`)
+    description: The status of the plan. For example, `PENDING` or `APPROVED`.
 runs:
   using: node20
   main: index.js

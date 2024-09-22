@@ -93,7 +93,7 @@ type AtlasExec interface {
 	SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error)
 }
 
-// Context holds the context of the environment the action is running in.
+// TriggerContext holds the context of the environment the action is running in.
 type TriggerContext struct {
 	SCM         SCM          // SCM is the source control management system.
 	Repo        string       // Repo is the repository name. e.g. "ariga/atlas-action".

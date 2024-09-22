@@ -29,6 +29,8 @@ inputs:
   plan:
     description: |
       The URL of the plan to be approved. For example, `atlas://<schema>/plans/<id>`.
+      If not provided, Atlas will search the registry for a plan corresponding to the given schema transition and approve it
+      (typically, this plan is created during the PR stage). If multiple plans are found, an error will be thrown.
     required: false
   schema-name:
     description: The name (slug) of the project in Atlas Cloud.
