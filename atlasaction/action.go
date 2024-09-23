@@ -444,7 +444,7 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 		return err
 	}
 	params := &atlasexec.SchemaPushParams{
-		Repo:        a.GetAtlasURLInput("schema-name"),
+		Name:        a.GetInput("schema-name"),
 		Description: a.GetInput("description"),
 		Version:     a.GetInput("version"),
 		DevURL:      a.GetInput("dev-url"),
