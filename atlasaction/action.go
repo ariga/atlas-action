@@ -444,7 +444,7 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 		return err
 	}
 	params := &atlasexec.SchemaPushParams{
-		Repo:        a.GetInput("schema-name"),
+		Repo:        a.GetAtlasURLInput("schema-name"),
 		Description: a.GetInput("description"),
 		Version:     a.GetInput("version"),
 		DevURL:      a.GetInput("dev-url"),
@@ -509,7 +509,7 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
 		Context:   a.GetRunContext(ctx, tc),
-		Repo:      a.GetInput("schema-name"),
+		Repo:      a.GetAtlasURLInput("schema-name"),
 		DevURL:    a.GetInput("dev-url"),
 		From:      a.GetArrayInput("from"),
 		To:        a.GetArrayInput("to"),
@@ -620,7 +620,7 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 			Env:       params.Env,
 			Vars:      params.Vars,
 			Context:   a.GetRunContext(ctx, tc),
-			Repo:      a.GetInput("schema-name"),
+			Repo:      a.GetAtlasURLInput("schema-name"),
 			DevURL:    a.GetInput("dev-url"),
 			From:      a.GetArrayInput("from"),
 			To:        a.GetArrayInput("to"),
@@ -739,6 +739,15 @@ func (a *Actions) GetDurationInput(name string) time.Duration {
 		a.Fatalf("the input %q got invalid value for duration: %v", name, err)
 	}
 	return 0
+}
+
+// GetAtlasURLInput returns the atlas URL input with the given name.
+func (a *Actions) GetAtlasURLInput(name string) string {
+	v := a.GetInput(name)
+	if v == "" {
+		return ""
+	}
+	return (&url.URL{Scheme: "atlas", Path: v}).String()
 }
 
 // GetVarsInput returns the vars input with the given name.
