@@ -245,7 +245,7 @@ Apply migrations to a database.
 
 All inputs are optional as they may be specified in the Atlas configuration file.
 
-* `url` - The URL of the target database.  For example: `mysql://root:pass@localhost:3306/dev`.
+* `url` - The URL of the target database. For example: `mysql://root:pass@localhost:3306/prod`.
 * `dir` - The URL of the migration directory to apply.  For example: `atlas://dir-name` for cloud
    based directories or `file://migrations` for local ones.
 * `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
@@ -346,6 +346,7 @@ Apply a declarative migrations to a database.
 #### Inputs
 
 * `to` - The URL(s) of the desired schema state.
+* `url` - The URL of the target database. For example: `mysql://root:pass@localhost:3306/prod`.
 * `plan` - Optional plan file to use for applying the migrations. For example: `atlas://<schema>/plans/<id>`.
 * `dry-run` - Print SQL (and optional analysis) without executing it. Either `true` or `false`. Defaults to `false`.
 * `auto-approve` - Automatically approve and apply changes. Either `true` or `false`. Defaults to `false`.
