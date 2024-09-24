@@ -370,6 +370,7 @@ Push a schema to [Atlas Registry](https://atlasgo.io/registry) with an optional 
 #### Inputs
 
 * `schema-name` - The name (slug) of the schema repository in [Atlas Registry](https://atlasgo.io/registry).
+* `url` - Desired schema URL(s) to push. For example: `file://schema.hcl`.
 * `tag` - The tag to apply to the pushed schema. By default, the current git commit hash is used.
 * `latest` - Whether to implicitly push the `latest` tag. True by default.
 * `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.

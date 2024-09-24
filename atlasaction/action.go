@@ -447,6 +447,7 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 		Name:        a.GetInput("schema-name"),
 		Description: a.GetInput("description"),
 		Version:     a.GetInput("version"),
+		URL:         a.GetArrayInput("url"),
 		DevURL:      a.GetInput("dev-url"),
 		Context:     a.GetRunContext(ctx, tc),
 		ConfigURL:   a.GetInput("config"),

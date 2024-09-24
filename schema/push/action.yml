@@ -31,6 +31,10 @@ inputs:
       The name (slug) of the schema repository in Atlas Registry.
       Read more in Atlas website: https://atlasgo.io/registry.
     required: false
+  url:
+    description: |
+      Desired schema URL(s) to push. For example: `file://schema.lt.hcl`.
+    required: false
   description:
     description: The description of the schema changes.
     required: false
