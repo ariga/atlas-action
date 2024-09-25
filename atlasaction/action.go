@@ -141,6 +141,9 @@ func newAction(getenv func(string) string, w io.Writer) (Action, error) {
 	if getenv("CIRCLECI") == "true" {
 		return NewCircleCIOrb(getenv, w), nil
 	}
+	if getenv("GITLAB_CI") == "true" {
+		return NewGitlabCI(getenv, w), nil
+	}
 	return nil, errors.New("unsupported environment")
 }
 
