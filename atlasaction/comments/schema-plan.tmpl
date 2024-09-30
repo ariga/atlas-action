@@ -1,5 +1,5 @@
 <h3>Atlas detected changes to the desired schema</h3>
-<h4>Migration Plan {{- with .Plan.File.Link }} ({{- . | link "View on Atlas Cloud" -}}){{ end }}</h4>
+<h4>Migration Plan {{- with .Plan.File.Link }} <span style="font-weight: normal;">({{- . | link "View on Atlas Cloud" -}})</span>{{ end }}</h4>
 {{- .Plan.File.Migration | codeblock "sql" -}}
 <h4>Atlas lint results</h4>
 {{- template "schema-lint" . -}}
