@@ -43,7 +43,7 @@ func (g *gitlabCI) GetInput(name string) string {
 	e := strings.ReplaceAll(name, " ", "_")
 	e = strings.ReplaceAll(e, "-", "_")
 	e = strings.ToUpper(e)
-	return strings.TrimSpace(g.getenv(e))
+	return strings.TrimSpace(g.getenv("ATLAS_" + e))
 }
 
 // SetOutput implements the Action interface.
@@ -121,6 +121,7 @@ type gitlabTransport struct {
 
 func (t *gitlabTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("PRIVATE-TOKEN", t.Token)
+	req.Header.Set("Content-Type", "application/json")
 	return http.DefaultTransport.RoundTrip(req)
 }
 
