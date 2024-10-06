@@ -6,19 +6,33 @@ package atlasaction
 
 import (
 	"fmt"
+	"golang.org/x/oauth2"
 	"io"
+	"net/http"
+	"os"
+	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sethvargo/go-githubactions"
 )
 
+const defaultGHApiUrl = "https://api.github.com"
+
 var _ Action = (*ghAction)(nil)
 
-// ghAction is an implementation of the Action interface for GitHub Actions.
-type ghAction struct {
-	*githubactions.Action
-}
+type (
+	// ghAction is an implementation of the Action interface for GitHub Actions.
+	ghAction struct {
+		*githubactions.Action
+	}
+	// ghAPI is an implementation of the APIClient interface for GitHub Actions.
+	githubAPI struct {
+		baseURL string
+		repo    string
+		client  *http.Client
+	}
+)
 
 // New returns a new Action for GitHub Actions.
 func NewGHAction(getenv func(string) string, w io.Writer) *ghAction {
@@ -66,6 +80,40 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 		}
 	}
 	return tc, nil
+}
+
+func (a *ghAction) API() (APIClient, error) {
+	tc, err := a.GetTriggerContext()
+	if err != nil {
+		return nil, err
+	}
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		a.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
+	}
+	return githubClient(tc.Repo, tc.SCM.APIURL, token), nil
+}
+
+// githubClient returns a new GitHub client for the given repository.
+// If the GITHUB_TOKEN is set, it will be used for authentication.
+func githubClient(repo, baseURL string, token string) *githubAPI {
+	httpClient := &http.Client{Timeout: time.Second * 30}
+	if token != "" {
+		httpClient.Transport = &oauth2.Transport{
+			Base: http.DefaultTransport,
+			Source: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: token,
+			}),
+		}
+	}
+	if baseURL == "" {
+		baseURL = defaultGHApiUrl
+	}
+	return &githubAPI{
+		baseURL: baseURL,
+		repo:    repo,
+		client:  httpClient,
+	}
 }
 
 // WithFieldsMap return a new Logger with the given fields.

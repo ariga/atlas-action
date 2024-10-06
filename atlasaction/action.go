@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
-	"golang.org/x/oauth2"
 )
 
 // Actions holds the runtime for the actions to run.
@@ -48,6 +47,17 @@ type Action interface {
 	GetTriggerContext() (*TriggerContext, error)
 	// AddStepSummary adds a summary to the action step.
 	AddStepSummary(string)
+	// API returns as APIClient.
+	API() (APIClient, error)
+}
+
+type APIClient interface {
+	// ListPullRequestFiles returns a list of files changed in a pull request.
+	ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error)
+	// UpsertSuggestion posts or updates a pull request suggestion.
+	UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error
+	// UpsertComment posts or updates a pull request comment.
+	UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error
 }
 
 type Logger interface {
@@ -395,18 +405,21 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		return nil
 	// In case of a pull request, we need to add comments and suggestion to the PR.
 	default:
-		c := a.GithubClient(tc.Repo, tc.SCM.APIURL)
-		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
+		api, err := a.API()
+		if err != nil {
+			return err
+		}
+		if err = api.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
 			a.Errorf("failed to comment on the pull request: %v", err)
 		}
-		switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest); {
+		switch files, err := api.ListPullRequestFiles(ctx, tc.PullRequest); {
 		case err != nil:
 			a.Errorf("failed to list pull request files: %w", err)
 		default:
 			err = a.addSuggestions(&payload, func(s *Suggestion) error {
 				// Add suggestion only if the file is part of the pull request.
 				if slices.Contains(files, s.Path) {
-					return c.UpsertSuggestion(ctx, tc.PullRequest, s)
+					return api.UpsertSuggestion(ctx, tc.PullRequest, s)
 				}
 				return nil
 			})
@@ -593,9 +606,12 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		return fmt.Errorf("failed to generate schema plan comment: %w", err)
 	}
 	a.AddStepSummary(summary)
+	api, err := a.API()
+	if err != nil {
+		return err
+	}
 	// Comment on the PR
-	err = a.GithubClient(tc.Repo, tc.SCM.APIURL).
-		UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
+	err = api.UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
 	if err != nil {
 		// Don't fail the action if the comment fails.
 		// It may be due to the missing permissions.
@@ -829,30 +845,6 @@ func (a *Actions) DeployRunContext() *atlasexec.DeployRunContext {
 	}
 }
 
-// GithubClient returns a new GitHub client for the given repository.
-// If the GITHUB_TOKEN is set, it will be used for authentication.
-func (a *Actions) GithubClient(repo, baseURL string) *githubAPI {
-	httpClient := &http.Client{Timeout: time.Second * 30}
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		httpClient.Transport = &oauth2.Transport{
-			Base: http.DefaultTransport,
-			Source: oauth2.StaticTokenSource(&oauth2.Token{
-				AccessToken: token,
-			}),
-		}
-	} else {
-		a.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
-	}
-	if baseURL == "" {
-		baseURL = defaultGHApiUrl
-	}
-	return &githubAPI{
-		baseURL: baseURL,
-		repo:    repo,
-		client:  httpClient,
-	}
-}
-
 // RequiredInputs returns an error if any of the given inputs are missing.
 func (a *Actions) RequiredInputs(input ...string) error {
 	for _, in := range input {
@@ -1072,7 +1064,6 @@ type (
 		ID   int    `json:"id"`
 		Body string `json:"body"`
 	}
-
 	pullRequestComment struct {
 		ID        int    `json:"id,omitempty"`
 		Body      string `json:"body"`
@@ -1081,19 +1072,10 @@ type (
 		StartLine int    `json:"start_line,omitempty"`
 		Line      int    `json:"line,omitempty"`
 	}
-
 	pullRequestFile struct {
 		Name string `json:"filename"`
 	}
-
-	githubAPI struct {
-		baseURL string
-		repo    string
-		client  *http.Client
-	}
 )
-
-const defaultGHApiUrl = "https://api.github.com"
 
 func (g *githubAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
 	comments, err := g.getIssueComments(ctx, pr)

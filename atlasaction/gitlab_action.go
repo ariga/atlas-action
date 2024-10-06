@@ -6,12 +6,20 @@ package atlasaction
 
 import (
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
+
+const defaultGitlabApiURL = "https://gitlab.com/api/v4"
 
 // gitlabCI is an implementation of the Action interface for GitHub Actions.
 type gitlabCI struct {
@@ -106,4 +114,161 @@ func (g *gitlabCI) WithFieldsMap(map[string]string) Logger {
 // AddStepSummary implements the Action interface.
 func (g *gitlabCI) AddStepSummary(summary string) {
 	// unsupported
+}
+
+type gitlabTransport struct {
+	Token string
+}
+
+func (t *gitlabTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("PRIVATE-TOKEN", t.Token)
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+func (g *gitlabCI) API() (APIClient, error) {
+	tc, err := g.GetTriggerContext()
+	if err != nil {
+		return nil, err
+	}
+	httpClient := &http.Client{Timeout: time.Second * 30}
+	if token := os.Getenv("CI_JOB_TOKEN"); token != "" {
+		httpClient.Transport = &gitlabTransport{
+			Token: token,
+		}
+	} else {
+		g.Warningf("CI_JOB_TOKEN is not set, the action may not have all the permissions")
+	}
+	return &gitlabAPI{
+		baseURL: tc.SCM.APIURL,
+		project: tc.Repo,
+		client:  httpClient,
+	}, nil
+}
+
+type gitlabAPI struct {
+	baseURL string
+	project string
+	client  *http.Client
+}
+
+type mergeRequestFile struct {
+	NewPath string `json:"new_path"`
+}
+
+type gitlabComment struct {
+	ID   int    `json:"id"`
+	Body string `json:"body"`
+}
+
+var _ APIClient = (*gitlabAPI)(nil)
+
+func (g *gitlabAPI) ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error) {
+	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/diffs", g.baseURL, g.project, pr.Number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := g.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
+		}
+		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	var files []mergeRequestFile
+	if err = json.NewDecoder(res.Body).Decode(&files); err != nil {
+		return nil, err
+	}
+	paths := make([]string, len(files))
+	for i := range files {
+		paths[i] = files[i].NewPath
+	}
+	return paths, nil
+}
+
+func (g *gitlabAPI) UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
+	return errors.New("not supported")
+}
+
+func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", g.baseURL, g.project, pr.Number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	res, err := g.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error querying github comments with %v/%v, %w", g.project, pr.Number, err)
+	}
+	defer res.Body.Close()
+	buf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("error reading PR issue comments from %v/%v, %v", g.project, pr.Number, err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code %v when calling Gitlab API", res.StatusCode)
+	}
+	var comments []gitlabComment
+	if err = json.Unmarshal(buf, &comments); err != nil {
+		return fmt.Errorf("error parsing gitlab notes with %v/%v from %v, %w", g.project, pr.Number, string(buf), err)
+	}
+	var (
+		marker = commentMarker(id)
+		body   = fmt.Sprintf(`{"body": %q}`, comment+"\n"+marker)
+	)
+	if found := slices.IndexFunc(comments, func(c gitlabComment) bool {
+		return strings.Contains(c.Body, marker)
+	}); found != -1 {
+		return g.updateComment(ctx, pr, comments[found].ID, body)
+	}
+	return g.createComment(ctx, pr, comment)
+}
+
+func (g *gitlabAPI) createComment(ctx context.Context, pr *PullRequest, comment string) error {
+	body := strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment))
+	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", g.baseURL, g.project, pr.Number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return err
+	}
+	res, err := g.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
+		}
+		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	return err
+}
+
+func (g *gitlabAPI) updateComment(ctx context.Context, pr *PullRequest, NoteId int, comment string) error {
+	body := strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment))
+	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes/%v", g.baseURL, g.project, pr.Number, NoteId)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
+	if err != nil {
+		return err
+	}
+	res, err := g.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
+		}
+		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	return err
 }
