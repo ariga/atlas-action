@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/fatih/color"
 	"io"
 	"net/http"
 	"os"
@@ -18,8 +19,6 @@ import (
 	"strings"
 	"time"
 )
-
-const defaultGitlabApiURL = "https://gitlab.com/api/v4"
 
 // gitlabCI is an implementation of the Action interface for GitHub Actions.
 type gitlabCI struct {
@@ -86,17 +85,17 @@ func (g *gitlabCI) GetTriggerContext() (*TriggerContext, error) {
 
 // Infof implements the Logger interface.
 func (g *gitlabCI) Infof(msg string, args ...any) {
-	fmt.Fprintf(g.w, msg+EOF, args...)
+	fmt.Fprint(g.w, color.CyanString(msg, args...)+"\n")
 }
 
 // Warningf implements the Logger interface.
 func (g *gitlabCI) Warningf(msg string, args ...any) {
-	fmt.Fprintf(g.w, msg+EOF, args...)
+	fmt.Fprint(g.w, color.YellowString(msg, args...)+"\n")
 }
 
 // Errorf implements the Logger interface.
 func (g *gitlabCI) Errorf(msg string, args ...any) {
-	fmt.Fprintf(g.w, msg+EOF, args...)
+	fmt.Fprint(g.w, color.RedString(msg, args...)+"\n")
 }
 
 // Fatalf implements the Logger interface.
@@ -140,7 +139,7 @@ func (g *gitlabCI) API() (APIClient, error) {
 	}
 	return &gitlabAPI{
 		baseURL: tc.SCM.APIURL,
-		project: tc.Repo,
+		project: os.Getenv("CI_PROJECT_ID"),
 		client:  httpClient,
 	}, nil
 }
