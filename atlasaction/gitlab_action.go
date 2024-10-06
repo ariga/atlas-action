@@ -130,12 +130,12 @@ func (g *gitlabCI) API() (APIClient, error) {
 		return nil, err
 	}
 	httpClient := &http.Client{Timeout: time.Second * 30}
-	if token := os.Getenv("CI_JOB_TOKEN"); token != "" {
+	if token := os.Getenv("CI_TOKEN"); token != "" {
 		httpClient.Transport = &gitlabTransport{
 			Token: token,
 		}
 	} else {
-		g.Warningf("CI_JOB_TOKEN is not set, the action may not have all the permissions")
+		g.Warningf("CI_TOKEN is not set, the action may not have all the permissions")
 	}
 	return &gitlabAPI{
 		baseURL: tc.SCM.APIURL,
