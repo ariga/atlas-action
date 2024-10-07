@@ -565,7 +565,9 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 			return fmt.Errorf("failed to save schema plan: %w", err)
 		case dryRun:
 			// Save the plan with the generated name.
-			name = fmt.Sprintf("pr-%d-%.8s", tc.PullRequest.Number, plan.File.FromHash)
+			name = fmt.Sprintf("pr-%d-%.8s", tc.PullRequest.Number,
+				// RFC4648 base64url encoding without padding.
+				strings.NewReplacer("+", "-", "/", "_", "=", "").Replace(plan.File.FromHash))
 			goto runPlan
 		}
 	default:
