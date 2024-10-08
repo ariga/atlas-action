@@ -2167,16 +2167,21 @@ time=NOW level=INFO msg="No schema plan found"
 `, out.String())
 }
 
-type mockAction struct {
-	trigger *atlasaction.TriggerContext // trigger context
-	inputs  map[string]string           // input values
-	output  map[string]string           // step's output
-	summary []string                    // step summaries
-	logger  *slog.Logger                // logger
-	fatal   bool                        // fatal called
-}
+type (
+	mockAction struct {
+		trigger *atlasaction.TriggerContext // trigger context
+		inputs  map[string]string           // input values
+		output  map[string]string           // step's output
+		summary []string                    // step summaries
+		logger  *slog.Logger                // logger
+		fatal   bool                        // fatal called
+	}
+	mockApi struct {
+	}
+)
 
 var _ atlasaction.Action = (*mockAction)(nil)
+var _ atlasaction.APIClient = (*mockApi)(nil)
 
 func (m *mockAction) resetOutputs() {
 	m.output = map[string]string{}
@@ -2242,6 +2247,21 @@ func (m *mockAction) WithFieldsMap(args map[string]string) atlasaction.Logger {
 		fatal:   m.fatal,
 		logger:  m.logger.With(argPairs...),
 	}
+}
+func (m *mockAction) API() (atlasaction.APIClient, error) {
+	return &mockApi{}, nil
+}
+
+func (m *mockApi) ListPullRequestFiles(context.Context, *atlasaction.PullRequest) ([]string, error) {
+	panic("unimplemented")
+}
+
+func (m *mockApi) UpsertSuggestion(context.Context, *atlasaction.PullRequest, *atlasaction.Suggestion) error {
+	panic("unimplemented")
+}
+
+func (m *mockApi) UpsertComment(context.Context, *atlasaction.PullRequest, string, string) error {
+	panic("unimplemented")
 }
 
 func TestGitHubActions(t *testing.T) {

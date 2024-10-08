@@ -156,8 +156,9 @@ type mergeRequestFile struct {
 }
 
 type gitlabComment struct {
-	ID   int    `json:"id"`
-	Body string `json:"body"`
+	ID     int    `json:"id"`
+	Body   string `json:"body"`
+	System bool   `json:"system"`
 }
 
 var _ APIClient = (*gitlabAPI)(nil)
@@ -222,7 +223,7 @@ func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comm
 		body   = fmt.Sprintf(`{"body": %q}`, comment+"\n"+marker)
 	)
 	if found := slices.IndexFunc(comments, func(c gitlabComment) bool {
-		return strings.Contains(c.Body, marker)
+		return !c.System && strings.Contains(c.Body, marker)
 	}); found != -1 {
 		return g.updateComment(ctx, pr, comments[found].ID, body)
 	}
