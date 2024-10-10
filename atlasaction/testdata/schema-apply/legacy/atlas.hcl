@@ -1,9 +1,8 @@
 env "test" {
   url = "sqlite://local.db"
   dev = "sqlite://file?mode=memory"
-  src = glob("*.lt.hcl")
   schema {
-    src = "atlas://atlas-action"
+    src = [for f in glob("*.lt.hcl"): format("file://%s", f)]
     repo {
       name = "atlas-action"
     }
