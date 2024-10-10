@@ -2015,6 +2015,7 @@ func TestSchemaPlan(t *testing.T) {
 				Commit: "commit-id",
 			},
 		},
+		scm: &mockSCM{baseURL: srv.URL, comments: make(map[string]struct{})},
 	}
 	ctx := context.Background()
 	// Multiple plans will fail with an error
@@ -2128,6 +2129,7 @@ func TestSchemaPlanApprove(t *testing.T) {
 			Branch:  "g/feature-1",
 			Commit:  "commit-id",
 		},
+		scm: &mockSCM{baseURL: srv.URL, comments: make(map[string]struct{})},
 	}
 	ctx := context.Background()
 	// Multiple plans will fail with an error
@@ -2170,13 +2172,17 @@ time=NOW level=INFO msg="No schema plan found"
 type (
 	mockAction struct {
 		trigger *atlasaction.TriggerContext // trigger context
+		scm     *mockSCM                    // scm client
 		inputs  map[string]string           // input values
 		output  map[string]string           // step's output
 		summary []string                    // step summaries
 		logger  *slog.Logger                // logger
 		fatal   bool                        // fatal called
 	}
-	mockSCM struct{}
+	mockSCM struct {
+		baseURL  string
+		comments map[string]struct{}
+	}
 )
 
 var _ atlasaction.Action = (*mockAction)(nil)
@@ -2245,10 +2251,11 @@ func (m *mockAction) WithFieldsMap(args map[string]string) atlasaction.Logger {
 		summary: m.summary,
 		fatal:   m.fatal,
 		logger:  m.logger.With(argPairs...),
+		scm:     m.scm,
 	}
 }
 func (m *mockAction) SCM() (atlasaction.SCMClient, error) {
-	return &mockSCM{}, nil
+	return m.scm, nil
 }
 
 func (m *mockSCM) ListPullRequestFiles(context.Context, *atlasaction.PullRequest) ([]string, error) {
@@ -2259,8 +2266,23 @@ func (m *mockSCM) UpsertSuggestion(context.Context, *atlasaction.PullRequest, *a
 	return nil
 }
 
-func (m *mockSCM) UpsertComment(context.Context, *atlasaction.PullRequest, string, string) error {
-	return nil
+func (m *mockSCM) UpsertComment(_ context.Context, _ *atlasaction.PullRequest, id string, _ string) error {
+	var (
+		method  = http.MethodPatch
+		urlPath = "/repos/ariga/atlas-action/issues/comments/1"
+	)
+	if _, ok := m.comments[id]; !ok {
+		method = http.MethodPost
+		urlPath = "/repos/ariga/atlas-action/issues/1/comments"
+		m.comments[id] = struct{}{}
+	}
+	req, err := http.NewRequest(method, m.baseURL+urlPath, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer token")
+	_, err = http.DefaultClient.Do(req)
+	return err
 }
 
 func TestGitHubActions(t *testing.T) {
