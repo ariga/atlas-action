@@ -1000,7 +1000,7 @@ func TestMigrateLint(t *testing.T) {
 			)
 			// List comments endpoint
 			if path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodGet {
-				// API is not working
+				// SCM is not working
 				writer.WriteHeader(http.StatusUnprocessableEntity)
 			}
 		}))
@@ -1716,7 +1716,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		tt.setInput("dir", "atlas://cloud-project")
 		tt.setInput("env", "test")
 
-		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
+		// This isn't simulating a user input but is a workaround for testing Cloud SCM calls.
 		cfgURL := generateHCL(t, srv.URL, "token")
 		tt.setInput("config", cfgURL)
 		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli, Version: "v1.2.3"}).MigrateApply(context.Background())
@@ -1743,7 +1743,7 @@ func TestMigrateApplyCloud(t *testing.T) {
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "atlas://cloud-project")
 
-		// This isn't simulating a user input but is a workaround for testing Cloud API calls.
+		// This isn't simulating a user input but is a workaround for testing Cloud SCM calls.
 		cfgURL := generateHCL(t, srv.URL, "token")
 		tt.setInput("config", cfgURL)
 
@@ -2015,6 +2015,7 @@ func TestSchemaPlan(t *testing.T) {
 				Commit: "commit-id",
 			},
 		},
+		scm: &mockSCM{baseURL: srv.URL, comments: make(map[string]struct{})},
 	}
 	ctx := context.Background()
 	// Multiple plans will fail with an error
@@ -2128,6 +2129,7 @@ func TestSchemaPlanApprove(t *testing.T) {
 			Branch:  "g/feature-1",
 			Commit:  "commit-id",
 		},
+		scm: &mockSCM{baseURL: srv.URL, comments: make(map[string]struct{})},
 	}
 	ctx := context.Background()
 	// Multiple plans will fail with an error
@@ -2167,16 +2169,24 @@ time=NOW level=INFO msg="No schema plan found"
 `, out.String())
 }
 
-type mockAction struct {
-	trigger *atlasaction.TriggerContext // trigger context
-	inputs  map[string]string           // input values
-	output  map[string]string           // step's output
-	summary []string                    // step summaries
-	logger  *slog.Logger                // logger
-	fatal   bool                        // fatal called
-}
+type (
+	mockAction struct {
+		trigger *atlasaction.TriggerContext // trigger context
+		scm     *mockSCM                    // scm client
+		inputs  map[string]string           // input values
+		output  map[string]string           // step's output
+		summary []string                    // step summaries
+		logger  *slog.Logger                // logger
+		fatal   bool                        // fatal called
+	}
+	mockSCM struct {
+		baseURL  string
+		comments map[string]struct{}
+	}
+)
 
 var _ atlasaction.Action = (*mockAction)(nil)
+var _ atlasaction.SCMClient = (*mockSCM)(nil)
 
 func (m *mockAction) resetOutputs() {
 	m.output = map[string]string{}
@@ -2241,7 +2251,38 @@ func (m *mockAction) WithFieldsMap(args map[string]string) atlasaction.Logger {
 		summary: m.summary,
 		fatal:   m.fatal,
 		logger:  m.logger.With(argPairs...),
+		scm:     m.scm,
 	}
+}
+func (m *mockAction) SCM() (atlasaction.SCMClient, error) {
+	return m.scm, nil
+}
+
+func (m *mockSCM) ListPullRequestFiles(context.Context, *atlasaction.PullRequest) ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockSCM) UpsertSuggestion(context.Context, *atlasaction.PullRequest, *atlasaction.Suggestion) error {
+	return nil
+}
+
+func (m *mockSCM) UpsertComment(_ context.Context, _ *atlasaction.PullRequest, id string, _ string) error {
+	var (
+		method  = http.MethodPatch
+		urlPath = "/repos/ariga/atlas-action/issues/comments/1"
+	)
+	if _, ok := m.comments[id]; !ok {
+		method = http.MethodPost
+		urlPath = "/repos/ariga/atlas-action/issues/1/comments"
+		m.comments[id] = struct{}{}
+	}
+	req, err := http.NewRequest(method, m.baseURL+urlPath, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer token")
+	_, err = http.DefaultClient.Do(req)
+	return err
 }
 
 func TestGitHubActions(t *testing.T) {
