@@ -26,7 +26,7 @@ type (
 	ghAction struct {
 		*githubactions.Action
 	}
-	// ghAPI is an implementation of the APIClient interface for GitHub Actions.
+	// ghAPI is an implementation of the SCMClient interface for GitHub Actions.
 	githubAPI struct {
 		baseURL string
 		repo    string
@@ -82,7 +82,7 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 	return tc, nil
 }
 
-func (a *ghAction) API() (APIClient, error) {
+func (a *ghAction) SCM() (SCMClient, error) {
 	tc, err := a.GetTriggerContext()
 	if err != nil {
 		return nil, err

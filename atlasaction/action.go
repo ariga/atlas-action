@@ -47,11 +47,12 @@ type Action interface {
 	GetTriggerContext() (*TriggerContext, error)
 	// AddStepSummary adds a summary to the action step.
 	AddStepSummary(string)
-	// API returns as APIClient.
-	API() (APIClient, error)
+	// SCM returns a SCMClient.
+	SCM() (SCMClient, error)
 }
 
-type APIClient interface {
+// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
+type SCMClient interface {
 	// ListPullRequestFiles returns a list of files changed in a pull request.
 	ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error)
 	// UpsertSuggestion posts or updates a pull request suggestion.
@@ -405,7 +406,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		return nil
 	// In case of a pull request, we need to add comments and suggestion to the PR.
 	default:
-		api, err := a.API()
+		api, err := a.SCM()
 		if err != nil {
 			return err
 		}
@@ -606,7 +607,7 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		return fmt.Errorf("failed to generate schema plan comment: %w", err)
 	}
 	a.AddStepSummary(summary)
-	api, err := a.API()
+	api, err := a.SCM()
 	if err != nil {
 		return err
 	}

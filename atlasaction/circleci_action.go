@@ -148,7 +148,7 @@ func (a *circleCIOrb) AddStepSummary(summary string) {
 	// unsupported
 }
 
-func (a *circleCIOrb) API() (APIClient, error) {
+func (a *circleCIOrb) SCM() (SCMClient, error) {
 	tc, err := a.GetTriggerContext()
 	if err != nil {
 		return nil, err

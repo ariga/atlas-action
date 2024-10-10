@@ -125,7 +125,7 @@ func (t *gitlabTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return http.DefaultTransport.RoundTrip(req)
 }
 
-func (g *gitlabCI) API() (APIClient, error) {
+func (g *gitlabCI) SCM() (SCMClient, error) {
 	tc, err := g.GetTriggerContext()
 	if err != nil {
 		return nil, err
@@ -161,7 +161,7 @@ type gitlabComment struct {
 	System bool   `json:"system"`
 }
 
-var _ APIClient = (*gitlabAPI)(nil)
+var _ SCMClient = (*gitlabAPI)(nil)
 
 func (g *gitlabAPI) ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error) {
 	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/diffs", g.baseURL, g.project, pr.Number)
