@@ -60,7 +60,7 @@ func (g *gitlabCI) SetOutput(name, value string) {
 func (g *gitlabCI) GetTriggerContext() (*TriggerContext, error) {
 	ctx := &TriggerContext{
 		SCM: SCM{
-			Type:   atlasexec.SCMTypeGithub, // TODO: Change to Gitlab.
+			Type:   atlasexec.SCMTypeGitlab,
 			APIURL: g.getenv("CI_API_V4_URL"),
 		},
 		Repo:    g.getenv("CI_PROJECT_NAME"),
@@ -192,12 +192,13 @@ func (g *gitlabAPI) ListPullRequestFiles(ctx context.Context, pr *PullRequest) (
 	return paths, nil
 }
 
-func (g *gitlabAPI) UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
+func (g *gitlabAPI) UpsertSuggestion(context.Context, *PullRequest, *Suggestion) error {
 	return errors.New("not supported")
 }
 
 func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
 	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", g.baseURL, g.project, pr.Number)
+	color.Cyan(url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
