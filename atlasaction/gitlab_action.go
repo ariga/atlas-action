@@ -198,7 +198,7 @@ func (g *gitlabAPI) UpsertSuggestion(context.Context, *PullRequest, *Suggestion)
 
 func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
 	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", g.baseURL, g.project, pr.Number)
-	color.Cyan(url)
+	fmt.Printf("GET %s\n", url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -234,6 +234,7 @@ func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comm
 func (g *gitlabAPI) createComment(ctx context.Context, pr *PullRequest, comment string) error {
 	body := strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment))
 	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", g.baseURL, g.project, pr.Number)
+	fmt.Printf("POST %s\n", url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	if err != nil {
 		return err
@@ -256,6 +257,7 @@ func (g *gitlabAPI) createComment(ctx context.Context, pr *PullRequest, comment 
 func (g *gitlabAPI) updateComment(ctx context.Context, pr *PullRequest, NoteId int, comment string) error {
 	body := strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment))
 	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes/%v", g.baseURL, g.project, pr.Number, NoteId)
+	fmt.Printf("PUT %s\n", url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
 	if err != nil {
 		return err
