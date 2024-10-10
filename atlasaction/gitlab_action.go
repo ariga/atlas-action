@@ -53,7 +53,7 @@ func (g *gitlabCI) SetOutput(name, value string) {
 		return
 	}
 	defer f.Close()
-	f.WriteString(fmt.Sprintf("%s=%s\n", name, value))
+	fmt.Fprintf(f, "%s=%s\n", name, value)
 }
 
 // GetTriggerContext implements the Action interface.
