@@ -137,7 +137,7 @@ func (g *gitlabCI) SCM() (SCMClient, error) {
 			Token: token,
 		}
 	} else {
-		g.Warningf("ATLAS_CI_TOKEN is not set, the action may not have all the permissions")
+		g.Warningf("ATLAS_GITLAB_TOKEN is not set, the action may not have all the permissions")
 	}
 	return &gitlabAPI{
 		baseURL: tc.SCM.APIURL,
@@ -156,7 +156,7 @@ type mergeRequestFile struct {
 	NewPath string `json:"new_path"`
 }
 
-type gitlabComment struct {
+type GitlabComment struct {
 	ID     int    `json:"id"`
 	Body   string `json:"body"`
 	System bool   `json:"system"`
@@ -214,9 +214,9 @@ func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comm
 		return fmt.Errorf("error reading PR issue comments from %v/%v, %v", g.project, pr.Number, err)
 	}
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code %v when calling Gitlab API", res.StatusCode)
+		return fmt.Errorf("unexpected status code %v when calling Gitlab API. body: %s", res.StatusCode, string(buf))
 	}
-	var comments []gitlabComment
+	var comments []GitlabComment
 	if err = json.Unmarshal(buf, &comments); err != nil {
 		return fmt.Errorf("error parsing gitlab notes with %v/%v from %v, %w", g.project, pr.Number, string(buf), err)
 	}
@@ -224,7 +224,7 @@ func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comm
 		marker = commentMarker(id)
 		body   = fmt.Sprintf(`{"body": %q}`, comment+"\n"+marker)
 	)
-	if found := slices.IndexFunc(comments, func(c gitlabComment) bool {
+	if found := slices.IndexFunc(comments, func(c GitlabComment) bool {
 		return !c.System && strings.Contains(c.Body, marker)
 	}); found != -1 {
 		return g.updateComment(ctx, pr, comments[found].ID, body)
