@@ -1,0 +1,140 @@
+! atlas-action schema/plan
+stderr 'the action should be run in a pull request context'
+
+mock-atlas $WORK/schema-plan
+env CI_MERGE_REQUEST_IID=1
+env CI_PROJECT_NAME=my-project
+env CI_PROJECT_URL=https://gitlab.com/projects/my-project
+env CI_COMMIT_REF_NAME=test-branch
+env CI_COMMIT_SHA=123
+env GITLAB_USER_NAME=user
+env GITLAB_USER_ID=123
+env CI_MERGE_REQUEST_REF_PATH=$CI_PROJECT_URL/merge_requests/1
+
+atlas-action schema/plan
+stdout 'Schema plan does not exist, creating a new one with name "pr-1-3RRRcLHF"'
+
+cmp comments-expected/1 comments/1
+
+-- schema-plan/1/args --
+schema plan list --format {{ json . }} --context {"repo":"my-project","branch":"test-branch","commit":"123","url":"https://gitlab.com/projects/my-project/merge_requests/1","username":"user","userID":"123","scmType":"GITLAB"} --pending --auto-approve
+
+-- schema-plan/1/stdout --
+[]
+
+-- schema-plan/2/args --
+schema plan --format {{ json . }} --context {"repo":"my-project","branch":"test-branch","commit":"123","url":"https://gitlab.com/projects/my-project/merge_requests/1","username":"user","userID":"123","scmType":"GITLAB"} --dry-run
+
+-- schema-plan/2/stdout --
+{
+    "Lint": {
+        "Steps": [
+            {
+                "Name": "Analyze 20241010143904.sql",
+                "Text": "0 reports were found in analysis",
+                "Result": {
+                    "Name": "20241010143904.sql",
+                    "Text": "-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n"
+                }
+            }
+        ],
+        "Files": [
+            {
+                "Name": "20241010143904.sql",
+                "Text": "-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n"
+            }
+        ]
+    },
+    "File": {
+        "Name": "20241010143904",
+        "FromHash": "3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=",
+        "FromDesc": "file://schema.lt.hcl",
+        "ToHash": "6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=",
+        "ToDesc": "file://schema1.lt.hcl",
+        "Migration": "-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n",
+        "Stmts": [
+            {
+                "Pos": 20,
+                "Text": "CREATE TABLE `1` (\n  `c` int NOT NULL\n);",
+                "Comments": [
+                    "-- Create \"1\" table\n"
+                ]
+            }
+        ],
+        "URL": "atlas://app/plans/20241010143904",
+        "Link": "http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511",
+        "Status": "PENDING"
+    }
+}
+
+-- schema-plan/3/args --
+schema plan --format {{ json . }} --context {"repo":"my-project","branch":"test-branch","commit":"123","url":"https://gitlab.com/projects/my-project/merge_requests/1","username":"user","userID":"123","scmType":"GITLAB"} --name pr-1-3RRRcLHF --pending --auto-approve
+
+-- schema-plan/3/stdout --
+{
+    "Lint": {
+        "Steps": [
+            {
+                "Name": "Analyze 20241010143904.sql",
+                "Text": "0 reports were found in analysis",
+                "Result": {
+                    "Name": "20241010143904.sql",
+                    "Text": "-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n"
+                }
+            }
+        ],
+        "Files": [
+            {
+                "Name": "20241010143904.sql",
+                "Text": "-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n"
+            }
+        ]
+    },
+    "File": {
+        "Name": "20241010143904",
+        "FromHash": "3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=",
+        "FromDesc": "file://schema.lt.hcl",
+        "ToHash": "6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=",
+        "ToDesc": "file://schema1.lt.hcl",
+        "Migration": "-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n",
+        "Stmts": [
+            {
+                "Pos": 20,
+                "Text": "CREATE TABLE `1` (\n  `c` int NOT NULL\n);",
+                "Comments": [
+                    "-- Create \"1\" table\n"
+                ]
+            }
+        ],
+        "URL": "atlas://app/plans/20241010143904",
+        "Link": "http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511",
+        "Status": "PENDING"
+    }
+}
+
+-- comments-expected/1 --
+<h3>Atlas detected changes to the desired schema</h3>
+<h4>Migration Plan (<a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511" target="_blank">View on Atlas Cloud</a>)</h4><pre lang="sql"><code>-- Create "1" table
+CREATE TABLE `1` (
+ `c` int NOT NULL
+);
+</code></pre><h4>Atlas lint results</h4><table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>Detect schema changes</td><td>1 new statement detected</td>
+    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>No issues found</td>
+      <td></td>
+    </tr></tbody></table><hr>
+<details>
+  <summary>📝 To edit this plan, follow these steps</summary>
+  <ol>
+    <li>Run <code>atlas schema plan pull --url "atlas://app/plans/20241010143904" > 20241010143904.plan.hcl</code></li>
+    <li>Modify the plan.</li>
+    <li>Push the plan using <code>atlas schema plan push --pending --env  --file 20241010143904.plan.hcl</code></li></ol>
+</details>
