@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -70,7 +69,7 @@ func newMockHandler(dir string) http.Handler {
 	r.Methods(http.MethodPut).Path("/projects/{project}/merge_requests/{mr}/notes/{note}").
 		HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			vars := mux.Vars(r)
-			if _, err := os.Stat(path.Join(dir, vars["note"])); err != nil {
+			if _, err := os.Stat(filepath.Join(dir, vars["note"])); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 			var body struct {
@@ -88,14 +87,22 @@ func newMockHandler(dir string) http.Handler {
 }
 
 func TestGitlabCI(t *testing.T) {
+	var srv *httptest.Server
+	cleanup := func() {
+		if srv != nil {
+			srv.Close()
+		}
+	}
+	defer cleanup()
 	testscript.Run(t, testscript.Params{
 		Dir: "testdata/gitlab",
 		Setup: func(env *testscript.Env) error {
-			commentsDir := path.Join(env.WorkDir, "comments")
+			commentsDir := filepath.Join(env.WorkDir, "comments")
 			if err := os.Mkdir(commentsDir, os.ModePerm); err != nil {
 				return err
 			}
-			srv := httptest.NewServer(newMockHandler(commentsDir))
+			cleanup()
+			srv = httptest.NewServer(newMockHandler(commentsDir))
 			env.Setenv("GITLAB_CI", "true")
 			env.Setenv("CI_PROJECT_ID", "1")
 			env.Setenv("CI_API_V4_URL", srv.URL)
