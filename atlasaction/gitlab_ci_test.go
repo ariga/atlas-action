@@ -18,6 +18,14 @@ import (
 func newMockHandler(dir string) http.Handler {
 	counter := 1
 	r := mux.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if tok := r.Header.Get("PRIVATE-TOKEN"); tok != "token" {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
 	r.Methods(http.MethodGet).Path("/projects/{project}/merge_requests/{mr}/notes").
 		HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			entries, err := os.ReadDir(dir)
@@ -81,7 +89,7 @@ func newMockHandler(dir string) http.Handler {
 
 func TestGitlabCI(t *testing.T) {
 	testscript.Run(t, testscript.Params{
-		Dir: filepath.Join("testdata", "gitlab"),
+		Dir: "testdata/gitlab",
 		Setup: func(env *testscript.Env) error {
 			commentsDir := path.Join(env.WorkDir, "comments")
 			if err := os.Mkdir(commentsDir, os.ModePerm); err != nil {
@@ -91,6 +99,7 @@ func TestGitlabCI(t *testing.T) {
 			env.Setenv("GITLAB_CI", "true")
 			env.Setenv("CI_PROJECT_ID", "1")
 			env.Setenv("CI_API_V4_URL", srv.URL)
+			env.Setenv("ATLAS_GITLAB_TOKEN", "token")
 			c, err := atlasexec.NewClient(env.WorkDir, "atlas")
 			if err != nil {
 				return err

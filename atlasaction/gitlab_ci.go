@@ -132,7 +132,6 @@ func (g *gitlabCI) SCM() (SCMClient, error) {
 	}
 	httpClient := &http.Client{Timeout: time.Second * 30}
 	if token := g.GetInput("gitlab-token"); token != "" {
-		fmt.Println("Token found")
 		httpClient.Transport = &gitlabTransport{
 			Token: token,
 		}

@@ -406,21 +406,21 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		return nil
 	// In case of a pull request, we need to add comments and suggestion to the PR.
 	default:
-		api, err := a.SCM()
+		scm, err := a.SCM()
 		if err != nil {
 			return err
 		}
-		if err = api.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
+		if err = scm.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
 			a.Errorf("failed to comment on the pull request: %v", err)
 		}
-		switch files, err := api.ListPullRequestFiles(ctx, tc.PullRequest); {
+		switch files, err := scm.ListPullRequestFiles(ctx, tc.PullRequest); {
 		case err != nil:
 			a.Errorf("failed to list pull request files: %w", err)
 		default:
 			err = a.addSuggestions(&payload, func(s *Suggestion) error {
 				// Add suggestion only if the file is part of the pull request.
 				if slices.Contains(files, s.Path) {
-					return api.UpsertSuggestion(ctx, tc.PullRequest, s)
+					return scm.UpsertSuggestion(ctx, tc.PullRequest, s)
 				}
 				return nil
 			})
@@ -607,12 +607,12 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		return fmt.Errorf("failed to generate schema plan comment: %w", err)
 	}
 	a.AddStepSummary(summary)
-	api, err := a.SCM()
+	scm, err := a.SCM()
 	if err != nil {
 		return err
 	}
 	// Comment on the PR
-	err = api.UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
+	err = scm.UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
 	if err != nil {
 		// Don't fail the action if the comment fails.
 		// It may be due to the missing permissions.
