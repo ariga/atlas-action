@@ -1,0 +1,76 @@
+mock-atlas $WORK/schema-plan-approve
+
+# No plans found.
+atlas-action schema/plan/approve
+stdout 'No plan URL provided, searching for the pending plan'
+stdout 'No schema plan found'
+
+# One pending plan.
+atlas-action schema/plan/approve
+
+# Multiple pending plans.
+! atlas-action schema/plan/approve
+stdout 'No plan URL provided, searching for the pending plan'
+stdout 'Found schema plan: atlas://plans/1234'
+stdout 'Found schema plan: atlas://plans/5678'
+stderr 'found multiple schema plans, please approve or delete the existing plans'
+
+
+-- schema-plan-approve/1/args --
+schema plan list --format {{ json . }} --context {"scmType":"GITLAB"} --pending --auto-approve
+
+-- schema-plan-approve/1/stdout --
+[]
+
+-- schema-plan-approve/2/args --
+schema plan list --format {{ json . }} --context {"scmType":"GITLAB"} --pending --auto-approve
+
+-- schema-plan-approve/2/stdout --
+[
+    {
+        "name": "pr-1-3RRRcLHF",
+        "status": "PENDING",
+        "atlasVersion": "atlas_test.123",
+        "fromHash": "12345",
+        "toHash": "23456",
+        "migration": "CRATE TABLE `users` (`c` INT NOT NULL);",
+        "link": "https://test.atlasgo.cloud/schemas/123/plans/456",
+        "url": "atlas://plans/1234"
+    }
+]
+
+-- schema-plan-approve/3/args --
+schema plan approve --format {{ json . }} --url atlas://plans/1234
+
+-- schema-plan-approve/3/stdout --
+{
+    "link": "https://test.atlasgo.cloud/schemas/123/plans/456",
+    "url": "atlas://plans/1234"
+}
+
+-- schema-plan-approve/4/args --
+schema plan list --format {{ json . }} --context {"scmType":"GITLAB"} --pending --auto-approve
+
+-- schema-plan-approve/4/stdout --
+[
+    {
+        "name": "plan1",
+        "status": "PENDING",
+        "atlasVersion": "atlas_test.123",
+        "fromHash": "12345",
+        "toHash": "23456",
+        "migration": "CRATE TABLE `users` (`c` INT NOT NULL);",
+        "link": "https://test.atlasgo.cloud/schemas/123/plans/456",
+        "url": "atlas://plans/1234"
+    },
+    {
+        "name": "plan-2",
+        "status": "PENDING",
+        "atlasVersion": "atlas_test.123",
+        "fromHash": "12345",
+        "toHash": "23456",
+        "migration": "CRATE TABLE `users` (`c` INT NOT NULL);",
+        "link": "https://test.atlasgo.cloud/schemas/123/plans/456",
+        "url": "atlas://plans/5678"
+    }
+]
