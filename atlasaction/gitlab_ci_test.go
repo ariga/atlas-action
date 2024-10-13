@@ -58,7 +58,6 @@ func newMockHandler(dir string) http.Handler {
 			}
 			counter++
 			w.WriteHeader(http.StatusCreated)
-			return
 		})
 	r.Methods(http.MethodPut).Path("/projects/{project}/merge_requests/{mr}/notes/{note}").
 		HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
