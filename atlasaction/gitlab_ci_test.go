@@ -87,22 +87,15 @@ func newMockHandler(dir string) http.Handler {
 }
 
 func TestGitlabCI(t *testing.T) {
-	var srv *httptest.Server
-	cleanup := func() {
-		if srv != nil {
-			srv.Close()
-		}
-	}
-	defer cleanup()
 	testscript.Run(t, testscript.Params{
 		Dir: "testdata/gitlab",
 		Setup: func(env *testscript.Env) error {
 			commentsDir := filepath.Join(env.WorkDir, "comments")
+			srv := httptest.NewServer(newMockHandler(commentsDir))
 			if err := os.Mkdir(commentsDir, os.ModePerm); err != nil {
 				return err
 			}
-			cleanup()
-			srv = httptest.NewServer(newMockHandler(commentsDir))
+			env.Defer(srv.Close)
 			env.Setenv("GITLAB_CI", "true")
 			env.Setenv("CI_PROJECT_ID", "1")
 			env.Setenv("CI_API_V4_URL", srv.URL)
