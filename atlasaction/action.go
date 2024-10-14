@@ -127,6 +127,7 @@ type PullRequest struct {
 	Number int    // Pull Request Number
 	URL    string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
 	Commit string // Latest commit SHA.
+	Body   string // Body (description) of the pull request.
 }
 
 // SCM holds the source control management system information.

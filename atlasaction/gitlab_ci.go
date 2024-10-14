@@ -78,6 +78,7 @@ func (g *gitlabCI) GetTriggerContext() (*TriggerContext, error) {
 			Commit: g.getenv("CI_COMMIT_SHA"),
 			Number: num,
 			URL:    g.getenv("CI_MERGE_REQUEST_REF_PATH"),
+			Body:   g.getenv("CI_MERGE_REQUEST_DESCRIPTION"),
 		}
 	}
 	return ctx, nil

@@ -34,7 +34,7 @@ type (
 	}
 )
 
-// New returns a new Action for GitHub Actions.
+// NewGHAction returns a new Action for GitHub Actions.
 func NewGHAction(getenv func(string) string, w io.Writer) *ghAction {
 	return &ghAction{
 		githubactions.New(
@@ -49,7 +49,7 @@ func (a *ghAction) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeGithubAction
 }
 
-// Context returns the context of the action.
+// GetTriggerContext returns the context of the action.
 func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 	ctx, err := a.Action.Context()
 	if err != nil {
@@ -77,6 +77,7 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 			Number: ev.PullRequest.Number,
 			URL:    ev.PullRequest.URL,
 			Commit: ev.PullRequest.Head.SHA,
+			Body:   ev.PullRequest.Body,
 		}
 	}
 	return tc, nil
@@ -125,6 +126,7 @@ func (a *ghAction) WithFieldsMap(m map[string]string) Logger {
 type githubTriggerEvent struct {
 	PullRequest struct {
 		Number int    `mapstructure:"number"`
+		Body   string `mapstructure:"body"`
 		URL    string `mapstructure:"html_url"`
 		Head   struct {
 			SHA string `mapstructure:"sha"`
