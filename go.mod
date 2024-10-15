@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	ariga.io/atlas v0.21.2-0.20240418081819-02b3f6239b04
-	ariga.io/atlas-go-sdk v0.6.4
+	ariga.io/atlas-go-sdk v0.6.5-0.20241014162907-6e1a48201dee
 	github.com/alecthomas/kong v0.8.0
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/mitchellh/mapstructure v1.1.2

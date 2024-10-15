@@ -1941,10 +1941,14 @@ func TestSchemaPlan(t *testing.T) {
 		Link:     "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
 		Status:   "PENDING",
 	}
-	var planFiles []atlasexec.SchemaPlanFile
-	var planErr, approveErr error
+	var (
+		planErr, approveErr error
+		planprams           *atlasexec.SchemaPlanParams
+		planFiles           []atlasexec.SchemaPlanFile
+	)
 	m := &mockAtlas{
 		schemaPlan: func(_ context.Context, p *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+			planprams = p
 			// Common input checks
 			require.Equal(t, "file://atlas.hcl", p.ConfigURL)
 			require.Equal(t, "test", p.Env)
@@ -1987,37 +1991,39 @@ func TestSchemaPlan(t *testing.T) {
 		},
 	}
 	t.Setenv("GITHUB_TOKEN", "token")
-	out := &bytes.Buffer{}
-	act := &mockAction{
-		inputs: map[string]string{
-			// "schema-name": "atlas://atlas-action",
-			"from":   "sqlite://file?_fk=1&mode=memory",
-			"config": "file://atlas.hcl",
-			"env":    "test",
-		},
-		logger: slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{
-			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-				if a.Key == slog.TimeKey {
-					return slog.String(slog.TimeKey, "NOW") // Fake time
-				}
-				return a
+	var (
+		out = &bytes.Buffer{}
+		act = &mockAction{
+			inputs: map[string]string{
+				// "schema-name": "atlas://atlas-action",
+				"from":   "sqlite://file?_fk=1&mode=memory",
+				"config": "file://atlas.hcl",
+				"env":    "test",
 			},
-		})),
-		trigger: &atlasaction.TriggerContext{
-			SCM:     atlasaction.SCM{Type: atlasexec.SCMTypeGithub, APIURL: srv.URL},
-			Repo:    "ariga/atlas-action",
-			RepoURL: "https://github.com/ariga/atlas-action",
-			Branch:  "g/feature-1",
-			Commit:  "commit-id",
-			PullRequest: &atlasaction.PullRequest{
-				Number: 1,
-				URL:    "https://github.com/ariga/atlas-action/pull/1",
-				Commit: "commit-id",
+			logger: slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{
+				ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+					if a.Key == slog.TimeKey {
+						return slog.String(slog.TimeKey, "NOW") // Fake time
+					}
+					return a
+				},
+			})),
+			trigger: &atlasaction.TriggerContext{
+				SCM:     atlasaction.SCM{Type: atlasexec.SCMTypeGithub, APIURL: srv.URL},
+				Repo:    "ariga/atlas-action",
+				RepoURL: "https://github.com/ariga/atlas-action",
+				Branch:  "g/feature-1",
+				Commit:  "commit-id",
+				PullRequest: &atlasaction.PullRequest{
+					Number: 1,
+					URL:    "https://github.com/ariga/atlas-action/pull/1",
+					Commit: "commit-id",
+				},
 			},
-		},
-		scm: &mockSCM{baseURL: srv.URL, comments: make(map[string]struct{})},
-	}
-	ctx := context.Background()
+			scm: &mockSCM{baseURL: srv.URL, comments: make(map[string]struct{})},
+		}
+		ctx = context.Background()
+	)
 	// Multiple plans will fail with an error
 	planFiles = []atlasexec.SchemaPlanFile{*planFile, *planFile}
 	act.resetOutputs()
@@ -2049,13 +2055,20 @@ func TestSchemaPlan(t *testing.T) {
 		"link":   "https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk",
 	}, act.output, "expected output with plan URL")
 
+	act.trigger.PullRequest.Body = "Text\n/atlas:txmode: none\nText"
+	act.resetOutputs()
+	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
+	require.Len(t, act.summary, 2, "Expected 1 summary")
+	require.Equal(t, []string{"atlas:txmode: none"}, planprams.Directives)
+	act.trigger.PullRequest.Body = ""
+
 	// Existing plan
 	planFiles = []atlasexec.SchemaPlanFile{*planFile}
 	act.resetOutputs()
 	require.NoError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx))
-	require.Len(t, act.summary, 2, "Expected 2 summaries")
+	require.Len(t, act.summary, 3, "Expected 2 summaries")
 	require.Equal(t, 1, commentCounter, "No more comments generated")
-	require.Equal(t, 1, commentEdited, "Expected comment to be edited")
+	require.Equal(t, 2, commentEdited, "Expected comment to be edited")
 	require.EqualValues(t, map[string]string{
 		"plan":   "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
 		"status": "PENDING",
@@ -2066,6 +2079,7 @@ func TestSchemaPlan(t *testing.T) {
 	require.Equal(t, `time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
 time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
 time=NOW level=INFO msg="The current state is synced with the desired state, no changes to be made"
+time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-ufnTS7Nr\""
 time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-ufnTS7Nr\""
 time=NOW level=INFO msg="Schema plan already exists, linting the plan \"pr-1-Rl4lBdMk\""
 `, out.String())
