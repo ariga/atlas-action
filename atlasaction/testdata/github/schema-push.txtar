@@ -1,0 +1,52 @@
+# Mock atlas command outputs
+mock-atlas $WORK/schema-push
+# Setup the action input variables
+env INPUT_ENV=test
+env INPUT_LATEST=true
+
+# Run the action without a tag
+atlas-action schema/push
+
+# Run the action with a tag
+env INPUT_TAG=98765
+atlas-action schema/push
+
+-- schema-push/1/args --
+schema push --format {{ json . }} --env test --context {"scmType":"GITHUB"} --tag latest
+
+-- schema-push/1/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}
+
+-- schema-push/2/args --
+schema push --format {{ json . }} --env test --context {"scmType":"GITHUB"}
+
+-- schema-push/2/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}
+
+-- schema-push/3/args --
+schema push --format {{ json . }} --env test --context {"scmType":"GITHUB"} --tag latest
+
+-- schema-push/3/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}
+
+-- schema-push/4/args --
+schema push --format {{ json . }} --env test --context {"scmType":"GITHUB"} --tag 98765
+
+-- schema-push/4/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}
