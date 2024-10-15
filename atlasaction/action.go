@@ -1062,6 +1062,7 @@ var (
 					// clicking on the image to view the full size.
 					return fmt.Sprintf(`<picture><source media="(prefers-color-scheme: light)" srcset=%q><img %s/></picture>`, src, attrs), nil
 				},
+				"trimRight": strings.TrimRight,
 			}).
 			ParseFS(comments, "comments/*.tmpl"),
 	)
