@@ -634,6 +634,11 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		// It may be due to the missing permissions.
 		a.Errorf("failed to comment on the pull request: %v", err)
 	}
+	if plan.Lint != nil {
+		if errs := plan.Lint.Errors(); len(errs) > 0 {
+			return fmt.Errorf("`atlas schema plan` completed with lint errors:\n%v", errors.Join(errs...))
+		}
+	}
 	return nil
 }
 
