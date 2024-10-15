@@ -470,15 +470,6 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 		ConfigURL:   a.GetInput("config"),
 		Env:         a.GetInput("env"),
 		Vars:        a.GetVarsInput("vars"),
-		Tag:         a.GetInput("tag"),
-	}
-	if params.Tag == "" {
-		// If the tag is not provided, use the commit SHA.
-		params.Tag = params.Context.Commit
-	}
-	resp, err := a.Atlas.SchemaPush(ctx, params)
-	if err != nil {
-		return fmt.Errorf("failed to push schema tag: %w", err)
 	}
 	if a.GetBoolInput("latest") {
 		// Push the "latest" tag.
@@ -486,6 +477,15 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 		if _, err := a.Atlas.SchemaPush(ctx, params); err != nil {
 			return fmt.Errorf("failed to push schema for latest tag: %v", err)
 		}
+	}
+	params.Tag = a.GetInput("tag")
+	if params.Tag == "" {
+		// If the tag is not provided, use the commit SHA.
+		params.Tag = params.Context.Commit
+	}
+	resp, err := a.Atlas.SchemaPush(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to push schema tag: %w", err)
 	}
 	a.Infof(`"atlas schema push" completed successfully to: %s`, resp.Link)
 	a.SetOutput("link", resp.Link)
