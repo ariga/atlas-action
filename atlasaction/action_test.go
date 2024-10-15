@@ -2083,6 +2083,18 @@ time=NOW level=INFO msg="Schema plan does not exist, creating a new one with nam
 time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-ufnTS7Nr\""
 time=NOW level=INFO msg="Schema plan already exists, linting the plan \"pr-1-Rl4lBdMk\""
 `, out.String())
+
+	planFiles = nil
+	act.resetOutputs()
+	m.schemaPlan = func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+		return &atlasexec.SchemaPlan{
+			File: planFile,
+			Lint: &atlasexec.SummaryReport{
+				Files: []*atlasexec.FileReport{{Error: "destructive changes detected"}},
+			},
+		}, nil
+	}
+	require.EqualError(t, (&atlasaction.Actions{Action: act, Atlas: m}).SchemaPlan(ctx), "`atlas schema plan` completed with lint errors:\ndestructive changes detected")
 }
 
 func TestSchemaPlanApprove(t *testing.T) {
