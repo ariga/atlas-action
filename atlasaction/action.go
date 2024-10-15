@@ -33,7 +33,7 @@ type Actions struct {
 	Atlas   AtlasExec
 }
 
-// Atlas action interface.
+// Action interface for Atlas.
 type Action interface {
 	Logger
 	// GetType returns the type of atlasexec trigger Type. e.g. "GITHUB_ACTION"
@@ -43,7 +43,7 @@ type Action interface {
 	GetInput(string) string
 	// SetOutput sets the value of the output with the given name.
 	SetOutput(string, string)
-	// TriggerContext returns the context of the trigger event.
+	// GetTriggerContext returns the context of the trigger event.
 	GetTriggerContext() (*TriggerContext, error)
 	// AddStepSummary adds a summary to the action step.
 	AddStepSummary(string)
@@ -128,6 +128,20 @@ type PullRequest struct {
 	URL    string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
 	Commit string // Latest commit SHA.
 	Body   string // Body (description) of the pull request.
+}
+
+// AtlasDirectives returns any directives that are
+// present in the pull request body. For example:
+//
+//	/atlas:nolint destructive
+func (p *PullRequest) AtlasDirectives() (ds []string) {
+	const prefix = "/atlas:"
+	for _, l := range strings.Split(p.Body, "\n") {
+		if l = strings.TrimSpace(l); strings.HasPrefix(l, prefix) && !strings.HasSuffix(l, prefix) {
+			ds = append(ds, l[1:])
+		}
+	}
+	return ds
 }
 
 // SCM holds the source control management system information.
@@ -562,21 +576,22 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 			a.Infof("Schema plan does not exist, creating a new one with name %q", name)
 		}
 		switch plan, err = a.Atlas.SchemaPlan(ctx, &atlasexec.SchemaPlanParams{
-			ConfigURL: params.ConfigURL,
-			Env:       params.Env,
-			Vars:      params.Vars,
-			Context:   params.Context,
-			DevURL:    params.DevURL,
-			From:      params.From,
-			To:        params.To,
-			Repo:      params.Repo,
-			Name:      name,
-			DryRun:    dryRun,
-			Pending:   !dryRun,
+			ConfigURL:  params.ConfigURL,
+			Env:        params.Env,
+			Vars:       params.Vars,
+			Context:    params.Context,
+			DevURL:     params.DevURL,
+			From:       params.From,
+			To:         params.To,
+			Repo:       params.Repo,
+			Name:       name,
+			DryRun:     dryRun,
+			Pending:    !dryRun,
+			Directives: tc.PullRequest.AtlasDirectives(),
 		}); {
 		// The schema plan is already in sync.
 		case err != nil && strings.Contains(err.Error(), "The current state is synced with the desired state, no changes to be made"):
-			// No thing to do.
+			// Nothing to do.
 			a.Infof("The current state is synced with the desired state, no changes to be made")
 			return nil
 		case err != nil:
@@ -820,17 +835,17 @@ func (a *Actions) GetArrayInput(name string) []string {
 }
 
 // GetRunContext returns the run context for the action.
-func (a *Actions) GetRunContext(ctx context.Context, tc *TriggerContext) *atlasexec.RunContext {
-	url := tc.RepoURL
+func (a *Actions) GetRunContext(_ context.Context, tc *TriggerContext) *atlasexec.RunContext {
+	u := tc.RepoURL
 	if tc.PullRequest != nil {
-		url = tc.PullRequest.URL
+		u = tc.PullRequest.URL
 	}
 	rc := &atlasexec.RunContext{
 		Repo:    tc.Repo,
 		Branch:  tc.Branch,
 		Commit:  tc.Commit,
 		Path:    a.GetInput("dir"),
-		URL:     url,
+		URL:     u,
 		SCMType: tc.SCM.Type,
 	}
 	if a := tc.Actor; a != nil {
