@@ -1,11 +1,9 @@
 ariga.io/atlas v0.21.2-0.20240418081819-02b3f6239b04 h1:YF3qiqtnhn+y4tfhZKTfZKfizpjqHYt7rWPUb+eA4ZA=
 ariga.io/atlas v0.21.2-0.20240418081819-02b3f6239b04/go.mod h1:VPlcXdd4w2KqKnH54yEZcry79UAhpaWaxEsmn5JRNoE=
-ariga.io/atlas-go-sdk v0.6.3 h1:szfRe9bAhMRfRapOVt9I0Ifdx6ROb7Cqmt/W4rPs3hw=
-ariga.io/atlas-go-sdk v0.6.3/go.mod h1:9Q+/04PVyJHUse1lEE9Kp6E18xj/6mIzaUTcWYSjSnQ=
-ariga.io/atlas-go-sdk v0.6.4 h1:6iSUoMkHi7CijzxW4c+iMly53UFdw07HX8ECRglkUR4=
-ariga.io/atlas-go-sdk v0.6.4/go.mod h1:9Q+/04PVyJHUse1lEE9Kp6E18xj/6mIzaUTcWYSjSnQ=
-ariga.io/atlas-go-sdk v0.6.5-0.20241014162907-6e1a48201dee h1:dP0eoov9PGcTrJaQJ9rPfr5ZssrT1EfAF/pPiXWY61w=
-ariga.io/atlas-go-sdk v0.6.5-0.20241014162907-6e1a48201dee/go.mod h1:9Q+/04PVyJHUse1lEE9Kp6E18xj/6mIzaUTcWYSjSnQ=
+ariga.io/atlas-go-sdk v0.6.5-0.20241016163912-e50771c23016 h1:IGZTRXwbW5fXabMcdAUbXmmyJvZqZfOZLDDo0d9vFhI=
+ariga.io/atlas-go-sdk v0.6.5-0.20241016163912-e50771c23016/go.mod h1:9Q+/04PVyJHUse1lEE9Kp6E18xj/6mIzaUTcWYSjSnQ=
+ariga.io/atlas-go-sdk v0.6.5-0.20241016165749-25a157fbe224 h1:V/n4TgCKyhcKMaUEszoUs8UmwMOFMDfbBMQbiDocE2o=
+ariga.io/atlas-go-sdk v0.6.5-0.20241016165749-25a157fbe224/go.mod h1:9Q+/04PVyJHUse1lEE9Kp6E18xj/6mIzaUTcWYSjSnQ=
 github.com/DATA-DOG/go-sqlmock v1.5.0 h1:Shsta01QNfFxHCfpW6YH2STWB0MudeXXEWMr20OEh60=
 github.com/DATA-DOG/go-sqlmock v1.5.0/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/agext/levenshtein v1.2.3 h1:YB2fHEn0UJagG8T1rrWknE3ZQzWM06O8AMAatNn7lmo=

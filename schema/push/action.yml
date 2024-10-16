@@ -35,6 +35,10 @@ inputs:
     description: |
       Desired schema URL(s) to push. For example: `file://schema.lt.hcl`.
     required: false
+  schema:
+    description: |
+      List of database schema(s). For example: `public`.
+    required: false
   description:
     description: The description of the schema changes.
     required: false
