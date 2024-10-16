@@ -34,6 +34,10 @@ inputs:
     description: |
       The URL of the target database to apply changes to. For example: `mysql://root:pass@localhost:3306/prod`.
     required: false
+  schema:
+    description: |
+      List of database schema(s). For example: `public`.
+    required: false
   plan:
     description: The plan to apply. For example, `atlas://<schema>/plans/<id>`.
     required: false

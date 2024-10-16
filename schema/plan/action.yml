@@ -37,6 +37,10 @@ inputs:
     description: |
       URL(s) of the desired schema state.
     required: false
+  schema:
+    description: |
+      List of database schema(s). For example: `public`.
+    required: false
   name:
     description: |
       The name of the plan. By default, Atlas will generate a name based on the schema changes.
