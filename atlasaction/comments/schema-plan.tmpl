@@ -12,15 +12,28 @@
 {{- template "schema-lint" . -}}
 <hr>
 <details>
-  <summary>📝 To edit this plan, follow these steps</summary>
-  <ol>
-    <li>Run <code>atlas schema plan pull --url "{{ .Plan.File.URL }}" > {{ .Plan.File.Name }}.plan.hcl</code></li>
-    <li>Modify the plan.</li>
-    <li>Push the plan using <code>atlas schema plan push --pending --env {{ .EnvName }} --file {{ .Plan.File.Name }}.plan.hcl</code></li>
-  {{- if .RerunCommand -}}
-    <li>Re-trigger this action using <code>{{ .RerunCommand }}</code></li>
-  {{- end -}}
-  </ol>
+<summary>📝 Steps to edit this migration plan</summary>
+
+1\. Run the following command to pull the generated plan to your local workstation:
+```bash
+atlas schema plan pull --url "{{ .Plan.File.URL }}" > {{ .Plan.File.Name }}.plan.hcl
+```
+
+2\. Open `{{ .Plan.File.Name }}` in your editor and modify it as needed. Note that the result of the plan should align
+the database with the desired state. Otherwise, Atlas will report a schema drift.
+
+3\. Push the updated plan to the registry using the following command:
+```bash
+atlas schema plan push --pending --env {{ .EnvName }} --file {{ .Plan.File.Name }}.plan.hcl
+```
+
+{{- if .RerunCommand }}
+4\. Re-trigger the `schema/plan` action to update this comment:
+```bash
+{{ .RerunCommand }}
+```
+{{- end }}
+
 </details>
 {{- define "schema-lint" -}}
 <table>
