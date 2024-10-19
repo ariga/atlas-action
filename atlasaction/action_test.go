@@ -207,12 +207,13 @@ func TestMigrateDown(t *testing.T) {
 
 	t.Run("down approval pending", func(t *testing.T) {
 		tt := setup(t)
-		tt.cli = must(atlasexec.NewClient("", "./mock-atlas-down.sh"))
+		tt.cli = must(atlasexec.NewClient("", "./mock-atlas.sh"))
 		tt.setupConfigWithLogin(t, "", "")
 		st := must(json.Marshal(atlasexec.MigrateDown{
 			URL:    "URL",
 			Status: "PENDING_USER",
 		}))
+		t.Setenv("TEST_ARGS", fmt.Sprintf(`migrate down --format {{ json . }} --env test --config %s --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION"} --url sqlite://%s --dir file://testdata/down/`, tt.configUrl, tt.db))
 		t.Setenv("TEST_STDOUT", string(st))
 		tt.setInput("env", "test")
 		require.EqualError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateDown(context.Background()), "plan approval pending, review here: URL")
@@ -221,12 +222,13 @@ func TestMigrateDown(t *testing.T) {
 
 	t.Run("aborted", func(t *testing.T) {
 		tt := setup(t)
-		tt.cli = must(atlasexec.NewClient("", "./mock-atlas-down.sh"))
+		tt.cli = must(atlasexec.NewClient("", "./mock-atlas.sh"))
 		tt.setupConfigWithLogin(t, "", "")
 		st := must(json.Marshal(atlasexec.MigrateDown{
 			URL:    "URL",
 			Status: "ABORTED",
 		}))
+		t.Setenv("TEST_ARGS", fmt.Sprintf(`migrate down --format {{ json . }} --env test --config %s --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION"} --url sqlite://%s --dir file://testdata/down/`, tt.configUrl, tt.db))
 		t.Setenv("TEST_STDOUT", string(st))
 		t.Setenv("TEST_EXIT_CODE", "1")
 		tt.setInput("env", "test")
@@ -410,48 +412,55 @@ func TestMigratePushWithCloud(t *testing.T) {
 		require.ErrorContains(t, err, `tag must be lowercase alphanumeric`)
 	})
 	t.Run("tag", func(t *testing.T) {
+		c, err := atlasexec.NewClient("", "./mock-atlas.sh")
+		require.NoError(t, err)
 		tt := newT(t, nil)
-		tt.cli, _ = atlasexec.NewClient("", "./mock-push.sh")
-		os.Remove("push-out.txt")
-		t.Cleanup(func() {
-			os.Remove("push-out.txt")
-		})
+		tt.cli = c
 		tt.setupConfigWithLogin(t, srv.URL, token)
+
+		dir := t.TempDir()
+		require.NoError(t, c.SetEnv(map[string]string{"TEST_BATCH": dir}))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "1"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "args"), []byte(fmt.Sprintf(`migrate push --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --context {"path":"file://testdata/migrations","scmType":"GITHUB"} --config %s test-dir`, tt.configUrl)), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "stdout"), []byte("LINK1"), 0644))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "2"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "2", "args"), []byte(fmt.Sprintf(`migrate push --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --context {"path":"file://testdata/migrations","scmType":"GITHUB"} --config %s test-dir:valid-tag-123`, tt.configUrl)), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "2", "stdout"), []byte("LINK2"), 0644))
+
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("tag", "valid-tag-123")
 		tt.setInput("latest", "true")
-		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		require.NoError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background()))
+
+		b, err := os.ReadFile(filepath.Join(dir, "counter"))
 		require.NoError(t, err)
-		out, err := os.ReadFile("push-out.txt")
-		require.NoError(t, err)
-		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		require.Len(t, lines, 2)
-		require.Contains(t, lines[0], "test-dir")
-		require.NotContains(t, lines[0], "valid-tag-123")
-		require.Contains(t, lines[1], "test-dir:valid-tag-123")
+		require.Equal(t, "2", string(b))
 	})
 	t.Run("no latest", func(t *testing.T) {
+		c, err := atlasexec.NewClient("", "./mock-atlas.sh")
+		require.NoError(t, err)
 		tt := newT(t, nil)
-		tt.cli, _ = atlasexec.NewClient("", "./mock-push.sh")
-		os.Remove("push-out.txt")
-		t.Cleanup(func() {
-			os.Remove("push-out.txt")
-		})
+		tt.cli = c
 		tt.setupConfigWithLogin(t, srv.URL, token)
+
+		dir := t.TempDir()
+		require.NoError(t, c.SetEnv(map[string]string{"TEST_BATCH": dir}))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "1"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "args"), []byte(fmt.Sprintf(`migrate push --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --context {"path":"file://testdata/migrations","scmType":"GITHUB"} --config %s test-dir:valid-tag-123`, tt.configUrl)), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "stdout"), []byte("LINK2"), 0644))
+
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dir-name", "test-dir")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("tag", "valid-tag-123")
 		tt.setInput("latest", "false")
-		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background())
+		require.NoError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigratePush(context.Background()))
+
+		b, err := os.ReadFile(filepath.Join(dir, "counter"))
 		require.NoError(t, err)
-		out, err := os.ReadFile("push-out.txt")
-		require.NoError(t, err)
-		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		require.Len(t, lines, 1)
-		require.Contains(t, lines[0], "test-dir:valid-tag-123")
+		require.Equal(t, "1", string(b))
 	})
 	t.Run("config", func(t *testing.T) {
 		tt := newT(t, nil)
@@ -476,59 +485,41 @@ func TestMigratePushWithCloud(t *testing.T) {
 
 func TestMigrateTest(t *testing.T) {
 	t.Run("all inputs", func(t *testing.T) {
+		c, err := atlasexec.NewClient("", "./mock-atlas.sh")
+		require.NoError(t, err)
+		require.NoError(t, c.SetEnv(map[string]string{
+			"TEST_ARGS":   "migrate test --env test --config file://testdata/config/atlas.hcl --dir file://testdata/migrations --dev-url sqlite://file?mode=memory --run example --var var1=value1 --var var2=value2",
+			"TEST_STDOUT": `No errors found`,
+		}))
 		tt := newT(t, nil)
-		tt.cli, _ = atlasexec.NewClient("", "./mock-atlas-test.sh")
-		os.Remove("test-out.txt")
-		t.Cleanup(func() {
-			os.Remove("test-out.txt")
-		})
+		tt.cli = c
 		tt.setInput("dir", "file://testdata/migrations")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("run", "example")
 		tt.setInput("config", "file://testdata/config/atlas.hcl")
 		tt.setInput("env", "test")
 		tt.setInput("vars", `{"var1": "value1", "var2": "value2"}`)
-		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateTest(context.Background())
-		require.NoError(t, err)
-		out, err := os.ReadFile("test-out.txt")
-		require.NoError(t, err)
-		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		require.Len(t, lines, 1)
-		require.Contains(t, lines[0], "--env test")
-		require.Contains(t, lines[0], "--run example")
-		require.Contains(t, lines[0], "--var var1=value1")
-		require.Contains(t, lines[0], "--var var2=value2")
-		require.Contains(t, lines[0], "--dir file://testdata/migrations")
-		require.Contains(t, lines[0], "--dev-url sqlite://file?mode=memory")
+		require.NoError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateTest(context.Background()))
 	})
 }
 
 func TestSchemaTest(t *testing.T) {
 	t.Run("all inputs", func(t *testing.T) {
+		c, err := atlasexec.NewClient("", "./mock-atlas.sh")
+		require.NoError(t, err)
+		require.NoError(t, c.SetEnv(map[string]string{
+			"TEST_ARGS":   "schema test --env test --config file://testdata/config/atlas.hcl --url file://schema.hcl --dev-url sqlite://file?mode=memory --run example --var var1=value1 --var var2=value2",
+			"TEST_STDOUT": `No errors found`,
+		}))
 		tt := newT(t, nil)
-		tt.cli, _ = atlasexec.NewClient("", "./mock-atlas-test.sh")
-		os.Remove("test-out.txt")
-		t.Cleanup(func() {
-			os.Remove("test-out.txt")
-		})
+		tt.cli = c
 		tt.setInput("url", "file://schema.hcl")
 		tt.setInput("dev-url", "sqlite://file?mode=memory")
 		tt.setInput("run", "example")
 		tt.setInput("config", "file://testdata/config/atlas.hcl")
 		tt.setInput("env", "test")
 		tt.setInput("vars", `{"var1": "value1", "var2": "value2"}`)
-		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).SchemaTest(context.Background())
-		require.NoError(t, err)
-		out, err := os.ReadFile("test-out.txt")
-		require.NoError(t, err)
-		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-		require.Len(t, lines, 1)
-		require.Contains(t, lines[0], "--env test")
-		require.Contains(t, lines[0], "--run example")
-		require.Contains(t, lines[0], "--var var1=value1")
-		require.Contains(t, lines[0], "--var var2=value2")
-		require.Contains(t, lines[0], "--url file://schema.hcl")
-		require.Contains(t, lines[0], "--dev-url sqlite://file?mode=memory")
+		require.NoError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).SchemaTest(context.Background()))
 	})
 }
 

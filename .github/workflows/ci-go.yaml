@@ -211,7 +211,7 @@ jobs:
           CGO_ENABLED: 0
       - name: mock atlas
         run: |
-          cp atlasaction/mock-atlas-down.sh $HOME/atlas  
+          cp atlasaction/mock-atlas.sh $HOME/atlas
           echo "$HOME" >> $GITHUB_PATH
       - id: pending-approval
         continue-on-error: true
@@ -220,6 +220,7 @@ jobs:
           dir: file://atlasaction/testdata/down
           dev-url: sqlite://dev?mode=memory
         env:
+          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
           TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
           TEST_EXIT_CODE: 1
       - name: check-exit-code
@@ -236,6 +237,7 @@ jobs:
           dev-url: sqlite://dev?mode=memory
           wait-timeout: 5s
         env:
+          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
           TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
           TEST_EXIT_CODE: 1
       - name: check-exit-code-wait
@@ -251,6 +253,7 @@ jobs:
           dir: file://atlasaction/testdata/down
           dev-url: sqlite://dev?mode=memory
         env:
+          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
           TEST_STDOUT: "{\"URL\":\"ABORTED_URL\",\"Status\":\"ABORTED\"}"
           TEST_EXIT_CODE: 1
       - name: check-exit-code
@@ -265,6 +268,7 @@ jobs:
           dir: file://atlasaction/testdata/down
           dev-url: sqlite://dev?mode=memory
         env:
+          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
           TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPROVED\"}"
       - id: applied
         uses: ./migrate/down
@@ -272,6 +276,7 @@ jobs:
           dir: file://atlasaction/testdata/down
           dev-url: sqlite://dev?mode=memory
         env:
+          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
           TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPLIED\"}"
       - name: verify output
         run: |
