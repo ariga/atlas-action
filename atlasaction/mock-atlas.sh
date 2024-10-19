@@ -33,7 +33,9 @@ fi
 if [[ "$TEST_STDOUT" != "" ]]; then
   echo -n $TEST_STDOUT
   if [[ "$TEST_STDERR" == "" ]]; then
-    exit 0 # No stderr
+    # `migrate down` and `migrate lint` commands print result to stdout
+    # but the error code is set to 1.
+    exit ${TEST_EXIT_CODE:-0} # No stderr
   fi
   # In some cases, Atlas will write the error in stderr
   # when if the command is partially successful.
