@@ -40,7 +40,7 @@ inputs:
       List of database schema(s). For example: `public`.
     required: false
   description:
-    description: The description of the schema changes.
+    description: The description of the schema.
     required: false
   version:
     description: The version of the schema changes.
