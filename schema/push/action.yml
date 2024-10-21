@@ -43,7 +43,7 @@ inputs:
     description: The description of the schema.
     required: false
   version:
-    description: The version of the schema changes.
+    description: The version of the schema.
     required: false
   tag:
     description: |
