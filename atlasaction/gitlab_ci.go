@@ -43,7 +43,7 @@ func (g *gitlabCI) GetInput(name string) string {
 	e := strings.ReplaceAll(name, " ", "_")
 	e = strings.ReplaceAll(e, "-", "_")
 	e = strings.ToUpper(e)
-	return strings.TrimSpace(g.getenv("ATLAS_" + e))
+	return strings.TrimSpace(g.getenv("ATLAS_INPUT_" + e))
 }
 
 // SetOutput implements the Action interface.
@@ -132,12 +132,12 @@ func (g *gitlabCI) SCM() (SCMClient, error) {
 		return nil, err
 	}
 	httpClient := &http.Client{Timeout: time.Second * 30}
-	if token := g.GetInput("gitlab-token"); token != "" {
+	if token := g.getenv("GITLAB_TOKEN"); token != "" {
 		httpClient.Transport = &gitlabTransport{
 			Token: token,
 		}
 	} else {
-		g.Warningf("ATLAS_GITLAB_TOKEN is not set, the action may not have all the permissions")
+		g.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
 	}
 	return &gitlabAPI{
 		baseURL: tc.SCM.APIURL,
