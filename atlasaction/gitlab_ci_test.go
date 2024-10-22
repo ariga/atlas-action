@@ -99,7 +99,7 @@ func TestGitlabCI(t *testing.T) {
 			env.Setenv("GITLAB_CI", "true")
 			env.Setenv("CI_PROJECT_ID", "1")
 			env.Setenv("CI_API_V4_URL", srv.URL)
-			env.Setenv("ATLAS_INPUT_GITLAB_TOKEN", "token")
+			env.Setenv("GITLAB_TOKEN", "token")
 			c, err := atlasexec.NewClient(env.WorkDir, "atlas")
 			if err != nil {
 				return err
