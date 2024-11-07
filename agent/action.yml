@@ -1,0 +1,20 @@
+name: 'Atlas Agent'
+description: 'Runs Atlas Agent'
+branding:
+  icon: database
+author: 'Ariga'
+inputs:
+  cloud-token:
+    description: 'Token for the agent to connect to Atlas Cloud (should be passed as a secret).'
+    required: true
+  wait-time:
+    description: 'The time to wait for the agent to run in seconds.'
+    required: false
+    default: '30'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    CLOUD_TOKEN: ${{ inputs.cloud-token }}
+    WAIT_TIME: ${{ inputs.wait-time }}
+

@@ -401,3 +401,30 @@ jobs:
           plan: ${{ matrix.test.plan }}
           to: ${{ matrix.test.to }}
           auto-approve: ${{ matrix.test.auto-approve }}
+  agent:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:latest
+        env:
+          MYSQL_ROOT_PASSWORD: pass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Run Atlas Agent
+        uses: ./agent
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+          wait-time: 60
+        env:
+          PASS: pass
+
+
