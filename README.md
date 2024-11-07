@@ -22,7 +22,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition             |
 | [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a declarative migration plan                             |
 | [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply)              | Apply a declarative migrations to a database                     |
-| [ariga/atlas-action/agent](#arigaatlas-actionagent)                           | Run an [Atlas Agent](https://atlasgo.io/cloud/agents)            |
+| [ariga/atlas-action/agent](#arigaatlas-actionagent)                           | Run an [Atlas Agent](https://atlasgo.io/monitoring/overview)     |
 
 ## Examples
 
@@ -450,7 +450,8 @@ Approve a declarative migration plan.
 
 ### `ariga/atlas-action/agent`
 
-Run an [Atlas Agent](https://atlasgo.io/cloud/agents) that execute cloud jobs on your database.
+Run an [Atlas Agent](https://atlasgo.io/monitoring/overview) that pick up jobs from atlas cloud (such as taking snapshot),
+and runs them on database connection you [configured](https://atlasgo.io/monitoring/quickstart#3-connect-atlas-to-your-database) in atlas cloud via the agent.
 
 #### Inputs
 
