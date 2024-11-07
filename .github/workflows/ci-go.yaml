@@ -411,7 +411,3 @@ jobs:
         with:
           cloud-token: ${{ secrets.ATLAS_AGENT_TOKEN }}
           wait-time: 10
-        env:
-          PASS: pass
-
-

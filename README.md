@@ -22,6 +22,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition             |
 | [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a declarative migration plan                             |
 | [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply)              | Apply a declarative migrations to a database                     |
+| [ariga/atlas-action/agent](#arigaatlas-actionagent)                           | Run an [Atlas Agent](https://atlasgo.io/cloud/agents)            |
 
 ## Examples
 
@@ -446,6 +447,29 @@ Approve a declarative migration plan.
 * `plan` - The URL of the generated plan in Atlas format. For example, `atlas://app/plans/123`.
 * `link` - The URL of the plan in [Atlas Registry](https://atlasgo.io/registry).
 * `status` - The status of the plan. For example, `PENDING` or `APPROVED`.
+
+### `ariga/atlas-action/agent`
+
+Run an [Atlas Agent](https://atlasgo.io/cloud/agents) that execute cloud jobs on your database.
+
+#### Inputs
+
+* `cloud-token` - (required) The Atlas Cloud token the Agent to use for authentication. To create
+   a cloud token see the [docs](https://atlasgo.io/monitoring/quickstart#2-install-atlas-agent).
+* `wait-time:` - (optional) The time to wait for the agent to run in seconds. Defaults to 30 seconds.
+
+#### Example usage
+
+```yaml
+        uses: ariga/atlas-action/agent@v1
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+          wait-time: 60
+        env:
+          # Put here the environment variables needed for the agent to connect to the database as defined:  
+          # https://atlasgo.io/monitoring/security#providing-credentials-to-the-atlas-agent
+          PASS: password
+```
 
 ### Legal 
 
