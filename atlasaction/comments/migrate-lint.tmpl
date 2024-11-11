@@ -1,4 +1,4 @@
-<code>atlas migrate lint</code> on <strong>{{- .Env.Dir }}</strong><table>
+<code>atlas migrate lint</code> on <strong>{{ if eq .Env.Dir "." }}working directory{{ else }}{{ .Env.Dir }}{{ end }}</strong><table>
   <thead>
     <tr>
       <th>Status</th>
