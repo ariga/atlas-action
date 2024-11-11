@@ -232,6 +232,7 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		DirURL:          a.GetInput("dir"),
 		URL:             a.GetInput("url"),
 		DryRun:          a.GetBoolInput("dry-run"),
+		RevisionsSchema: a.GetInput("revisions-schema"),
 		TxMode:          a.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: a.GetInput("baseline"), // Hidden param.
 	}
@@ -272,16 +273,17 @@ const (
 // MigrateDown runs the GitHub Action for "ariga/atlas-action/migrate/down".
 func (a *Actions) MigrateDown(ctx context.Context) (err error) {
 	params := &atlasexec.MigrateDownParams{
-		ConfigURL: a.GetInput("config"),
-		Env:       a.GetInput("env"),
-		Vars:      a.GetVarsInput("vars"),
-		Context:   a.DeployRunContext(),
-		DevURL:    a.GetInput("dev-url"),
-		URL:       a.GetInput("url"),
-		DirURL:    a.GetInput("dir"),
-		ToVersion: a.GetInput("to-version"),
-		ToTag:     a.GetInput("to-tag"),
-		Amount:    a.GetUin64Input("amount"),
+		ConfigURL:       a.GetInput("config"),
+		Env:             a.GetInput("env"),
+		Vars:            a.GetVarsInput("vars"),
+		Context:         a.DeployRunContext(),
+		DevURL:          a.GetInput("dev-url"),
+		URL:             a.GetInput("url"),
+		DirURL:          a.GetInput("dir"),
+		ToVersion:       a.GetInput("to-version"),
+		ToTag:           a.GetInput("to-tag"),
+		Amount:          a.GetUin64Input("amount"),
+		RevisionsSchema: a.GetInput("revisions-schema"),
 	}
 	// Based on the retry configuration values, retry the action if there is an error.
 	var (
@@ -454,12 +456,13 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 // MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
 func (a *Actions) MigrateTest(ctx context.Context) error {
 	result, err := a.Atlas.MigrateTest(ctx, &atlasexec.MigrateTestParams{
-		DirURL:    a.GetInput("dir"),
-		DevURL:    a.GetInput("dev-url"),
-		Run:       a.GetInput("run"),
-		ConfigURL: a.GetInput("config"),
-		Env:       a.GetInput("env"),
-		Vars:      a.GetVarsInput("vars"),
+		DirURL:          a.GetInput("dir"),
+		DevURL:          a.GetInput("dev-url"),
+		Run:             a.GetInput("run"),
+		ConfigURL:       a.GetInput("config"),
+		Env:             a.GetInput("env"),
+		Vars:            a.GetVarsInput("vars"),
+		RevisionsSchema: a.GetInput("revisions-schema"),
 	})
 	if err != nil {
 		return fmt.Errorf("`atlas migrate test` completed with errors:\n%s", err)
