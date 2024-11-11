@@ -49,6 +49,9 @@ inputs:
   wait-timeout:
     description: Time after which no other retry attempt is made and the action exits.
     required: false
+  revisions-schema:
+    description: The name of the schema containing the revisions table.
+    required: false
 outputs:
   current:
     description: The current version of the database. (before applying migrations)
