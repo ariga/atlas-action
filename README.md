@@ -222,6 +222,7 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `dir` - The URL of the migration directory to lint. For example: `file://migrations`.
   Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
 * `dir-name` - The name (slug) of the project in Atlas Cloud.
+* `tag` - The tag of migrations to used as base for linting. By default, the `latest` tag is used.
 * `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
   Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 * `config` - The path to the Atlas configuration file. By default, Atlas will look for a file

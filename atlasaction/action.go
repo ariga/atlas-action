@@ -390,7 +390,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		DirURL:    a.GetInput("dir"),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
-		Base:      "atlas://" + dirName,
+		Base:      a.GetAtlasURLInput("dir-name", "tag"),
 		Context:   a.GetRunContext(ctx, tc),
 		Vars:      a.GetVarsInput("vars"),
 		Web:       true,
@@ -795,12 +795,23 @@ func (a *Actions) GetDurationInput(name string) time.Duration {
 }
 
 // GetAtlasURLInput returns the atlas URL input with the given name.
-func (a *Actions) GetAtlasURLInput(name string) string {
+// paramsName is the list of input names to be added as query parameters.
+func (a *Actions) GetAtlasURLInput(name string, paramsName ...string) string {
 	v := a.GetInput(name)
 	if v == "" {
 		return ""
 	}
-	return (&url.URL{Scheme: "atlas", Path: v}).String()
+	u := (&url.URL{Scheme: "atlas", Path: v})
+	if len(paramsName) > 0 {
+		q := u.Query()
+		for _, p := range paramsName {
+			if v := a.GetInput(p); v != "" {
+				q.Set(p, v)
+			}
+		}
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
 }
 
 // GetVarsInput returns the vars input with the given name.
