@@ -34,6 +34,10 @@ inputs:
   dir-name:
     description: The name (slug) of the project in Atlas Cloud.
     required: true
+  tag:
+    description: |
+      The tag of migrations to used as base for linting. By default, the `latest` tag is used.
+    required: false
 outputs:
   url:
     description: |
