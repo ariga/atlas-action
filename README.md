@@ -448,16 +448,23 @@ Approve a declarative migration plan.
 * `link` - The URL of the plan in [Atlas Registry](https://atlasgo.io/registry).
 * `status` - The status of the plan. For example, `PENDING` or `APPROVED`.
 
-### `ariga/atlas-action/agent`
+### `ariga/atlas-action/monitoring`
 
-Run an [Atlas Agent](https://atlasgo.io/monitoring/overview) that pick up jobs from atlas cloud (such as taking snapshot),
-and runs them on database connection you [configured](https://atlasgo.io/monitoring/quickstart#3-connect-atlas-to-your-database) in atlas cloud via the agent.
+Takes snapshot of the database schema and uploads it to Atlas Cloud.
+Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in the database schema.
 
 #### Inputs
 
 * `cloud-token` - (required) The Atlas Cloud token the Agent to use for authentication. To create
    a cloud token see the [docs](https://atlasgo.io/monitoring/quickstart#2-install-atlas-agent).
-* `wait-time:` - (optional) The time to wait for the agent to run in seconds. Defaults to 30 seconds.
+* `url` - (required) The URL of the database to take snapshot of. For example: `mysql://root:pass@localhost:3306/prod`.
+* `extID` - (optional) Unique identifier for the database server.
+* `schemas` - (optional) List of database schemas to include in snapshot (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas
+* `exclude` - (optional) List of exclude patterns from snapshot inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas
+
+#### Outputs
+
+* `snapshot-url` - The URL of the snapshot taken by the agent.
 
 #### Example usage
 

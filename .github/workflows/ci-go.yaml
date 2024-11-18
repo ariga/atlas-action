@@ -402,12 +402,27 @@ jobs:
           to: ${{ matrix.test.to }}
           auto-approve: ${{ matrix.test.auto-approve }}
   agent:
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: pass
+          MYSQL_DATABASE: dev
+        ports:
+          - "3306:3306"
+        options: >-
+          --health-cmd "mysqladmin ping -ppass"
+          --health-interval 10s
+          --health-start-period 10s
+          --health-timeout 5s
+          --health-retries 10
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Run Atlas Agent
-        uses: ./agent
+        uses: ./monitoring
         with:
           cloud-token: ${{ secrets.ATLAS_AGENT_TOKEN }}
-          wait-time: 10
+          url: 'mysql://root:pass@localhost:3306/dev'
+          extID: 'github-action'

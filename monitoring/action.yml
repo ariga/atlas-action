@@ -1,0 +1,36 @@
+name: 'Atlas Schema Monitoring'
+description: 'Takes snapshot of the database schema and uploads it to Atlas Cloud.'
+branding:
+  icon: database
+author: 'Ariga'
+inputs:
+  cloud-token:
+    description: 'Token for the agent to connect to Atlas Cloud (should be passed as a secret).'
+    required: true
+  url:
+    description: 'URL of the database to take snapshot of.'
+    required: true
+  extID:
+    description: 'Optional unique identifier for the database server.'
+    required: false
+  schemas:
+    description: 'List of database schemas to include in snapshot (by default includes all schemas).
+     see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas'
+    required: false
+  exclude:
+    description: 'List of exclude patterns from snapshot inspection.   
+     see: https://atlasgo.io/declarative/inspect#exclude-schemas'
+    required: false
+outputs:
+  snapshot-url:
+    description: 'URL of the snapshot taken.'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    CLOUD_TOKEN: ${{ inputs.cloud-token }}
+    URL: ${{ inputs.url }}
+    EXT_ID: ${{ inputs.extID }}
+    SCHEMAS: ${{ inputs.schemas }}
+    EXCLUDE: ${{ inputs.exclude }}
+
