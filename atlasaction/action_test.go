@@ -2388,8 +2388,13 @@ func atlasAction(ts *testscript.TestScript, neg bool, args []string) {
 	ts.Check(err)
 	act.Atlas = client.AtlasExec
 	act.Version = "testscript"
+	action := args[0]
+	ts.Setenv("ATLAS_ACTION_COMMAND", action)
+	ts.Defer(func() {
+		ts.Setenv("ATLAS_ACTION_COMMAND", "")
+	})
 	// Run the action!
-	switch err := act.Run(context.Background(), args[0]); {
+	switch err := act.Run(context.Background(), action); {
 	case !neg:
 		ts.Check(err)
 	case err == nil:
