@@ -2,16 +2,6 @@
 
 set -e
 
-if [ -z "$CLOUD_TOKEN" ]; then
-  echo "CLOUD_TOKEN must be set. Exiting..."
-  exit 1
-fi
-
-if [ -z "$URL" ]; then
-  echo "URL must be set. Exiting..."
-  exit 1
-fi
-
 # Base command
 cmd="/atlas-agent push-snapshot --token \"$CLOUD_TOKEN\" --url \"$URL\""
 
