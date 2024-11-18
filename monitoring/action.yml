@@ -5,7 +5,7 @@ branding:
 author: 'Ariga'
 inputs:
   cloud-token:
-    description: 'Token for the agent to connect to Atlas Cloud (should be passed as a secret).'
+    description: 'The token that is used to connect to Atlas Cloud (should be passed as a secret).'
     required: true
   url:
     description: 'URL of the database to take snapshot of.'
@@ -23,7 +23,7 @@ inputs:
     required: false
 outputs:
   snapshot-url:
-    description: 'URL of the snapshot taken.'
+    description: 'URL of the snapshot taken in Atlas Cloud'
 runs:
   using: 'docker'
   image: 'Dockerfile'

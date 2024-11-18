@@ -424,5 +424,5 @@ jobs:
         uses: ./monitoring
         with:
           cloud-token: ${{ secrets.ATLAS_AGENT_TOKEN }}
-          url: 'mysql://root:pass@localhost:3306/dev'
+          url: 'mysql://root:pass@mysql:3306/dev'
           extID: 'github-action'

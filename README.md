@@ -22,7 +22,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition             |
 | [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a declarative migration plan                             |
 | [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply)              | Apply a declarative migrations to a database                     |
-| [ariga/atlas-action/agent](#arigaatlas-actionagent)                           | Run an [Atlas Agent](https://atlasgo.io/monitoring/overview)     |
+| [ariga/atlas-action/monitoring](#arigaatlas-actionmonitoring)                 | Run an [Atlas Monitoring](https://atlasgo.io/monitoring)         |
 
 ## Examples
 
@@ -455,8 +455,7 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 
 #### Inputs
 
-* `cloud-token` - (required) The Atlas Cloud token the Agent to use for authentication. To create
-   a cloud token see the [docs](https://atlasgo.io/monitoring/quickstart#2-install-atlas-agent).
+* `cloud-token` - (required) The token that is used to connect to Atlas Cloud (should be passed as a secret).
 * `url` - (required) The URL of the database to take snapshot of. For example: `mysql://root:pass@localhost:3306/prod`.
 * `extID` - (optional) Unique identifier for the database server.
 * `schemas` - (optional) List of database schemas to include in snapshot (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas
@@ -464,19 +463,20 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 
 #### Outputs
 
-* `snapshot-url` - The URL of the snapshot taken by the agent.
+* `snapshot-url` - The URL of the snapshot in Atlas Cloud.
 
 #### Example usage
 
+The next action will take a snapshot of the `dev` and `users` schemas of the `mysql://root:pass@localhost:3306` database.
+If the URL of the database changes, atlas knows to track that is the same database via the `extID` parameter.
+
 ```yaml
-        uses: ariga/atlas-action/agent@v1
+        uses: ariga/atlas-action/monitoring@v1
         with:
           cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
-          wait-time: 60
-        env:
-          # Put here the environment variables needed for the agent to connect to the database as defined:  
-          # https://atlasgo.io/monitoring/security#providing-credentials-to-the-atlas-agent
-          PASS: password
+          url: 'mysql://root:pass@localhost:3306'
+          schemas: 'dev,users'
+          extID: 'dev-db'
 ```
 
 ### Legal 

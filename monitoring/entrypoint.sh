@@ -28,8 +28,6 @@ if [ -n "$EXCLUDE" ]; then
   cmd="$cmd --exclude \"$EXCLUDE\""
 fi
 
-#cmd="$cmd --cloud-url \"http://api.atlas.ariga/query\""
-
 snapshot_url=$(eval "$cmd")
 
 echo "$snapshot_url"
