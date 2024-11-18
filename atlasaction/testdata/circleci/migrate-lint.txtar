@@ -1,0 +1,26 @@
+# Mock the atlas command outputs
+mock-atlas $WORK/migrate-lint
+# Setup the action input variables
+env INPUT_CONFIG=file://testdata/config/atlas.hcl
+env INPUT_ENV=test
+env INPUT_DIR_NAME=pupisu
+env INPUT_TAG=staging
+env INPUT_VARS='{"var1":"value1","var2":"value2"}'
+env INPUT_DIR=file://testdata/migrations
+env INPUT_DEV_URL=sqlite://file?mode=memory
+env INPUT_RUN=example
+
+# The action's output should append the existing outputs
+cp output-pre.txt actions/output.txt
+atlas-action migrate/lint
+output output.txt
+
+-- migrate-lint/1/args --
+migrate lint -w --context {"repo":"atlas-orb","path":"file://testdata/migrations","commit":"1234567890"} --env test --config file://testdata/config/atlas.hcl --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --base atlas://pupisu?tag=staging --var var1=value1 --var var2=value2 --format {{ json . }}
+-- migrate-lint/1/stdout --
+{"URL":"https://migration-lint-report-url"}
+-- output-pre.txt --
+export FOO=bar
+-- output.txt --
+export FOO=bar
+export ATLAS_OUTPUT_MIGRATE_LINT_REPORT_URL="https://migration-lint-report-url"
