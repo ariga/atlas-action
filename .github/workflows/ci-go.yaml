@@ -401,7 +401,7 @@ jobs:
           plan: ${{ matrix.test.plan }}
           to: ${{ matrix.test.to }}
           auto-approve: ${{ matrix.test.auto-approve }}
-  agent:
+  monitoring:
     services:
       mysql:
         image: mysql:8
@@ -420,8 +420,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Run Atlas Agent
-        uses: ./monitor/sync
+      - name: Run Schema Monitoring
+        uses: ./monitor/schema
         with:
           cloud-token: ${{ secrets.ATLAS_AGENT_TOKEN }}
           url: 'mysql://root:pass@mysql:3306/dev'

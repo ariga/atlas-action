@@ -1,4 +1,4 @@
-name: 'Atlas Schema Monitor Sync'
+name: 'Atlas Schema Monitor'
 description: 'Sync the database schema to Atlas Cloud.'
 branding:
   icon: database

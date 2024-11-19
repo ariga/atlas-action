@@ -22,7 +22,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition                                |
 | [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a declarative migration plan                                                |
 | [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply)              | Apply a declarative migrations to a database                                        |
-| [ariga/atlas-action/monitor/sync](#arigaatlas-actionmonitorsync)              | Sync the database schema to [Atlas Cloud Monitoring](https://atlasgo.io/monitoring) |
+| [ariga/atlas-action/monitor/schema](#arigaatlas-actionmonitorschema)          | Sync the database schema to [Atlas Cloud Monitoring](https://atlasgo.io/monitoring) |
 
 ## Examples
 
@@ -448,7 +448,7 @@ Approve a declarative migration plan.
 * `link` - The URL of the plan in [Atlas Registry](https://atlasgo.io/registry).
 * `status` - The status of the plan. For example, `PENDING` or `APPROVED`.
 
-### `ariga/atlas-action/monitor/sync`
+### `ariga/atlas-action/monitor/schema`
 
 Sync the database schema to Atlas Cloud.
 Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in the database schema.
@@ -471,7 +471,7 @@ The next action will upload the `dev` and `users` schemas inside the `mysql://ro
 If the URL of the database changes, atlas knows to track that is the same database via the `slug` parameter.
 
 ```yaml
-        uses: ariga/atlas-action/monitor/sync@v1
+        uses: ariga/atlas-action/monitor/schema@v1
         with:
           cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
           url: 'mysql://root:pass@localhost:3306'
