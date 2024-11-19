@@ -458,8 +458,8 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 * `cloud-token` - (required) The token that is used to connect to Atlas Cloud (should be passed as a secret).
 * `url` - (required) The URL of the database to take snapshot of. For example: `mysql://root:pass@localhost:3306/prod`.
 * `extID` - (optional) Unique identifier for the database server.
-* `schemas` - (optional) List of database schemas to include in snapshot (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas
-* `exclude` - (optional) List of exclude patterns from snapshot inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas
+* `schemas` - (optional) List of database schemas to include in snapshot (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas.
+* `exclude` - (optional) List of exclude patterns from snapshot inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas.
 
 #### Outputs
 
