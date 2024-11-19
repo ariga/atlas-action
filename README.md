@@ -457,7 +457,7 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 
 * `cloud-token` - (required) The token that is used to connect to Atlas Cloud (should be passed as a secret).
 * `url` - (required) The URL of the database to take snapshot of. For example: `mysql://root:pass@localhost:3306/prod`.
-* `extID` - (optional) Unique identifier for the database server.
+* `slug` - (optional) Unique identifier for the database server.
 * `schemas` - (optional) List of database schemas to include in snapshot (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas.
 * `exclude` - (optional) List of exclude patterns from snapshot inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas.
 
@@ -468,7 +468,7 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 #### Example usage
 
 The next action will take a snapshot of the `dev` and `users` schemas of the `mysql://root:pass@localhost:3306` database.
-If the URL of the database changes, atlas knows to track that is the same database via the `extID` parameter.
+If the URL of the database changes, atlas knows to track that is the same database via the `slug` parameter.
 
 ```yaml
         uses: ariga/atlas-action/monitoring@v1
@@ -476,7 +476,7 @@ If the URL of the database changes, atlas knows to track that is the same databa
           cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
           url: 'mysql://root:pass@localhost:3306'
           schemas: 'dev,users'
-          extID: 'dev-db'
+          slug: 'dev-db'
 ```
 
 ### Legal 

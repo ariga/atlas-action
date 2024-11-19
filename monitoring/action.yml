@@ -10,7 +10,7 @@ inputs:
   url:
     description: 'URL of the database to take snapshot of.'
     required: true
-  extID:
+  slug:
     description: 'Optional unique identifier for the database server.'
     required: false
   schemas:
@@ -30,7 +30,7 @@ runs:
   env:
     CLOUD_TOKEN: ${{ inputs.cloud-token }}
     URL: ${{ inputs.url }}
-    EXT_ID: ${{ inputs.extID }}
+    SLUG: ${{ inputs.slug }}
     SCHEMAS: ${{ inputs.schemas }}
     EXCLUDE: ${{ inputs.exclude }}
 

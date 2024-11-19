@@ -6,8 +6,8 @@ set -e
 cmd="/atlas-agent push-snapshot --token \"$CLOUD_TOKEN\" --url \"$URL\""
 
 # Conditionally add flags
-if [ -n "$EXT_ID" ]; then
-  cmd="$cmd --ext-id \"$EXT_ID\""
+if [ -n "$SLUG" ]; then
+  cmd="$cmd --ext-id \"$SLUG\""
 fi
 
 if [ -n "$SCHEMAS" ]; then
