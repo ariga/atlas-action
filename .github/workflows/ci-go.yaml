@@ -421,7 +421,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Run Atlas Agent
-        uses: ./monitoring
+        uses: ./monitor/sync
         with:
           cloud-token: ${{ secrets.ATLAS_AGENT_TOKEN }}
           url: 'mysql://root:pass@mysql:3306/dev'

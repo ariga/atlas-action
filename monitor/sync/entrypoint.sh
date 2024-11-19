@@ -23,4 +23,4 @@ snapshot_url=$(eval "$cmd")
 echo "$snapshot_url"
 
 # Write snapshot URL to output of GitHub Action
-echo "snapshot-url=$snapshot_url" >> $GITHUB_OUTPUT
+echo "url=$snapshot_url" >> $GITHUB_OUTPUT
