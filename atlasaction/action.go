@@ -7,7 +7,9 @@ package atlasaction
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +24,7 @@ import (
 	"text/template"
 	"time"
 
+	"ariga.io/atlas-action/atlasaction/cloud"
 	"ariga.io/atlas-go-sdk/atlasexec"
 )
 
@@ -88,6 +91,8 @@ type AtlasExec interface {
 	MigratePush(context.Context, *atlasexec.MigratePushParams) (string, error)
 	// MigrateTest runs the `migrate test` command.
 	MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error)
+	// SchemaInspect runs the `schema inspect` command.
+	SchemaInspect(ctx context.Context, params *atlasexec.SchemaInspectParams) (string, error)
 	// SchemaPush runs the `schema push` command.
 	SchemaPush(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	// SchemaTest runs the `schema test` command.
@@ -186,6 +191,8 @@ const (
 	CmdSchemaPlan        = "schema/plan"
 	CmdSchemaPlanApprove = "schema/plan/approve"
 	CmdSchemaApply       = "schema/apply"
+	// Montioring Commands
+	CmdMonitorSchema = "monitor/schema"
 )
 
 // Run runs the action based on the command name.
@@ -217,6 +224,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.SchemaPlanApprove(ctx)
 	case CmdSchemaApply:
 		return a.SchemaApply(ctx)
+	case CmdMonitorSchema:
+		return a.MonitorSchema(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", act)
 	}
@@ -745,6 +754,63 @@ func (a *Actions) SchemaApply(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// MonitorSchema runs the Action for "ariga/atlas-action/monitor/schema"
+func (a *Actions) MonitorSchema(ctx context.Context) error {
+	var (
+		token   = a.GetInput("cloud-token")
+		url     = a.GetInput("url")
+		slug    = a.GetInput("slug")
+		schemas = strings.Split(a.GetInput("schemas"), ",")
+		exclude = strings.Split(a.GetInput("exclude"), ",")
+	)
+	cc := cloud.New(token)
+	if err := cc.ValidateToken(ctx); err != nil {
+		return errors.New("atlasaction: invalid cloud token")
+	}
+	hcl, err := a.Atlas.SchemaInspect(ctx, &atlasexec.SchemaInspectParams{
+		URL:     url,
+		Schema:  schemas,
+		Exclude: exclude,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to inspect the schema: %w", err)
+	}
+	h, err := cc.SnapshotHash(ctx, cloud.SnapshotHashInput{
+		ExtID:   slug,
+		URL:     url,
+		Schemas: schemas,
+		Exclude: exclude,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get the schema snapshot hash: %w", err)
+	}
+	input := cloud.PushSnapshotInput{
+		ExtID:   slug,
+		URL:     url,
+		Schemas: schemas,
+		Exclude: exclude,
+	}
+	if hash(hcl) == h {
+		input.HashMatch = true
+	} else {
+		input.HCL = hcl
+	}
+	u, err := cc.PushSnapshot(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to push the schema snapshot: %w", err)
+	}
+	a.SetOutput("url", u)
+	a.Infof(`"atlas monitor schema" completed successfully, see the schema in Atlas Cloud: %s`, u)
+	return nil
+}
+
+// Hash computes a hash of the input. Used by the agent to determine if a new snapshot is needed.
+func hash(src string) string {
+	sha := sha256.New()
+	sha.Write([]byte(src))
+	return "h1:" + base64.StdEncoding.EncodeToString(sha.Sum(nil))
 }
 
 // WorkingDir returns the working directory for the action.

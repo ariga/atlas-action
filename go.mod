@@ -13,6 +13,7 @@ require (
 	github.com/rogpeppe/go-internal v1.12.1-0.20240709150035-ccf4b4329d21
 	github.com/sethvargo/go-githubactions v1.3.0
 	github.com/stretchr/testify v1.8.4
+	github.com/vektah/gqlparser v1.3.1
 	golang.org/x/oauth2 v0.22.0
 )
 
