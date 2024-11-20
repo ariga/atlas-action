@@ -1,0 +1,29 @@
+name: 'Atlas Schema Monitoring'
+description: 'Sync the database schema to Atlas Cloud.'
+branding:
+  icon: database
+author: 'Ariga'
+inputs:
+  cloud-token:
+    description: 'The token that is used to connect to Atlas Cloud (should be passed as a secret).'
+    required: true
+  url:
+    description: 'URL of the database to sync.'
+    required: true
+  slug:
+    description: 'Optional unique identifier for the database server.'
+    required: false
+  schemas:
+    description: 'List of database schemas to include (by default includes all schemas).
+     see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas'
+    required: false
+  exclude:
+    description: 'List of exclude patterns from inspection.   
+     see: https://atlasgo.io/declarative/inspect#exclude-schemas'
+    required: false
+outputs:
+  url:
+    description: 'URL of the schema of the database inside Atlas Cloud.'
+runs:
+  using: node20
+  main: index.js
