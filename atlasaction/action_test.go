@@ -298,6 +298,10 @@ func (m *mockAtlas) MigrateTest(context.Context, *atlasexec.MigrateTestParams) (
 	panic("unimplemented")
 }
 
+func (m *mockAtlas) SchemaInspect(context.Context, *atlasexec.SchemaInspectParams) (string, error) {
+	panic("unimplemented")
+}
+
 // SchemaPush implements AtlasExec.
 func (m *mockAtlas) SchemaPush(ctx context.Context, p *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error) {
 	return m.schemaPush(ctx, p)

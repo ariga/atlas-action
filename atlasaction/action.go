@@ -762,9 +762,11 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		token   = a.GetInput("cloud-token")
 		url     = a.GetInput("url")
 		slug    = a.GetInput("slug")
-		schemas = strings.Split(a.GetInput("schemas"), ",")
-		exclude = strings.Split(a.GetInput("exclude"), ",")
+		schemas = splitOrEmpty(a.GetInput("schemas"), ",")
+		exclude = splitOrEmpty(a.GetInput("exclude"), ",")
 	)
+	fmt.Println("len of schemas", len(schemas), "schemas is", schemas)
+	fmt.Println("len of exclude", len(exclude), "exclude is", exclude)
 	cc := cloud.New(token)
 	if err := cc.ValidateToken(ctx); err != nil {
 		return errors.New("atlasaction: invalid cloud token")
@@ -804,6 +806,13 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	a.SetOutput("url", u)
 	a.Infof(`"atlas monitor schema" completed successfully, see the schema in Atlas Cloud: %s`, u)
 	return nil
+}
+
+func splitOrEmpty(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, sep)
 }
 
 // Hash computes a hash of the input. Used by the agent to determine if a new snapshot is needed.
