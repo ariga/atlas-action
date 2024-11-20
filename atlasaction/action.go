@@ -765,8 +765,6 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		schemas = splitOrEmpty(a.GetInput("schemas"), ",")
 		exclude = splitOrEmpty(a.GetInput("exclude"), ",")
 	)
-	fmt.Println("len of schemas", len(schemas), "schemas is", schemas)
-	fmt.Println("len of exclude", len(exclude), "exclude is", exclude)
 	cc := cloud.New(token)
 	if err := cc.ValidateToken(ctx); err != nil {
 		return errors.New("atlasaction: invalid cloud token")
