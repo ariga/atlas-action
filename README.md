@@ -9,19 +9,20 @@ To learn more about the recommended way to build workflows, read our guide on
 
 ## Actions
 
-| Action                                                                        | Description                                                      |
-|-------------------------------------------------------------------------------|------------------------------------------------------------------|
-| [ariga/setup-atlas](#arigasetup-atlas)                                        | Setup the Atlas CLI and optionally login to Atlas Cloud          |
-| [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)              | Push migrations to [Atlas Registry](https://atlasgo.io/registry) |
-| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)              | Lint migrations (required `atlas login` )                        |
-| [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply)            | Apply migrations to a database                                   |
-| [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Revert migrations to a database                                  |
-| [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                                    |
-| [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                                        |
-| [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema to [Atlas Registry](https://atlasgo.io/registry)   |
-| [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition             |
-| [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a declarative migration plan                             |
-| [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply)              | Apply a declarative migrations to a database                     |
+| Action                                                                        | Description                                                                         |
+|-------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| [ariga/setup-atlas](#arigasetup-atlas)                                        | Setup the Atlas CLI and optionally login to Atlas Cloud                             |
+| [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)              | Push migrations to [Atlas Registry](https://atlasgo.io/registry)                    |
+| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)              | Lint migrations (required `atlas login` )                                           |
+| [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply)            | Apply migrations to a database                                                      |
+| [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Revert migrations to a database                                                     |
+| [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                                                       |
+| [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                                                           |
+| [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema to [Atlas Registry](https://atlasgo.io/registry)                      |
+| [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition                                |
+| [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a declarative migration plan                                                |
+| [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply)              | Apply a declarative migrations to a database                                        |
+| [ariga/atlas-action/monitor/schema](#arigaatlas-actionmonitorschema)          | Sync the database schema to [Atlas Cloud Monitoring](https://atlasgo.io/monitoring) |
 
 ## Examples
 
@@ -447,6 +448,37 @@ Approve a declarative migration plan.
 * `plan` - The URL of the generated plan in Atlas format. For example, `atlas://app/plans/123`.
 * `link` - The URL of the plan in [Atlas Registry](https://atlasgo.io/registry).
 * `status` - The status of the plan. For example, `PENDING` or `APPROVED`.
+
+### `ariga/atlas-action/monitor/schema`
+
+Sync the database schema to Atlas Cloud.
+Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in the database schema.
+
+#### Inputs
+
+* `cloud-token` - (required) The token that is used to connect to Atlas Cloud (should be passed as a secret).
+* `url` - (required) The URL of the database to sync. For example: `mysql://root:pass@localhost:3306/prod`.
+* `slug` - (optional) Unique identifier for the database server.
+* `schemas` - (optional) List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas.
+* `exclude` - (optional) List of exclude patterns from inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas.
+
+#### Outputs
+
+* `url` - URL of the schema of the database inside Atlas Cloud.
+
+#### Example usage
+
+The next action will upload the `dev` and `users` schemas inside the `mysql://root:pass@localhost:3306` database to Atlas Cloud.
+If the URL of the database changes, atlas knows to track that is the same database via the `slug` parameter.
+
+```yaml
+        uses: ariga/atlas-action/monitor/schema@v1
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+          url: 'mysql://root:pass@localhost:3306'
+          schemas: 'dev,users'
+          slug: 'dev-db'
+```
 
 ### Legal 
 
