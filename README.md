@@ -451,7 +451,7 @@ Approve a declarative migration plan.
 
 ### `ariga/atlas-action/monitor/schema`
 
-Sync the database schema to Atlas Cloud.
+Monitor changes of the database schema and track them in Atlas Cloud.
 Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in the database schema.
 
 #### Inputs
@@ -469,7 +469,7 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 
 #### Example usage
 
-The next action will monitor changes to the `auth` and `app` schemas inside the `mysql://root:pass@localhost:3306` database and track them in Atlas Cloud.
+The following action will monitor changes to the `auth` and `app` schemas inside the `mysql://root:pass@localhost:3306` database and track them in Atlas Cloud.
 In case the database URL is subject to change, the `slug` parameter can use to identify the same database across runs.
 
 ```yaml
