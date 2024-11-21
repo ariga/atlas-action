@@ -458,7 +458,7 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 
 * `cloud-token` - (required) The Atlas Cloud token to use for authentication. To create
   a cloud token see the [docs](https://atlasgo.io/cloud/bots).
-* `url` - (required) The URL of the database to sync. For example: `mysql://root:pass@localhost:3306/prod`.
+* `url` - (required) The URL of the database to monitor. For example: `mysql://root:pass@localhost:3306/prod`.
 * `slug` - (optional) Unique identifier for the database server.
 * `schemas` - (optional) List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas.
 * `exclude` - (optional) List of exclude patterns from inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas.
@@ -469,8 +469,8 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 
 #### Example usage
 
-The next action will upload the `dev` and `users` schemas inside the `mysql://root:pass@localhost:3306` database to Atlas Cloud.
-If the URL of the database changes, atlas knows to track that is the same database via the `slug` parameter.
+The next action will monitor changes to the `auth` and `app` schemas inside the `mysql://root:pass@localhost:3306` database and track them in Atlas Cloud.
+In case the database URL is subject to change, the `slug` parameter can use to identify the same database across runs.
 
 ```yaml
         uses: ariga/atlas-action/monitor/schema@v1
