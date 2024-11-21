@@ -477,7 +477,9 @@ In case the database URL is subject to change, the `slug` parameter can use to i
         with:
           cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
           url: 'mysql://root:pass@localhost:3306'
-          schemas: 'auth,app'
+          schemas: |-
+            auth
+            app
 ```
 
 ### Legal 
