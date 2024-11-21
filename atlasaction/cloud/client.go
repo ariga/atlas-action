@@ -19,33 +19,33 @@ type (
 	Client struct {
 		client   *http.Client
 		endpoint string
-		token    string
 	}
 	// roundTripper is a http.RoundTripper that adds the Authorization header.
 	roundTripper struct {
-		token string
+		token, version, cliVersion string
 	}
 )
 
 // RoundTrip implements http.RoundTripper.
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Authorization", "Bearer "+r.token)
-	req.Header.Set("User-Agent", "atlas-action")
+	req.Header.Set("User-Agent", fmt.Sprintf("Atlas Action/%s Atlas CLI/%s", r.version, r.cliVersion))
 	req.Header.Set("Content-Type", "application/json")
 	return http.DefaultTransport.RoundTrip(req)
 }
 
 // New creates a new Client for the Atlas Cloud API.
-func New(token string) *Client {
+func New(token, version, cliVersion string) *Client {
 	return &Client{
 		endpoint: cloudURL,
 		client: &http.Client{
 			Transport: &roundTripper{
-				token: token,
+				token:      token,
+				version:    version,
+				cliVersion: cliVersion,
 			},
 			Timeout: time.Second * 30,
 		},
-		token: token,
 	}
 }
 

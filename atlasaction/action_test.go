@@ -617,7 +617,9 @@ func TestMonitorSchema(t *testing.T) {
 				as, err = atlasaction.New(
 					atlasaction.WithAction(act),
 					atlasaction.WithAtlas(cli),
-					atlasaction.WithCloudClient(func(string) atlasaction.CloudClient { return cc }),
+					atlasaction.WithCloudClient(func(context.Context, string) (atlasaction.CloudClient, error) {
+						return cc, nil
+					}),
 				)
 			)
 			require.NoError(t, err)

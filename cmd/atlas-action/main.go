@@ -26,9 +26,19 @@ var (
 )
 
 func main() {
+	var a *atlasexec.Client
 	act, err := atlasaction.New(
 		atlasaction.WithVersion(version),
-		atlasaction.WithCloudClient(func(t string) atlasaction.CloudClient { return cloud.New(t) }),
+		atlasaction.WithCloudClient(func(ctx context.Context, t string) (atlasaction.CloudClient, error) {
+			if a == nil {
+				return nil, errors.New("unexpected missing atlas client")
+			}
+			v, err := a.Version(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return cloud.New(t, version, v.String()), nil
+		}),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to run action in the current environment: %s\n", err)

@@ -35,7 +35,7 @@ type (
 		Action
 		Version     string
 		Atlas       AtlasExec
-		cloudClient func(token string) CloudClient
+		cloudClient func(ctx context.Context, token string) (CloudClient, error)
 	}
 
 	// Action interface for Atlas.
@@ -211,7 +211,7 @@ func WithAtlas(a AtlasExec) Option {
 }
 
 // WithCloudClient specifies how to obtain a CloudClient given the name of the token input variable.
-func WithCloudClient(cc func(token string) CloudClient) Option {
+func WithCloudClient(cc func(ctx context.Context, token string) (CloudClient, error)) Option {
 	return func(c *config) { c.cloudClient = cc }
 }
 
@@ -226,7 +226,7 @@ type (
 		out         io.Writer
 		action      Action
 		atlas       AtlasExec
-		cloudClient func(token string) CloudClient
+		cloudClient func(ctx context.Context, token string) (CloudClient, error)
 		version     string
 	}
 	Option func(*config)
@@ -826,7 +826,7 @@ func (a *Actions) SchemaApply(ctx context.Context) error {
 
 // MonitorSchema runs the Action for "ariga/atlas-action/monitor/schema"
 func (a *Actions) MonitorSchema(ctx context.Context) error {
-	db, err := url.Parse(a.GetInput("url"))
+	db, err := a.GetURLInput("url")
 	if err != nil {
 		return err
 	}
@@ -838,18 +838,18 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 			Exclude: nilIfEmpty(a.GetArrayInput("exclude")),
 		}
 	)
-	cc, err := a.CloudClient("cloud-token")
-	if err != nil {
-		return err
-	}
 	res, err := a.Atlas.SchemaInspect(ctx, &atlasexec.SchemaInspectParams{
-		URL:     a.GetInput("url"),
+		URL:     db.String(),
 		Schema:  id.Schemas,
 		Exclude: id.Schemas,
 		Format:  `{{ printf "# %s\n%s" .Hash .MarshalHCL }}`,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to inspect the schema: %w", err)
+	}
+	cc, err := a.CloudClient(ctx, "cloud-token")
+	if err != nil {
+		return err
 	}
 	h, err := cc.SnapshotHash(ctx, &cloud.SnapshotHashInput{ScopeIdent: id})
 	if err != nil {
@@ -876,12 +876,12 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	return nil
 }
 
-func (a *Actions) CloudClient(tokenInput string) (CloudClient, error) {
+func (a *Actions) CloudClient(ctx context.Context, tokenInput string) (CloudClient, error) {
 	t := a.GetInput(tokenInput)
 	if t == "" {
 		return nil, fmt.Errorf("missing required input: %q", tokenInput)
 	}
-	return a.cloudClient(t), nil
+	return a.cloudClient(ctx, t)
 }
 
 func nilIfEmpty[T any](xs []T) []T {
@@ -965,6 +965,20 @@ func (a *Actions) GetAtlasURLInput(name string, paramsName ...string) string {
 		u.RawQuery = q.Encode()
 	}
 	return u.String()
+}
+
+// GetURLInput tries to parse the input as URL. In case of a parsing error,
+// this function ensures the error does not leak any sensitive information.
+func (a *Actions) GetURLInput(name string) (*url.URL, error) {
+	u, err := url.Parse(a.GetInput(name))
+	if err != nil {
+		// Ensure to not leak any sensitive information into logs.
+		if uerr := new(url.Error); errors.As(err, &uerr) {
+			return nil, uerr.Err
+		}
+		return nil, errors.New("invalid URL")
+	}
+	return u, nil
 }
 
 // GetVarsInput returns the vars input with the given name.
