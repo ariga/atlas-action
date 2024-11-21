@@ -257,6 +257,7 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
    For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
+* `allow-dirty` - Allow applying migration on a non-clean database. Defaults to false.
 
 #### Outputs
 
