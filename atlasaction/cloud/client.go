@@ -49,6 +49,78 @@ func New(token string) *Client {
 	}
 }
 
+type (
+	ScopeIdent struct {
+		URL     string   `json:"url"`               // The (Atlas CLI) URL of the database snapshot.
+		ExtID   string   `json:"extID,omitempty"`   // Optional user defined identifier for an instance.
+		Schemas []string `json:"schemas,omitempty"` // List of schemas to inspect, empty to inspect everything.
+		Exclude []string `json:"exclude,omitempty"` // List of exclude patterns to apply on the inspection.
+	}
+	PushSnapshotInput struct {
+		ScopeIdent
+		Snapshot  *SnapshotInput `json:"snapshot,omitempty"` // The snapshot taken, required if hashMatch is false.
+		HashMatch bool           `json:"hashMatch"`          // If hash of snapshot matches hash of last snapshot.
+	}
+	SnapshotInput struct {
+		Hash string `json:"hash"` // Atlas schema hash for the given HCL.
+		HCL  string `json:"hcl"`  // HCL representation of the snapshot.
+	}
+)
+
+// PushSnapshot to the cloud, return the url to the schema snapshot in the cloud.
+func (c *Client) PushSnapshot(ctx context.Context, input *PushSnapshotInput) (string, error) {
+	var (
+		req = `mutation ($input: PushSnapshotInput!) {
+			pushSnapshot(input: $input) {
+				newVersion
+				url
+			}
+		}`
+		payload struct {
+			PushSnapshot struct {
+				NewVersion bool   `json:"newVersion"`
+				URL        string `json:"url"`
+			} `json:"pushSnapshot"`
+		}
+		vars = struct {
+			Input *PushSnapshotInput `json:"input"`
+		}{
+			Input: input,
+		}
+	)
+	if err := c.post(ctx, req, vars, &payload); err != nil {
+		return "", err
+	}
+	return payload.PushSnapshot.URL, nil
+}
+
+type SnapshotHashInput struct{ ScopeIdent }
+
+// SnapshotHash retrieves the hash of the schema snapshot from the cloud.
+func (c *Client) SnapshotHash(ctx context.Context, input *SnapshotHashInput) (string, error) {
+	var (
+		req = `query ($input: SnapshotHashInput!) {
+			snapshotHash(input: $input) {
+				hash
+			}
+		}`
+		payload struct {
+			SnapshotHash struct {
+				Hash string `json:"hash"`
+			} `json:"snapshotHash"`
+		}
+		vars = struct {
+			Input *SnapshotHashInput `json:"input"`
+		}{
+			Input: input,
+		}
+	)
+	if err := c.post(ctx, req, vars, &payload); err != nil {
+		return "", err
+	}
+	return payload.SnapshotHash.Hash, nil
+}
+
 // sends a POST request to the Atlas Cloud API.
 func (c *Client) post(ctx context.Context, query string, vars, data any) error {
 	body, err := json.Marshal(struct {
@@ -86,94 +158,4 @@ func (c *Client) post(ctx context.Context, query string, vars, data any) error {
 		return scan.Errors
 	}
 	return nil
-}
-
-// ValidateToken validates the token inside the client with the Atlas Cloud API.
-func (c *Client) ValidateToken(ctx context.Context) error {
-	var (
-		payload struct {
-			ValidateToken struct {
-				Success bool `json:"success"`
-			} `json:"validateToken"`
-		}
-		query = `mutation validateToken($token: String!) {
-		validateToken(token: $token) {
-			success
-		}
-	}`
-		vars = struct {
-			Token string `json:"token"`
-		}{
-			Token: c.token,
-		}
-	)
-	return c.post(ctx, query, vars, &payload)
-}
-
-type PushSnapshotInput struct {
-	URL       string   `json:"url"`               // The (Atlas CLI) URL of the database a snapshot is taken of.
-	HCL       string   `json:"hcl"`               // HCL representation of the snapshot. If hashMatch is false, this is required.
-	HashMatch bool     `json:"hashMatch"`         // Whether the hash of the taken snapshot matches the hash of the last snapshot.
-	ExtID     string   `json:"extID,omitempty"`   // Optional externally defined ID to identify an instance if the URL is ambiguous, e.g. in case of localhost connections.
-	Schemas   []string `json:"schemas,omitempty"` // List of schemas to inspect. Empty if all schemas should be inspected.
-	Exclude   []string `json:"exclude,omitempty"` // List of exclude patterns to apply on the inspection.
-}
-
-// PushSnapshot to the cloud, return the url to the schema snapshot in the cloud.
-func (c *Client) PushSnapshot(ctx context.Context, input PushSnapshotInput) (string, error) {
-	var (
-		req = `mutation ($input: PushSnapshotInput!) {
-			pushSnapshot(input: $input) {
-				newVersion
-				url
-			}
-		}`
-		payload struct {
-			PushSnapshot struct {
-				NewVersion bool   `json:"newVersion"`
-				URL        string `json:"url"`
-			} `json:"pushSnapshot"`
-		}
-		vars = struct {
-			Input PushSnapshotInput `json:"input"`
-		}{
-			Input: input,
-		}
-	)
-	if err := c.post(ctx, req, vars, &payload); err != nil {
-		return "", err
-	}
-	return payload.PushSnapshot.URL, nil
-}
-
-type SnapshotHashInput struct {
-	ExtID   string   `json:"extID,omitempty"`   // Optional externally defined ID to identify an instance if the URL is ambiguous, e.g. in case of localhost connections.
-	URL     string   `json:"url"`               // The (Atlas CLI) URL of the database a snapshot is taken of.
-	Schemas []string `json:"schemas,omitempty"` // List of schemas to inspect. Empty if all schemas should be inspected.
-	Exclude []string `json:"exclude,omitempty"` // List of exclude patterns to apply on the inspection.
-}
-
-// SnapshotHash retrieves the hash of the schema snapshot from the cloud.
-func (c *Client) SnapshotHash(ctx context.Context, input SnapshotHashInput) (string, error) {
-	var (
-		req = `query ($input: SnapshotHashInput!) {
-			snapshotHash(input: $input) {
-				hash
-			}
-		}`
-		payload struct {
-			SnapshotHash struct {
-				Hash string `json:"hash"`
-			} `json:"snapshotHash"`
-		}
-		vars = struct {
-			Input SnapshotHashInput `json:"input"`
-		}{
-			Input: input,
-		}
-	)
-	if err := c.post(ctx, req, vars, &payload); err != nil {
-		return "", err
-	}
-	return payload.SnapshotHash.Hash, nil
 }

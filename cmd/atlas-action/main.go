@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"ariga.io/atlas-action/atlasaction"
+	"ariga.io/atlas-action/atlasaction/cloud"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/alecthomas/kong"
 )
@@ -25,7 +26,10 @@ var (
 )
 
 func main() {
-	act, err := atlasaction.New(os.Getenv, os.Stdout)
+	act, err := atlasaction.New(
+		atlasaction.WithVersion(version),
+		atlasaction.WithCloudClient(func(t string) atlasaction.CloudClient { return cloud.New(t) }),
+	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to run action in the current environment: %s\n", err)
 		os.Exit(1)
@@ -34,7 +38,6 @@ func main() {
 	if err != nil {
 		act.Fatalf("Failed to create client: %s", err)
 	}
-	act.Version = version
 	cli := kong.Parse(
 		&RunActionCmd{},
 		kong.BindTo(context.Background(), (*context.Context)(nil)),

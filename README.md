@@ -456,7 +456,8 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 
 #### Inputs
 
-* `cloud-token` - (required) The token that is used to connect to Atlas Cloud (should be passed as a secret).
+* `cloud-token` - (required) The Atlas Cloud token to use for authentication. To create
+  a cloud token see the [docs](https://atlasgo.io/cloud/bots).
 * `url` - (required) The URL of the database to sync. For example: `mysql://root:pass@localhost:3306/prod`.
 * `slug` - (optional) Unique identifier for the database server.
 * `schemas` - (optional) List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas.
@@ -476,8 +477,7 @@ If the URL of the database changes, atlas knows to track that is the same databa
         with:
           cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
           url: 'mysql://root:pass@localhost:3306'
-          schemas: 'dev,users'
-          slug: 'dev-db'
+          schemas: 'auth,app'
 ```
 
 ### Legal 

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"ariga.io/atlas-action/atlasaction"
+	"ariga.io/atlas-action/atlasaction/cloud"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
 	"ariga.io/atlas/sql/sqlcheck"
@@ -264,6 +265,7 @@ func TestMigrateDown(t *testing.T) {
 
 type mockAtlas struct {
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
+	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
 	schemaPlanList    func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
@@ -298,8 +300,8 @@ func (m *mockAtlas) MigrateTest(context.Context, *atlasexec.MigrateTestParams) (
 	panic("unimplemented")
 }
 
-func (m *mockAtlas) SchemaInspect(context.Context, *atlasexec.SchemaInspectParams) (string, error) {
-	panic("unimplemented")
+func (m *mockAtlas) SchemaInspect(ctx context.Context, p *atlasexec.SchemaInspectParams) (string, error) {
+	return m.schemaInspect(ctx, p)
 }
 
 // SchemaPush implements AtlasExec.
@@ -505,6 +507,134 @@ func TestMigrateTest(t *testing.T) {
 		tt.setInput("vars", `{"var1": "value1", "var2": "value2"}`)
 		require.NoError(t, (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateTest(context.Background()))
 	})
+}
+
+type mockCloudClient struct {
+	hash      string
+	lastInput *cloud.PushSnapshotInput
+}
+
+func (m *mockCloudClient) SnapshotHash(context.Context, *cloud.SnapshotHashInput) (string, error) {
+	return m.hash, nil
+}
+
+func (m *mockCloudClient) PushSnapshot(_ context.Context, i *cloud.PushSnapshotInput) (string, error) {
+	m.lastInput = i
+	return "url", nil
+}
+
+func TestMonitorSchema(t *testing.T) {
+	const (
+		u = "mysql://user:pass@host:1234/path?foo=bar"
+	)
+	var (
+		ctx = context.Background()
+	)
+	for _, tt := range []struct {
+		name, url, slug          string
+		schemas, exclude         []string
+		latestHash, newHash, hcl string
+		exSnapshot               *cloud.SnapshotInput
+		exMatch                  bool
+	}{
+		{
+			name:    "no latest hash",
+			url:     u,
+			newHash: "hash",
+			hcl:     "hcl",
+			exSnapshot: &cloud.SnapshotInput{
+				Hash: "hash",
+				HCL:  "hcl",
+			},
+		},
+		{
+			name:       "latest hash no match",
+			url:        u,
+			latestHash: "different",
+			newHash:    "hash",
+			hcl:        "hcl",
+			exSnapshot: &cloud.SnapshotInput{
+				Hash: "hash",
+				HCL:  "hcl",
+			},
+		},
+		{
+			name:       "hash match old hash func",
+			url:        u,
+			latestHash: atlasaction.OldAgentHash("hcl"),
+			newHash:    "hash",
+			hcl:        "hcl",
+			exMatch:    true,
+		},
+		{
+			name:       "hash match new hash func",
+			url:        u,
+			latestHash: "hash",
+			newHash:    "hash",
+			hcl:        "hcl",
+			exMatch:    true,
+		},
+		{
+			name:       "with slug",
+			url:        u,
+			slug:       "slug",
+			latestHash: "hash",
+			newHash:    "hash",
+			hcl:        "hcl",
+			exMatch:    true,
+		},
+		{
+			name:       "with schema and exclude",
+			url:        u,
+			slug:       "slug",
+			latestHash: "hash",
+			newHash:    "hash",
+			hcl:        "hcl",
+			schemas:    []string{"foo", "bar"},
+			exclude:    []string{"foo.*", "bar.*.*"},
+			exMatch:    true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				out = &bytes.Buffer{}
+				act = &mockAction{
+					inputs: map[string]string{
+						"cloud-token": "token",
+						"url":         tt.url,
+						"slug":        tt.slug,
+						"schemas":     strings.Join(tt.schemas, ","),
+						"exclude":     strings.Join(tt.exclude, ","),
+					},
+					logger: slog.New(slog.NewTextHandler(out, nil)),
+				}
+				cli = &mockAtlas{
+					schemaInspect: func(_ context.Context, p *atlasexec.SchemaInspectParams) (string, error) {
+						return fmt.Sprintf("%s\n%s", tt.newHash, tt.hcl), nil
+					},
+				}
+				cc      = &mockCloudClient{hash: tt.latestHash}
+				as, err = atlasaction.New(
+					atlasaction.WithAction(act),
+					atlasaction.WithAtlas(cli),
+					atlasaction.WithCloudClient(func(string) atlasaction.CloudClient { return cc }),
+				)
+			)
+			require.NoError(t, err)
+			require.NoError(t, as.MonitorSchema(ctx))
+			require.Equal(t, &cloud.PushSnapshotInput{
+				ScopeIdent: cloud.ScopeIdent{
+					URL:     must(url.Parse(tt.url)).Redacted(),
+					ExtID:   tt.slug,
+					Schemas: tt.schemas,
+					Exclude: tt.exclude,
+				},
+				Snapshot:  tt.exSnapshot,
+				HashMatch: tt.exMatch,
+			}, cc.lastInput)
+			require.Equal(t, map[string]string{"url": "url"}, act.output)
+		})
+	}
 }
 
 func TestSchemaTest(t *testing.T) {
@@ -2230,6 +2360,9 @@ func (m *mockAction) GetInput(name string) string {
 
 // SetOutput implements Action.
 func (m *mockAction) SetOutput(name, value string) {
+	if m.output == nil {
+		m.output = make(map[string]string)
+	}
 	m.output[name] = value
 }
 
@@ -2388,10 +2521,13 @@ func atlasAction(ts *testscript.TestScript, neg bool, args []string) {
 		ts.Fatalf("client not found")
 	}
 	// The action need to be create for each call to read correct inputs
-	act, err := atlasaction.New(ts.Getenv, ts.Stdout())
+	act, err := atlasaction.New(
+		atlasaction.WithGetenv(ts.Getenv),
+		atlasaction.WithOut(ts.Stdout()),
+		atlasaction.WithAtlas(client.AtlasExec),
+		atlasaction.WithVersion("testscript"),
+	)
 	ts.Check(err)
-	act.Atlas = client.AtlasExec
-	act.Version = "testscript"
 	action := args[0]
 	ts.Setenv("ATLAS_ACTION_COMMAND", action)
 	ts.Defer(func() {
