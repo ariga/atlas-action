@@ -190,26 +190,32 @@ func New(opts ...Option) (*Actions, error) {
 	}, nil
 }
 
+// WithGetenv specifies how to obtain environment variables.
 func WithGetenv(getenv func(string) string) Option {
 	return func(c *config) { c.getenv = getenv }
 }
 
+// WithOut specifies where to print to.
 func WithOut(out io.Writer) Option {
 	return func(c *config) { c.out = out }
 }
 
+// WithAction sets the Action to use.
 func WithAction(a Action) Option {
 	return func(c *config) { c.action = a }
 }
 
+// WithAtlas sets the AtlasExec to use.
 func WithAtlas(a AtlasExec) Option {
 	return func(c *config) { c.atlas = a }
 }
 
+// WithCloudClient specifies how to obtain a CloudClient given the name of the token input variable.
 func WithCloudClient(cc func(token string) CloudClient) Option {
 	return func(c *config) { c.cloudClient = cc }
 }
 
+// WithVersion specifies the version of the Actions.
 func WithVersion(v string) Option {
 	return func(c *config) { c.version = v }
 }
@@ -840,7 +846,7 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		URL:     a.GetInput("url"),
 		Schema:  id.Schemas,
 		Exclude: id.Schemas,
-		Format:  `{{ printf "%s\n%s" .Hash .MarshalHCL }}`,
+		Format:  `{{ printf "# %s\n%s" .Hash .MarshalHCL }}`,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to inspect the schema: %w", err)
@@ -851,16 +857,15 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	}
 	var (
 		parts = strings.SplitN(res, "\n", 2)
+		hash  = strings.TrimPrefix(parts[0], "# ")
+		hcl   = parts[1]
 		input = &cloud.PushSnapshotInput{
 			ScopeIdent: id,
-			HashMatch:  strings.HasPrefix(h, "h1:") && OldAgentHash(parts[1]) == h || parts[0] == h,
+			HashMatch:  strings.HasPrefix(h, "h1:") && OldAgentHash(hcl) == h || hash == h,
 		}
 	)
 	if !input.HashMatch {
-		input.Snapshot = &cloud.SnapshotInput{
-			Hash: parts[0],
-			HCL:  parts[1],
-		}
+		input.Snapshot = &cloud.SnapshotInput{Hash: hash, HCL: hcl}
 	}
 	u, err := cc.PushSnapshot(ctx, input)
 	if err != nil {

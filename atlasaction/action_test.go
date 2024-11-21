@@ -610,7 +610,7 @@ func TestMonitorSchema(t *testing.T) {
 				}
 				cli = &mockAtlas{
 					schemaInspect: func(_ context.Context, p *atlasexec.SchemaInspectParams) (string, error) {
-						return fmt.Sprintf("%s\n%s", tt.newHash, tt.hcl), nil
+						return fmt.Sprintf("# %s\n%s", tt.newHash, tt.hcl), nil
 					},
 				}
 				cc      = &mockCloudClient{hash: tt.latestHash}
