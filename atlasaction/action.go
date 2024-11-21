@@ -834,8 +834,8 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		id = cloud.ScopeIdent{
 			URL:     db.Redacted(),
 			ExtID:   a.GetInput("slug"),
-			Schemas: splitOrEmpty(a.GetInput("schemas"), ","),
-			Exclude: splitOrEmpty(a.GetInput("exclude"), ","),
+			Schemas: nilIfEmpty(a.GetArrayInput("schemas")),
+			Exclude: nilIfEmpty(a.GetArrayInput("exclude")),
 		}
 	)
 	cc, err := a.CloudClient("cloud-token")
@@ -884,11 +884,11 @@ func (a *Actions) CloudClient(tokenInput string) (CloudClient, error) {
 	return a.cloudClient(t), nil
 }
 
-func splitOrEmpty(s, sep string) []string {
-	if s == "" {
+func nilIfEmpty[T any](xs []T) []T {
+	if len(xs) == 0 {
 		return nil
 	}
-	return strings.Split(s, sep)
+	return xs
 }
 
 // OldAgentHash computes a hash of the input. Used by the agent to determine if a new snapshot is needed.

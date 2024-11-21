@@ -603,8 +603,8 @@ func TestMonitorSchema(t *testing.T) {
 						"cloud-token": "token",
 						"url":         tt.url,
 						"slug":        tt.slug,
-						"schemas":     strings.Join(tt.schemas, ","),
-						"exclude":     strings.Join(tt.exclude, ","),
+						"schemas":     strings.Join(tt.schemas, "\n"),
+						"exclude":     strings.Join(tt.exclude, "\n"),
 					},
 					logger: slog.New(slog.NewTextHandler(out, nil)),
 				}
