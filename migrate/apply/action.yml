@@ -35,6 +35,9 @@ inputs:
   revisions-schema:
     description: The name of the schema containing the revisions table.
     required: false
+  allow-dirty:
+    description: Allow start working on a non-clean database.
+    required: false
 outputs:
   current:
     description: The current version of the database. (before applying migrations)

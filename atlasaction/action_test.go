@@ -137,6 +137,21 @@ func TestMigrateApply(t *testing.T) {
 		err := (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
 		require.NoError(t, err)
 	})
+	t.Run("allow-dirty", func(t *testing.T) {
+		tt := newT(t, nil)
+		db, err := sql.Open("sqlite3", tt.db)
+		require.NoError(t, err)
+		_, err = db.Exec("CREATE TABLE dirty_table (id INTEGER PRIMARY KEY)")
+		require.NoError(t, err)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "file://testdata/migrations/")
+		err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		require.EqualError(t, err, "Error: sql/migrate: connected database is not clean: found multiple tables: 2. baseline version or allow-dirty is required")
+
+		tt.setInput("allow-dirty", "true")
+		err = (&atlasaction.Actions{Action: tt.act, Atlas: tt.cli}).MigrateApply(context.Background())
+		require.NoError(t, err)
+	})
 }
 
 func TestMigrateDown(t *testing.T) {

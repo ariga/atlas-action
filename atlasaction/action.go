@@ -233,6 +233,7 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		URL:             a.GetInput("url"),
 		DryRun:          a.GetBoolInput("dry-run"),
 		RevisionsSchema: a.GetInput("revisions-schema"),
+		AllowDirty:      a.GetBoolInput("allow-dirty"),
 		TxMode:          a.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: a.GetInput("baseline"), // Hidden param.
 	}
