@@ -7,7 +7,9 @@ package atlasaction
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,113 +24,127 @@ import (
 	"text/template"
 	"time"
 
+	"ariga.io/atlas-action/atlasaction/cloud"
 	"ariga.io/atlas-go-sdk/atlasexec"
 )
 
-// Actions holds the runtime for the actions to run.
-// This helps to inject the runtime dependencies. Like the SCM client, Atlas client, etc.
-type Actions struct {
-	Action
-	Version string
-	Atlas   AtlasExec
-}
+type (
+	// Actions holds the runtime for the actions to run.
+	// This helps to inject the runtime dependencies. Like the SCM client, Atlas client, etc.
+	Actions struct {
+		Action
+		Version     string
+		Atlas       AtlasExec
+		cloudClient func(ctx context.Context, token string) (CloudClient, error)
+	}
 
-// Action interface for Atlas.
-type Action interface {
-	Logger
-	// GetType returns the type of atlasexec trigger Type. e.g. "GITHUB_ACTION"
-	// The value is used to identify the type on CI-Run page in Atlas Cloud.
-	GetType() atlasexec.TriggerType
-	// GetInput returns the value of the input with the given name.
-	GetInput(string) string
-	// SetOutput sets the value of the output with the given name.
-	SetOutput(string, string)
-	// GetTriggerContext returns the context of the trigger event.
-	GetTriggerContext() (*TriggerContext, error)
-	// AddStepSummary adds a summary to the action step.
-	AddStepSummary(string)
-	// SCM returns a SCMClient.
-	SCM() (SCMClient, error)
-}
+	// Action interface for Atlas.
+	Action interface {
+		Logger
+		// GetType returns the type of atlasexec trigger Type. e.g. "GITHUB_ACTION"
+		// The value is used to identify the type on CI-Run page in Atlas Cloud.
+		GetType() atlasexec.TriggerType
+		// GetInput returns the value of the input with the given name.
+		GetInput(string) string
+		// SetOutput sets the value of the output with the given name.
+		SetOutput(string, string)
+		// GetTriggerContext returns the context of the trigger event.
+		GetTriggerContext() (*TriggerContext, error)
+		// AddStepSummary adds a summary to the action step.
+		AddStepSummary(string)
+		// SCM returns a SCMClient.
+		SCM() (SCMClient, error)
+	}
 
-// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
-type SCMClient interface {
-	// ListPullRequestFiles returns a list of files changed in a pull request.
-	ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error)
-	// UpsertSuggestion posts or updates a pull request suggestion.
-	UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error
-	// UpsertComment posts or updates a pull request comment.
-	UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error
-}
+	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
+	SCMClient interface {
+		// ListPullRequestFiles returns a list of files changed in a pull request.
+		ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error)
+		// UpsertSuggestion posts or updates a pull request suggestion.
+		UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error
+		// UpsertComment posts or updates a pull request comment.
+		UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error
+	}
 
-type Logger interface {
-	// Infof logs an info message.
-	Infof(string, ...interface{})
-	// Warningf logs a warning message.
-	Warningf(string, ...interface{})
-	// Errorf logs an error message.
-	Errorf(string, ...interface{})
-	// Fatalf logs a fatal error message and exits the action.
-	Fatalf(string, ...interface{})
-	// WithFieldsMap returns a new Logger with the given fields.
-	WithFieldsMap(map[string]string) Logger
-}
+	Logger interface {
+		// Infof logs an info message.
+		Infof(string, ...interface{})
+		// Warningf logs a warning message.
+		Warningf(string, ...interface{})
+		// Errorf logs an error message.
+		Errorf(string, ...interface{})
+		// Fatalf logs a fatal error message and exits the action.
+		Fatalf(string, ...interface{})
+		// WithFieldsMap returns a new Logger with the given fields.
+		WithFieldsMap(map[string]string) Logger
+	}
 
-// AtlasExec is the interface for the atlas exec client.
-type AtlasExec interface {
-	// MigrateStatus runs the `migrate status` command.
-	MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
-	// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
-	MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error)
-	// MigrateDown runs the `migrate down` command.
-	MigrateDown(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
-	// MigrateLintError runs the `migrate lint` command and fails if there are lint errors.
-	MigrateLintError(context.Context, *atlasexec.MigrateLintParams) error
-	// MigratePush runs the `migrate push` command.
-	MigratePush(context.Context, *atlasexec.MigratePushParams) (string, error)
-	// MigrateTest runs the `migrate test` command.
-	MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error)
-	// SchemaPush runs the `schema push` command.
-	SchemaPush(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
-	// SchemaTest runs the `schema test` command.
-	SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error)
-	// SchemaPlan runs the `schema plan` command.
-	SchemaPlan(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
-	// SchemaPlanList runs the `schema plan list` command.
-	SchemaPlanList(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
-	// SchemaPlanLint runs the `schema plan lint` command.
-	SchemaPlanLint(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
-	// SchemaPlanApprove runs the `schema plan approve` command.
-	SchemaPlanApprove(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
-	// SchemaApplySlice runs the `schema apply` command.
-	SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error)
-}
+	// AtlasExec is the interface for the atlas exec client.
+	AtlasExec interface {
+		// MigrateStatus runs the `migrate status` command.
+		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
+		// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
+		MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error)
+		// MigrateDown runs the `migrate down` command.
+		MigrateDown(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
+		// MigrateLintError runs the `migrate lint` command and fails if there are lint errors.
+		MigrateLintError(context.Context, *atlasexec.MigrateLintParams) error
+		// MigratePush runs the `migrate push` command.
+		MigratePush(context.Context, *atlasexec.MigratePushParams) (string, error)
+		// MigrateTest runs the `migrate test` command.
+		MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error)
+		// SchemaInspect runs the `schema inspect` command.
+		SchemaInspect(ctx context.Context, params *atlasexec.SchemaInspectParams) (string, error)
+		// SchemaPush runs the `schema push` command.
+		SchemaPush(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
+		// SchemaTest runs the `schema test` command.
+		SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error)
+		// SchemaPlan runs the `schema plan` command.
+		SchemaPlan(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
+		// SchemaPlanList runs the `schema plan list` command.
+		SchemaPlanList(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
+		// SchemaPlanLint runs the `schema plan lint` command.
+		SchemaPlanLint(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
+		// SchemaPlanApprove runs the `schema plan approve` command.
+		SchemaPlanApprove(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
+		// SchemaApplySlice runs the `schema apply` command.
+		SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error)
+	}
 
-// TriggerContext holds the context of the environment the action is running in.
-type TriggerContext struct {
-	SCM         SCM          // SCM is the source control management system.
-	Repo        string       // Repo is the repository name. e.g. "ariga/atlas-action".
-	RepoURL     string       // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
-	Branch      string       // Branch name.
-	Commit      string       // Commit SHA.
-	PullRequest *PullRequest // PullRequest will be available if the event is "pull_request".
-	Actor       *Actor       // Actor is the user who triggered the action.
-	RerunCmd    string       // RerunCmd is the command to rerun the action.
-}
+	// CloudClient lets an action talk to Atlas Cloud.
+	CloudClient interface {
+		// SnapshotHash returns the latest snapshot hash for a monitored schema.
+		SnapshotHash(context.Context, *cloud.SnapshotHashInput) (string, error)
+		// PushSnapshot pushes a new snapshot version of a monitored schema to the cloud.
+		PushSnapshot(context.Context, *cloud.PushSnapshotInput) (string, error)
+	}
 
-// Actor holds the actor information.
-type Actor struct {
-	Name string // Username of the actor.
-	ID   string // ID of the actor on the SCM.
-}
+	// TriggerContext holds the context of the environment the action is running in.
+	TriggerContext struct {
+		SCM         SCM          // SCM is the source control management system.
+		Repo        string       // Repo is the repository name. e.g. "ariga/atlas-action".
+		RepoURL     string       // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
+		Branch      string       // Branch name.
+		Commit      string       // Commit SHA.
+		PullRequest *PullRequest // PullRequest will be available if the event is "pull_request".
+		Actor       *Actor       // Actor is the user who triggered the action.
+		RerunCmd    string       // RerunCmd is the command to rerun the action.
+	}
 
-// PullRequest holds the pull request information.
-type PullRequest struct {
-	Number int    // Pull Request Number
-	URL    string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
-	Commit string // Latest commit SHA.
-	Body   string // Body (description) of the pull request.
-}
+	// Actor holds the actor information.
+	Actor struct {
+		Name string // Username of the actor.
+		ID   string // ID of the actor on the SCM.
+	}
+
+	// PullRequest holds the pull request information.
+	PullRequest struct {
+		Number int    // Pull Request Number
+		URL    string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
+		Commit string // Latest commit SHA.
+		Body   string // Body (description) of the pull request.
+	}
+)
 
 // AtlasDirectives returns any directives that are
 // present in the pull request body. For example:
@@ -151,13 +167,70 @@ type SCM struct {
 }
 
 // New creates a new Actions based on the environment.
-func New(getenv func(string) string, w io.Writer) (*Actions, error) {
-	a, err := newAction(getenv, w)
-	if err != nil {
-		return nil, err
+func New(opts ...Option) (*Actions, error) {
+	cfg := &config{
+		getenv: os.Getenv,
+		out:    os.Stdout,
 	}
-	return &Actions{Action: a}, nil
+	for _, o := range opts {
+		o(cfg)
+	}
+	var err error
+	if cfg.action == nil {
+		cfg.action, err = newAction(cfg.getenv, cfg.out)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &Actions{
+		Action:      cfg.action,
+		Atlas:       cfg.atlas,
+		Version:     cfg.version,
+		cloudClient: cfg.cloudClient,
+	}, nil
 }
+
+// WithGetenv specifies how to obtain environment variables.
+func WithGetenv(getenv func(string) string) Option {
+	return func(c *config) { c.getenv = getenv }
+}
+
+// WithOut specifies where to print to.
+func WithOut(out io.Writer) Option {
+	return func(c *config) { c.out = out }
+}
+
+// WithAction sets the Action to use.
+func WithAction(a Action) Option {
+	return func(c *config) { c.action = a }
+}
+
+// WithAtlas sets the AtlasExec to use.
+func WithAtlas(a AtlasExec) Option {
+	return func(c *config) { c.atlas = a }
+}
+
+// WithCloudClient specifies how to obtain a CloudClient given the name of the token input variable.
+func WithCloudClient(cc func(ctx context.Context, token string) (CloudClient, error)) Option {
+	return func(c *config) { c.cloudClient = cc }
+}
+
+// WithVersion specifies the version of the Actions.
+func WithVersion(v string) Option {
+	return func(c *config) { c.version = v }
+}
+
+type (
+	config struct {
+		getenv      func(string) string
+		out         io.Writer
+		action      Action
+		atlas       AtlasExec
+		cloudClient func(ctx context.Context, token string) (CloudClient, error)
+		version     string
+	}
+	Option func(*config)
+)
 
 // New creates a new Action based on the environment.
 func newAction(getenv func(string) string, w io.Writer) (Action, error) {
@@ -186,6 +259,8 @@ const (
 	CmdSchemaPlan        = "schema/plan"
 	CmdSchemaPlanApprove = "schema/plan/approve"
 	CmdSchemaApply       = "schema/apply"
+	// Montioring Commands
+	CmdMonitorSchema = "monitor/schema"
 )
 
 // Run runs the action based on the command name.
@@ -217,6 +292,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.SchemaPlanApprove(ctx)
 	case CmdSchemaApply:
 		return a.SchemaApply(ctx)
+	case CmdMonitorSchema:
+		return a.MonitorSchema(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", act)
 	}
@@ -748,6 +825,75 @@ func (a *Actions) SchemaApply(ctx context.Context) error {
 	return nil
 }
 
+// MonitorSchema runs the Action for "ariga/atlas-action/monitor/schema"
+func (a *Actions) MonitorSchema(ctx context.Context) error {
+	db, err := a.GetURLInput("url")
+	if err != nil {
+		return err
+	}
+	var (
+		id = cloud.ScopeIdent{
+			URL:     db.Redacted(),
+			ExtID:   a.GetInput("slug"),
+			Schemas: a.GetArrayInput("schemas"),
+			Exclude: a.GetArrayInput("exclude"),
+		}
+	)
+	res, err := a.Atlas.SchemaInspect(ctx, &atlasexec.SchemaInspectParams{
+		URL:     db.String(),
+		Schema:  id.Schemas,
+		Exclude: id.Schemas,
+		Format:  `{{ printf "# %s\n%s" .Hash .MarshalHCL }}`,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to inspect the schema: %w", err)
+	}
+	cc, err := a.CloudClient(ctx, "cloud-token")
+	if err != nil {
+		return err
+	}
+	h, err := cc.SnapshotHash(ctx, &cloud.SnapshotHashInput{ScopeIdent: id})
+	if err != nil {
+		return fmt.Errorf("failed to get the schema snapshot hash: %w", err)
+	}
+	var (
+		parts = strings.SplitN(res, "\n", 2)
+		hash  = strings.TrimPrefix(parts[0], "# ")
+		hcl   = parts[1]
+		input = &cloud.PushSnapshotInput{
+			ScopeIdent: id,
+			HashMatch:  strings.HasPrefix(h, "h1:") && OldAgentHash(hcl) == h || hash == h,
+		}
+	)
+	if !input.HashMatch {
+		input.Snapshot = &cloud.SnapshotInput{Hash: hash, HCL: hcl}
+	}
+	u, err := cc.PushSnapshot(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to push the schema snapshot: %w", err)
+	}
+	a.SetOutput("url", u)
+	a.Infof(`"atlas monitor schema" completed successfully, see the schema in Atlas Cloud: %s`, u)
+	return nil
+}
+
+func (a *Actions) CloudClient(ctx context.Context, tokenInput string) (CloudClient, error) {
+	t := a.GetInput(tokenInput)
+	if t == "" {
+		return nil, fmt.Errorf("missing required input: %q", tokenInput)
+	}
+	return a.cloudClient(ctx, t)
+}
+
+// OldAgentHash computes a hash of the input. Used by the agent to determine if a new snapshot is needed.
+//
+// Only here for backwards compatability as for new snapshots the Atlas CLI computed hash is used.
+func OldAgentHash(src string) string {
+	sha := sha256.New()
+	sha.Write([]byte(src))
+	return "h1:" + base64.StdEncoding.EncodeToString(sha.Sum(nil))
+}
+
 // WorkingDir returns the working directory for the action.
 func (a *Actions) WorkingDir() string {
 	return a.GetInput("working-directory")
@@ -813,6 +959,20 @@ func (a *Actions) GetAtlasURLInput(name string, paramsName ...string) string {
 		u.RawQuery = q.Encode()
 	}
 	return u.String()
+}
+
+// GetURLInput tries to parse the input as URL. In case of a parsing error,
+// this function ensures the error does not leak any sensitive information.
+func (a *Actions) GetURLInput(name string) (*url.URL, error) {
+	u, err := url.Parse(a.GetInput(name))
+	if err != nil {
+		// Ensure to not leak any sensitive information into logs.
+		if uerr := new(url.Error); errors.As(err, &uerr) {
+			err = uerr.Err
+		}
+		a.Fatalf("the input %q is not a valid URL string: %v", name, err)
+	}
+	return u, nil
 }
 
 // GetVarsInput returns the vars input with the given name.
