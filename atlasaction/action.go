@@ -834,8 +834,8 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		id = cloud.ScopeIdent{
 			URL:     db.Redacted(),
 			ExtID:   a.GetInput("slug"),
-			Schemas: nilIfEmpty(a.GetArrayInput("schemas")),
-			Exclude: nilIfEmpty(a.GetArrayInput("exclude")),
+			Schemas: a.GetArrayInput("schemas"),
+			Exclude: a.GetArrayInput("exclude"),
 		}
 	)
 	res, err := a.Atlas.SchemaInspect(ctx, &atlasexec.SchemaInspectParams{
@@ -882,13 +882,6 @@ func (a *Actions) CloudClient(ctx context.Context, tokenInput string) (CloudClie
 		return nil, fmt.Errorf("missing required input: %q", tokenInput)
 	}
 	return a.cloudClient(ctx, t)
-}
-
-func nilIfEmpty[T any](xs []T) []T {
-	if len(xs) == 0 {
-		return nil
-	}
-	return xs
 }
 
 // OldAgentHash computes a hash of the input. Used by the agent to determine if a new snapshot is needed.
@@ -974,9 +967,9 @@ func (a *Actions) GetURLInput(name string) (*url.URL, error) {
 	if err != nil {
 		// Ensure to not leak any sensitive information into logs.
 		if uerr := new(url.Error); errors.As(err, &uerr) {
-			return nil, uerr.Err
+			err = uerr.Err
 		}
-		return nil, errors.New("invalid URL")
+		a.Fatalf("the input %q is not a valid URL string: %v", name, err)
 	}
 	return u, nil
 }

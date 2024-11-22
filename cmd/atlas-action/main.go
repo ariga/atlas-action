@@ -44,10 +44,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to run action in the current environment: %s\n", err)
 		os.Exit(1)
 	}
-	act.Atlas, err = atlasexec.NewClient("", "atlas")
+	a, err = atlasexec.NewClient("", "atlas")
 	if err != nil {
 		act.Fatalf("Failed to create client: %s", err)
 	}
+	act.Atlas = a
 	cli := kong.Parse(
 		&RunActionCmd{},
 		kong.BindTo(context.Background(), (*context.Context)(nil)),

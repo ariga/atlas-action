@@ -542,6 +542,8 @@ func TestMonitorSchema(t *testing.T) {
 			url:     u,
 			newHash: "hash",
 			hcl:     "hcl",
+			schemas: []string{},
+			exclude: []string{},
 			exSnapshot: &cloud.SnapshotInput{
 				Hash: "hash",
 				HCL:  "hcl",
@@ -553,6 +555,8 @@ func TestMonitorSchema(t *testing.T) {
 			latestHash: "different",
 			newHash:    "hash",
 			hcl:        "hcl",
+			schemas:    []string{},
+			exclude:    []string{},
 			exSnapshot: &cloud.SnapshotInput{
 				Hash: "hash",
 				HCL:  "hcl",
@@ -564,6 +568,8 @@ func TestMonitorSchema(t *testing.T) {
 			latestHash: atlasaction.OldAgentHash("hcl"),
 			newHash:    "hash",
 			hcl:        "hcl",
+			schemas:    []string{},
+			exclude:    []string{},
 			exMatch:    true,
 		},
 		{
@@ -572,6 +578,8 @@ func TestMonitorSchema(t *testing.T) {
 			latestHash: "hash",
 			newHash:    "hash",
 			hcl:        "hcl",
+			schemas:    []string{},
+			exclude:    []string{},
 			exMatch:    true,
 		},
 		{
@@ -581,6 +589,8 @@ func TestMonitorSchema(t *testing.T) {
 			latestHash: "hash",
 			newHash:    "hash",
 			hcl:        "hcl",
+			schemas:    []string{},
+			exclude:    []string{},
 			exMatch:    true,
 		},
 		{
