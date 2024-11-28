@@ -1,0 +1,37 @@
+name: Monitor Ecommerce DB
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9,16 * * 0-4' # Runs at 9 AM and 4 PM (UTC) on Sunday to Thursday
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add AWS Profile
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_SANDBOX_DEPLOYER_KEY_ID }} --profile sandbox
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SANDBOX_SECRET_SECRET_KEY }} --profile sandbox
+          aws configure set region us-east-1 --profile sandbox
+      - name: Read AWS Secret
+        id: secrets
+        run: |
+          SECRET_STRING=$(aws secretsmanager get-secret-value --secret-id aurora-mysql --profile sandbox | jq -rc '.SecretString')
+          for key in $(echo $SECRET_STRING | jq -r 'keys[]'); do
+            SECRET=$(echo $SECRET_STRING | jq -r ".$key")
+            echo "::add-mask::$SECRET"
+            echo "$key=$SECRET" >> $GITHUB_OUTPUT
+          done
+      - name: Install socat
+        run: sudo apt-get install -y socat
+      - name: Port Forward to Aurora
+        run: |
+          socat tcp-l:3306,fork,reuseaddr tcp:${{ steps.secrets.outputs.host }}:${{ steps.secrets.outputs.port }} &
+          echo "127.0.0.1 ecommerce.atlas.ariga" | sudo tee -a /etc/hosts
+      - name: Setup Atlas
+        uses: ariga/setup-atlas@master
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+      - uses: ariga/atlas-action/monitor/schema@master
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+          url: mysql://${{ steps.secrets.outputs.username }}:${{ steps.secrets.outputs.password }}@ecommerce.atlas.ariga:3306/${{ steps.secrets.outputs.schema }}
