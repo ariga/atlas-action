@@ -279,6 +279,7 @@ func TestMigrateDown(t *testing.T) {
 }
 
 type mockAtlas struct {
+	login             func(context.Context, *atlasexec.LoginParams) error
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
@@ -289,6 +290,11 @@ type mockAtlas struct {
 }
 
 var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
+
+// Login implements AtlasExec.
+func (m *mockAtlas) Login(ctx context.Context, params *atlasexec.LoginParams) error {
+	return m.login(ctx, params)
+}
 
 // MigrateStatus implements AtlasExec.
 func (m *mockAtlas) MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error) {
@@ -634,6 +640,9 @@ func TestMonitorSchema(t *testing.T) {
 					logger: slog.New(slog.NewTextHandler(out, nil)),
 				}
 				cli = &mockAtlas{
+					login: func(ctx context.Context, params *atlasexec.LoginParams) error {
+						return nil
+					},
 					schemaInspect: func(_ context.Context, p *atlasexec.SchemaInspectParams) (string, error) {
 						return fmt.Sprintf("# %s\n%s", tt.newHash, tt.hcl), nil
 					},

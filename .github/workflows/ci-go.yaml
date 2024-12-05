@@ -436,16 +436,7 @@ jobs:
           SELECT id, email FROM users;
           EOF
           echo "Table and view created!"
-
-      - name: Verify Table and View
-        run: |
-          echo "Verifying table and view..."
-          mysql -h 127.0.0.1 -u root --password=pass dev -e "SHOW TABLES;"
-          mysql -h 127.0.0.1 -u root --password=pass dev -e "SELECT * FROM user_emails;"
-
       - uses: ariga/setup-atlas@v0
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
