@@ -219,6 +219,8 @@ func WithRuntimeAction() Option {
 			c.action = NewCircleCIOrb(c.getenv, c.out)
 		case c.getenv("GITLAB_CI") == "true":
 			c.action = NewGitlabCI(c.getenv, c.out)
+		case c.getenv("BITBUCKET_PIPELINE_UUID") != "":
+			c.action = NewBitBucketPipe(c.getenv, c.out)
 		}
 	}
 }

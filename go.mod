@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	ariga.io/atlas v0.21.2-0.20240418081819-02b3f6239b04
-	ariga.io/atlas-go-sdk v0.6.5-0.20241016165749-25a157fbe224
+	ariga.io/atlas-go-sdk v0.6.5
 	github.com/alecthomas/kong v0.8.0
 	github.com/fatih/color v1.17.0
 	github.com/gorilla/mux v1.8.1
