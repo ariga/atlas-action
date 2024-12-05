@@ -421,6 +421,28 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
+      # views are logged in only feature in atlas
+      - name: Create Table and View
+        run: |
+          echo "Creating table and view..."
+          mysql -h 127.0.0.1 -u root --password=pass dev <<EOF
+          CREATE TABLE users (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              name VARCHAR(255) NOT NULL,
+              email VARCHAR(255) NOT NULL
+          );
+
+          CREATE VIEW user_emails AS
+          SELECT id, email FROM users;
+          EOF
+          echo "Table and view created!"
+
+      - name: Verify Table and View
+        run: |
+          echo "Verifying table and view..."
+          mysql -h 127.0.0.1 -u root --password=pass dev -e "SHOW TABLES;"
+          mysql -h 127.0.0.1 -u root --password=pass dev -e "SELECT * FROM user_emails;"
+
       - uses: ariga/setup-atlas@v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
