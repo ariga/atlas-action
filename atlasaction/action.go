@@ -26,6 +26,7 @@ import (
 
 	"ariga.io/atlas-action/atlasaction/cloud"
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"github.com/fatih/color"
 )
 
 type (
@@ -1258,6 +1259,38 @@ func RenderTemplate(name string, data any) (string, error) {
 	}
 	return buf.String(), nil
 }
+
+type colorsLogger struct {
+	w io.Writer
+}
+
+// Infof implements the Logger interface.
+func (l *colorsLogger) Infof(msg string, args ...any) {
+	fmt.Fprint(l.w, color.CyanString(msg, args...)+"\n")
+}
+
+// Warningf implements the Logger interface.
+func (l *colorsLogger) Warningf(msg string, args ...any) {
+	fmt.Fprint(l.w, color.YellowString(msg, args...)+"\n")
+}
+
+// Errorf implements the Logger interface.
+func (l *colorsLogger) Errorf(msg string, args ...any) {
+	fmt.Fprint(l.w, color.RedString(msg, args...)+"\n")
+}
+
+// Fatalf implements the Logger interface.
+func (l *colorsLogger) Fatalf(msg string, args ...any) {
+	l.Errorf(msg, args...)
+	os.Exit(1)
+}
+
+// WithFieldsMap implements the Logger interface.
+func (l *colorsLogger) WithFieldsMap(map[string]string) Logger {
+	return l // unsupported
+}
+
+var _ Logger = (*colorsLogger)(nil)
 
 type (
 	githubIssueComment struct {

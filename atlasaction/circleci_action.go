@@ -19,7 +19,7 @@ import (
 
 // circleciOrb is an implementation of the Action interface for GitHub Actions.
 type circleCIOrb struct {
-	w      io.Writer
+	*colorsLogger
 	getenv func(string) string
 }
 
@@ -27,7 +27,7 @@ var _ Action = (*circleCIOrb)(nil)
 
 // New returns a new Action for GitHub Actions.
 func NewCircleCIOrb(getenv func(string) string, w io.Writer) Action {
-	return &circleCIOrb{getenv: getenv, w: w}
+	return &circleCIOrb{getenv: getenv, colorsLogger: &colorsLogger{w}}
 }
 
 // GetType implements the Action interface.
@@ -129,36 +129,6 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		}
 	}
 	return ctx, nil
-}
-
-// Line separator for logging.
-const EOF = "\n"
-
-// Infof implements the Logger interface.
-func (o *circleCIOrb) Infof(msg string, args ...any) {
-	fmt.Fprintf(o.w, msg+EOF, args...)
-}
-
-// Warningf implements the Logger interface.
-func (o *circleCIOrb) Warningf(msg string, args ...any) {
-	fmt.Fprintf(o.w, msg+EOF, args...)
-}
-
-// Errorf implements the Logger interface.
-func (o *circleCIOrb) Errorf(msg string, args ...any) {
-	fmt.Fprintf(o.w, msg+EOF, args...)
-}
-
-// Fatalf implements the Logger interface.
-func (a *circleCIOrb) Fatalf(msg string, args ...any) {
-	a.Errorf(msg, args...)
-	os.Exit(1)
-}
-
-// WithFieldsMap implements the Logger interface.
-func (a *circleCIOrb) WithFieldsMap(map[string]string) Logger {
-	// unsupported
-	return a
 }
 
 // AddStepSummary implements the Action interface.
