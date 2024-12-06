@@ -1260,6 +1260,28 @@ func RenderTemplate(name string, data any) (string, error) {
 	return buf.String(), nil
 }
 
+// toEnvVar converts the given string to an environment variable name.
+func toEnvVar(s string) string {
+	return strings.ToUpper(strings.NewReplacer(
+		" ", "_", "-", "_", "/", "_",
+	).Replace(s))
+}
+
+// writeBashEnv writes the given name and value to the bash environment file.
+func writeBashEnv(path, name, value string) error {
+	// Write the output to a file.
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer f.Close()
+	_, err = fmt.Fprintf(f, "export %s=%q\n", name, value)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type colorsLogger struct {
 	w io.Writer
 }

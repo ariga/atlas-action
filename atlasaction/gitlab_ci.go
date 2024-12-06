@@ -40,10 +40,7 @@ func (g *gitlabCI) GetType() atlasexec.TriggerType {
 
 // GetInput implements the Action interface.
 func (g *gitlabCI) GetInput(name string) string {
-	e := strings.ReplaceAll(name, " ", "_")
-	e = strings.ReplaceAll(e, "-", "_")
-	e = strings.ToUpper(e)
-	return strings.TrimSpace(g.getenv("ATLAS_INPUT_" + e))
+	return strings.TrimSpace(g.getenv(toEnvVar("ATLAS_INPUT_" + name)))
 }
 
 // SetOutput implements the Action interface.
