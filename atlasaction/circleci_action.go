@@ -19,7 +19,7 @@ import (
 
 // circleciOrb is an implementation of the Action interface for GitHub Actions.
 type circleCIOrb struct {
-	w      io.Writer
+	*coloredLogger
 	getenv func(string) string
 }
 
@@ -27,7 +27,7 @@ var _ Action = (*circleCIOrb)(nil)
 
 // New returns a new Action for GitHub Actions.
 func NewCircleCIOrb(getenv func(string) string, w io.Writer) Action {
-	return &circleCIOrb{getenv: getenv, w: w}
+	return &circleCIOrb{getenv: getenv, coloredLogger: &coloredLogger{w}}
 }
 
 // GetType implements the Action interface.
@@ -37,31 +37,17 @@ func (a *circleCIOrb) GetType() atlasexec.TriggerType {
 
 // GetInput implements the Action interface.
 func (a *circleCIOrb) GetInput(name string) string {
-	e := strings.ReplaceAll(name, " ", "_")
-	e = strings.ReplaceAll(e, "-", "_")
-	e = strings.ToUpper(e)
-	e = "INPUT_" + e
-	return strings.TrimSpace(a.getenv(e))
+	return strings.TrimSpace(a.getenv(toEnvVar("INPUT_" + name)))
 }
 
 // SetOutput implements the Action interface.
 func (a *circleCIOrb) SetOutput(name, value string) {
 	if bashEnv := a.getenv("BASH_ENV"); bashEnv != "" {
-		// Write the output to a file.
-		f, err := os.OpenFile(bashEnv, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		cmd := a.getenv("ATLAS_ACTION_COMMAND")
+		err := writeBashEnv(bashEnv, toEnvVar(
+			fmt.Sprintf("ATLAS_OUTPUT_%s_%s", cmd, name)), value)
 		if err != nil {
-			a.Fatalf("failed to open file %s: %v", bashEnv, err)
-		}
-		defer f.Close()
-		var (
-			envReplacer = strings.NewReplacer(" ", "_", "-", "_", "/", "_")
-			cmdName     = a.getenv("ATLAS_ACTION_COMMAND")
-			envName     = strings.ToUpper(envReplacer.Replace(fmt.Sprintf(
-				"ATLAS_OUTPUT_%s_%s", cmdName, name)))
-		)
-		_, err = fmt.Fprintf(f, "export %s=%q\n", envName, value)
-		if err != nil {
-			a.Fatalf("failed to write to file %s: %v", bashEnv, err)
+			a.Fatalf("failed to write env to file %s: %v", bashEnv, err)
 		}
 		return
 	}
@@ -129,36 +115,6 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 		}
 	}
 	return ctx, nil
-}
-
-// Line separator for logging.
-const EOF = "\n"
-
-// Infof implements the Logger interface.
-func (o *circleCIOrb) Infof(msg string, args ...any) {
-	fmt.Fprintf(o.w, msg+EOF, args...)
-}
-
-// Warningf implements the Logger interface.
-func (o *circleCIOrb) Warningf(msg string, args ...any) {
-	fmt.Fprintf(o.w, msg+EOF, args...)
-}
-
-// Errorf implements the Logger interface.
-func (o *circleCIOrb) Errorf(msg string, args ...any) {
-	fmt.Fprintf(o.w, msg+EOF, args...)
-}
-
-// Fatalf implements the Logger interface.
-func (a *circleCIOrb) Fatalf(msg string, args ...any) {
-	a.Errorf(msg, args...)
-	os.Exit(1)
-}
-
-// WithFieldsMap implements the Logger interface.
-func (a *circleCIOrb) WithFieldsMap(map[string]string) Logger {
-	// unsupported
-	return a
 }
 
 // AddStepSummary implements the Action interface.

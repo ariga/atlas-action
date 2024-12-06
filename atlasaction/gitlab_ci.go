@@ -5,12 +5,10 @@
 package atlasaction
 
 import (
-	"ariga.io/atlas-go-sdk/atlasexec"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/fatih/color"
 	"io"
 	"net/http"
 	"os"
@@ -18,11 +16,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"ariga.io/atlas-go-sdk/atlasexec"
 )
 
 // gitlabCI is an implementation of the Action interface for Gitlab CI.
 type gitlabCI struct {
-	w      io.Writer
+	*coloredLogger
 	getenv func(string) string
 }
 
@@ -30,7 +30,7 @@ var _ Action = (*gitlabCI)(nil)
 
 // NewGitlabCI returns a new Action for Gitlab CI.
 func NewGitlabCI(getenv func(string) string, w io.Writer) Action {
-	return &gitlabCI{getenv: getenv, w: w}
+	return &gitlabCI{getenv: getenv, coloredLogger: &coloredLogger{w}}
 }
 
 // GetType implements the Action interface.
@@ -40,10 +40,7 @@ func (g *gitlabCI) GetType() atlasexec.TriggerType {
 
 // GetInput implements the Action interface.
 func (g *gitlabCI) GetInput(name string) string {
-	e := strings.ReplaceAll(name, " ", "_")
-	e = strings.ReplaceAll(e, "-", "_")
-	e = strings.ToUpper(e)
-	return strings.TrimSpace(g.getenv("ATLAS_INPUT_" + e))
+	return strings.TrimSpace(g.getenv(toEnvVar("ATLAS_INPUT_" + name)))
 }
 
 // SetOutput implements the Action interface.
@@ -82,33 +79,6 @@ func (g *gitlabCI) GetTriggerContext() (*TriggerContext, error) {
 		}
 	}
 	return ctx, nil
-}
-
-// Infof implements the Logger interface.
-func (g *gitlabCI) Infof(msg string, args ...any) {
-	fmt.Fprint(g.w, color.CyanString(msg, args...)+"\n")
-}
-
-// Warningf implements the Logger interface.
-func (g *gitlabCI) Warningf(msg string, args ...any) {
-	fmt.Fprint(g.w, color.YellowString(msg, args...)+"\n")
-}
-
-// Errorf implements the Logger interface.
-func (g *gitlabCI) Errorf(msg string, args ...any) {
-	fmt.Fprint(g.w, color.RedString(msg, args...)+"\n")
-}
-
-// Fatalf implements the Logger interface.
-func (g *gitlabCI) Fatalf(msg string, args ...any) {
-	g.Errorf(msg, args...)
-	os.Exit(1)
-}
-
-// WithFieldsMap implements the Logger interface.
-func (g *gitlabCI) WithFieldsMap(map[string]string) Logger {
-	// unsupported
-	return g
 }
 
 // AddStepSummary implements the Action interface.
