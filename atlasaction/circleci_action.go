@@ -19,7 +19,7 @@ import (
 
 // circleciOrb is an implementation of the Action interface for GitHub Actions.
 type circleCIOrb struct {
-	*colorsLogger
+	*coloredLogger
 	getenv func(string) string
 }
 
@@ -27,7 +27,7 @@ var _ Action = (*circleCIOrb)(nil)
 
 // New returns a new Action for GitHub Actions.
 func NewCircleCIOrb(getenv func(string) string, w io.Writer) Action {
-	return &circleCIOrb{getenv: getenv, colorsLogger: &colorsLogger{w}}
+	return &circleCIOrb{getenv: getenv, coloredLogger: &coloredLogger{w}}
 }
 
 // GetType implements the Action interface.

@@ -1282,37 +1282,37 @@ func writeBashEnv(path, name, value string) error {
 	return nil
 }
 
-type colorsLogger struct {
+type coloredLogger struct {
 	w io.Writer
 }
 
 // Infof implements the Logger interface.
-func (l *colorsLogger) Infof(msg string, args ...any) {
+func (l *coloredLogger) Infof(msg string, args ...any) {
 	fmt.Fprint(l.w, color.CyanString(msg, args...)+"\n")
 }
 
 // Warningf implements the Logger interface.
-func (l *colorsLogger) Warningf(msg string, args ...any) {
+func (l *coloredLogger) Warningf(msg string, args ...any) {
 	fmt.Fprint(l.w, color.YellowString(msg, args...)+"\n")
 }
 
 // Errorf implements the Logger interface.
-func (l *colorsLogger) Errorf(msg string, args ...any) {
+func (l *coloredLogger) Errorf(msg string, args ...any) {
 	fmt.Fprint(l.w, color.RedString(msg, args...)+"\n")
 }
 
 // Fatalf implements the Logger interface.
-func (l *colorsLogger) Fatalf(msg string, args ...any) {
+func (l *coloredLogger) Fatalf(msg string, args ...any) {
 	l.Errorf(msg, args...)
 	os.Exit(1)
 }
 
 // WithFieldsMap implements the Logger interface.
-func (l *colorsLogger) WithFieldsMap(map[string]string) Logger {
+func (l *coloredLogger) WithFieldsMap(map[string]string) Logger {
 	return l // unsupported
 }
 
-var _ Logger = (*colorsLogger)(nil)
+var _ Logger = (*coloredLogger)(nil)
 
 type (
 	githubIssueComment struct {

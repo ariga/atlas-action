@@ -22,7 +22,7 @@ import (
 
 // gitlabCI is an implementation of the Action interface for Gitlab CI.
 type gitlabCI struct {
-	*colorsLogger
+	*coloredLogger
 	getenv func(string) string
 }
 
@@ -30,7 +30,7 @@ var _ Action = (*gitlabCI)(nil)
 
 // NewGitlabCI returns a new Action for Gitlab CI.
 func NewGitlabCI(getenv func(string) string, w io.Writer) Action {
-	return &gitlabCI{getenv: getenv, colorsLogger: &colorsLogger{w}}
+	return &gitlabCI{getenv: getenv, coloredLogger: &coloredLogger{w}}
 }
 
 // GetType implements the Action interface.
