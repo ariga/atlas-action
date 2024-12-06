@@ -168,19 +168,13 @@ type SCM struct {
 
 // New creates a new Actions based on the environment.
 func New(opts ...Option) (*Actions, error) {
-	cfg := &config{
-		getenv: os.Getenv,
-		out:    os.Stdout,
-	}
+	cfg := &config{getenv: os.Getenv, out: os.Stdout}
+	opts = append(opts, WithRuntimeAction())
 	for _, o := range opts {
 		o(cfg)
 	}
-	var err error
 	if cfg.action == nil {
-		cfg.action, err = newAction(cfg.getenv, cfg.out)
-		if err != nil {
-			return nil, err
-		}
+		return nil, errors.New("atlasaction: no action found for the current environment")
 	}
 	return &Actions{
 		Action:      cfg.action,
@@ -203,6 +197,22 @@ func WithOut(out io.Writer) Option {
 // WithAction sets the Action to use.
 func WithAction(a Action) Option {
 	return func(c *config) { c.action = a }
+}
+
+// WithRuntimeAction detects the action based on the environment.
+func WithRuntimeAction() Option {
+	return func(c *config) {
+		switch {
+		case c.action != nil:
+			// Do nothing. Action is already set.
+		case c.getenv("GITHUB_ACTIONS") == "true":
+			c.action = NewGHAction(c.getenv, c.out)
+		case c.getenv("CIRCLECI") == "true":
+			c.action = NewCircleCIOrb(c.getenv, c.out)
+		case c.getenv("GITLAB_CI") == "true":
+			c.action = NewGitlabCI(c.getenv, c.out)
+		}
+	}
 }
 
 // WithAtlas sets the AtlasExec to use.
@@ -231,20 +241,6 @@ type (
 	}
 	Option func(*config)
 )
-
-// New creates a new Action based on the environment.
-func newAction(getenv func(string) string, w io.Writer) (Action, error) {
-	if getenv("GITHUB_ACTIONS") == "true" {
-		return NewGHAction(getenv, w), nil
-	}
-	if getenv("CIRCLECI") == "true" {
-		return NewCircleCIOrb(getenv, w), nil
-	}
-	if getenv("GITLAB_CI") == "true" {
-		return NewGitlabCI(getenv, w), nil
-	}
-	return nil, errors.New("unsupported environment")
-}
 
 const (
 	// Versioned workflow Commands
