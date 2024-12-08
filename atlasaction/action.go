@@ -82,6 +82,7 @@ type (
 
 	// AtlasExec is the interface for the atlas exec client.
 	AtlasExec interface {
+		Login(ctx context.Context, params *atlasexec.LoginParams) error
 		// MigrateStatus runs the `migrate status` command.
 		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
 		// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
@@ -836,6 +837,11 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 			Exclude: a.GetArrayInput("exclude"),
 		}
 	)
+	if err = a.Atlas.Login(ctx, &atlasexec.LoginParams{
+		Token: a.GetInput("cloud-token"),
+	}); err != nil {
+		return fmt.Errorf("failed to login to Atlas Cloud: %w", err)
+	}
 	res, err := a.Atlas.SchemaInspect(ctx, &atlasexec.SchemaInspectParams{
 		URL:     db.String(),
 		Schema:  id.Schemas,
