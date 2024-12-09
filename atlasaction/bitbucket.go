@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"github.com/fatih/color"
 )
 
 type bbPipe struct {
@@ -22,6 +23,7 @@ type bbPipe struct {
 
 // New returns a new Action for GitHub Actions.
 func NewBitBucketPipe(getenv func(string) string, w io.Writer) Action {
+	color.NoColor = false // Enable color for Bitbucket.
 	return &bbPipe{getenv: getenv, coloredLogger: &coloredLogger{w: w}}
 }
 
