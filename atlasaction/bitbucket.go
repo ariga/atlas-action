@@ -6,6 +6,7 @@ package atlasaction
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"path/filepath"
@@ -71,7 +72,14 @@ func (a *bbPipe) GetInput(name string) string {
 
 // SetOutput implements Action.
 func (a *bbPipe) SetOutput(name, value string) {
-	dir := a.getenv("BITBUCKET_PIPE_STORAGE_DIR")
+	// The user can set the output directory using the OUTPUT_DIR environment variable.
+	// This is useful when the user wants to share the output with steps run outside the pipe.
+	dir := a.getenv("OUTPUT_DIR")
+	if dir == "" {
+		// If the variable is not set, we use
+		// the BITBUCKET_PIPE_STORAGE_DIR environment variable.
+		dir = a.getenv("BITBUCKET_PIPE_STORAGE_DIR")
+	}
 	if dir == "" {
 		return
 	}
@@ -80,10 +88,13 @@ func (a *bbPipe) SetOutput(name, value string) {
 	// So the next step can read the outputs using the source command.
 	// e.g:
 	// ```shell
-	// source $BITBUCKET_PIPE_SHARED_STORAGE_DIR/arigaio/atlas-action-<action>/outputs.sh
+	// source $OUTPUT_DIR/outputs.sh
 	// ```
 	// https://support.atlassian.com/bitbucket-cloud/docs/advanced-techniques-for-writing-pipes/#Sharing-information-between-pipes
-	if err := writeBashEnv(filepath.Join(dir, "outputs.sh"), name, value); err != nil {
+	cmd := a.getenv("ATLAS_ACTION_COMMAND")
+	err := writeBashEnv(filepath.Join(dir, "outputs.sh"),
+		fmt.Sprintf("ATLAS_OUTPUT_%s_%s", cmd, name), value)
+	if err != nil {
 		a.Errorf("failed to write output to file %s: %v", dir, err)
 	}
 	// TODO: Add JSON output support.
