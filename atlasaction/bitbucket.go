@@ -22,7 +22,7 @@ type bbPipe struct {
 	getenv func(string) string
 }
 
-// New returns a new Action for GitHub Actions.
+// NewBitBucketPipe returns a new Action for BitBucket.
 func NewBitBucketPipe(getenv func(string) string, w io.Writer) Action {
 	// Disable color output for testing,
 	// but enable it for non-testing environments.
