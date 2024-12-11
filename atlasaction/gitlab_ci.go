@@ -7,7 +7,6 @@ package atlasaction
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -122,10 +121,6 @@ type gitlabAPI struct {
 	client  *http.Client
 }
 
-type mergeRequestFile struct {
-	NewPath string `json:"new_path"`
-}
-
 type GitlabComment struct {
 	ID     int    `json:"id"`
 	Body   string `json:"body"`
@@ -133,39 +128,6 @@ type GitlabComment struct {
 }
 
 var _ SCMClient = (*gitlabAPI)(nil)
-
-func (g *gitlabAPI) ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error) {
-	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/diffs", g.baseURL, g.project, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := g.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	var files []mergeRequestFile
-	if err = json.NewDecoder(res.Body).Decode(&files); err != nil {
-		return nil, err
-	}
-	paths := make([]string, len(files))
-	for i := range files {
-		paths[i] = files[i].NewPath
-	}
-	return paths, nil
-}
-
-func (g *gitlabAPI) UpsertSuggestion(context.Context, *PullRequest, *Suggestion) error {
-	return errors.New("not supported")
-}
 
 func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
 	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", g.baseURL, g.project, pr.Number)

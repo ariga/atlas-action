@@ -59,12 +59,17 @@ type (
 
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
-		// ListPullRequestFiles returns a list of files changed in a pull request.
-		ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error)
-		// UpsertSuggestion posts or updates a pull request suggestion.
-		UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error
 		// UpsertComment posts or updates a pull request comment.
 		UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error
+	}
+
+	// SCMSuggestions contains methods for interacting with SCM platforms (GitHub, Gitlab etc...)
+	// that support suggestions on the pull request.
+	SCMSuggestions interface {
+		// UpsertSuggestion posts or updates a pull request suggestion.
+		UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error
+		// ListPullRequestFiles returns a list of files changed in a pull request.
+		ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error)
 	}
 
 	Logger interface {
@@ -530,19 +535,21 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
 			a.Errorf("failed to comment on the pull request: %v", err)
 		}
-		switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest); {
-		case err != nil:
-			a.Errorf("failed to list pull request files: %w", err)
-		default:
-			err = a.addSuggestions(&payload, func(s *Suggestion) error {
-				// Add suggestion only if the file is part of the pull request.
-				if slices.Contains(files, s.Path) {
-					return c.UpsertSuggestion(ctx, tc.PullRequest, s)
+		if c, ok := c.(SCMSuggestions); ok {
+			switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest); {
+			case err != nil:
+				a.Errorf("failed to list pull request files: %w", err)
+			default:
+				err = a.addSuggestions(&payload, func(s *Suggestion) error {
+					// Add suggestion only if the file is part of the pull request.
+					if slices.Contains(files, s.Path) {
+						return c.UpsertSuggestion(ctx, tc.PullRequest, s)
+					}
+					return nil
+				})
+				if err != nil {
+					a.Errorf("failed to add suggestion on the pull request: %v", err)
 				}
-				return nil
-			})
-			if err != nil {
-				a.Errorf("failed to add suggestion on the pull request: %v", err)
 			}
 		}
 	}
