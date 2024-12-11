@@ -25,7 +25,7 @@ inputs:
     description: |
       The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
       Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
-    required: true
+    required: false
   url:
     description: "The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`."
     required: false
