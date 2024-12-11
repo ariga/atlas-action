@@ -1,17 +1,18 @@
 package atlasaction_test
 
 import (
-	"ariga.io/atlas-action/atlasaction"
-	"ariga.io/atlas-go-sdk/atlasexec"
 	"encoding/json"
-	"github.com/gorilla/mux"
-	"github.com/rogpeppe/go-internal/testscript"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	"ariga.io/atlas-action/atlasaction"
+	"ariga.io/atlas-go-sdk/atlasexec"
+	"github.com/gorilla/mux"
+	"github.com/rogpeppe/go-internal/testscript"
 )
 
 func newMockHandler(dir string) http.Handler {
@@ -89,23 +90,23 @@ func newMockHandler(dir string) http.Handler {
 func TestGitlabCI(t *testing.T) {
 	testscript.Run(t, testscript.Params{
 		Dir: "testdata/gitlab",
-		Setup: func(env *testscript.Env) error {
-			commentsDir := filepath.Join(env.WorkDir, "comments")
+		Setup: func(e *testscript.Env) error {
+			commentsDir := filepath.Join(e.WorkDir, "comments")
 			srv := httptest.NewServer(newMockHandler(commentsDir))
 			if err := os.Mkdir(commentsDir, os.ModePerm); err != nil {
 				return err
 			}
-			env.Defer(srv.Close)
-			env.Setenv("GITLAB_CI", "true")
-			env.Setenv("CI_PROJECT_ID", "1")
-			env.Setenv("CI_API_V4_URL", srv.URL)
-			env.Setenv("GITLAB_TOKEN", "token")
-			c, err := atlasexec.NewClient(env.WorkDir, "atlas")
+			e.Defer(srv.Close)
+			e.Setenv("CI_API_V4_URL", srv.URL)
+			e.Setenv("CI_PROJECT_ID", "1")
+			e.Setenv("GITLAB_CI", "true")
+			e.Setenv("GITLAB_TOKEN", "token")
+			c, err := atlasexec.NewClient(e.WorkDir, "atlas")
 			if err != nil {
 				return err
 			}
 			// Create a new actions for each test.
-			env.Values[atlasKey{}] = &atlasClient{c}
+			e.Values[atlasKey{}] = &atlasClient{c}
 			return nil
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){

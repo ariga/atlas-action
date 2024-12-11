@@ -101,9 +101,4 @@ func (a *bbPipe) SetOutput(name, value string) {
 
 func (a *bbPipe) AddStepSummary(string) {}
 
-// SCM implements Action.
-func (a *bbPipe) SCM() (SCMClient, error) {
-	return nil, ErrNoSCM // Not implemented yet.
-}
-
 var _ Action = (*bbPipe)(nil)

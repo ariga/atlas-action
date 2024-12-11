@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -82,18 +81,6 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 		}
 	}
 	return tc, nil
-}
-
-func (a *ghAction) SCM() (SCMClient, error) {
-	tc, err := a.GetTriggerContext()
-	if err != nil {
-		return nil, err
-	}
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		a.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
-	}
-	return githubClient(tc.Repo, tc.SCM.APIURL, token), nil
 }
 
 // githubClient returns a new GitHub client for the given repository.

@@ -95,30 +95,22 @@ func (t *gitlabTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return http.DefaultTransport.RoundTrip(req)
 }
 
-func (g *gitlabCI) SCM() (SCMClient, error) {
-	tc, err := g.GetTriggerContext()
-	if err != nil {
-		return nil, err
-	}
-	httpClient := &http.Client{Timeout: time.Second * 30}
-	if token := g.getenv("GITLAB_TOKEN"); token != "" {
-		httpClient.Transport = &gitlabTransport{
-			Token: token,
-		}
-	} else {
-		g.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
-	}
-	return &gitlabAPI{
-		baseURL: tc.SCM.APIURL,
-		project: g.getenv("CI_PROJECT_ID"),
-		client:  httpClient,
-	}, nil
-}
-
 type gitlabAPI struct {
 	baseURL string
 	project string
 	client  *http.Client
+}
+
+func gitlabClient(project, baseURL, token string) *gitlabAPI {
+	httpClient := &http.Client{Timeout: time.Second * 30}
+	if token != "" {
+		httpClient.Transport = &gitlabTransport{Token: token}
+	}
+	return &gitlabAPI{
+		baseURL: baseURL,
+		project: project,
+		client:  httpClient,
+	}
 }
 
 type GitlabComment struct {
