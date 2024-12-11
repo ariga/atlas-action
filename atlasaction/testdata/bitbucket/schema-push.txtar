@@ -1,0 +1,60 @@
+# Mock atlas command outputs
+mock-atlas $WORK/schema-push
+# Setup the action input variables
+env ATLAS_INPUT_ENV=test
+env ATLAS_INPUT_LATEST=true
+
+# Run the action without a tag
+atlas-action schema/push
+
+# Run the action with a tag
+env ATLAS_INPUT_TAG=98765
+atlas-action schema/push
+
+output outputs.sh
+-- outputs.sh --
+export ATLAS_OUTPUT_SCHEMA_PUSH_LINK="https://test.atlas.ariga/schemas/12345"
+export ATLAS_OUTPUT_SCHEMA_PUSH_SLUG="test-repo"
+export ATLAS_OUTPUT_SCHEMA_PUSH_URL="atlas://schema/12345"
+export ATLAS_OUTPUT_SCHEMA_PUSH_LINK="https://test.atlas.ariga/schemas/12345"
+export ATLAS_OUTPUT_SCHEMA_PUSH_SLUG="test-repo"
+export ATLAS_OUTPUT_SCHEMA_PUSH_URL="atlas://schema/12345"
+-- schema-push/1/args --
+schema push --format {{ json . }} --env test --context {"scmType":"BITBUCKET"} --tag latest
+
+-- schema-push/1/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}
+
+-- schema-push/2/args --
+schema push --format {{ json . }} --env test --context {"scmType":"BITBUCKET"}
+
+-- schema-push/2/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}
+
+-- schema-push/3/args --
+schema push --format {{ json . }} --env test --context {"scmType":"BITBUCKET"} --tag latest
+
+-- schema-push/3/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}
+
+-- schema-push/4/args --
+schema push --format {{ json . }} --env test --context {"scmType":"BITBUCKET"} --tag 98765
+
+-- schema-push/4/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}

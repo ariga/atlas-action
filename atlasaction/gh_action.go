@@ -6,11 +6,12 @@ package atlasaction
 
 import (
 	"fmt"
-	"golang.org/x/oauth2"
 	"io"
 	"net/http"
 	"os"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/mitchellh/mapstructure"
