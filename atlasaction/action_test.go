@@ -291,6 +291,11 @@ type mockAtlas struct {
 
 var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
 
+// Version implements AtlasExec.
+func (m *mockAtlas) Version(context.Context) (*atlasexec.Version, error) {
+	return &atlasexec.Version{Version: "v0.29.1", SHA: "bb8bf66", Canary: true}, nil
+}
+
 // Login implements AtlasExec.
 func (m *mockAtlas) Login(ctx context.Context, params *atlasexec.LoginParams) error {
 	return m.login(ctx, params)
@@ -651,8 +656,8 @@ func TestMonitorSchema(t *testing.T) {
 				as, err = atlasaction.New(
 					atlasaction.WithAction(act),
 					atlasaction.WithAtlas(cli),
-					atlasaction.WithCloudClient(func(context.Context, string) (atlasaction.CloudClient, error) {
-						return cc, nil
+					atlasaction.WithCloudClient(func(token, version, cliVersion string) *mockCloudClient {
+						return cc
 					}),
 				)
 			)
