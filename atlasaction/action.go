@@ -37,6 +37,7 @@ type (
 		Version     string
 		Atlas       AtlasExec
 		CloudClient func(string, string, *atlasexec.Version) CloudClient
+		Getenv      func(string) string
 	}
 
 	// Action interface for Atlas.
@@ -53,8 +54,6 @@ type (
 		GetTriggerContext() (*TriggerContext, error)
 		// AddStepSummary adds a summary to the action step.
 		AddStepSummary(string)
-		// SCM returns a SCMClient.
-		SCM() (SCMClient, error)
 	}
 
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
@@ -194,6 +193,7 @@ func New(opts ...Option) (*Actions, error) {
 		Atlas:       cfg.atlas,
 		CloudClient: cfg.cloudClient,
 		Version:     cfg.version,
+		Getenv:      cfg.getenv,
 	}, nil
 }
 
@@ -527,7 +527,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		return nil
 	}
 	// In case of a pull request, we need to add comments and suggestion to the PR.
-	switch c, err := a.SCM(); {
+	switch c, err := a.SCM(tc); {
 	case errors.Is(err, ErrNoSCM):
 	case err != nil:
 		return err
@@ -737,7 +737,7 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		return fmt.Errorf("failed to generate schema plan comment: %w", err)
 	}
 	a.AddStepSummary(summary)
-	switch c, err := a.SCM(); {
+	switch c, err := a.SCM(tc); {
 	case errors.Is(err, ErrNoSCM):
 	case err != nil:
 		return err
@@ -1095,6 +1095,26 @@ func (a *Actions) RequiredInputs(input ...string) error {
 		}
 	}
 	return nil
+}
+
+// SCM returns a SCMClient.
+func (a *Actions) SCM(tc *TriggerContext) (SCMClient, error) {
+	switch tc.SCM.Type {
+	case atlasexec.SCMTypeGithub:
+		token := a.Getenv("GITHUB_TOKEN")
+		if token == "" {
+			a.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
+		}
+		return githubClient(tc.Repo, tc.SCM.APIURL, token), nil
+	case atlasexec.SCMTypeGitlab:
+		token := a.Getenv("GITLAB_TOKEN")
+		if token == "" {
+			a.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
+		}
+		return gitlabClient(a.Getenv("CI_PROJECT_ID"), tc.SCM.APIURL, token), nil
+	default:
+		return nil, ErrNoSCM // Not implemented yet.
+	}
 }
 
 // addChecks runs annotations to the trigger event pull request for the given payload.
