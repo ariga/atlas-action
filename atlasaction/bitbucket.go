@@ -5,7 +5,6 @@
 package atlasaction
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -104,7 +103,7 @@ func (a *bbPipe) AddStepSummary(string) {}
 
 // SCM implements Action.
 func (a *bbPipe) SCM() (SCMClient, error) {
-	return nil, errors.New("not implemented")
+	return nil, ErrNoSCM // Not implemented yet.
 }
 
 var _ Action = (*bbPipe)(nil)

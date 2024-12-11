@@ -251,6 +251,9 @@ func WithVersion(v string) Option {
 	return func(c *config) { c.version = v }
 }
 
+// ErrNoSCM is returned when no SCM client is found.
+var ErrNoSCM = errors.New("atlasaction: no SCM client found")
+
 type (
 	config struct {
 		getenv      func(string) string
@@ -512,28 +515,29 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		return err
 	}
 	a.AddStepSummary(summary)
-	switch {
-	case tc.PullRequest == nil && isLintErr:
-		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
-	case tc.PullRequest == nil:
-		return nil
-	// In case of a pull request, we need to add comments and suggestion to the PR.
-	default:
-		scm, err := a.SCM()
-		if err != nil {
-			return err
+	if tc.PullRequest == nil {
+		if isLintErr {
+			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
 		}
-		if err = scm.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
+		return nil
+	}
+	// In case of a pull request, we need to add comments and suggestion to the PR.
+	switch c, err := a.SCM(); {
+	case errors.Is(err, ErrNoSCM):
+	case err != nil:
+		return err
+	default:
+		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
 			a.Errorf("failed to comment on the pull request: %v", err)
 		}
-		switch files, err := scm.ListPullRequestFiles(ctx, tc.PullRequest); {
+		switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest); {
 		case err != nil:
 			a.Errorf("failed to list pull request files: %w", err)
 		default:
 			err = a.addSuggestions(&payload, func(s *Suggestion) error {
 				// Add suggestion only if the file is part of the pull request.
 				if slices.Contains(files, s.Path) {
-					return scm.UpsertSuggestion(ctx, tc.PullRequest, s)
+					return c.UpsertSuggestion(ctx, tc.PullRequest, s)
 				}
 				return nil
 			})
@@ -541,12 +545,12 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 				a.Errorf("failed to add suggestion on the pull request: %v", err)
 			}
 		}
-		if isLintErr {
-			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
-		}
-		a.Infof("`atlas migrate lint` completed successfully, no issues found")
-		return nil
 	}
+	if isLintErr {
+		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
+	}
+	a.Infof("`atlas migrate lint` completed successfully, no issues found")
+	return nil
 }
 
 // MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
@@ -726,16 +730,17 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		return fmt.Errorf("failed to generate schema plan comment: %w", err)
 	}
 	a.AddStepSummary(summary)
-	scm, err := a.SCM()
-	if err != nil {
+	switch c, err := a.SCM(); {
+	case errors.Is(err, ErrNoSCM):
+	case err != nil:
 		return err
-	}
-	// Comment on the PR
-	err = scm.UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
-	if err != nil {
-		// Don't fail the action if the comment fails.
-		// It may be due to the missing permissions.
-		a.Errorf("failed to comment on the pull request: %v", err)
+	default:
+		err = c.UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
+		if err != nil {
+			// Don't fail the action if the comment fails.
+			// It may be due to the missing permissions.
+			a.Errorf("failed to comment on the pull request: %v", err)
+		}
 	}
 	if plan.Lint != nil {
 		if errs := plan.Lint.Errors(); len(errs) > 0 {
