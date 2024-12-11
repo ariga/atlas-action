@@ -12,7 +12,6 @@ import (
 
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-action/atlasaction/cloud"
-	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/alecthomas/kong"
 )
 
@@ -26,29 +25,24 @@ var (
 )
 
 func main() {
-	var a *atlasexec.Client
+	atlasPath := "atlas"
+	if p := os.Getenv("ATLAS_PATH"); p != "" {
+		// The environment can provide the path to the atlas-cli binary.
+		//
+		// This is useful when running the action in a Docker container,
+		// and the user can mount the atlas-cli binary in the container and set the
+		// ATLAS_PATH environment variable to the path of the binary.
+		atlasPath = p
+	}
 	act, err := atlasaction.New(
+		atlasaction.WithAtlasPath(atlasPath),
+		atlasaction.WithCloudClient(cloud.New),
 		atlasaction.WithVersion(version),
-		atlasaction.WithCloudClient(func(ctx context.Context, t string) (atlasaction.CloudClient, error) {
-			if a == nil {
-				return nil, errors.New("unexpected missing atlas client")
-			}
-			v, err := a.Version(ctx)
-			if err != nil {
-				return nil, err
-			}
-			return cloud.New(t, version, v.String()), nil
-		}),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to run action in the current environment: %s\n", err)
 		os.Exit(1)
 	}
-	a, err = atlasexec.NewClient("", "atlas")
-	if err != nil {
-		act.Fatalf("Failed to create client: %s", err)
-	}
-	act.Atlas = a
 	cli := kong.Parse(
 		&RunActionCmd{},
 		kong.BindTo(context.Background(), (*context.Context)(nil)),

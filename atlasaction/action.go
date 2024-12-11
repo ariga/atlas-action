@@ -36,7 +36,7 @@ type (
 		Action
 		Version     string
 		Atlas       AtlasExec
-		cloudClient func(ctx context.Context, token string) (CloudClient, error)
+		CloudClient func(string, string, *atlasexec.Version) CloudClient
 	}
 
 	// Action interface for Atlas.
@@ -82,6 +82,9 @@ type (
 
 	// AtlasExec is the interface for the atlas exec client.
 	AtlasExec interface {
+		// Version returns the version of the atlas binary.
+		Version(ctx context.Context) (*atlasexec.Version, error)
+		// Login runs the `login` command.
 		Login(ctx context.Context, params *atlasexec.LoginParams) error
 		// MigrateStatus runs the `migrate status` command.
 		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
@@ -174,6 +177,9 @@ func New(opts ...Option) (*Actions, error) {
 	opts = append(opts, WithRuntimeAction())
 	for _, o := range opts {
 		o(cfg)
+		if cfg.err != nil {
+			return nil, cfg.err
+		}
 	}
 	if cfg.action == nil {
 		return nil, errors.New("atlasaction: no action found for the current environment")
@@ -181,8 +187,8 @@ func New(opts ...Option) (*Actions, error) {
 	return &Actions{
 		Action:      cfg.action,
 		Atlas:       cfg.atlas,
+		CloudClient: cfg.cloudClient,
 		Version:     cfg.version,
-		cloudClient: cfg.cloudClient,
 	}, nil
 }
 
@@ -217,14 +223,25 @@ func WithRuntimeAction() Option {
 	}
 }
 
+// WithAtlasPath sets the path to the atlas binary.
+func WithAtlasPath(bin string) Option {
+	return func(c *config) {
+		c.atlas, c.err = atlasexec.NewClient("", bin)
+	}
+}
+
 // WithAtlas sets the AtlasExec to use.
 func WithAtlas(a AtlasExec) Option {
 	return func(c *config) { c.atlas = a }
 }
 
 // WithCloudClient specifies how to obtain a CloudClient given the name of the token input variable.
-func WithCloudClient(cc func(ctx context.Context, token string) (CloudClient, error)) Option {
-	return func(c *config) { c.cloudClient = cc }
+func WithCloudClient[T CloudClient](cc func(token, version, cliVersion string) T) Option {
+	return func(c *config) {
+		c.cloudClient = func(token, version string, v *atlasexec.Version) CloudClient {
+			return cc(token, version, v.String())
+		}
+	}
 }
 
 // WithVersion specifies the version of the Actions.
@@ -238,8 +255,9 @@ type (
 		out         io.Writer
 		action      Action
 		atlas       AtlasExec
-		cloudClient func(ctx context.Context, token string) (CloudClient, error)
+		cloudClient func(string, string, *atlasexec.Version) CloudClient
 		version     string
+		err         error // the error occurred during the configuration.
 	}
 	Option func(*config)
 )
@@ -851,7 +869,7 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to inspect the schema: %w", err)
 	}
-	cc, err := a.CloudClient(ctx, "cloud-token")
+	cc, err := a.cloudClient(ctx, "cloud-token")
 	if err != nil {
 		return err
 	}
@@ -880,12 +898,16 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	return nil
 }
 
-func (a *Actions) CloudClient(ctx context.Context, tokenInput string) (CloudClient, error) {
+func (a *Actions) cloudClient(ctx context.Context, tokenInput string) (CloudClient, error) {
 	t := a.GetInput(tokenInput)
 	if t == "" {
 		return nil, fmt.Errorf("missing required input: %q", tokenInput)
 	}
-	return a.cloudClient(ctx, t)
+	v, err := a.Atlas.Version(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the atlas version: %w", err)
+	}
+	return a.CloudClient(t, a.Version, v), nil
 }
 
 // OldAgentHash computes a hash of the input. Used by the agent to determine if a new snapshot is needed.
