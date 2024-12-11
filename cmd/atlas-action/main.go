@@ -67,7 +67,7 @@ func (v VersionFlag) BeforeReset(app *kong.Kong) error {
 
 // RunActionCmd is a command to run one of the Atlas GitHub Actions.
 type RunActionCmd struct {
-	Action  string      `help:"Command to run" required:""`
+	Action  string      `help:"Command to run" required:"" env:"ATLAS_ACTION"`
 	Version VersionFlag `help:"Prints the version and exits"`
 }
 
