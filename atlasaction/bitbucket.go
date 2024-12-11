@@ -5,16 +5,23 @@
 package atlasaction
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/fatih/color"
+	"golang.org/x/oauth2"
 )
 
 type bbPipe struct {
@@ -101,4 +108,148 @@ func (a *bbPipe) SetOutput(name, value string) {
 
 func (a *bbPipe) AddStepSummary(string) {}
 
+type bbClient struct {
+	baseURL   string
+	workspace string
+	repoSlug  string
+	client    *http.Client
+}
+
+func BitbucketClient(workspace, repoSlug, baseURL, token string) *bbClient {
+	httpClient := &http.Client{Timeout: time.Second * 30}
+	if token != "" {
+		httpClient.Transport = &oauth2.Transport{
+			Base: http.DefaultTransport,
+			Source: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: token,
+			}),
+		}
+	}
+	return &bbClient{
+		baseURL:   baseURL,
+		workspace: workspace,
+		repoSlug:  repoSlug,
+		client:    httpClient,
+	}
+}
+
+// UpsertComment implements SCMClient.
+func (b *bbClient) UpsertComment(ctx context.Context, pr *PullRequest, id string, comment string) error {
+	c, err := b.listComments(ctx, pr)
+	if err != nil {
+		return err
+	}
+	var (
+		marker = commentMarker(id)
+		body   = strings.NewReader(fmt.Sprintf(`{"content":{"raw":%q}}`, comment+"\n"+marker))
+	)
+	if found := slices.IndexFunc(c, func(c BitBucketComment) bool {
+		return strings.Contains(c.Body, marker)
+	}); found != -1 {
+		return b.updateComment(ctx, pr, c[found].ID, body)
+	}
+	return b.createComment(ctx, pr, body)
+}
+
+type (
+	BitBucketComment struct {
+		ID   int    `json:"id"`
+		Body string `json:"body"`
+	}
+	BitBucketPaginatedResponse[T any] struct {
+		Size     int    `json:"size"`
+		Page     int    `json:"page"`
+		PageLen  int    `json:"pagelen"`
+		Next     string `json:"next"`
+		Previous string `json:"previous"`
+		Values   []T    `json:"values"`
+	}
+)
+
+func (b *bbClient) listComments(ctx context.Context, pr *PullRequest) (result []BitBucketComment, err error) {
+	u, err := b.commentsURL(pr)
+	if err != nil {
+		return nil, err
+	}
+	for u != "" {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+		res, err := b.client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("unexpected status code %d", res.StatusCode)
+		}
+		var comments BitBucketPaginatedResponse[struct {
+			ID      int `json:"id"`
+			Content struct {
+				Raw string `json:"raw"`
+			} `json:"content"`
+		}]
+		if err := json.NewDecoder(io.TeeReader(res.Body, os.Stdout)).Decode(&comments); err != nil {
+			return nil, err
+		}
+		for _, c := range comments.Values {
+			result = append(result, BitBucketComment{ID: c.ID, Body: c.Content.Raw})
+		}
+		u = comments.Next // Fetch the next page if available.
+	}
+	return result, nil
+}
+
+func (b *bbClient) createComment(ctx context.Context, pr *PullRequest, content io.Reader) error {
+	u, err := b.commentsURL(pr)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, content)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := b.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		return fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
+	return nil
+}
+
+func (b *bbClient) updateComment(ctx context.Context, pr *PullRequest, commentID int, content io.Reader) error {
+	u, err := b.commentsURL(pr)
+	if err != nil {
+		return err
+	}
+	u, err = url.JoinPath(u, strconv.Itoa(commentID))
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, u, content)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := b.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
+	return nil
+}
+
+func (b *bbClient) commentsURL(pr *PullRequest) (string, error) {
+	return url.JoinPath(b.baseURL, "repositories", b.workspace, b.repoSlug, "pullrequests", strconv.Itoa(pr.Number), "comments")
+}
+
 var _ Action = (*bbPipe)(nil)
+var _ SCMClient = (*bbClient)(nil)

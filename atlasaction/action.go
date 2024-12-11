@@ -1112,6 +1112,13 @@ func (a *Actions) SCM(tc *TriggerContext) (SCMClient, error) {
 			a.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
 		}
 		return gitlabClient(a.Getenv("CI_PROJECT_ID"), tc.SCM.APIURL, token), nil
+	case atlasexec.SCMTypeBitbucket:
+		token := a.Getenv("BITBUCKET_ACCESS_TOKEN")
+		return BitbucketClient(
+			a.Getenv("BITBUCKET_WORKSPACE"),
+			a.Getenv("BITBUCKET_REPO_SLUG"),
+			tc.SCM.APIURL, token,
+		), nil
 	default:
 		return nil, ErrNoSCM // Not implemented yet.
 	}
