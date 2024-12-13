@@ -1,13 +1,11 @@
 {{- block "migrate-header" . -}}
-<h2>
 {{- if .Error -}}
-{{- assetsImage "error.svg" | image "22px" }} Migration Failed
+{{- assetsImage "error.svg" | image "22px" | printf "%s Migration Failed" | heading 2 }}
 {{- else -}}
-{{- assetsImage "success.svg" | image "22px" }} Migration Passed
+{{- assetsImage "success.svg" | image "22px" | printf "%s Migration Passed" | heading 2 }}
 {{- end -}}
-</h2>
 {{- end -}}
-<h4><code>atlas migrate apply</code> Summary:</h4>
+{{ heading 4 "`atlas migrate apply`" }}
 <table>
   <tr>
     <th>Parameter</th>
@@ -50,7 +48,7 @@
 </table>
 {{- range .Applied -}}
 {{- block "applied-file" . -}}
-<h4>Version {{ .Name }}:</h4>
+{{ printf "Version %s" .Name | heading 4 }}
 <table>
   <tr>
     <th>Status</th>
@@ -60,7 +58,7 @@
     <th>Error Statement</th>
   </tr>
   <tr>
-    {{- template "lint-check" (or (and .Error "error.svg") "success.svg") -}}
+    <td>{{- template "lint-check" (or (and .Error "error.svg") "success.svg") -}}</td>
     <td>{{ len .Applied }}</td>
     <td>{{ execTime .Start .End }}</td>
 {{- with .Error -}}

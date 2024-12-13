@@ -1,23 +1,23 @@
 {{- template "migrate-header" . -}}
-<h4><code>atlas schema apply</code> Summary:</h4>
+{{ heading 4 "`atlas schema apply` Summary:" }}
 {{- with .Plan -}}
 <table>
   <tr>
     <td>Database URL</td>
-    <td><code>{{ $.URL }}</code></td>
+    <td>`{{ $.URL }}`</td>
   </tr>
   {{- with .File -}}
   <tr>
     <td>Plan Name</td>
-    <td><code>{{ .Name }}</code></td>
+    <td>`{{ .Name }}`</td>
   </tr>
   <tr>
     <td>From Hash</td>
-    <td><code>{{ .FromHash }}</code></td>
+    <td>`{{ .FromHash }}`</td>
   </tr>
   <tr>
     <td>To Hash</td>
-    <td><code>{{ .ToHash }}</code></td>
+    <td>`{{ .ToHash }}`</td>
   </tr>
     {{- if .URL -}}
   <tr>
@@ -51,15 +51,15 @@
   {{- $kind := or (and .File.URL "Pre-planned SQL") "SQL" -}}
   {{- .File.Migration | codeblock "sql" | details (printf "📄 View %s Statements" $kind) -}}
   {{- with .Lint -}}
-<h4>Atlas lint results</h4>
+{{ heading 4 "Atlas lint results" }}
     {{- template "schema-lint" $ -}}
   {{- end -}}
 {{/* Fallback to the old output */}}
 {{- else with .Changes -}}
   {{- with .Error -}}
 The following SQL statement failed to execute:
-    {{- .Stmt | codeblock "sql" -}}
-<br>Database returned the following error:
+    {{ .Stmt | codeblock "sql" }}
+Database returned the following error:
     {{- .Text | codeblock "" -}}
   {{- end -}}
   {{- with .Applied -}}

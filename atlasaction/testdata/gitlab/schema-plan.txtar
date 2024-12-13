@@ -14,7 +14,7 @@ env CI_MERGE_REQUEST_REF_PATH=$CI_PROJECT_URL/merge_requests/1
 atlas-action schema/plan
 stdout 'Schema plan does not exist, creating a new one with name "pr-1-3RRRcLHF"'
 
-cmp comments-expected/1 comments/1
+cmp comments-expected/1.md comments/1
 
 -- schema-plan/1/args --
 schema plan list --format {{ json . }} --context {"repo":"my-project","branch":"test-branch","commit":"123","url":"https://gitlab.com/projects/my-project/merge_requests/1","username":"user","userID":"123","scmType":"GITLAB"} --pending --auto-approve
@@ -112,9 +112,9 @@ schema plan --format {{ json . }} --context {"repo":"my-project","branch":"test-
     }
 }
 
--- comments-expected/1 --
-<h3>Atlas detected changes to the desired schema</h3>
-<h4>Migration Plan (<a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511" target="_blank">View on Atlas Cloud</a>)</h4>
+-- comments-expected/1.md --
+### Atlas detected changes to the desired schema
+#### Migration Plan ([View on Atlas Cloud](http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511))
 
 
 ```sql
@@ -124,19 +124,14 @@ CREATE TABLE `1` (
 );
 ```
 
-<h4>Atlas lint results</h4><table>
-  <thead>
-    <tr>
-      <th>Status</th>
-      <th>Step</th>
-      <th>Result</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>Detect schema changes</td><td>1 new statement detected</td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>No issues found</td>
-      <td></td>
-    </tr></tbody></table><hr>
+#### Atlas lint results
+| Status | Step | Result |
+| :---: | :--- | :--- |
+| ![](https://release.ariga.io/images/assets/success.svg?v=1){width=20px height=20px} | Detect schema changes | 1 new statement detected
+| ![](https://release.ariga.io/images/assets/success.svg?v=1){width=20px height=20px} | No issues found |  |
+
+---
+
 <details>
 <summary>📝 Steps to edit this migration plan</summary>
 

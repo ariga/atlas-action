@@ -1279,33 +1279,34 @@ var (
 					return u.String(), nil
 				},
 				"join": strings.Join,
+				"heading": func(level int, text string) string {
+					return strings.Repeat("#", level) + " " + text
+				},
+				"separator": func() string {
+					return "\n---\n"
+				},
 				"codeblock": func(lang, code string) string {
-					return fmt.Sprintf("<pre lang=%q><code>%s</code></pre>", lang, code)
+					return fmt.Sprintf("```%s\n%s```\n", lang, code)
 				},
 				"details": func(label, details string) string {
 					return fmt.Sprintf("<details><summary>%s</summary>%s</details>", label, details)
 				},
 				"link": func(text, href string) string {
-					return fmt.Sprintf(`<a href=%q target="_blank">%s</a>`, href, text)
+					return fmt.Sprintf(`[%s](%s)`, text, href)
 				},
 				"image": func(args ...any) (string, error) {
-					var attrs string
-					var src any
 					switch len(args) {
 					case 1:
-						src, attrs = args[0], fmt.Sprintf("src=%q", args...)
+						return fmt.Sprintf("![](%s)", args...), nil
 					case 2:
-						src, attrs = args[1], fmt.Sprintf("width=%[1]q height=%[1]q src=%[2]q", args...)
+						return fmt.Sprintf("![](%[2]s){width=%[1]s height=%[1]s}", args[0], args[1]), nil
 					case 3:
-						src, attrs = args[2], fmt.Sprintf("width=%q height=%q src=%q", args...)
+						return fmt.Sprintf("![](%[3]s){width=%[2]s height=%[1]s}", args[0], args[1], args[2]), nil
 					case 4:
-						src, attrs = args[3], fmt.Sprintf("width=%q height=%q alt=%q src=%q", args...)
+						return fmt.Sprintf("![%[3]s](%[4]s){width=%[2]s height=%[1]s}", args[0], args[1], args[2], args[3]), nil
 					default:
 						return "", fmt.Errorf("invalid number of arguments %d", len(args))
 					}
-					// Wrap the image in a picture element to avoid
-					// clicking on the image to view the full size.
-					return fmt.Sprintf(`<picture><source media="(prefers-color-scheme: light)" srcset=%q><img %s/></picture>`, src, attrs), nil
 				},
 				"trimRight": strings.TrimRight,
 			}).

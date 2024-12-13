@@ -1,5 +1,9 @@
-<h3>Atlas detected changes to the desired schema</h3>
-<h4>Migration Plan {{- with .Plan.File.Link }} ({{- . | link "View on Atlas Cloud" -}}){{ end }}</h4>
+{{ heading 3 "Atlas detected changes to the desired schema" }}
+{{- with .Plan.File.Link }}
+{{ . | link "View on Atlas Cloud" | printf "Migration Plan (%s)" | heading 4 -}}
+{{ else }}
+{{ heading 4 "Migration Plan" -}}
+{{ end }}
 
 {{/* Respect double new lines as they are skipped in <pre/code> blocks. */}}
 {{- with .Plan.File.Migration }}
@@ -8,9 +12,9 @@
 ```
 {{- end }}
 
-<h4>Atlas lint results</h4>
-{{- template "schema-lint" . -}}
-<hr>
+{{ heading 4 "Atlas lint results" }}
+{{ template "schema-lint" . -}}
+{{ separator }}
 <details>
 <summary>📝 Steps to edit this migration plan</summary>
 
@@ -36,30 +40,15 @@ atlas schema plan push --pending --env {{ .EnvName }} --file {{ .Plan.File.Name 
 
 </details>
 {{- define "schema-lint" -}}
-<table>
-  <thead>
-    <tr>
-      <th>Status</th>
-      <th>Step</th>
-      <th>Result</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-  {{- template "lint-check" "success.svg" -}}
-  {{- with .Plan.File -}}
-      <td>Detect schema changes</td><td>
-        {{- $stmtCount := len .Stmts -}}
-        {{- if eq $stmtCount 1 -}}
-        1 new statement detected
-        {{- else if $stmtCount -}}
-        {{- $stmtCount }} new statements detected
-        {{- else -}}
-        No statements detected
-        {{- end -}}
-      </td>
-    </tr>
-  {{- end -}}
-  {{- template "lint-report" .Plan.Lint -}}
-  </tbody></table>
+| Status | Step | Result |
+| :---: | :--- | :--- |
+{{ with .Plan.File -}}
+{{- $stmtCount := len .Stmts -}}
+| {{ template "lint-check" "success.svg" }} | Detect schema changes |
+{{- if eq $stmtCount 1 }} 1 new statement detected
+{{- else if $stmtCount }} {{ $stmtCount }} new statements detected
+{{- else }} No statements detected
+{{- end }}
+{{- end -}}
+{{- template "lint-report" .Plan.Lint -}}
 {{- end -}}

@@ -1,4 +1,5 @@
-<code>atlas migrate lint</code> on <strong>{{ if eq .Env.Dir "." }}working directory{{ else }}{{ .Env.Dir }}{{ end }}</strong><table>
+`atlas migrate lint` on *{{ if eq .Env.Dir "." }}working directory{{ else }}{{ .Env.Dir }}{{ end }}*
+<table>
   <thead>
     <tr>
       <th>Status</th>
@@ -8,7 +9,7 @@
   </thead>
   <tbody>
     <tr>
-{{- template "lint-check" "success.svg" -}}
+      <td>{{- template "lint-check" "success.svg" -}}</td>
       <td>
         {{- $fileCount := len .Files -}}
         {{- if eq $fileCount 1 -}}
