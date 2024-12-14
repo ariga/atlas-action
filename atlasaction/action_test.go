@@ -2351,7 +2351,7 @@ func TestSchemaPlanApprove(t *testing.T) {
 		return a
 	}
 	require.ErrorContains(t, newActs().SchemaPlanApprove(ctx), "found multiple schema plans, please approve or delete the existing plans")
-	require.Len(t, act.summary, 0, "Expected 1 summary")
+	require.Equal(t, 0, act.summary, "Expected 0 summary")
 
 	// Trigger with no pull request, master branch
 	planFiles = []atlasexec.SchemaPlanFile{*planFile}
@@ -2359,7 +2359,7 @@ func TestSchemaPlanApprove(t *testing.T) {
 	act.trigger.Branch = "master"
 	act.resetOutputs()
 	require.NoError(t, newActs().SchemaPlanApprove(ctx))
-	require.Len(t, act.summary, 0, "No more summaries generated")
+	require.Equal(t, 0, act.summary, "No more summaries generated")
 	require.EqualValues(t, map[string]string{
 		"plan":   "atlas://atlas-action/plans/pr-1-Rl4lBdMk",
 		"status": "APPROVED",
@@ -2370,7 +2370,7 @@ func TestSchemaPlanApprove(t *testing.T) {
 	planFiles = nil
 	act.resetOutputs()
 	require.NoError(t, newActs().SchemaPlanApprove(ctx))
-	require.Len(t, act.summary, 0, "No more summaries generated")
+	require.Equal(t, 0, act.summary, "No more summaries generated")
 	require.EqualValues(t, map[string]string{}, act.output, "expected output with plan URL")
 
 	// Check all logs output
