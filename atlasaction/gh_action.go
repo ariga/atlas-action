@@ -87,7 +87,7 @@ func (a *ghAction) GetType() atlasexec.TriggerType {
 }
 
 // GetTriggerContext returns the context of the action.
-func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
+func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	ctx, err := a.Action.Context()
 	if err != nil {
 		return nil, err

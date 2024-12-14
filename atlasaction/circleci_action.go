@@ -8,12 +8,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
-	"time"
 
 	"ariga.io/atlas-go-sdk/atlasexec"
-	"golang.org/x/oauth2"
 )
 
 // circleciOrb is an implementation of the Action interface for GitHub Actions.
@@ -54,64 +51,52 @@ func (a *circleCIOrb) SetOutput(name, value string) {
 
 // GetTriggerContext implements the Action interface.
 // https://circleci.com/docs/variables/#built-in-environment-variables
-func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
-	ctx := &TriggerContext{}
-	if ctx.Repo = a.getenv("CIRCLE_PROJECT_REPONAME"); ctx.Repo == "" {
+func (a *circleCIOrb) GetTriggerContext(ctx context.Context) (*TriggerContext, error) {
+	tc := &TriggerContext{
+		RepoURL: a.getenv("CIRCLE_REPOSITORY_URL"),
+		Repo:    a.getenv("CIRCLE_PROJECT_REPONAME"),
+		Branch:  a.getenv("CIRCLE_BRANCH"),
+		Commit:  a.getenv("CIRCLE_SHA1"),
+	}
+	if tc.Repo == "" {
 		return nil, fmt.Errorf("missing CIRCLE_PROJECT_REPONAME environment variable")
 	}
-	ctx.RepoURL = a.getenv("CIRCLE_REPOSITORY_URL")
-	ctx.Branch = a.getenv("CIRCLE_BRANCH")
-	if ctx.Commit = a.getenv("CIRCLE_SHA1"); ctx.Commit == "" {
+	if tc.Commit == "" {
 		return nil, fmt.Errorf("missing CIRCLE_SHA1 environment variable")
 	}
 	// Detect SCM provider based on Token.
 	switch ghToken := a.getenv("GITHUB_TOKEN"); {
 	case ghToken != "":
-		ctx.SCM = SCM{
+		tc.SCM = SCM{
 			Type:   atlasexec.SCMTypeGithub,
-			APIURL: defaultGHApiUrl,
-		}
-		if v := a.getenv("GITHUB_API_URL"); v != "" {
-			ctx.SCM.APIURL = v
+			APIURL: a.getenv("GITHUB_API_URL"),
 		}
 		// Used to change the location that the linting results are posted to.
 		// If GITHUB_REPOSITORY is not set, we default to the CIRCLE_PROJECT_REPONAME repo.
 		if v := a.getenv("GITHUB_REPOSITORY"); v != "" {
-			ctx.Repo = v
+			tc.Repo = v
 		}
 		// CIRCLE_REPOSITORY_URL will be empty for some reason, causing ctx.RepoURL to be empty.
 		// In this case, we default to the GitHub Cloud URL.
-		if ctx.RepoURL == "" {
-			ctx.RepoURL = fmt.Sprintf("https://github.com/%s", ctx.Repo)
+		if tc.RepoURL == "" {
+			tc.RepoURL = fmt.Sprintf("https://github.com/%s", tc.Repo)
 		}
 		// CIRCLE_BRANCH will be empty when the event is triggered by a tag.
 		// In this case, we can use CIRCLE_TAG as the branch.
-		if ctx.Branch == "" {
+		if tc.Branch == "" {
 			tag := a.getenv("CIRCLE_TAG")
 			if tag == "" {
 				return nil, fmt.Errorf("cannot determine branch due to missing CIRCLE_BRANCH and CIRCLE_TAG environment variables")
 			}
-			ctx.Branch = tag
-			return ctx, nil
+			tc.Branch = tag
+			return tc, nil
 		}
-		// get open pull requests for the branch.
-		c := &githubAPI{
-			client: &http.Client{
-				Timeout: time.Second * 30,
-				Transport: &oauth2.Transport{
-					Source: oauth2.StaticTokenSource(&oauth2.Token{
-						AccessToken: ghToken,
-					}),
-				},
-			},
-			baseURL: ctx.SCM.APIURL,
-			repo:    ctx.Repo,
-		}
+		c := githubClient(tc.Repo, tc.SCM.APIURL, ghToken)
 		var err error
-		ctx.PullRequest, err = c.OpeningPullRequest(context.Background(), ctx.Branch)
+		tc.PullRequest, err = c.OpeningPullRequest(ctx, tc.Branch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
 		}
 	}
-	return ctx, nil
+	return tc, nil
 }

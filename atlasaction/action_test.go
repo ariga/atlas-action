@@ -2434,7 +2434,7 @@ func (m *mockAction) GetType() atlasexec.TriggerType {
 }
 
 // GetTriggerContext implements Action.
-func (m *mockAction) GetTriggerContext() (*atlasaction.TriggerContext, error) {
+func (m *mockAction) GetTriggerContext(context.Context) (*atlasaction.TriggerContext, error) {
 	return m.trigger, nil
 }
 

@@ -5,6 +5,7 @@
 package atlasaction
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -36,7 +37,7 @@ func (a *bbPipe) GetType() atlasexec.TriggerType {
 }
 
 // GetTriggerContext implements Action.
-func (a *bbPipe) GetTriggerContext() (*TriggerContext, error) {
+func (a *bbPipe) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	tc := &TriggerContext{
 		Branch:  a.getenv("BITBUCKET_BRANCH"),
 		Commit:  a.getenv("BITBUCKET_COMMIT"),

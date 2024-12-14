@@ -53,7 +53,7 @@ func (g *gitlabCI) SetOutput(name, value string) {
 }
 
 // GetTriggerContext implements the Action interface.
-func (g *gitlabCI) GetTriggerContext() (*TriggerContext, error) {
+func (g *gitlabCI) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	ctx := &TriggerContext{
 		SCM: SCM{
 			Type:   atlasexec.SCMTypeGitlab,
@@ -86,7 +86,6 @@ type gitlabTransport struct {
 
 func (t *gitlabTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("PRIVATE-TOKEN", t.Token)
-	req.Header.Set("Content-Type", "application/json")
 	return http.DefaultTransport.RoundTrip(req)
 }
 
@@ -122,6 +121,7 @@ func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comm
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/json")
 	res, err := g.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("error querying gitlab comments with %v/%v, %w", g.project, pr.Number, err)
@@ -157,6 +157,7 @@ func (g *gitlabAPI) createComment(ctx context.Context, pr *PullRequest, comment 
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/json")
 	res, err := g.client.Do(req)
 	if err != nil {
 		return err
@@ -179,6 +180,7 @@ func (g *gitlabAPI) updateComment(ctx context.Context, pr *PullRequest, NoteId i
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/json")
 	res, err := g.client.Do(req)
 	if err != nil {
 		return err

@@ -50,7 +50,7 @@ type (
 		// SetOutput sets the value of the output with the given name.
 		SetOutput(string, string)
 		// GetTriggerContext returns the context of the trigger event.
-		GetTriggerContext() (*TriggerContext, error)
+		GetTriggerContext(context.Context) (*TriggerContext, error)
 	}
 
 	// Reporter is an interface for reporting the status of the actions.
@@ -442,15 +442,17 @@ func (a *Actions) MigrateDown(ctx context.Context) (err error) {
 
 // MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
 func (a *Actions) MigratePush(ctx context.Context) error {
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
 	}
+	rc := tc.GetRunContext()
+	rc.Path = a.GetInput("dir")
 	params := &atlasexec.MigratePushParams{
+		Context:   rc,
 		Name:      a.GetInput("dir-name"),
 		DirURL:    a.GetInput("dir"),
 		DevURL:    a.GetInput("dev-url"),
-		Context:   a.GetRunContext(ctx, tc),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
@@ -482,7 +484,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if dirName == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -490,13 +492,15 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		resp      bytes.Buffer
 		isLintErr bool
 	)
+	rc := tc.GetRunContext()
+	rc.Path = a.GetInput("dir")
 	switch err := a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
+		Context:   rc,
 		DevURL:    a.GetInput("dev-url"),
 		DirURL:    a.GetInput("dir"),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Base:      a.GetAtlasURLInput("dir-name", "tag"),
-		Context:   a.GetRunContext(ctx, tc),
 		Vars:      a.GetVarsInput("vars"),
 		Web:       true,
 		Writer:    &resp,
@@ -584,18 +588,18 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 
 // SchemaPush runs the GitHub Action for "ariga/atlas-action/schema/push"
 func (a *Actions) SchemaPush(ctx context.Context) error {
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
 	}
 	params := &atlasexec.SchemaPushParams{
+		Context:     tc.GetRunContext(),
 		Name:        a.GetInput("schema-name"),
 		Description: a.GetInput("description"),
 		Version:     a.GetInput("version"),
 		URL:         a.GetArrayInput("url"),
 		Schema:      a.GetArrayInput("schema"),
 		DevURL:      a.GetInput("dev-url"),
-		Context:     a.GetRunContext(ctx, tc),
 		ConfigURL:   a.GetInput("config"),
 		Env:         a.GetInput("env"),
 		Vars:        a.GetVarsInput("vars"),
@@ -643,7 +647,7 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 
 // SchemaPlan runs the GitHub Action for "ariga/atlas-action/schema/plan"
 func (a *Actions) SchemaPlan(ctx context.Context) error {
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	switch {
 	case err != nil:
 		return fmt.Errorf("unable to get the trigger context: %w", err)
@@ -652,10 +656,10 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	}
 	var plan *atlasexec.SchemaPlan
 	params := &atlasexec.SchemaPlanListParams{
+		Context:   tc.GetRunContext(),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
-		Context:   a.GetRunContext(ctx, tc),
 		Repo:      a.GetAtlasURLInput("schema-name"),
 		DevURL:    a.GetInput("dev-url"),
 		Schema:    a.GetArrayInput("schema"),
@@ -764,7 +768,7 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 
 // SchemaPlanApprove runs the GitHub Action for "ariga/atlas-action/schema/plan/approve"
 func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	switch {
 	case err != nil:
 		return fmt.Errorf("unable to get the trigger context: %w", err)
@@ -780,10 +784,10 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 	if params.URL == "" {
 		a.Infof("No plan URL provided, searching for the pending plan")
 		switch planFiles, err := a.Atlas.SchemaPlanList(ctx, &atlasexec.SchemaPlanListParams{
+			Context:   tc.GetRunContext(),
 			ConfigURL: params.ConfigURL,
 			Env:       params.Env,
 			Vars:      params.Vars,
-			Context:   a.GetRunContext(ctx, tc),
 			Repo:      a.GetAtlasURLInput("schema-name"),
 			DevURL:    a.GetInput("dev-url"),
 			Schema:    a.GetArrayInput("schema"),
@@ -1061,26 +1065,6 @@ func (a *Actions) GetArrayInput(name string) []string {
 	})
 }
 
-// GetRunContext returns the run context for the action.
-func (a *Actions) GetRunContext(_ context.Context, tc *TriggerContext) *atlasexec.RunContext {
-	u := tc.RepoURL
-	if tc.PullRequest != nil {
-		u = tc.PullRequest.URL
-	}
-	rc := &atlasexec.RunContext{
-		Repo:    tc.Repo,
-		Branch:  tc.Branch,
-		Commit:  tc.Commit,
-		Path:    a.GetInput("dir"),
-		URL:     u,
-		SCMType: tc.SCM.Type,
-	}
-	if a := tc.Actor; a != nil {
-		rc.Username, rc.UserID = a.Name, a.ID
-	}
-	return rc
-}
-
 // DeployRunContext returns the run context for the `migrate/apply`, and `migrate/down` actions.
 func (a *Actions) DeployRunContext() *atlasexec.DeployRunContext {
 	return &atlasexec.DeployRunContext{
@@ -1153,6 +1137,24 @@ func (a *Actions) addChecks(lint *atlasexec.SummaryReport) error {
 		}
 	}
 	return nil
+}
+
+// GetRunContext returns the run context for the action.
+func (tc *TriggerContext) GetRunContext() *atlasexec.RunContext {
+	rc := &atlasexec.RunContext{
+		URL:     tc.RepoURL,
+		Repo:    tc.Repo,
+		Branch:  tc.Branch,
+		Commit:  tc.Commit,
+		SCMType: tc.SCM.Type,
+	}
+	if pr := tc.PullRequest; pr != nil {
+		rc.URL = pr.URL
+	}
+	if a := tc.Actor; a != nil {
+		rc.Username, rc.UserID = a.Name, a.ID
+	}
+	return rc
 }
 
 type Suggestion struct {

@@ -5,6 +5,7 @@
 package atlasaction_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,13 +20,13 @@ import (
 
 func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	orb := atlasaction.NewCircleCIOrb(os.Getenv, os.Stdout)
-	_, err := orb.GetTriggerContext()
+	_, err := orb.GetTriggerContext(context.Background())
 	require.EqualError(t, err, "missing CIRCLE_PROJECT_REPONAME environment variable")
 	t.Setenv("CIRCLE_PROJECT_REPONAME", "atlas-orb")
-	_, err = orb.GetTriggerContext()
+	_, err = orb.GetTriggerContext(context.Background())
 	require.EqualError(t, err, "missing CIRCLE_SHA1 environment variable")
 	t.Setenv("CIRCLE_SHA1", "1234567890")
-	ctx, err := orb.GetTriggerContext()
+	ctx, err := orb.GetTriggerContext(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, &atlasaction.TriggerContext{
 		Repo:   "atlas-orb",
@@ -33,7 +34,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	}, ctx)
 	t.Setenv("GITHUB_TOKEN", "1234567890")
 	t.Setenv("GITHUB_REPOSITORY", "ariga/atlas-orb")
-	_, err = orb.GetTriggerContext()
+	_, err = orb.GetTriggerContext(context.Background())
 	require.EqualError(t, err, "cannot determine branch due to missing CIRCLE_BRANCH and CIRCLE_TAG environment variables")
 	t.Setenv("CIRCLE_BRANCH", "main")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +49,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	}))
 	defer server.Close()
 	t.Setenv("GITHUB_API_URL", server.URL)
-	ctx, err = orb.GetTriggerContext()
+	ctx, err = orb.GetTriggerContext(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, &atlasaction.PullRequest{
 		Number: 1,
