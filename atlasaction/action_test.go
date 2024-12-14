@@ -2211,7 +2211,7 @@ func TestSchemaPlan(t *testing.T) {
 		return a
 	}
 	require.ErrorContains(t, newActs().SchemaPlan(ctx), "found multiple schema plans, please approve or delete the existing plans")
-	require.Len(t, act.summary, 0, "Expected 1 summary")
+	require.Equal(t, 0, act.summary, "No summaries generated")
 	require.Equal(t, 0, commentCounter, "No more comments generated")
 	require.Equal(t, 0, commentEdited, "No comment should be edited")
 
@@ -2220,7 +2220,7 @@ func TestSchemaPlan(t *testing.T) {
 	planFiles = nil
 	act.resetOutputs()
 	require.NoError(t, newActs().SchemaPlan(ctx))
-	require.Len(t, act.summary, 0, "No summaries generated")
+	require.Equal(t, 0, act.summary, "No summaries generated")
 	require.Equal(t, 0, commentCounter, "Expected 1 comment generated")
 	require.Equal(t, 0, commentEdited, "No comment should be edited")
 
@@ -2229,7 +2229,7 @@ func TestSchemaPlan(t *testing.T) {
 	planFiles = nil
 	act.resetOutputs()
 	require.NoError(t, newActs().SchemaPlan(ctx))
-	require.Len(t, act.summary, 1, "Expected 1 summary")
+	require.Equal(t, 1, act.summary, "Expected 1 summary")
 	require.Equal(t, 1, commentCounter, "Expected 1 comment generated")
 	require.Equal(t, 0, commentEdited, "No comment should be edited")
 	require.EqualValues(t, map[string]string{
@@ -2241,7 +2241,7 @@ func TestSchemaPlan(t *testing.T) {
 	act.trigger.PullRequest.Body = "Text\n/atlas:txmode: none\nText"
 	act.resetOutputs()
 	require.NoError(t, newActs().SchemaPlan(ctx))
-	require.Len(t, act.summary, 2, "Expected 1 summary")
+	require.Equal(t, 2, act.summary, "Expected 2 summary")
 	require.Equal(t, []string{"atlas:txmode: none"}, planprams.Directives)
 	act.trigger.PullRequest.Body = ""
 
@@ -2249,7 +2249,7 @@ func TestSchemaPlan(t *testing.T) {
 	planFiles = []atlasexec.SchemaPlanFile{*planFile}
 	act.resetOutputs()
 	require.NoError(t, newActs().SchemaPlan(ctx))
-	require.Len(t, act.summary, 3, "Expected 2 summaries")
+	require.Equal(t, 3, act.summary, "Expected 3 summaries")
 	require.Equal(t, 1, commentCounter, "No more comments generated")
 	require.Equal(t, 2, commentEdited, "Expected comment to be edited")
 	require.EqualValues(t, map[string]string{
@@ -2390,7 +2390,7 @@ type (
 		scm     *mockSCM                    // scm client
 		inputs  map[string]string           // input values
 		output  map[string]string           // step's output
-		summary []string                    // step summaries
+		summary int                         // step summaries
 		logger  *slog.Logger                // logger
 		fatal   bool                        // fatal called
 	}
@@ -2400,7 +2400,28 @@ type (
 	}
 )
 
+// MigrateApply implements atlasaction.Reporter.
+func (m *mockAction) MigrateApply(context.Context, *atlasexec.MigrateApply) {
+	m.summary++
+}
+
+// MigrateLint implements atlasaction.Reporter.
+func (m *mockAction) MigrateLint(context.Context, *atlasexec.SummaryReport) {
+	m.summary++
+}
+
+// SchemaApply implements atlasaction.Reporter.
+func (m *mockAction) SchemaApply(context.Context, *atlasexec.SchemaApply) {
+	m.summary++
+}
+
+// SchemaPlan implements atlasaction.Reporter.
+func (m *mockAction) SchemaPlan(context.Context, *atlasexec.SchemaPlan) {
+	m.summary++
+}
+
 var _ atlasaction.Action = (*mockAction)(nil)
+var _ atlasaction.Reporter = (*mockAction)(nil)
 var _ atlasaction.SCMClient = (*mockSCM)(nil)
 
 func (m *mockAction) resetOutputs() {
@@ -2428,11 +2449,6 @@ func (m *mockAction) SetOutput(name, value string) {
 		m.output = make(map[string]string)
 	}
 	m.output[name] = value
-}
-
-// AddStepSummary implements Action.
-func (m *mockAction) AddStepSummary(s string) {
-	m.summary = append(m.summary, s)
 }
 
 // Infof implements Action.

@@ -99,6 +99,4 @@ func (a *bbPipe) SetOutput(name, value string) {
 	}
 }
 
-func (a *bbPipe) AddStepSummary(string) {}
-
 var _ Action = (*bbPipe)(nil)

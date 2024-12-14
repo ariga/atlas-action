@@ -5,6 +5,7 @@
 package atlasaction
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,8 +20,6 @@ import (
 
 const defaultGHApiUrl = "https://api.github.com"
 
-var _ Action = (*ghAction)(nil)
-
 type (
 	// ghAction is an implementation of the Action interface for GitHub Actions.
 	ghAction struct {
@@ -33,6 +32,50 @@ type (
 		client  *http.Client
 	}
 )
+
+// MigrateApply implements Reporter.
+func (a *ghAction) MigrateApply(_ context.Context, r *atlasexec.MigrateApply) {
+	summary, err := RenderTemplate("migrate-apply.tmpl", r)
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
+
+// MigrateLint implements Reporter.
+func (a *ghAction) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
+	summary, err := RenderTemplate("migrate-lint.tmpl", r)
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
+
+// SchemaApply implements Reporter.
+func (a *ghAction) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
+	summary, err := RenderTemplate("schema-apply.tmpl", r)
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
+
+// SchemaPlan implements Reporter.
+func (a *ghAction) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
+	summary, err := RenderTemplate("schema-plan.tmpl", map[string]any{
+		"Plan":         r,
+		"EnvName":      a.GetInput("env"),
+		"RerunCommand": fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
+	})
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
 
 // NewGHAction returns a new Action for GitHub Actions.
 func NewGHAction(getenv func(string) string, w io.Writer) *ghAction {
@@ -82,6 +125,9 @@ func (a *ghAction) GetTriggerContext() (*TriggerContext, error) {
 	}
 	return tc, nil
 }
+
+var _ Action = (*ghAction)(nil)
+var _ Reporter = (*ghAction)(nil)
 
 // githubClient returns a new GitHub client for the given repository.
 // If the GITHUB_TOKEN is set, it will be used for authentication.

@@ -52,10 +52,15 @@ type (
 		SetOutput(string, string)
 		// GetTriggerContext returns the context of the trigger event.
 		GetTriggerContext() (*TriggerContext, error)
-		// AddStepSummary adds a summary to the action step.
-		AddStepSummary(string)
 	}
 
+	// Reporter is an interface for reporting the status of the actions.
+	Reporter interface {
+		MigrateApply(context.Context, *atlasexec.MigrateApply)
+		MigrateLint(context.Context, *atlasexec.SummaryReport)
+		SchemaPlan(context.Context, *atlasexec.SchemaPlan)
+		SchemaApply(context.Context, *atlasexec.SchemaApply)
+	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
 		// UpsertComment posts or updates a pull request comment.
@@ -352,11 +357,8 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		return nil
 	}
 	for _, run := range runs {
-		switch summary, err := RenderTemplate("migrate-apply.tmpl", run); {
-		case err != nil:
-			a.Errorf("failed to create summary: %v", err)
-		default:
-			a.AddStepSummary(summary)
+		if r, ok := a.Action.(Reporter); ok {
+			r.MigrateApply(ctx, run)
 		}
 		if run.Error != "" {
 			a.SetOutput("error", run.Error)
@@ -515,11 +517,9 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if err := a.addChecks(&payload); err != nil {
 		return err
 	}
-	summary, err := RenderTemplate("migrate-lint.tmpl", &payload)
-	if err != nil {
-		return err
+	if r, ok := a.Action.(Reporter); ok {
+		r.MigrateLint(ctx, &payload)
 	}
-	a.AddStepSummary(summary)
 	if tc.PullRequest == nil {
 		if isLintErr {
 			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
@@ -532,7 +532,11 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	case err != nil:
 		return err
 	default:
-		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
+		comment, err := RenderTemplate("migrate-lint.tmpl", &payload)
+		if err != nil {
+			return err
+		}
+		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, comment); err != nil {
 			a.Errorf("failed to comment on the pull request: %v", err)
 		}
 		if c, ok := c.(SCMSuggestions); ok {
@@ -727,22 +731,24 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	a.SetOutput("link", plan.File.Link)
 	a.SetOutput("plan", plan.File.URL)
 	a.SetOutput("status", plan.File.Status)
-	// Report the schema plan to the user and add a comment to the PR.
-	summary, err := RenderTemplate("schema-plan.tmpl", map[string]any{
-		"Plan":         plan,
-		"EnvName":      params.Env,
-		"RerunCommand": tc.RerunCmd,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to generate schema plan comment: %w", err)
+	if r, ok := a.Action.(Reporter); ok {
+		r.SchemaPlan(ctx, plan)
 	}
-	a.AddStepSummary(summary)
 	switch c, err := a.SCM(tc); {
 	case errors.Is(err, ErrNoSCM):
 	case err != nil:
 		return err
 	default:
-		err = c.UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
+		// Report the schema plan to the user and add a comment to the PR.
+		comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
+			"Plan":         plan,
+			"EnvName":      params.Env,
+			"RerunCommand": tc.RerunCmd,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to generate schema plan comment: %w", err)
+		}
+		err = c.UpsertComment(ctx, tc.PullRequest, plan.File.Name, comment)
 		if err != nil {
 			// Don't fail the action if the comment fails.
 			// It may be due to the missing permissions.
@@ -834,11 +840,8 @@ func (a *Actions) SchemaApply(ctx context.Context) error {
 		results = mErr.Result
 	}
 	for _, result := range results {
-		switch summary, err := RenderTemplate("schema-apply.tmpl", result); {
-		case err != nil:
-			a.Errorf("failed to create summary: %v", err)
-		default:
-			a.AddStepSummary(summary)
+		if r, ok := a.Action.(Reporter); ok {
+			r.SchemaApply(ctx, result)
 		}
 		if result.Error != "" {
 			a.SetOutput("error", result.Error)

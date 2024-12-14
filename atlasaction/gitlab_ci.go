@@ -80,11 +80,6 @@ func (g *gitlabCI) GetTriggerContext() (*TriggerContext, error) {
 	return ctx, nil
 }
 
-// AddStepSummary implements the Action interface.
-func (g *gitlabCI) AddStepSummary(summary string) {
-	// unsupported
-}
-
 type gitlabTransport struct {
 	Token string
 }

@@ -115,8 +115,3 @@ func (a *circleCIOrb) GetTriggerContext() (*TriggerContext, error) {
 	}
 	return ctx, nil
 }
-
-// AddStepSummary implements the Action interface.
-func (a *circleCIOrb) AddStepSummary(summary string) {
-	// unsupported
-}
