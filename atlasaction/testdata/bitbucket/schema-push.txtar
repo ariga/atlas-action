@@ -11,6 +11,7 @@ atlas-action schema/push
 env ATLAS_INPUT_TAG=98765
 atlas-action schema/push
 
+exec cat .atlas-action/outputs.sh
 output outputs.sh
 -- outputs.sh --
 export ATLAS_OUTPUT_SCHEMA_PUSH_LINK="https://test.atlas.ariga/schemas/12345"

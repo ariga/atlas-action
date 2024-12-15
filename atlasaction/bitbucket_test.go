@@ -12,7 +12,7 @@ import (
 func TestBitbucketPipe(t *testing.T) {
 	var (
 		actions = "actions"
-		outputs = filepath.Join(actions, "outputs.sh")
+		outputs = filepath.Join("outputs.sh")
 	)
 	testscript.Run(t, testscript.Params{
 		Dir: filepath.Join("testdata", "bitbucket"),
@@ -23,6 +23,7 @@ func TestBitbucketPipe(t *testing.T) {
 			}
 			e.Setenv("BITBUCKET_PIPELINE_UUID", "fbfb4205-c666-42ed-983a-d27f47f2aad2")
 			e.Setenv("BITBUCKET_PIPE_STORAGE_DIR", dir)
+			e.Setenv("BITBUCKET_CLONE_DIR", e.WorkDir)
 			c, err := atlasexec.NewClient(e.WorkDir, "atlas")
 			if err != nil {
 				return err
