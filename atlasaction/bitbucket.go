@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -77,18 +78,18 @@ func (a *bbPipe) SetOutput(name, value string) {
 	// So the next step can read the outputs using the source command.
 	// e.g:
 	// ```shell
-	// source $BITBUCKET_PIPE_STORAGE_DIR/outputs.sh
+	// source .atlas-action/outputs.sh
 	// ```
-	// https://support.atlassian.com/bitbucket-cloud/docs/advanced-techniques-for-writing-pipes/#Sharing-information-between-pipes
-	dir := a.getenv("BITBUCKET_PIPE_STORAGE_DIR")
-	if out := a.getenv("OUTPUT_DIR"); out != "" {
+	dir := filepath.Join(a.getenv("BITBUCKET_CLONE_DIR"), ".atlas-action")
+	if out := a.getenv("ATLAS_OUTPUT_DIR"); out != "" {
 		// The user can set the output directory using
-		// the OUTPUT_DIR environment variable.
+		// the ATLAS_OUTPUT_DIR environment variable.
 		// This is useful when the user wants to share the output
 		// with steps run outside the pipe.
 		dir = out
 	}
-	if dir == "" {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		a.Errorf("failed to create output directory %s: %v", dir, err)
 		return
 	}
 	cmd := a.getenv("ATLAS_ACTION_COMMAND")
