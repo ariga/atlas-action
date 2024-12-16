@@ -14,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -51,11 +50,16 @@ type (
 		// SetOutput sets the value of the output with the given name.
 		SetOutput(string, string)
 		// GetTriggerContext returns the context of the trigger event.
-		GetTriggerContext() (*TriggerContext, error)
-		// AddStepSummary adds a summary to the action step.
-		AddStepSummary(string)
+		GetTriggerContext(context.Context) (*TriggerContext, error)
 	}
 
+	// Reporter is an interface for reporting the status of the actions.
+	Reporter interface {
+		MigrateApply(context.Context, *atlasexec.MigrateApply)
+		MigrateLint(context.Context, *atlasexec.SummaryReport)
+		SchemaPlan(context.Context, *atlasexec.SchemaPlan)
+		SchemaApply(context.Context, *atlasexec.SchemaApply)
+	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
 		// UpsertComment posts or updates a pull request comment.
@@ -352,11 +356,8 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		return nil
 	}
 	for _, run := range runs {
-		switch summary, err := RenderTemplate("migrate-apply.tmpl", run); {
-		case err != nil:
-			a.Errorf("failed to create summary: %v", err)
-		default:
-			a.AddStepSummary(summary)
+		if r, ok := a.Action.(Reporter); ok {
+			r.MigrateApply(ctx, run)
 		}
 		if run.Error != "" {
 			a.SetOutput("error", run.Error)
@@ -441,15 +442,17 @@ func (a *Actions) MigrateDown(ctx context.Context) (err error) {
 
 // MigratePush runs the GitHub Action for "ariga/atlas-action/migrate/push"
 func (a *Actions) MigratePush(ctx context.Context) error {
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
 	}
+	rc := tc.GetRunContext()
+	rc.Path = a.GetInput("dir")
 	params := &atlasexec.MigratePushParams{
+		Context:   rc,
 		Name:      a.GetInput("dir-name"),
 		DirURL:    a.GetInput("dir"),
 		DevURL:    a.GetInput("dev-url"),
-		Context:   a.GetRunContext(ctx, tc),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
@@ -481,7 +484,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if dirName == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -489,13 +492,15 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		resp      bytes.Buffer
 		isLintErr bool
 	)
+	rc := tc.GetRunContext()
+	rc.Path = a.GetInput("dir")
 	switch err := a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
+		Context:   rc,
 		DevURL:    a.GetInput("dev-url"),
 		DirURL:    a.GetInput("dir"),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Base:      a.GetAtlasURLInput("dir-name", "tag"),
-		Context:   a.GetRunContext(ctx, tc),
 		Vars:      a.GetVarsInput("vars"),
 		Web:       true,
 		Writer:    &resp,
@@ -515,11 +520,9 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if err := a.addChecks(&payload); err != nil {
 		return err
 	}
-	summary, err := RenderTemplate("migrate-lint.tmpl", &payload)
-	if err != nil {
-		return err
+	if r, ok := a.Action.(Reporter); ok {
+		r.MigrateLint(ctx, &payload)
 	}
-	a.AddStepSummary(summary)
 	if tc.PullRequest == nil {
 		if isLintErr {
 			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
@@ -532,7 +535,11 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	case err != nil:
 		return err
 	default:
-		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, summary); err != nil {
+		comment, err := RenderTemplate("migrate-lint.tmpl", &payload)
+		if err != nil {
+			return err
+		}
+		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, comment); err != nil {
 			a.Errorf("failed to comment on the pull request: %v", err)
 		}
 		if c, ok := c.(SCMSuggestions); ok {
@@ -581,18 +588,18 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 
 // SchemaPush runs the GitHub Action for "ariga/atlas-action/schema/push"
 func (a *Actions) SchemaPush(ctx context.Context) error {
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
 	}
 	params := &atlasexec.SchemaPushParams{
+		Context:     tc.GetRunContext(),
 		Name:        a.GetInput("schema-name"),
 		Description: a.GetInput("description"),
 		Version:     a.GetInput("version"),
 		URL:         a.GetArrayInput("url"),
 		Schema:      a.GetArrayInput("schema"),
 		DevURL:      a.GetInput("dev-url"),
-		Context:     a.GetRunContext(ctx, tc),
 		ConfigURL:   a.GetInput("config"),
 		Env:         a.GetInput("env"),
 		Vars:        a.GetVarsInput("vars"),
@@ -640,7 +647,7 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 
 // SchemaPlan runs the GitHub Action for "ariga/atlas-action/schema/plan"
 func (a *Actions) SchemaPlan(ctx context.Context) error {
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	switch {
 	case err != nil:
 		return fmt.Errorf("unable to get the trigger context: %w", err)
@@ -649,10 +656,10 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	}
 	var plan *atlasexec.SchemaPlan
 	params := &atlasexec.SchemaPlanListParams{
+		Context:   tc.GetRunContext(),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
-		Context:   a.GetRunContext(ctx, tc),
 		Repo:      a.GetAtlasURLInput("schema-name"),
 		DevURL:    a.GetInput("dev-url"),
 		Schema:    a.GetArrayInput("schema"),
@@ -727,22 +734,24 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	a.SetOutput("link", plan.File.Link)
 	a.SetOutput("plan", plan.File.URL)
 	a.SetOutput("status", plan.File.Status)
-	// Report the schema plan to the user and add a comment to the PR.
-	summary, err := RenderTemplate("schema-plan.tmpl", map[string]any{
-		"Plan":         plan,
-		"EnvName":      params.Env,
-		"RerunCommand": tc.RerunCmd,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to generate schema plan comment: %w", err)
+	if r, ok := a.Action.(Reporter); ok {
+		r.SchemaPlan(ctx, plan)
 	}
-	a.AddStepSummary(summary)
 	switch c, err := a.SCM(tc); {
 	case errors.Is(err, ErrNoSCM):
 	case err != nil:
 		return err
 	default:
-		err = c.UpsertComment(ctx, tc.PullRequest, plan.File.Name, summary)
+		// Report the schema plan to the user and add a comment to the PR.
+		comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
+			"Plan":         plan,
+			"EnvName":      params.Env,
+			"RerunCommand": tc.RerunCmd,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to generate schema plan comment: %w", err)
+		}
+		err = c.UpsertComment(ctx, tc.PullRequest, plan.File.Name, comment)
 		if err != nil {
 			// Don't fail the action if the comment fails.
 			// It may be due to the missing permissions.
@@ -759,7 +768,7 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 
 // SchemaPlanApprove runs the GitHub Action for "ariga/atlas-action/schema/plan/approve"
 func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
-	tc, err := a.GetTriggerContext()
+	tc, err := a.GetTriggerContext(ctx)
 	switch {
 	case err != nil:
 		return fmt.Errorf("unable to get the trigger context: %w", err)
@@ -775,10 +784,10 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 	if params.URL == "" {
 		a.Infof("No plan URL provided, searching for the pending plan")
 		switch planFiles, err := a.Atlas.SchemaPlanList(ctx, &atlasexec.SchemaPlanListParams{
+			Context:   tc.GetRunContext(),
 			ConfigURL: params.ConfigURL,
 			Env:       params.Env,
 			Vars:      params.Vars,
-			Context:   a.GetRunContext(ctx, tc),
 			Repo:      a.GetAtlasURLInput("schema-name"),
 			DevURL:    a.GetInput("dev-url"),
 			Schema:    a.GetArrayInput("schema"),
@@ -834,11 +843,8 @@ func (a *Actions) SchemaApply(ctx context.Context) error {
 		results = mErr.Result
 	}
 	for _, result := range results {
-		switch summary, err := RenderTemplate("schema-apply.tmpl", result); {
-		case err != nil:
-			a.Errorf("failed to create summary: %v", err)
-		default:
-			a.AddStepSummary(summary)
+		if r, ok := a.Action.(Reporter); ok {
+			r.SchemaApply(ctx, result)
 		}
 		if result.Error != "" {
 			a.SetOutput("error", result.Error)
@@ -1059,26 +1065,6 @@ func (a *Actions) GetArrayInput(name string) []string {
 	})
 }
 
-// GetRunContext returns the run context for the action.
-func (a *Actions) GetRunContext(_ context.Context, tc *TriggerContext) *atlasexec.RunContext {
-	u := tc.RepoURL
-	if tc.PullRequest != nil {
-		u = tc.PullRequest.URL
-	}
-	rc := &atlasexec.RunContext{
-		Repo:    tc.Repo,
-		Branch:  tc.Branch,
-		Commit:  tc.Commit,
-		Path:    a.GetInput("dir"),
-		URL:     u,
-		SCMType: tc.SCM.Type,
-	}
-	if a := tc.Actor; a != nil {
-		rc.Username, rc.UserID = a.Name, a.ID
-	}
-	return rc
-}
-
 // DeployRunContext returns the run context for the `migrate/apply`, and `migrate/down` actions.
 func (a *Actions) DeployRunContext() *atlasexec.DeployRunContext {
 	return &atlasexec.DeployRunContext{
@@ -1151,6 +1137,24 @@ func (a *Actions) addChecks(lint *atlasexec.SummaryReport) error {
 		}
 	}
 	return nil
+}
+
+// GetRunContext returns the run context for the action.
+func (tc *TriggerContext) GetRunContext() *atlasexec.RunContext {
+	rc := &atlasexec.RunContext{
+		URL:     tc.RepoURL,
+		Repo:    tc.Repo,
+		Branch:  tc.Branch,
+		Commit:  tc.Commit,
+		SCMType: tc.SCM.Type,
+	}
+	if pr := tc.PullRequest; pr != nil {
+		rc.URL = pr.URL
+	}
+	if a := tc.Actor; a != nil {
+		rc.Username, rc.UserID = a.Name, a.ID
+	}
+	return rc
 }
 
 type Suggestion struct {
@@ -1344,6 +1348,11 @@ func writeBashEnv(path, name, value string) error {
 	return nil
 }
 
+// commentMarker creates a hidden marker to identify the comment as one created by this action.
+func commentMarker(id string) string {
+	return fmt.Sprintf(`<!-- generated by ariga/atlas-action for %v -->`, id)
+}
+
 type coloredLogger struct {
 	w io.Writer
 }
@@ -1375,300 +1384,3 @@ func (l *coloredLogger) WithFieldsMap(map[string]string) Logger {
 }
 
 var _ Logger = (*coloredLogger)(nil)
-
-type (
-	githubIssueComment struct {
-		ID   int    `json:"id"`
-		Body string `json:"body"`
-	}
-	pullRequestComment struct {
-		ID        int    `json:"id,omitempty"`
-		Body      string `json:"body"`
-		Path      string `json:"path"`
-		CommitID  string `json:"commit_id,omitempty"`
-		StartLine int    `json:"start_line,omitempty"`
-		Line      int    `json:"line,omitempty"`
-	}
-	pullRequestFile struct {
-		Name string `json:"filename"`
-	}
-)
-
-func (g *githubAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
-	comments, err := g.getIssueComments(ctx, pr)
-	if err != nil {
-		return err
-	}
-	var (
-		marker = commentMarker(id)
-		body   = strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment+"\n"+marker))
-	)
-	if found := slices.IndexFunc(comments, func(c githubIssueComment) bool {
-		return strings.Contains(c.Body, marker)
-	}); found != -1 {
-		return g.updateIssueComment(ctx, comments[found].ID, body)
-	}
-	return g.createIssueComment(ctx, pr, body)
-}
-
-func (g *githubAPI) getIssueComments(ctx context.Context, pr *PullRequest) ([]githubIssueComment, error) {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := g.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", g.repo, pr.Number, err)
-	}
-	defer res.Body.Close()
-	buf, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading PR issue comments from %v/%v, %v", g.repo, pr.Number, err)
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code %v when calling GitHub API", res.StatusCode)
-	}
-	var comments []githubIssueComment
-	if err = json.Unmarshal(buf, &comments); err != nil {
-		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", g.repo, pr.Number, string(buf), err)
-	}
-	return comments, nil
-}
-
-func (g *githubAPI) createIssueComment(ctx context.Context, pr *PullRequest, content io.Reader) error {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, content)
-	if err != nil {
-		return err
-	}
-	res, err := g.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusCreated {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	return err
-}
-
-// updateIssueComment updates issue comment with the given id.
-func (g *githubAPI) updateIssueComment(ctx context.Context, id int, content io.Reader) error {
-	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", g.baseURL, g.repo, id)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, content)
-	if err != nil {
-		return err
-	}
-	res, err := g.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	return err
-}
-
-// UpsertSuggestion creates or updates a suggestion review comment on trigger event pull request.
-func (g *githubAPI) UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
-	marker := commentMarker(s.ID)
-	body := fmt.Sprintf("%s\n%s", s.Comment, marker)
-	// TODO: Listing the comments only once and updating the comment in the same call.
-	comments, err := g.listReviewComments(ctx, pr)
-	if err != nil {
-		return err
-	}
-	// Search for the comment marker in the comments list.
-	// If found, update the comment with the new suggestion.
-	// If not found, create a new suggestion comment.
-	found := slices.IndexFunc(comments, func(c pullRequestComment) bool {
-		return c.Path == s.Path && strings.Contains(c.Body, marker)
-	})
-	if found != -1 {
-		if err := g.updateReviewComment(ctx, comments[found].ID, body); err != nil {
-			return err
-		}
-		return nil
-	}
-	buf, err := json.Marshal(pullRequestComment{
-		Body:      body,
-		Path:      s.Path,
-		CommitID:  pr.Commit,
-		Line:      s.Line,
-		StartLine: s.StartLine,
-	})
-	if err != nil {
-		return err
-	}
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(buf))
-	if err != nil {
-		return err
-	}
-	res, err := g.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusCreated {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	return err
-}
-
-// listReviewComments for the trigger event pull request.
-func (g *githubAPI) listReviewComments(ctx context.Context, pr *PullRequest) ([]pullRequestComment, error) {
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := g.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	var comments []pullRequestComment
-	if err = json.NewDecoder(res.Body).Decode(&comments); err != nil {
-		return nil, err
-	}
-	return comments, nil
-}
-
-// updateReviewComment updates the review comment with the given id.
-func (g *githubAPI) updateReviewComment(ctx context.Context, id int, body string) error {
-	type pullRequestUpdate struct {
-		Body string `json:"body"`
-	}
-	b, err := json.Marshal(pullRequestUpdate{Body: body})
-	if err != nil {
-		return err
-	}
-	url := fmt.Sprintf("%v/repos/%v/pulls/comments/%v", g.baseURL, g.repo, id)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-	res, err := g.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	return err
-}
-
-// ListPullRequestFiles return paths of the files in the trigger event pull request.
-func (g *githubAPI) ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error) {
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/files", g.baseURL, g.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := g.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	var files []pullRequestFile
-	if err = json.NewDecoder(res.Body).Decode(&files); err != nil {
-		return nil, err
-	}
-	paths := make([]string, len(files))
-	for i := range files {
-		paths[i] = files[i].Name
-	}
-	return paths, nil
-}
-
-// OpeningPullRequest returns the latest open pull request for the given branch.
-func (g *githubAPI) OpeningPullRequest(ctx context.Context, branch string) (*PullRequest, error) {
-	owner, _, err := g.ownerRepo()
-	if err != nil {
-		return nil, err
-	}
-	// Get open pull requests for the branch.
-	url := fmt.Sprintf("%s/repos/%s/pulls?state=open&head=%s:%s&sort=created&direction=desc&per_page=1&page=1",
-		g.baseURL, g.repo, owner, branch)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := g.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error calling GitHub API: %w", err)
-	}
-	defer res.Body.Close()
-	switch buf, err := io.ReadAll(res.Body); {
-	case err != nil:
-		return nil, fmt.Errorf("error reading open pull requests: %w", err)
-	case res.StatusCode != http.StatusOK:
-		return nil, fmt.Errorf("unexpected status code: %d when calling GitHub API", res.StatusCode)
-	default:
-		var resp []struct {
-			Url    string `json:"url"`
-			Number int    `json:"number"`
-			Head   struct {
-				Sha string `json:"sha"`
-			} `json:"head"`
-		}
-		if err = json.Unmarshal(buf, &resp); err != nil {
-			return nil, err
-		}
-		if len(resp) == 0 {
-			return nil, nil
-		}
-		return &PullRequest{
-			Number: resp[0].Number,
-			URL:    resp[0].Url,
-			Commit: resp[0].Head.Sha,
-		}, nil
-	}
-}
-
-func (g *githubAPI) ownerRepo() (string, string, error) {
-	s := strings.Split(g.repo, "/")
-	if len(s) != 2 {
-		return "", "", fmt.Errorf("GITHUB_REPOSITORY must be in the format of 'owner/repo'")
-	}
-	return s[0], s[1], nil
-}
-
-// commentMarker creates a hidden marker to identify the comment as one created by this action.
-func commentMarker(id string) string {
-	return fmt.Sprintf(`<!-- generated by ariga/atlas-action for %v -->`, id)
-}
