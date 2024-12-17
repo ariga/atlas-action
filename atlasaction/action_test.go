@@ -2500,7 +2500,19 @@ func (m *mockSCM) UpsertSuggestion(context.Context, *atlasaction.PullRequest, *a
 	return nil
 }
 
-func (m *mockSCM) UpsertComment(_ context.Context, _ *atlasaction.PullRequest, id string, _ string) error {
+func (m *mockSCM) CommentLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasexec.SummaryReport) error {
+	comment, err := atlasaction.RenderTemplate("migrate-lint.tmpl", r)
+	if err != nil {
+		return err
+	}
+	return m.comment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
+}
+
+func (m *mockSCM) CommentPlan(ctx context.Context, tc *atlasaction.TriggerContext, p *atlasexec.SchemaPlan) error {
+	return m.comment(ctx, tc.PullRequest, p.File.Name, "")
+}
+
+func (m *mockSCM) comment(_ context.Context, _ *atlasaction.PullRequest, id string, _ string) error {
 	var (
 		method  = http.MethodPatch
 		urlPath = "/repos/ariga/atlas-action/issues/comments/1"

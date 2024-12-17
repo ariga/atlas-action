@@ -62,8 +62,10 @@ type (
 	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
-		// UpsertComment posts or updates a pull request comment.
-		UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error
+		// CommentLint comments on the pull request with the lint report.
+		CommentLint(context.Context, *TriggerContext, *atlasexec.SummaryReport) error
+		// CommentPlan comments on the pull request with the schema plan.
+		CommentPlan(context.Context, *TriggerContext, *atlasexec.SchemaPlan) error
 	}
 
 	// SCMSuggestions contains methods for interacting with SCM platforms (GitHub, Gitlab etc...)
@@ -134,6 +136,7 @@ type (
 
 	// TriggerContext holds the context of the environment the action is running in.
 	TriggerContext struct {
+		Act         Action       // Act is the action that is running.
 		SCM         SCM          // SCM is the source control management system.
 		Repo        string       // Repo is the repository name. e.g. "ariga/atlas-action".
 		RepoURL     string       // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
@@ -535,11 +538,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	case err != nil:
 		return err
 	default:
-		comment, err := RenderTemplate("migrate-lint.tmpl", &payload)
-		if err != nil {
-			return err
-		}
-		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, comment); err != nil {
+		if err = c.CommentLint(ctx, tc, &payload); err != nil {
 			a.Errorf("failed to comment on the pull request: %v", err)
 		}
 		if c, ok := c.(SCMSuggestions); ok {
@@ -742,16 +741,7 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	case err != nil:
 		return err
 	default:
-		// Report the schema plan to the user and add a comment to the PR.
-		comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
-			"Plan":         plan,
-			"EnvName":      params.Env,
-			"RerunCommand": tc.RerunCmd,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to generate schema plan comment: %w", err)
-		}
-		err = c.UpsertComment(ctx, tc.PullRequest, plan.File.Name, comment)
+		err = c.CommentPlan(ctx, tc, plan)
 		if err != nil {
 			// Don't fail the action if the comment fails.
 			// It may be due to the missing permissions.

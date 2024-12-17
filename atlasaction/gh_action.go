@@ -71,7 +71,6 @@ func (a *ghAction) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
 func (a *ghAction) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
 	summary, err := RenderTemplate("schema-plan.tmpl", map[string]any{
 		"Plan":         r,
-		"EnvName":      a.GetInput("env"),
 		"RerunCommand": fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
 	})
 	if err != nil {
@@ -82,7 +81,7 @@ func (a *ghAction) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
 }
 
 // GetType implements the Action interface.
-func (a *ghAction) GetType() atlasexec.TriggerType {
+func (*ghAction) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeGithubAction
 }
 
@@ -97,6 +96,7 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 		return nil, err
 	}
 	tc := &TriggerContext{
+		Act:      a,
 		SCM:      SCM{Type: atlasexec.SCMTypeGithub, APIURL: ctx.APIURL},
 		Repo:     ctx.Repository,
 		Branch:   ctx.HeadRef,
@@ -176,8 +176,29 @@ type (
 	}
 )
 
-func (g *githubAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
-	comments, err := g.getIssueComments(ctx, pr)
+// CommentLint implements SCMClient.
+func (c *githubAPI) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
+	comment, err := RenderTemplate("migrate-lint.tmpl", r)
+	if err != nil {
+		return err
+	}
+	return c.comment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
+}
+
+// CommentPlan implements SCMClient.
+func (c *githubAPI) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
+	// Report the schema plan to the user and add a comment to the PR.
+	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
+		"Plan": p,
+	})
+	if err != nil {
+		return err
+	}
+	return c.comment(ctx, tc.PullRequest, p.File.Name, comment)
+}
+
+func (c *githubAPI) comment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	comments, err := c.getIssueComments(ctx, pr)
 	if err != nil {
 		return err
 	}
@@ -188,43 +209,43 @@ func (g *githubAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comm
 	if found := slices.IndexFunc(comments, func(c githubIssueComment) bool {
 		return strings.Contains(c.Body, marker)
 	}); found != -1 {
-		return g.updateIssueComment(ctx, comments[found].ID, body)
+		return c.updateIssueComment(ctx, comments[found].ID, body)
 	}
-	return g.createIssueComment(ctx, pr, body)
+	return c.createIssueComment(ctx, pr, body)
 }
 
-func (g *githubAPI) getIssueComments(ctx context.Context, pr *PullRequest) ([]githubIssueComment, error) {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, pr.Number)
+func (c *githubAPI) getIssueComments(ctx context.Context, pr *PullRequest) ([]githubIssueComment, error) {
+	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", c.baseURL, c.repo, pr.Number)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", g.repo, pr.Number, err)
+		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", c.repo, pr.Number, err)
 	}
 	defer res.Body.Close()
 	buf, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading PR issue comments from %v/%v, %v", g.repo, pr.Number, err)
+		return nil, fmt.Errorf("error reading PR issue comments from %v/%v, %v", c.repo, pr.Number, err)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code %v when calling GitHub API", res.StatusCode)
 	}
 	var comments []githubIssueComment
 	if err = json.Unmarshal(buf, &comments); err != nil {
-		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", g.repo, pr.Number, string(buf), err)
+		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", c.repo, pr.Number, string(buf), err)
 	}
 	return comments, nil
 }
 
-func (g *githubAPI) createIssueComment(ctx context.Context, pr *PullRequest, content io.Reader) error {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", g.baseURL, g.repo, pr.Number)
+func (c *githubAPI) createIssueComment(ctx context.Context, pr *PullRequest, content io.Reader) error {
+	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", c.baseURL, c.repo, pr.Number)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, content)
 	if err != nil {
 		return err
 	}
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -240,13 +261,13 @@ func (g *githubAPI) createIssueComment(ctx context.Context, pr *PullRequest, con
 }
 
 // updateIssueComment updates issue comment with the given id.
-func (g *githubAPI) updateIssueComment(ctx context.Context, id int, content io.Reader) error {
-	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", g.baseURL, g.repo, id)
+func (c *githubAPI) updateIssueComment(ctx context.Context, id int, content io.Reader) error {
+	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", c.baseURL, c.repo, id)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, content)
 	if err != nil {
 		return err
 	}
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -262,11 +283,11 @@ func (g *githubAPI) updateIssueComment(ctx context.Context, id int, content io.R
 }
 
 // UpsertSuggestion creates or updates a suggestion review comment on trigger event pull request.
-func (g *githubAPI) UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
+func (c *githubAPI) UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
 	marker := commentMarker(s.ID)
 	body := fmt.Sprintf("%s\n%s", s.Comment, marker)
 	// TODO: Listing the comments only once and updating the comment in the same call.
-	comments, err := g.listReviewComments(ctx, pr)
+	comments, err := c.listReviewComments(ctx, pr)
 	if err != nil {
 		return err
 	}
@@ -277,7 +298,7 @@ func (g *githubAPI) UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Su
 		return c.Path == s.Path && strings.Contains(c.Body, marker)
 	})
 	if found != -1 {
-		if err := g.updateReviewComment(ctx, comments[found].ID, body); err != nil {
+		if err := c.updateReviewComment(ctx, comments[found].ID, body); err != nil {
 			return err
 		}
 		return nil
@@ -292,12 +313,12 @@ func (g *githubAPI) UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Su
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, pr.Number)
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", c.baseURL, c.repo, pr.Number)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(buf))
 	if err != nil {
 		return err
 	}
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -313,13 +334,13 @@ func (g *githubAPI) UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Su
 }
 
 // listReviewComments for the trigger event pull request.
-func (g *githubAPI) listReviewComments(ctx context.Context, pr *PullRequest) ([]pullRequestComment, error) {
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", g.baseURL, g.repo, pr.Number)
+func (c *githubAPI) listReviewComments(ctx context.Context, pr *PullRequest) ([]pullRequestComment, error) {
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", c.baseURL, c.repo, pr.Number)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +360,7 @@ func (g *githubAPI) listReviewComments(ctx context.Context, pr *PullRequest) ([]
 }
 
 // updateReviewComment updates the review comment with the given id.
-func (g *githubAPI) updateReviewComment(ctx context.Context, id int, body string) error {
+func (c *githubAPI) updateReviewComment(ctx context.Context, id int, body string) error {
 	type pullRequestUpdate struct {
 		Body string `json:"body"`
 	}
@@ -347,12 +368,12 @@ func (g *githubAPI) updateReviewComment(ctx context.Context, id int, body string
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%v/repos/%v/pulls/comments/%v", g.baseURL, g.repo, id)
+	url := fmt.Sprintf("%v/repos/%v/pulls/comments/%v", c.baseURL, c.repo, id)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -368,13 +389,13 @@ func (g *githubAPI) updateReviewComment(ctx context.Context, id int, body string
 }
 
 // ListPullRequestFiles return paths of the files in the trigger event pull request.
-func (g *githubAPI) ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error) {
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/files", g.baseURL, g.repo, pr.Number)
+func (c *githubAPI) ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error) {
+	url := fmt.Sprintf("%v/repos/%v/pulls/%v/files", c.baseURL, c.repo, pr.Number)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -398,19 +419,19 @@ func (g *githubAPI) ListPullRequestFiles(ctx context.Context, pr *PullRequest) (
 }
 
 // OpeningPullRequest returns the latest open pull request for the given branch.
-func (g *githubAPI) OpeningPullRequest(ctx context.Context, branch string) (*PullRequest, error) {
-	owner, _, err := g.ownerRepo()
+func (c *githubAPI) OpeningPullRequest(ctx context.Context, branch string) (*PullRequest, error) {
+	owner, _, err := c.ownerRepo()
 	if err != nil {
 		return nil, err
 	}
 	// Get open pull requests for the branch.
 	url := fmt.Sprintf("%s/repos/%s/pulls?state=open&head=%s:%s&sort=created&direction=desc&per_page=1&page=1",
-		g.baseURL, g.repo, owner, branch)
+		c.baseURL, c.repo, owner, branch)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error calling GitHub API: %w", err)
 	}
@@ -442,8 +463,8 @@ func (g *githubAPI) OpeningPullRequest(ctx context.Context, branch string) (*Pul
 	}
 }
 
-func (g *githubAPI) ownerRepo() (string, string, error) {
-	s := strings.Split(g.repo, "/")
+func (c *githubAPI) ownerRepo() (string, string, error) {
+	s := strings.Split(c.repo, "/")
 	if len(s) != 2 {
 		return "", "", fmt.Errorf("GITHUB_REPOSITORY must be in the format of 'owner/repo'")
 	}
