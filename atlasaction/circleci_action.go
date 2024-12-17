@@ -31,6 +31,11 @@ func (a *circleCIOrb) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeCircleCIOrb
 }
 
+// Getenv implements Action.
+func (a *circleCIOrb) Getenv(key string) string {
+	return a.getenv(key)
+}
+
 // GetInput implements the Action interface.
 func (a *circleCIOrb) GetInput(name string) string {
 	return strings.TrimSpace(a.getenv(toEnvVar("INPUT_" + name)))

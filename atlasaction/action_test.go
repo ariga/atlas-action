@@ -874,6 +874,18 @@ func TestMigrateLint(t *testing.T) {
 			)
 			switch {
 			// List comments endpoint
+			case path == "/repos/test-owner/test-repository/issues/0/comments" && method == http.MethodGet:
+				b, err := json.Marshal(comments)
+				require.NoError(t, err)
+				_, err = writer.Write(b)
+				require.NoError(t, err)
+				return
+			case path == "/repos/test-owner/test-repository/issues/0/comments" && method == http.MethodPost:
+				var payload map[string]any
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+				payload["id"] = 123
+				writer.WriteHeader(http.StatusCreated)
+				return
 			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodGet:
 				b, err := json.Marshal(comments)
 				require.NoError(t, err)
@@ -1051,6 +1063,18 @@ func TestMigrateLint(t *testing.T) {
 			)
 			switch {
 			// List comments endpoint
+			case path == "/repos/test-owner/test-repository/issues/0/comments" && method == http.MethodGet:
+				b, err := json.Marshal(comments)
+				require.NoError(t, err)
+				_, err = writer.Write(b)
+				require.NoError(t, err)
+				return
+			case path == "/repos/test-owner/test-repository/issues/0/comments" && method == http.MethodPost:
+				var payload map[string]any
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+				payload["id"] = 123
+				writer.WriteHeader(http.StatusCreated)
+				return
 			case path == "/repos/test-owner/test-repository/pulls/0/comments" && method == http.MethodGet:
 				b, err := json.Marshal(comments)
 				require.NoError(t, err)
@@ -2204,6 +2228,7 @@ func TestSchemaPlan(t *testing.T) {
 	// Multiple plans will fail with an error
 	planFiles = []atlasexec.SchemaPlanFile{*planFile, *planFile}
 	act.resetOutputs()
+	act.trigger.Act = act
 	newActs := func() *atlasaction.Actions {
 		t.Helper()
 		a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(m))
@@ -2408,6 +2433,7 @@ func (m *mockAction) MigrateApply(context.Context, *atlasexec.MigrateApply) {
 // MigrateLint implements atlasaction.Reporter.
 func (m *mockAction) MigrateLint(context.Context, *atlasexec.SummaryReport) {
 	m.summary++
+
 }
 
 // SchemaApply implements atlasaction.Reporter.
@@ -2431,6 +2457,11 @@ func (m *mockAction) resetOutputs() {
 // GetType implements Action.
 func (m *mockAction) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeGithubAction
+}
+
+// Getenv implements Action.
+func (m *mockAction) Getenv(e string) string {
+	return os.Getenv(e)
 }
 
 // GetTriggerContext implements Action.
@@ -2490,14 +2521,6 @@ func (m *mockAction) WithFieldsMap(args map[string]string) atlasaction.Logger {
 }
 func (m *mockAction) SCM() (atlasaction.SCMClient, error) {
 	return m.scm, nil
-}
-
-func (m *mockSCM) ListPullRequestFiles(context.Context, *atlasaction.PullRequest) ([]string, error) {
-	return nil, nil
-}
-
-func (m *mockSCM) UpsertSuggestion(context.Context, *atlasaction.PullRequest, *atlasaction.Suggestion) error {
-	return nil
 }
 
 func (m *mockSCM) CommentLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasexec.SummaryReport) error {

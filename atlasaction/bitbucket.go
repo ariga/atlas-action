@@ -37,6 +37,11 @@ func (*bbPipe) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeBitbucket
 }
 
+// Getenv implements Action.
+func (a *bbPipe) Getenv(key string) string {
+	return a.getenv(key)
+}
+
 // GetTriggerContext implements Action.
 func (a *bbPipe) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	tc := &TriggerContext{
