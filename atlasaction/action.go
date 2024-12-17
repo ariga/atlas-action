@@ -76,8 +76,6 @@ type (
 		Errorf(string, ...interface{})
 		// Fatalf logs a fatal error message and exits the action.
 		Fatalf(string, ...interface{})
-		// WithFieldsMap returns a new Logger with the given fields.
-		WithFieldsMap(map[string]string) Logger
 	}
 
 	// AtlasExec is the interface for the atlas exec client.
@@ -1221,11 +1219,6 @@ func (l *coloredLogger) Errorf(msg string, args ...any) {
 func (l *coloredLogger) Fatalf(msg string, args ...any) {
 	l.Errorf(msg, args...)
 	os.Exit(1)
-}
-
-// WithFieldsMap implements the Logger interface.
-func (l *coloredLogger) WithFieldsMap(map[string]string) Logger {
-	return l // unsupported
 }
 
 var _ Logger = (*coloredLogger)(nil)

@@ -125,11 +125,6 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	return tc, nil
 }
 
-// WithFieldsMap return a new Logger with the given fields.
-func (a *ghAction) WithFieldsMap(m map[string]string) Logger {
-	return &ghAction{a.Action.WithFieldsMap(m)}
-}
-
 // addChecks runs annotations to the trigger event pull request for the given payload.
 func (a *ghAction) addChecks(lint *atlasexec.SummaryReport) error {
 	// Get the directory path from the lint report.

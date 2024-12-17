@@ -2503,22 +2503,6 @@ func (m *mockAction) Fatalf(msg string, args ...interface{}) {
 	m.fatal = true // Mark fatal called
 }
 
-// WithFieldsMap implements Action.
-func (m *mockAction) WithFieldsMap(args map[string]string) atlasaction.Logger {
-	argPairs := make([]any, 0, len(args)*2)
-	for k, v := range args {
-		argPairs = append(argPairs, k, v)
-	}
-	return &mockAction{
-		inputs:  m.inputs,
-		trigger: m.trigger,
-		output:  m.output,
-		summary: m.summary,
-		fatal:   m.fatal,
-		logger:  m.logger.With(argPairs...),
-		scm:     m.scm,
-	}
-}
 func (m *mockAction) SCM() (atlasaction.SCMClient, error) {
 	return m.scm, nil
 }
