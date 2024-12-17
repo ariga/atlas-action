@@ -135,7 +135,7 @@ func (a *ghAction) addChecks(lint *atlasexec.SummaryReport) error {
 			a.WithFieldsMap(map[string]string{
 				"file": filePath,
 				"line": "1",
-			}).Errorf(file.Error)
+			}).Errorf(file.Error) //nolint:govet
 			continue
 		}
 		for _, report := range file.Reports {
@@ -151,9 +151,9 @@ func (a *ghAction) addChecks(lint *atlasexec.SummaryReport) error {
 					"title": report.Text,
 				})
 				if file.Error != "" {
-					logger.Errorf(msg)
+					logger.Errorf(msg) //nolint:govet
 				} else {
-					logger.Warningf(msg)
+					logger.Warningf(msg) //nolint:govet
 				}
 			}
 		}
