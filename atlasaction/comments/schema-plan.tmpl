@@ -24,7 +24,7 @@ the database with the desired state. Otherwise, Atlas will report a schema drift
 
 3\. Push the updated plan to the registry using the following command:
 ```bash
-atlas schema plan push --pending --env {{ .EnvName }} --file {{ .Plan.File.Name }}.plan.hcl
+atlas schema plan push --pending --file {{ .Plan.File.Name }}.plan.hcl
 ```
 
 {{- if .RerunCommand }}

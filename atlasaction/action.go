@@ -16,7 +16,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -36,7 +35,6 @@ type (
 		Version     string
 		Atlas       AtlasExec
 		CloudClient func(string, string, *atlasexec.Version) CloudClient
-		Getenv      func(string) string
 	}
 
 	// Action interface for Atlas.
@@ -45,6 +43,8 @@ type (
 		// GetType returns the type of atlasexec trigger Type. e.g. "GITHUB_ACTION"
 		// The value is used to identify the type on CI-Run page in Atlas Cloud.
 		GetType() atlasexec.TriggerType
+		// Getenv returns the value of the environment variable with the given name.
+		Getenv(string) string
 		// GetInput returns the value of the input with the given name.
 		GetInput(string) string
 		// SetOutput sets the value of the output with the given name.
@@ -62,19 +62,11 @@ type (
 	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
-		// UpsertComment posts or updates a pull request comment.
-		UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error
+		// CommentLint comments on the pull request with the lint report.
+		CommentLint(context.Context, *TriggerContext, *atlasexec.SummaryReport) error
+		// CommentPlan comments on the pull request with the schema plan.
+		CommentPlan(context.Context, *TriggerContext, *atlasexec.SchemaPlan) error
 	}
-
-	// SCMSuggestions contains methods for interacting with SCM platforms (GitHub, Gitlab etc...)
-	// that support suggestions on the pull request.
-	SCMSuggestions interface {
-		// UpsertSuggestion posts or updates a pull request suggestion.
-		UpsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error
-		// ListPullRequestFiles returns a list of files changed in a pull request.
-		ListPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error)
-	}
-
 	Logger interface {
 		// Infof logs an info message.
 		Infof(string, ...interface{})
@@ -84,8 +76,6 @@ type (
 		Errorf(string, ...interface{})
 		// Fatalf logs a fatal error message and exits the action.
 		Fatalf(string, ...interface{})
-		// WithFieldsMap returns a new Logger with the given fields.
-		WithFieldsMap(map[string]string) Logger
 	}
 
 	// AtlasExec is the interface for the atlas exec client.
@@ -134,6 +124,7 @@ type (
 
 	// TriggerContext holds the context of the environment the action is running in.
 	TriggerContext struct {
+		Act         Action       // Act is the action that is running.
 		SCM         SCM          // SCM is the source control management system.
 		Repo        string       // Repo is the repository name. e.g. "ariga/atlas-action".
 		RepoURL     string       // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
@@ -197,7 +188,6 @@ func New(opts ...Option) (*Actions, error) {
 		Atlas:       cfg.atlas,
 		CloudClient: cfg.cloudClient,
 		Version:     cfg.version,
-		Getenv:      cfg.getenv,
 	}, nil
 }
 
@@ -517,46 +507,18 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if payload.URL != "" {
 		a.SetOutput("report-url", payload.URL)
 	}
-	if err := a.addChecks(&payload); err != nil {
-		return err
-	}
 	if r, ok := a.Action.(Reporter); ok {
 		r.MigrateLint(ctx, &payload)
 	}
-	if tc.PullRequest == nil {
-		if isLintErr {
-			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
-		}
-		return nil
-	}
-	// In case of a pull request, we need to add comments and suggestion to the PR.
-	switch c, err := a.SCM(tc); {
-	case errors.Is(err, ErrNoSCM):
-	case err != nil:
-		return err
-	default:
-		comment, err := RenderTemplate("migrate-lint.tmpl", &payload)
-		if err != nil {
+	if tc.PullRequest != nil {
+		// In case of a pull request, we need to add comments and suggestion to the PR.
+		switch c, err := tc.SCMClient(); {
+		case errors.Is(err, ErrNoSCM):
+		case err != nil:
 			return err
-		}
-		if err = c.UpsertComment(ctx, tc.PullRequest, dirName, comment); err != nil {
-			a.Errorf("failed to comment on the pull request: %v", err)
-		}
-		if c, ok := c.(SCMSuggestions); ok {
-			switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest); {
-			case err != nil:
-				a.Errorf("failed to list pull request files: %w", err)
-			default:
-				err = a.addSuggestions(&payload, func(s *Suggestion) error {
-					// Add suggestion only if the file is part of the pull request.
-					if slices.Contains(files, s.Path) {
-						return c.UpsertSuggestion(ctx, tc.PullRequest, s)
-					}
-					return nil
-				})
-				if err != nil {
-					a.Errorf("failed to add suggestion on the pull request: %v", err)
-				}
+		default:
+			if err = c.CommentLint(ctx, tc, &payload); err != nil {
+				a.Errorf("failed to comment on the pull request: %v", err)
 			}
 		}
 	}
@@ -737,21 +699,12 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	if r, ok := a.Action.(Reporter); ok {
 		r.SchemaPlan(ctx, plan)
 	}
-	switch c, err := a.SCM(tc); {
+	switch c, err := tc.SCMClient(); {
 	case errors.Is(err, ErrNoSCM):
 	case err != nil:
 		return err
 	default:
-		// Report the schema plan to the user and add a comment to the PR.
-		comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
-			"Plan":         plan,
-			"EnvName":      params.Env,
-			"RerunCommand": tc.RerunCmd,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to generate schema plan comment: %w", err)
-		}
-		err = c.UpsertComment(ctx, tc.PullRequest, plan.File.Name, comment)
+		err = c.CommentPlan(ctx, tc, plan)
 		if err != nil {
 			// Don't fail the action if the comment fails.
 			// It may be due to the missing permissions.
@@ -1083,60 +1036,24 @@ func (a *Actions) RequiredInputs(input ...string) error {
 	return nil
 }
 
-// SCM returns a SCMClient.
-func (a *Actions) SCM(tc *TriggerContext) (SCMClient, error) {
+// SCMClient returns a Client to interact with the SCM.
+func (tc *TriggerContext) SCMClient() (SCMClient, error) {
 	switch tc.SCM.Type {
 	case atlasexec.SCMTypeGithub:
-		token := a.Getenv("GITHUB_TOKEN")
+		token := tc.Act.Getenv("GITHUB_TOKEN")
 		if token == "" {
-			a.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
+			tc.Act.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
 		}
 		return githubClient(tc.Repo, tc.SCM.APIURL, token), nil
 	case atlasexec.SCMTypeGitlab:
-		token := a.Getenv("GITLAB_TOKEN")
+		token := tc.Act.Getenv("GITLAB_TOKEN")
 		if token == "" {
-			a.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
+			tc.Act.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
 		}
-		return gitlabClient(a.Getenv("CI_PROJECT_ID"), tc.SCM.APIURL, token), nil
+		return gitlabClient(tc.Act.Getenv("CI_PROJECT_ID"), tc.SCM.APIURL, token), nil
 	default:
 		return nil, ErrNoSCM // Not implemented yet.
 	}
-}
-
-// addChecks runs annotations to the trigger event pull request for the given payload.
-func (a *Actions) addChecks(lint *atlasexec.SummaryReport) error {
-	// Get the directory path from the lint report.
-	dir := path.Join(a.WorkingDir(), lint.Env.Dir)
-	for _, file := range lint.Files {
-		filePath := path.Join(dir, file.Name)
-		if file.Error != "" && len(file.Reports) == 0 {
-			a.WithFieldsMap(map[string]string{
-				"file": filePath,
-				"line": "1",
-			}).Errorf(file.Error)
-			continue
-		}
-		for _, report := range file.Reports {
-			for _, diag := range report.Diagnostics {
-				msg := diag.Text
-				if diag.Code != "" {
-					msg = fmt.Sprintf("%v (%v)\n\nDetails: https://atlasgo.io/lint/analyzers#%v", msg, diag.Code, diag.Code)
-				}
-				lines := strings.Split(file.Text[:diag.Pos], "\n")
-				logger := a.WithFieldsMap(map[string]string{
-					"file":  filePath,
-					"line":  strconv.Itoa(max(1, len(lines))),
-					"title": report.Text,
-				})
-				if file.Error != "" {
-					logger.Errorf(msg)
-				} else {
-					logger.Warningf(msg)
-				}
-			}
-		}
-	}
-	return nil
 }
 
 // GetRunContext returns the run context for the action.
@@ -1155,80 +1072,6 @@ func (tc *TriggerContext) GetRunContext() *atlasexec.RunContext {
 		rc.Username, rc.UserID = a.Name, a.ID
 	}
 	return rc
-}
-
-type Suggestion struct {
-	ID        string // Unique identifier for the suggestion.
-	Path      string // File path.
-	StartLine int    // Start line numbers for the suggestion.
-	Line      int    // End line number for the suggestion.
-	Comment   string // Comment body.
-}
-
-// addSuggestions returns the suggestions from the lint report.
-func (a *Actions) addSuggestions(lint *atlasexec.SummaryReport, fn func(*Suggestion) error) (err error) {
-	if !slices.ContainsFunc(lint.Files, func(f *atlasexec.FileReport) bool {
-		return len(f.Reports) > 0
-	}) {
-		// No reports to add suggestions.
-		return nil
-	}
-	dir := a.WorkingDir()
-	for _, file := range lint.Files {
-		filePath := path.Join(dir, lint.Env.Dir, file.Name)
-		for reportIdx, report := range file.Reports {
-			for _, f := range report.SuggestedFixes {
-				if f.TextEdit == nil {
-					continue
-				}
-				s := Suggestion{Path: filePath, ID: f.Message}
-				if f.TextEdit.End <= f.TextEdit.Line {
-					s.Line = f.TextEdit.Line
-				} else {
-					s.StartLine = f.TextEdit.Line
-					s.Line = f.TextEdit.End
-				}
-				s.Comment, err = RenderTemplate("suggestion.tmpl", map[string]any{
-					"Fix": f,
-					"Dir": lint.Env.Dir,
-				})
-				if err != nil {
-					return fmt.Errorf("failed to render suggestion: %w", err)
-				}
-				if err = fn(&s); err != nil {
-					return fmt.Errorf("failed to process suggestion: %w", err)
-				}
-			}
-			for diagIdx, d := range report.Diagnostics {
-				for _, f := range d.SuggestedFixes {
-					if f.TextEdit == nil {
-						continue
-					}
-					s := Suggestion{Path: filePath, ID: f.Message}
-					if f.TextEdit.End <= f.TextEdit.Line {
-						s.Line = f.TextEdit.Line
-					} else {
-						s.StartLine = f.TextEdit.Line
-						s.Line = f.TextEdit.End
-					}
-					s.Comment, err = RenderTemplate("suggestion.tmpl", map[string]any{
-						"Fix":    f,
-						"Dir":    lint.Env.Dir,
-						"File":   file,
-						"Report": reportIdx,
-						"Diag":   diagIdx,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to render suggestion: %w", err)
-					}
-					if err = fn(&s); err != nil {
-						return fmt.Errorf("failed to process suggestion: %w", err)
-					}
-				}
-			}
-		}
-	}
-	return nil
 }
 
 func execTime(start, end time.Time) string {
@@ -1376,11 +1219,6 @@ func (l *coloredLogger) Errorf(msg string, args ...any) {
 func (l *coloredLogger) Fatalf(msg string, args ...any) {
 	l.Errorf(msg, args...)
 	os.Exit(1)
-}
-
-// WithFieldsMap implements the Logger interface.
-func (l *coloredLogger) WithFieldsMap(map[string]string) Logger {
-	return l // unsupported
 }
 
 var _ Logger = (*coloredLogger)(nil)

@@ -25,7 +25,7 @@ type bbPipe struct {
 }
 
 // NewBitBucketPipe returns a new Action for BitBucket.
-func NewBitBucketPipe(getenv func(string) string, w io.Writer) Action {
+func NewBitBucketPipe(getenv func(string) string, w io.Writer) *bbPipe {
 	// Disable color output for testing,
 	// but enable it for non-testing environments.
 	color.NoColor = testing.Testing()
@@ -33,13 +33,19 @@ func NewBitBucketPipe(getenv func(string) string, w io.Writer) Action {
 }
 
 // GetType implements Action.
-func (a *bbPipe) GetType() atlasexec.TriggerType {
+func (*bbPipe) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeBitbucket
+}
+
+// Getenv implements Action.
+func (a *bbPipe) Getenv(key string) string {
+	return a.getenv(key)
 }
 
 // GetTriggerContext implements Action.
 func (a *bbPipe) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	tc := &TriggerContext{
+		Act:     a,
 		Branch:  a.getenv("BITBUCKET_BRANCH"),
 		Commit:  a.getenv("BITBUCKET_COMMIT"),
 		Repo:    a.getenv("BITBUCKET_REPO_FULL_NAME"),

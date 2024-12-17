@@ -25,25 +25,28 @@ type gitlabCI struct {
 	getenv func(string) string
 }
 
-var _ Action = (*gitlabCI)(nil)
-
 // NewGitlabCI returns a new Action for Gitlab CI.
-func NewGitlabCI(getenv func(string) string, w io.Writer) Action {
+func NewGitlabCI(getenv func(string) string, w io.Writer) *gitlabCI {
 	return &gitlabCI{getenv: getenv, coloredLogger: &coloredLogger{w}}
 }
 
 // GetType implements the Action interface.
-func (g *gitlabCI) GetType() atlasexec.TriggerType {
-	return "GITLAB_CI"
+func (*gitlabCI) GetType() atlasexec.TriggerType {
+	return atlasexec.TriggerTypeGitlab
+}
+
+// Getenv implements Action.
+func (a *gitlabCI) Getenv(key string) string {
+	return a.getenv(key)
 }
 
 // GetInput implements the Action interface.
-func (g *gitlabCI) GetInput(name string) string {
-	return strings.TrimSpace(g.getenv(toEnvVar("ATLAS_INPUT_" + name)))
+func (a *gitlabCI) GetInput(name string) string {
+	return strings.TrimSpace(a.getenv(toEnvVar("ATLAS_INPUT_" + name)))
 }
 
 // SetOutput implements the Action interface.
-func (g *gitlabCI) SetOutput(name, value string) {
+func (a *gitlabCI) SetOutput(name, value string) {
 	f, err := os.OpenFile(".env", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		return
@@ -53,32 +56,32 @@ func (g *gitlabCI) SetOutput(name, value string) {
 }
 
 // GetTriggerContext implements the Action interface.
-func (g *gitlabCI) GetTriggerContext(context.Context) (*TriggerContext, error) {
+func (a *gitlabCI) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	ctx := &TriggerContext{
-		SCM: SCM{
-			Type:   atlasexec.SCMTypeGitlab,
-			APIURL: g.getenv("CI_API_V4_URL"),
-		},
-		Repo:    g.getenv("CI_PROJECT_NAME"),
-		RepoURL: g.getenv("CI_PROJECT_URL"),
-		Branch:  g.getenv("CI_COMMIT_REF_NAME"),
-		Commit:  g.getenv("CI_COMMIT_SHA"),
-		Actor:   &Actor{Name: g.getenv("GITLAB_USER_NAME"), ID: g.getenv("GITLAB_USER_ID")},
+		Act:     a,
+		SCM:     SCM{Type: atlasexec.SCMTypeGitlab, APIURL: a.getenv("CI_API_V4_URL")},
+		Repo:    a.getenv("CI_PROJECT_NAME"),
+		RepoURL: a.getenv("CI_PROJECT_URL"),
+		Branch:  a.getenv("CI_COMMIT_REF_NAME"),
+		Commit:  a.getenv("CI_COMMIT_SHA"),
+		Actor:   &Actor{Name: a.getenv("GITLAB_USER_NAME"), ID: a.getenv("GITLAB_USER_ID")},
 	}
-	if mr := g.getenv("CI_MERGE_REQUEST_IID"); mr != "" {
+	if mr := a.getenv("CI_MERGE_REQUEST_IID"); mr != "" {
 		num, err := strconv.Atoi(mr)
 		if err != nil {
 			return nil, err
 		}
 		ctx.PullRequest = &PullRequest{
-			Commit: g.getenv("CI_COMMIT_SHA"),
+			Commit: a.getenv("CI_COMMIT_SHA"),
 			Number: num,
-			URL:    g.getenv("CI_MERGE_REQUEST_REF_PATH"),
-			Body:   g.getenv("CI_MERGE_REQUEST_DESCRIPTION"),
+			URL:    a.getenv("CI_MERGE_REQUEST_REF_PATH"),
+			Body:   a.getenv("CI_MERGE_REQUEST_DESCRIPTION"),
 		}
 	}
 	return ctx, nil
 }
+
+var _ Action = (*gitlabCI)(nil)
 
 type gitlabTransport struct {
 	Token string
@@ -115,28 +118,49 @@ type GitlabComment struct {
 
 var _ SCMClient = (*gitlabAPI)(nil)
 
-func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
-	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", g.baseURL, g.project, pr.Number)
+// CommentLint implements SCMClient.
+func (c *gitlabAPI) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
+	comment, err := RenderTemplate("migrate-lint.tmpl", r)
+	if err != nil {
+		return err
+	}
+	return c.comment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
+}
+
+// CommentPlan implements SCMClient.
+func (c *gitlabAPI) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
+	// Report the schema plan to the user and add a comment to the PR.
+	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
+		"Plan": p,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to generate schema plan comment: %w", err)
+	}
+	return c.comment(ctx, tc.PullRequest, p.File.Name, comment)
+}
+
+func (c *gitlabAPI) comment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", c.baseURL, c.project, pr.Number)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("error querying gitlab comments with %v/%v, %w", g.project, pr.Number, err)
+		return fmt.Errorf("error querying gitlab comments with %v/%v, %w", c.project, pr.Number, err)
 	}
 	defer res.Body.Close()
 	buf, err := io.ReadAll(res.Body)
 	if err != nil {
-		return fmt.Errorf("error reading PR issue comments from %v/%v, %v", g.project, pr.Number, err)
+		return fmt.Errorf("error reading PR issue comments from %v/%v, %v", c.project, pr.Number, err)
 	}
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code %v when calling Gitlab API. body: %s", res.StatusCode, string(buf))
 	}
 	var comments []GitlabComment
 	if err = json.Unmarshal(buf, &comments); err != nil {
-		return fmt.Errorf("error parsing gitlab notes with %v/%v from %v, %w", g.project, pr.Number, string(buf), err)
+		return fmt.Errorf("error parsing gitlab notes with %v/%v from %v, %w", c.project, pr.Number, string(buf), err)
 	}
 	var (
 		marker = commentMarker(id)
@@ -145,20 +169,20 @@ func (g *gitlabAPI) UpsertComment(ctx context.Context, pr *PullRequest, id, comm
 	if found := slices.IndexFunc(comments, func(c GitlabComment) bool {
 		return !c.System && strings.Contains(c.Body, marker)
 	}); found != -1 {
-		return g.updateComment(ctx, pr, comments[found].ID, body)
+		return c.updateComment(ctx, pr, comments[found].ID, body)
 	}
-	return g.createComment(ctx, pr, comment)
+	return c.createComment(ctx, pr, comment)
 }
 
-func (g *gitlabAPI) createComment(ctx context.Context, pr *PullRequest, comment string) error {
+func (c *gitlabAPI) createComment(ctx context.Context, pr *PullRequest, comment string) error {
 	body := strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment))
-	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", g.baseURL, g.project, pr.Number)
+	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", c.baseURL, c.project, pr.Number)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -173,15 +197,15 @@ func (g *gitlabAPI) createComment(ctx context.Context, pr *PullRequest, comment 
 	return err
 }
 
-func (g *gitlabAPI) updateComment(ctx context.Context, pr *PullRequest, NoteId int, comment string) error {
+func (c *gitlabAPI) updateComment(ctx context.Context, pr *PullRequest, NoteId int, comment string) error {
 	body := strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment))
-	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes/%v", g.baseURL, g.project, pr.Number, NoteId)
+	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes/%v", c.baseURL, c.project, pr.Number, NoteId)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	res, err := g.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return err
 	}

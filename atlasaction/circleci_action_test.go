@@ -41,7 +41,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 		require.Equal(t, "/repos/ariga/atlas-orb/pulls", r.URL.Path)
 		require.Equal(t, "GET", r.Method)
 		require.Equal(t, "state=open&head=ariga:main&sort=created&direction=desc&per_page=1&page=1", r.URL.RawQuery)
-		w.Write([]byte(`
+		_, _ = w.Write([]byte(`
 		[
 			{"number":1,"url":"https://api.github.com/repos/ariga/atlas-orb/pulls/9","head":{"sha":"1234567890"}},
 			{"number":2,"url":"https://api.github.com/repos/ariga/atlas-orb/pulls/8","head":{"sha":"1234567890"}}
