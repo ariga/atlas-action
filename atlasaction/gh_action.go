@@ -244,7 +244,8 @@ func (c *githubAPI) CommentLint(ctx context.Context, tc *TriggerContext, r *atla
 func (c *githubAPI) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
 	// Report the schema plan to the user and add a comment to the PR.
 	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
-		"Plan": p,
+		"Plan":         p,
+		"RerunCommand": tc.RerunCmd,
 	})
 	if err != nil {
 		return err
