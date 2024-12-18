@@ -1,0 +1,191 @@
+# first apply, 2 files, 3 statements
+render-migrate-apply migrate-apply.tmpl data-0.json
+cmp stdout golden-0.html
+
+# 2 files, 1 statement error
+render-migrate-apply migrate-apply.tmpl data-1.json
+cmp stdout golden-1.html
+
+# no work migration
+render-migrate-apply migrate-apply.tmpl data-2.json
+cmp stdout golden-2.html
+
+-- data-0.json --
+{"Driver":"sqlite","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"file","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"_fk=1\u0026mode=memory","Fragment":"","RawFragment":"","Schema":"main"},"Dir":"testdata/migrations","Pending":[{"Name":"20221108173626.sql","Version":"20221108173626"},{"Name":"20221108173658.sql","Version":"20221108173658"}],"Applied":[{"Name":"20221108173626.sql","Version":"20221108173626","Start":"2024-06-16T15:27:38.914578+03:00","End":"2024-06-16T15:27:38.940343+03:00","Skipped":0,"Applied":["CREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT \"VIEW\";","CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"],"Checks":null,"Error":null},{"Name":"20221108173658.sql","Version":"20221108173658","Start":"2024-06-16T15:27:38.940343+03:00","End":"2024-06-16T15:27:38.963743+03:00","Skipped":0,"Applied":["CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"],"Checks":null,"Error":null}],"Target":"20221108173658","Start":"2024-06-16T15:27:38.909446+03:00","End":"2024-06-16T15:27:38.963743+03:00"}
+-- golden-0.html --
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> Migration Passed</h2><h4><code>atlas migrate apply</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Migration Directory</td>
+    <td><code>testdata/migrations</code></td>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://file?_fk=1&mode=memory</code></td>
+  </tr>
+  <tr>
+    <td>Migrate to Version</td>
+    <td>
+      <code>20221108173658</code>
+    </td>
+  </tr>
+  <tr>
+    <td>SQL Summary</td>
+    <td>2 migration files, 3 statements passed</td>
+  </tr>
+  <tr>
+    <td>Total Time</td>
+    <td>54.297ms</td>
+  </tr>
+</table><h4>Version 20221108173626.sql:</h4>
+<table>
+  <tr>
+    <th>Status</th>
+    <th>Executed Statements</th>
+    <th>Execution Time</th>
+    <th>Error</th>
+    <th>Error Statement</th>
+  </tr>
+  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>2</td>
+    <td>25.765ms</td><td>-</td><td>-</td></tr>
+</table><details><summary>📄 View SQL Statements</summary>
+
+```sql
+CREATE TABLE `dept_emp_latest_date` (`emp_no` int NOT NULL, `from_date` date NULL, `to_date` date NULL) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT "VIEW";
+CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+```
+
+</details><h4>Version 20221108173658.sql:</h4>
+<table>
+  <tr>
+    <th>Status</th>
+    <th>Executed Statements</th>
+    <th>Execution Time</th>
+    <th>Error</th>
+    <th>Error Statement</th>
+  </tr>
+  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
+    <td>23.4ms</td><td>-</td><td>-</td></tr>
+</table><details><summary>📄 View SQL Statements</summary>
+
+```sql
+CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `first_name` varchar(14) NOT NULL, `last_name` varchar(16) NOT NULL, `gender` enum('M','F') NOT NULL, `hire_date` date NOT NULL, PRIMARY KEY (`emp_no`)) CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+```
+
+</details>
+-- data-1.json --
+{"Driver":"mysql","URL":{"Scheme":"mysql","Opaque":"","User":null,"Host":"localhost:3306","Path":"/test","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"parseTime=true","Fragment":"","RawFragment":"","Schema":"test"},"Dir":"testdata/migrations","Pending":[{"Name":"20221108173626.sql","Version":"20221108173626"},{"Name":"20221108173658.sql","Version":"20221108173658"}],"Applied":[{"Name":"20221108173626.sql","Version":"20221108173626","Start":"2024-06-16T15:27:38.914578+03:00","End":"2024-06-16T15:27:38.940343+03:00","Skipped":0,"Applied":["CREATE TABLE Persons ( PersonID int );"],"Checks":null,"Error":null},{"Name":"20221108173658.sql","Version":"20221108173658","Start":"2024-06-16T15:27:38.940343+03:00","End":"2024-06-16T15:27:38.963743+03:00","Skipped":0,"Applied":["create Table Err?"],"Checks":null,"Error":{"Stmt":"create Table Err?","Text":"Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1"}}],"Current":"20221108143624","Target":"20221108173658","Start":"2024-06-16T15:27:38.909446+03:00","End":"2024-06-16T15:27:38.963743+03:00","Error":"sql/migrate: executing statement \"create Table Err?\" from version \"20240616125213\": Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1"}
+-- golden-1.html --
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture> Migration Failed</h2><h4><code>atlas migrate apply</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Migration Directory</td>
+    <td><code>testdata/migrations</code></td>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>mysql://localhost:3306/test?parseTime=true</code></td>
+  </tr>
+  <tr>
+    <td>Migrate from Version</td>
+    <td><code>20221108143624</code></td>
+  </tr>
+  <tr>
+    <td>Migrate to Version</td>
+    <td>
+      <code>20221108173658</code>
+    </td>
+  </tr>
+  <tr>
+    <td>SQL Summary</td>
+    <td>2 migration files, 2 statements passed, 1 failed</td>
+  </tr>
+  <tr>
+    <td>Total Time</td>
+    <td>54.297ms</td>
+  </tr>
+</table><h4>Version 20221108173626.sql:</h4>
+<table>
+  <tr>
+    <th>Status</th>
+    <th>Executed Statements</th>
+    <th>Execution Time</th>
+    <th>Error</th>
+    <th>Error Statement</th>
+  </tr>
+  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
+    <td>25.765ms</td><td>-</td><td>-</td></tr>
+</table><details><summary>📄 View SQL Statements</summary>
+
+```sql
+CREATE TABLE Persons ( PersonID int );
+```
+
+</details><h4>Version 20221108173658.sql:</h4>
+<table>
+  <tr>
+    <th>Status</th>
+    <th>Executed Statements</th>
+    <th>Execution Time</th>
+    <th>Error</th>
+    <th>Error Statement</th>
+  </tr>
+  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td><td>1</td>
+    <td>23.4ms</td><td>Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1</td><td><details><summary>📄 View</summary>
+
+```sql
+create Table Err?
+```
+
+</details></td></tr>
+</table><details><summary>📄 View SQL Statements</summary>
+
+```sql
+create Table Err?
+```
+
+</details>
+-- data-2.json --
+{"Driver":"mysql","URL":{"Scheme":"mysql","Opaque":"","User":null,"Host":"localhost:3306","Path":"/test","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"parseTime=true","Fragment":"","RawFragment":"","Schema":"test"},"Dir":"testdata/migrations","Current":"20240616130838","Start":"2024-06-16T16:09:01.683771+03:00","End":"2024-06-16T16:09:01.689411+03:00"}
+-- golden-2.html --
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> Migration Passed</h2><h4><code>atlas migrate apply</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Migration Directory</td>
+    <td><code>testdata/migrations</code></td>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>mysql://localhost:3306/test?parseTime=true</code></td>
+  </tr>
+  <tr>
+    <td>Migrate from Version</td>
+    <td><code>20240616130838</code></td>
+  </tr>
+  <tr>
+    <td>Migrate to Version</td>
+    <td>
+      <code>20240616130838</code>
+    </td>
+  </tr>
+  <tr>
+    <td>SQL Summary</td>
+    <td>0 migration files</td>
+  </tr>
+  <tr>
+    <td>Total Time</td>
+    <td>5.64ms</td>
+  </tr>
+</table>
