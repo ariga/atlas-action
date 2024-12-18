@@ -1,13 +1,6 @@
 <h3>Atlas detected changes to the desired schema</h3>
 <h4>Migration Plan {{- with .Plan.File.Link }} ({{- . | link "View on Atlas Cloud" -}}){{ end }}</h4>
-
-{{/* Respect double new lines as they are skipped in <pre/code> blocks. */}}
-{{- with .Plan.File.Migration }}
-```sql
-{{ trimRight . "\n" }}
-```
-{{- end }}
-
+{{- with .Plan.File.Migration }}{{ codeblock "sql" . }}{{- end -}}
 <h4>Atlas lint results</h4>
 {{- template "schema-lint" . -}}
 <hr>

@@ -32,13 +32,18 @@ _GitHubActionsFileCommandDelimeter_
   <tr>
     <td>To Hash</td>
     <td><code>Rl4lBdMkvFoGQ4xu+3sYCeogTVnamJ7bmDoq9pMXcjw=</code></td>
-  </tr><tr><td>Error</td><td>Rejected by review policy: errors or warnings were found</td></tr></table><details><summary>📄 View SQL Statements</summary><pre lang="sql"><code>-- Disable the enforcement of foreign-keys constraints
+  </tr><tr><td>Error</td><td>Rejected by review policy: errors or warnings were found</td></tr></table><details><summary>📄 View SQL Statements</summary>
+
+```sql
+-- Disable the enforcement of foreign-keys constraints
 PRAGMA foreign_keys = off;
 -- Drop "t4" table
 DROP TABLE `t4`;
 -- Enable back the enforcement of foreign-keys constraints
 PRAGMA foreign_keys = on;
-</code></pre></details><h4>Atlas lint results</h4><table>
+```
+
+</details><h4>Atlas lint results</h4><table>
   <thead>
     <tr>
       <th>Status</th>

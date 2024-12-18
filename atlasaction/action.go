@@ -1127,7 +1127,7 @@ var (
 				},
 				"join": strings.Join,
 				"codeblock": func(lang, code string) string {
-					return fmt.Sprintf("<pre lang=%q><code>%s</code></pre>", lang, code)
+					return fmt.Sprintf("\n\n```%s\n%s\n```\n\n", lang, strings.Trim(code, "\n"))
 				},
 				"details": func(label, details string) string {
 					return fmt.Sprintf("<details><summary>%s</summary>%s</details>", label, details)
@@ -1154,7 +1154,6 @@ var (
 					// clicking on the image to view the full size.
 					return fmt.Sprintf(`<picture><source media="(prefers-color-scheme: light)" srcset=%q><img %s/></picture>`, src, attrs), nil
 				},
-				"trimRight": strings.TrimRight,
 			}).
 			ParseFS(comments, "comments/*.tmpl"),
 	)
