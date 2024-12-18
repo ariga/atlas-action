@@ -61,9 +61,14 @@ _GitHubActionsFileCommandDelimeter_
   </tr>
   <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
     <td>234µs</td><td>-</td><td>-</td></tr>
-</table><details><summary>📄 View Pre-planned SQL Statements</summary><pre lang="sql"><code>-- Add column "c2" to table: "t4"
+</table><details><summary>📄 View Pre-planned SQL Statements</summary>
+
+```sql
+-- Add column "c2" to table: "t4"
 ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;
-</code></pre></details>
+```
+
+</details>
 <h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> Migration Passed</h2><h4><code>atlas schema apply</code> Summary:</h4><table>
   <tr>
     <td>Database URL</td>
@@ -96,9 +101,14 @@ ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;
   </tr>
   <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
     <td>315µs</td><td>-</td><td>-</td></tr>
-</table><details><summary>📄 View Pre-planned SQL Statements</summary><pre lang="sql"><code>-- Add column "c2" to table: "t4"
+</table><details><summary>📄 View Pre-planned SQL Statements</summary>
+
+```sql
+-- Add column "c2" to table: "t4"
 ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;
-</code></pre></details>
+```
+
+</details>
 <h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> Migration Passed</h2><h4><code>atlas schema apply</code> Summary:</h4><table>
   <tr>
     <td>Database URL</td>
@@ -131,6 +141,11 @@ ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;
   </tr>
   <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
     <td>221µs</td><td>-</td><td>-</td></tr>
-</table><details><summary>📄 View Pre-planned SQL Statements</summary><pre lang="sql"><code>-- Add column "c2" to table: "t4"
+</table><details><summary>📄 View Pre-planned SQL Statements</summary>
+
+```sql
+-- Add column "c2" to table: "t4"
 ALTER TABLE `t4` ADD COLUMN `c2` integer NOT NULL;
-</code></pre></details>
+```
+
+</details>
