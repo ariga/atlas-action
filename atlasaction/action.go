@@ -1087,9 +1087,9 @@ func appliedStmts(a *atlasexec.MigrateApply) int {
 }
 
 var (
-	//go:embed comments/*.tmpl
+	//go:embed comments
 	comments     embed.FS
-	commentsTmpl = template.Must(
+	CommentsTmpl = template.Must(
 		template.New("comments").
 			Funcs(template.FuncMap{
 				"execTime":     execTime,
@@ -1155,14 +1155,14 @@ var (
 					return fmt.Sprintf(`<picture><source media="(prefers-color-scheme: light)" srcset=%q><img %s/></picture>`, src, attrs), nil
 				},
 			}).
-			ParseFS(comments, "comments/*.tmpl"),
+			ParseFS(comments, "comments/*"),
 	)
 )
 
 // RenderTemplate renders the given template with the data.
 func RenderTemplate(name string, data any) (string, error) {
 	var buf bytes.Buffer
-	if err := commentsTmpl.ExecuteTemplate(&buf, name, data); err != nil {
+	if err := CommentsTmpl.ExecuteTemplate(&buf, name, data); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

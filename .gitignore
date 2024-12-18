@@ -52,3 +52,6 @@ lib/**/*
 
 # IDE files
 .idea/
+
+# the binary file for the atlas-action
+atlas-action
