@@ -7,19 +7,7 @@
 <details>
 <summary>📝 Steps to edit this migration plan</summary>
 
-1\. Run the following command to pull the generated plan to your local workstation:
-```bash
-atlas schema plan pull --url "{{ .Plan.File.URL }}" > {{ .Plan.File.Name }}.plan.hcl
-```
-
-2\. Open `{{ .Plan.File.Name }}` in your editor and modify it as needed. Note that the result of the plan should align
-the database with the desired state. Otherwise, Atlas will report a schema drift.
-
-3\. Push the updated plan to the registry using the following command:
-```bash
-atlas schema plan push --pending --file {{ .Plan.File.Name }}.plan.hcl
-```
-
+{{ template "plan-modify/md" .Plan.File }}
 {{- if .RerunCommand }}
 4\. Re-trigger the `schema/plan` action to update this comment:
 ```bash
@@ -38,19 +26,10 @@ atlas schema plan push --pending --file {{ .Plan.File.Name }}.plan.hcl
     </tr>
   </thead>
   <tbody>
-    <tr>
-  {{- template "lint-check" "success.svg" -}}
   {{- with .Plan.File -}}
-      <td>Detect schema changes</td><td>
-        {{- $stmtCount := len .Stmts -}}
-        {{- if eq $stmtCount 1 -}}
-        1 new statement detected
-        {{- else if $stmtCount -}}
-        {{- $stmtCount }} new statements detected
-        {{- else -}}
-        No statements detected
-        {{- end -}}
-      </td>
+    <tr>
+      <td><div align="center">{{- template "lint-check" "success.svg" -}}</div></td>
+      <td>Detect schema changes</td><td>{{ stmtsDetected . }}</td>
     </tr>
   {{- end -}}
   {{- template "lint-report" .Plan.Lint -}}

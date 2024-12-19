@@ -1086,6 +1086,24 @@ func appliedStmts(a *atlasexec.MigrateApply) int {
 	return total
 }
 
+func filterIssues(steps []*atlasexec.StepReport) []*atlasexec.StepReport {
+	result := make([]*atlasexec.StepReport, 0, len(steps))
+	for _, s := range steps {
+		switch {
+		case s.Error != "":
+			result = append(result, s)
+		case s.Result == nil: // No result.
+		case s.Result.Error != "" || len(s.Result.Reports) > 0:
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+func stepIsError(s *atlasexec.StepReport) bool {
+	return s.Error != "" || (s.Result != nil && s.Result.Error != "")
+}
+
 var (
 	//go:embed comments
 	comments     embed.FS
@@ -1094,21 +1112,59 @@ var (
 			Funcs(template.FuncMap{
 				"execTime":     execTime,
 				"appliedStmts": appliedStmts,
-				"filterIssues": func(steps []*atlasexec.StepReport) []*atlasexec.StepReport {
-					result := make([]*atlasexec.StepReport, 0, len(steps))
-					for _, s := range steps {
-						switch {
-						case s.Error != "":
-							result = append(result, s)
-						case s.Result == nil: // No result.
-						case s.Result.Error != "" || len(s.Result.Reports) > 0:
-							result = append(result, s)
+				"filterIssues": filterIssues,
+				"stepIsError":  stepIsError,
+				"stmtsDetected": func(plan *atlasexec.SchemaPlanFile) string {
+					switch l := len(plan.Stmts); {
+					case l == 0:
+						return "No statements detected"
+					case l == 1:
+						return "1 new statement detected"
+					default:
+						return fmt.Sprintf("%d new statements detected", l)
+					}
+				},
+				"filesDetected": func(files []*atlasexec.FileReport) string {
+					switch l := len(files); {
+					case l == 0:
+						return "No migration files detected"
+					case l == 1:
+						return "1 new migration file detected"
+					default:
+						return fmt.Sprintf("%d new migration files detected", l)
+					}
+				},
+				"fileNames": func(files []*atlasexec.FileReport) []string {
+					names := make([]string, len(files))
+					for i, f := range files {
+						names[i] = f.Name
+					}
+					return names
+				},
+				"stepSummary": func(s *atlasexec.StepReport) string {
+					if s.Text == "" {
+						return s.Name
+					}
+					return s.Name + "\n" + s.Text
+				},
+				"stepDetails": func(s *atlasexec.StepReport) string {
+					if s.Result == nil {
+						return s.Error
+					}
+					var details []string
+					for _, r := range s.Result.Reports {
+						if t := r.Text; t != "" {
+							details = append(details, fmt.Sprintf("**%s%s**", strings.ToUpper(t[:1]), t[1:]))
+						}
+						for _, d := range r.Diagnostics {
+							if d.Code == "" {
+								details = append(details, d.Text)
+							} else {
+								details = append(details, fmt.Sprintf("%[1]s [(%[2]s)](https://atlasgo.io/lint/analyzers#%[2]s)", d.Text, d.Code))
+							}
 						}
 					}
-					return result
-				},
-				"stepIsError": func(s *atlasexec.StepReport) bool {
-					return s.Error != "" || (s.Result != nil && s.Result.Error != "")
+					return strings.Join(details, "\n")
 				},
 				"firstUpper": func(s string) string {
 					if s == "" {
@@ -1154,6 +1210,7 @@ var (
 					// clicking on the image to view the full size.
 					return fmt.Sprintf(`<picture><source media="(prefers-color-scheme: light)" srcset=%q><img %s/></picture>`, src, attrs), nil
 				},
+				"nl2br": func(s string) string { return strings.ReplaceAll(s, "\n", "<br/>") },
 			}).
 			ParseFS(comments, "comments/*"),
 	)

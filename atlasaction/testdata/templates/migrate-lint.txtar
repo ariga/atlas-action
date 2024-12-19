@@ -30,11 +30,17 @@ cmp stdout golden-4.html
     </tr>
   </thead>
   <tbody>
-    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1 new migration file detected</td>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>1 new migration file detected</td>
       <td>20230925192914.sql</td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>ERD and visual diff generated</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>ERD and visual diff generated</td>
       <td><a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a></td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>No issues found</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No issues found</td>
       <td><a href="https://migration-lint-report-url" target="_blank">View Report</a></td>
     </tr><tr><td colspan="4"><div align="center">Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a></div></td></tr></body></table>
 -- data-1.json --
@@ -49,11 +55,17 @@ cmp stdout golden-4.html
     </tr>
   </thead>
   <tbody>
-    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1 new migration file detected</td>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>1 new migration file detected</td>
       <td>20230925192914.sql</td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>ERD and visual diff generated</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>ERD and visual diff generated</td>
       <td><a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a></td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/warning.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/warning.svg?v=1"/></picture></div></td><td>Analyze 20230925192914.sql<br/>2 reports were found in analysis</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/warning.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/warning.svg?v=1"/></picture></div></td>
+      <td>Analyze 20230925192914.sql<br/>2 reports were found in analysis</td>
       <td><b>Data dependent changes detected</b><br/>Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries&nbsp;<a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a><br/>Adding a non-nullable "varchar" column "City" on table "Persons" without a default value implicitly sets existing rows with ""&nbsp;<a href="https://atlasgo.io/lint/analyzers#MY101" target="_blank">(MY101)</a><br/></td>
     </tr><tr><td colspan="4"><div align="center">Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a></div></td></tr></body></table>
 -- data-2.json --
@@ -68,13 +80,21 @@ cmp stdout golden-4.html
     </tr>
   </thead>
   <tbody>
-    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>2 new migration files detected</td>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>2 new migration files detected</td>
       <td>20230925192914.sql<br/>20230925192915.sql</td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>ERD and visual diff generated</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>ERD and visual diff generated</td>
       <td><a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a></td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/warning.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/warning.svg?v=1"/></picture></div></td><td>Analyze 20230925192914.sql<br/>1 reports were found in analysis</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/warning.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/warning.svg?v=1"/></picture></div></td>
+      <td>Analyze 20230925192914.sql<br/>1 reports were found in analysis</td>
       <td><b>Data dependent changes detected</b><br/>Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries&nbsp;<a href="https://atlasgo.io/lint/analyzers#MF101" target="_blank">(MF101)</a><br/></td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td><td>Analyze 20240625104520_destructive.sql<br/>1 reports were found in analysis</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td>
+      <td>Analyze 20240625104520_destructive.sql<br/>1 reports were found in analysis</td>
       <td><b>Destructive changes detected</b><br/>Dropping table "Persons"&nbsp;<a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/></td>
     </tr><tr><td colspan="4"><div align="center">Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a></div></td></tr></body></table>
 -- data-3.json --
@@ -89,11 +109,17 @@ cmp stdout golden-4.html
     </tr>
   </thead>
   <tbody>
-    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1 new migration file detected</td>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>1 new migration file detected</td>
       <td>20230925192914.sql</td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>ERD and visual diff generated</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>ERD and visual diff generated</td>
       <td><a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a></td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td><td>Migration Integrity Check<br/>File atlas.sum is invalid</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td>
+      <td>Migration Integrity Check<br/>File atlas.sum is invalid</td>
       <td>checksum mismatch</td>
     </tr><tr><td colspan="4"><div align="center">Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a></div></td></tr></body></table>
 -- data-4.json --
@@ -108,10 +134,16 @@ cmp stdout golden-4.html
     </tr>
   </thead>
   <tbody>
-    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>No migration files detected</td>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No migration files detected</td>
       <td>&nbsp;</td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>ERD and visual diff generated</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>ERD and visual diff generated</td>
       <td><a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a></td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/warning.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/warning.svg?v=1"/></picture></div></td><td>Detected 1 non-additive change<br/>Pulling the the latest git changes might fix this warning</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/warning.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/warning.svg?v=1"/></picture></div></td>
+      <td>Detected 1 non-additive change<br/>Pulling the the latest git changes might fix this warning</td>
       <td>File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted<br/></td>
     </tr><tr><td colspan="4"><div align="center">Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a></div></td></tr></body></table>

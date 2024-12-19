@@ -51,8 +51,11 @@ PRAGMA foreign_keys = on;
       <th>Result</th>
     </tr>
   </thead>
-  <tbody>
-    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>Detect schema changes</td><td>3 new statements detected</td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td><td>Analyze 20240918042521.sql<br/>1 reports were found in analysis</td>
+  <tbody><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>Detect schema changes</td><td>3 new statements detected</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td>
+      <td>Analyze 20240918042521.sql<br/>1 reports were found in analysis</td>
       <td><b>Destructive changes detected</b><br/>Dropping table "t4"&nbsp;<a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/></td>
     </tr></tbody></table>

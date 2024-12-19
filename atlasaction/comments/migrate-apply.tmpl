@@ -60,7 +60,7 @@
     <th>Error Statement</th>
   </tr>
   <tr>
-    {{- template "lint-check" (or (and .Error "error.svg") "success.svg") -}}
+    <td><div align="center">{{- template "lint-check" (or (and .Error "error.svg") "success.svg") -}}</div></td>
     <td>{{ len .Applied }}</td>
     <td>{{ execTime .Start .End }}</td>
 {{- with .Error -}}
