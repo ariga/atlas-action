@@ -12,6 +12,9 @@ the database with the desired state. Otherwise, Atlas will report a schema drift
 atlas schema plan push --pending --file {{ .Name }}.plan.hcl
 ```
 {{- end -}}
+{{- define "lint-check/md" -}}
+![]({{- assetsImage . }})
+{{- end -}}
 {{- define "lint-check" -}}
 {{- assetsImage . | image "20px" -}}
 {{- end -}}
