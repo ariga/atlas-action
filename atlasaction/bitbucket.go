@@ -253,7 +253,7 @@ func LintReport(commit string, r *atlasexec.SummaryReport) (*bitbucket.CommitRep
 		ReportType: bitbucket.ReportTypeSecurity,
 		Title:      "Atlas Lint",
 		Link:       r.URL,
-		LogoURL:    "https://ariga.io/assets/favicon.ico",
+		LogoURL:    "https://atlasgo.io/uploads/websiteicon.svg",
 	}
 	if issues := len(filterIssues(r.Steps)); issues > 0 {
 		cr.Details = fmt.Sprintf("Found %d issues.", issues)
