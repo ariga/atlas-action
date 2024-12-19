@@ -50,7 +50,9 @@ cmp stdout golden-2.html
     <th>Error</th>
     <th>Error Statement</th>
   </tr>
-  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>2</td>
+  <tr>
+    <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+    <td>2</td>
     <td>25.765ms</td><td>-</td><td>-</td></tr>
 </table><details><summary>📄 View SQL Statements</summary>
 
@@ -68,7 +70,9 @@ CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `fi
     <th>Error</th>
     <th>Error Statement</th>
   </tr>
-  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
+  <tr>
+    <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+    <td>1</td>
     <td>23.4ms</td><td>-</td><td>-</td></tr>
 </table><details><summary>📄 View SQL Statements</summary>
 
@@ -121,7 +125,9 @@ CREATE TABLE `employees` (`emp_no` int NOT NULL, `birth_date` date NOT NULL, `fi
     <th>Error</th>
     <th>Error Statement</th>
   </tr>
-  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>1</td>
+  <tr>
+    <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+    <td>1</td>
     <td>25.765ms</td><td>-</td><td>-</td></tr>
 </table><details><summary>📄 View SQL Statements</summary>
 
@@ -138,7 +144,9 @@ CREATE TABLE Persons ( PersonID int );
     <th>Error</th>
     <th>Error Statement</th>
   </tr>
-  <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td><td>1</td>
+  <tr>
+    <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td>
+    <td>1</td>
     <td>23.4ms</td><td>Error 1064 (42000): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?' at line 1</td><td><details><summary>📄 View</summary>
 
 ```sql

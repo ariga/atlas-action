@@ -131,9 +131,12 @@ CREATE TABLE `1` (
       <th>Result</th>
     </tr>
   </thead>
-  <tbody>
-    <tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>Detect schema changes</td><td>1 new statement detected</td>
-    </tr><tr><td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td><td>No issues found</td>
+  <tbody><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>Detect schema changes</td><td>1 new statement detected</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No issues found</td>
       <td></td>
     </tr></tbody></table><hr>
 <details>

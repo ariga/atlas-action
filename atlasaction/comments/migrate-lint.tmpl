@@ -8,22 +8,11 @@
   </thead>
   <tbody>
     <tr>
-{{- template "lint-check" "success.svg" -}}
-      <td>
-        {{- $fileCount := len .Files -}}
-        {{- if eq $fileCount 1 -}}
-        1 new migration file detected
-        {{- else if $fileCount -}}
-        {{- $fileCount }} new migration files detected
-        {{- else -}}
-        No migration files detected
-        {{- end -}}
-      </td>
+      <td><div align="center">{{- template "lint-check" "success.svg" -}}</div></td>
+      <td>{{- filesDetected .Files -}}</td>
       <td>
         {{- with .Files -}}
-          {{- range $i, $f := . -}}
-          {{- if $i -}}<br/>{{- end -}}{{- $f.Name -}}
-          {{- end -}}
+          {{- join (fileNames .) "<br/>" -}}
         {{- else -}}
           &nbsp;
         {{- end -}}
