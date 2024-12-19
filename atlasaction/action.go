@@ -1051,6 +1051,12 @@ func (tc *TriggerContext) SCMClient() (SCMClient, error) {
 			tc.Act.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
 		}
 		return gitlabClient(tc.Act.Getenv("CI_PROJECT_ID"), tc.SCM.APIURL, token), nil
+	case atlasexec.SCMTypeBitbucket:
+		return BitbucketClient(
+			tc.Act.Getenv("BITBUCKET_WORKSPACE"),
+			tc.Act.Getenv("BITBUCKET_REPO_SLUG"),
+			tc.Act.Getenv("BITBUCKET_ACCESS_TOKEN"),
+		)
 	default:
 		return nil, ErrNoSCM // Not implemented yet.
 	}
