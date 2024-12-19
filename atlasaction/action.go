@@ -1217,6 +1217,7 @@ var (
 					return fmt.Sprintf(`<picture><source media="(prefers-color-scheme: light)" srcset=%q><img %s/></picture>`, src, attrs), nil
 				},
 				"nl2br": func(s string) string { return strings.ReplaceAll(s, "\n", "<br/>") },
+				"nl2sp": func(s string) string { return strings.ReplaceAll(s, "\n", " ") },
 			}).
 			ParseFS(comments, "comments/*"),
 	)
