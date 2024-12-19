@@ -3,7 +3,7 @@
 
 | Status | Step | Result |
 | :----: | :--- | :----- |
-| {{ template "lint-check/md" "success.svg" }} | {{ filesDetected .Files }} | {{ join (fileNames .Files) "<br/>" }} |
+| {{ template "lint-check/md" "success.svg" }} | {{ filesDetected .Files }} | {{ join (fileNames .Files) " " }} |
 {{ template "lint-report/md" . }}
 {{- end -}}
 {{- define "schema-plan/md" -}}
@@ -34,7 +34,7 @@
 {{ end }}
 {{- with (.Steps | filterIssues) -}}
 {{ range $step := . -}}
-| {{ template "lint-check/md" (or (and ($step | stepIsError) "error.svg") "warning.svg") }} | {{ stepSummary $step | nl2br }} | {{ stepDetails $step | nl2br }} |
+| {{ template "lint-check/md" (or (and ($step | stepIsError) "error.svg") "warning.svg") }} | {{ stepSummary $step | nl2sp }} | {{ stepDetails $step | nl2sp }} |
 {{ end -}}
 {{- else -}}
 | {{ template "lint-check/md" "success.svg" }} | No issues found | {{ with .URL -}}[View Report]({{- . -}}){{- end }} |

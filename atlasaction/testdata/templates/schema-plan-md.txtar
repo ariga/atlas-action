@@ -71,7 +71,7 @@ ALTER TABLE [MySchema].[Image] DROP COLUMN [StorageKey];
 | Status | Step | Result |
 | :----: | :--- | :----- |
 | ![](https://release.ariga.io/images/assets/success.svg?v=1) | Detect schema changes | 2 new statements detected |
-| ![](https://release.ariga.io/images/assets/error.svg?v=1) | Analyze pr-3-ae2Xr0Ir.sql<br/>1 reports were found in analysis | **Destructive changes detected**<br/>Dropping non-virtual column "Description" [(DS103)](https://atlasgo.io/lint/analyzers#DS103)<br/>Dropping non-virtual column "StorageKey" [(DS103)](https://atlasgo.io/lint/analyzers#DS103) |
+| ![](https://release.ariga.io/images/assets/error.svg?v=1) | Analyze pr-3-ae2Xr0Ir.sql 1 reports were found in analysis | **Destructive changes detected** Dropping non-virtual column "Description" [(DS103)](https://atlasgo.io/lint/analyzers#DS103) Dropping non-virtual column "StorageKey" [(DS103)](https://atlasgo.io/lint/analyzers#DS103) |
 
 
 ---

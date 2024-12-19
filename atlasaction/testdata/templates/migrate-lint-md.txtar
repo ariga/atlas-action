@@ -37,7 +37,7 @@ cmp stdout golden-4.md
 | :----: | :--- | :----- |
 | ![](https://release.ariga.io/images/assets/success.svg?v=1) | 1 new migration file detected | 20230925192914.sql |
 | ![](https://release.ariga.io/images/assets/success.svg?v=1) | ERD and visual diff generated | [View Visualization](https://migration-lint-report-url#erd) |
-| ![](https://release.ariga.io/images/assets/warning.svg?v=1) | Analyze 20230925192914.sql<br/>2 reports were found in analysis | **Data dependent changes detected**<br/>Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries [(MF101)](https://atlasgo.io/lint/analyzers#MF101)<br/>Adding a non-nullable "varchar" column "City" on table "Persons" without a default value implicitly sets existing rows with "" [(MY101)](https://atlasgo.io/lint/analyzers#MY101) |
+| ![](https://release.ariga.io/images/assets/warning.svg?v=1) | Analyze 20230925192914.sql 2 reports were found in analysis | **Data dependent changes detected** Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries [(MF101)](https://atlasgo.io/lint/analyzers#MF101) Adding a non-nullable "varchar" column "City" on table "Persons" without a default value implicitly sets existing rows with "" [(MY101)](https://atlasgo.io/lint/analyzers#MY101) |
 -- data-2.json --
 {"URL":"https://migration-lint-report-url","Env":{"Dir":"testdata/migrations"},"Schema":{},"Steps":[{"Name":"Migration Integrity Check","Text":"File atlas.sum is valid"},{"Name":"Detect New Migration Files","Text":"Found 1 new migration files (from 1 total)"},{"Name":"Analyze 20230925192914.sql","Text":"1 reports were found in analysis","Result":{"Name":"20230925192914.sql","Text":"CREATE UNIQUE INDEX idx_unique_fullname ON Persons (FirstName, LastName);","Reports":[{"Text":"data dependent changes detected","Diagnostics":[{"Pos":0,"Text":"Adding a unique index \"idx_unique_fullname\" on table \"Persons\" might fail in case columns \"FirstName\", \"LastName\" contain duplicate entries","Code":"MF101"}]}]}},{"Name":"Analyze 20240625104520_destructive.sql","Text":"1 reports were found in analysis","Result":{"Name":"20240625104520_destructive.sql","Text":"DROP TABLE Persons;\n\n","Reports":[{"Text":"destructive changes detected","Diagnostics":[{"Pos":0,"Text":"Dropping table \"Persons\"","Code":"DS102"}]}],"Error":"Destructive changes detected"}}],"Files":[{"Name":"20230925192914.sql","Error":"Destructive changes detected"},{"Name":"20230925192915.sql","Reports":[{"Text":"","Diagnostics":[{"Pos":0,"Text":"Missing the CONCURRENTLY in index creation","Code":"PG101"}]}]}]}
 -- golden-2.md --
@@ -45,10 +45,10 @@ cmp stdout golden-4.md
 
 | Status | Step | Result |
 | :----: | :--- | :----- |
-| ![](https://release.ariga.io/images/assets/success.svg?v=1) | 2 new migration files detected | 20230925192914.sql<br/>20230925192915.sql |
+| ![](https://release.ariga.io/images/assets/success.svg?v=1) | 2 new migration files detected | 20230925192914.sql 20230925192915.sql |
 | ![](https://release.ariga.io/images/assets/success.svg?v=1) | ERD and visual diff generated | [View Visualization](https://migration-lint-report-url#erd) |
-| ![](https://release.ariga.io/images/assets/warning.svg?v=1) | Analyze 20230925192914.sql<br/>1 reports were found in analysis | **Data dependent changes detected**<br/>Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries [(MF101)](https://atlasgo.io/lint/analyzers#MF101) |
-| ![](https://release.ariga.io/images/assets/error.svg?v=1) | Analyze 20240625104520_destructive.sql<br/>1 reports were found in analysis | **Destructive changes detected**<br/>Dropping table "Persons" [(DS102)](https://atlasgo.io/lint/analyzers#DS102) |
+| ![](https://release.ariga.io/images/assets/warning.svg?v=1) | Analyze 20230925192914.sql 1 reports were found in analysis | **Data dependent changes detected** Adding a unique index "idx_unique_fullname" on table "Persons" might fail in case columns "FirstName", "LastName" contain duplicate entries [(MF101)](https://atlasgo.io/lint/analyzers#MF101) |
+| ![](https://release.ariga.io/images/assets/error.svg?v=1) | Analyze 20240625104520_destructive.sql 1 reports were found in analysis | **Destructive changes detected** Dropping table "Persons" [(DS102)](https://atlasgo.io/lint/analyzers#DS102) |
 -- data-3.json --
 {"URL":"https://migration-lint-report-url","Env":{"Dir":"testdata/migrations"},"Schema":{},"Steps":[{"Name":"Migration Integrity Check","Text":"File atlas.sum is invalid","Error":"checksum mismatch"}],"Files":[{"Name":"20230925192914.sql","Error":"checksum mismatch"}]}
 -- golden-3.md --
@@ -58,7 +58,7 @@ cmp stdout golden-4.md
 | :----: | :--- | :----- |
 | ![](https://release.ariga.io/images/assets/success.svg?v=1) | 1 new migration file detected | 20230925192914.sql |
 | ![](https://release.ariga.io/images/assets/success.svg?v=1) | ERD and visual diff generated | [View Visualization](https://migration-lint-report-url#erd) |
-| ![](https://release.ariga.io/images/assets/error.svg?v=1) | Migration Integrity Check<br/>File atlas.sum is invalid | checksum mismatch |
+| ![](https://release.ariga.io/images/assets/error.svg?v=1) | Migration Integrity Check File atlas.sum is invalid | checksum mismatch |
 -- data-4.json --
 {"URL":"https://migration-lint-report-url","Env":{"Dir":"testdata/migrations"},"Schema":{},"Steps":[{"Name":"Migration Integrity Check","Text":"File atlas.sum is valid"},{"Name":"Detected 1 non-additive change","Text":"Pulling the the latest git changes might fix this warning","Result":{"Reports":[{"Text":"","Diagnostics":[{"Pos":0,"Text":"File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted","Code":""}]}]}}]}
 -- golden-4.md --
@@ -68,4 +68,4 @@ cmp stdout golden-4.md
 | :----: | :--- | :----- |
 | ![](https://release.ariga.io/images/assets/success.svg?v=1) | No migration files detected |  |
 | ![](https://release.ariga.io/images/assets/success.svg?v=1) | ERD and visual diff generated | [View Visualization](https://migration-lint-report-url#erd) |
-| ![](https://release.ariga.io/images/assets/warning.svg?v=1) | Detected 1 non-additive change<br/>Pulling the the latest git changes might fix this warning | File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted |
+| ![](https://release.ariga.io/images/assets/warning.svg?v=1) | Detected 1 non-additive change Pulling the the latest git changes might fix this warning | File 20240613102407.sql is missing or has been removed. Changes that have already been applied will not be reverted |
