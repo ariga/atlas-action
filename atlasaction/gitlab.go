@@ -41,7 +41,7 @@ func (a *GitLab) Getenv(key string) string {
 
 // GetInput implements the Action interface.
 func (a *GitLab) GetInput(name string) string {
-	return strings.TrimSpace(a.getenv(toInputVarName(name)))
+	return strings.TrimSpace(a.getenv(ToInputVarName(name)))
 }
 
 // SetOutput implements the Action interface.
