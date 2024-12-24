@@ -1,21 +1,26 @@
-mock-atlas $WORK/schema-plan-approve
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-plan-approve
 
 # No plans found.
-atlas-action schema/plan/approve
+atlas-action --action=schema/plan/approve
 stdout 'No plan URL provided, searching for the pending plan'
 stdout 'No schema plan found'
 
 # One pending plan.
-atlas-action schema/plan/approve
+atlas-action --action=schema/plan/approve
+cmp .env expected.env
 
 # Multiple pending plans.
-! atlas-action schema/plan/approve
+! atlas-action --action=schema/plan/approve
 stdout 'No plan URL provided, searching for the pending plan'
 stdout 'Found schema plan: atlas://plans/1234'
 stdout 'Found schema plan: atlas://plans/5678'
-stderr 'found multiple schema plans, please approve or delete the existing plans'
+stdout 'found multiple schema plans, please approve or delete the existing plans'
+cmp .env expected.env
 
-
+-- expected.env --
+link=https://test.atlasgo.cloud/schemas/123/plans/456
+plan=atlas://plans/1234
+status=
 -- schema-plan-approve/1/args --
 schema plan list --format {{ json . }} --context {"scmType":"GITLAB"} --pending --auto-approve
 

@@ -2,7 +2,7 @@
 // This source code is licensed under the Apache 2.0 license found
 // in the LICENSE file in the root directory of this source tree.
 
-package main
+package cmdapi_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"ariga.io/atlas-action/atlasaction"
+	"ariga.io/atlas-action/internal/cmdapi"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ func TestRunAction_Run(t *testing.T) {
 	require.NoError(t, err)
 	act := atlasaction.NewGHAction(os.Getenv, os.Stdout)
 	t.Run("fake", func(t *testing.T) {
-		r := &RunActionCmd{Action: "fake"}
+		r := &cmdapi.RunActionCmd{Action: "fake"}
 		c, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(client))
 		require.NoError(t, err)
 		err = r.Run(context.Background(), c)
