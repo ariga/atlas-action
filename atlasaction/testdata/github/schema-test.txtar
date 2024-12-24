@@ -1,5 +1,5 @@
 # Mock the atlas command outputs
-mock-atlas $WORK/schema-test
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-test
 # Setup the action input variables
 env INPUT_CONFIG=file://testdata/config/atlas.hcl
 env INPUT_ENV=test
@@ -7,14 +7,13 @@ env INPUT_VARS='{"var1":"value1","var2":"value2"}'
 env INPUT_DEV_URL=sqlite://file?mode=memory
 env INPUT_RUN=example
 
-atlas-action schema/test
+atlas-action --action=schema/test
 stdout '`atlas schema test` completed successfully, no issues found'
 stdout 'Success'
 ! output
 
-! atlas-action schema/test
-stderr '`atlas schema test` completed with errors:'
-stderr 'Failure'
+! atlas-action --action=schema/test
+stdout '::error::`atlas schema test` completed with errors:%0AFailure'
 ! output
 
 -- schema-test/1/args --

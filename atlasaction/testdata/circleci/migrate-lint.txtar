@@ -1,5 +1,5 @@
 # Mock the atlas command outputs
-mock-atlas $WORK/migrate-lint
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-lint
 # Setup the action input variables
 env INPUT_CONFIG=file://testdata/config/atlas.hcl
 env INPUT_ENV=test
@@ -12,7 +12,7 @@ env INPUT_RUN=example
 
 # The action's output should append the existing outputs
 cp output-pre.txt actions/output.txt
-atlas-action migrate/lint
+atlas-action --action=migrate/lint
 output output.txt
 
 -- migrate-lint/1/args --

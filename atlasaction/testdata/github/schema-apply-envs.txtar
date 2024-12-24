@@ -1,10 +1,10 @@
 # Mock the atlas command outputs
-mock-atlas $WORK/schema-apply
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-apply
 # Setup the action input variables
 env INPUT_ENV=test
 env INPUT_PLAN=file://20240910173744.plan.hcl
 # Run the action
-! atlas-action schema/apply
+! atlas-action --action=schema/apply
 stdout '"atlas schema apply" completed successfully on the target "sqlite://local-bu.db"'
 stdout '"atlas schema apply" completed successfully on the target "sqlite://local-pi.db"'
 stdout '"atlas schema apply" completed successfully on the target "sqlite://local-su.db"'

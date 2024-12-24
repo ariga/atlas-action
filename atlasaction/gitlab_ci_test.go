@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"ariga.io/atlas-action/atlasaction"
-	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/gorilla/mux"
 	"github.com/rogpeppe/go-internal/testscript"
+	"github.com/stretchr/testify/require"
 )
 
 func newMockHandler(dir string) http.Handler {
@@ -88,6 +88,8 @@ func newMockHandler(dir string) http.Handler {
 }
 
 func TestGitlabCI(t *testing.T) {
+	wd, err := os.Getwd()
+	require.NoError(t, err)
 	testscript.Run(t, testscript.Params{
 		Dir: "testdata/gitlab",
 		Setup: func(e *testscript.Env) error {
@@ -97,21 +99,14 @@ func TestGitlabCI(t *testing.T) {
 				return err
 			}
 			e.Defer(srv.Close)
+			e.Setenv("MOCK_ATLAS", filepath.Join(wd, "mock-atlas.sh"))
 			e.Setenv("CI_API_V4_URL", srv.URL)
 			e.Setenv("CI_PROJECT_ID", "1")
 			e.Setenv("GITLAB_CI", "true")
 			e.Setenv("GITLAB_TOKEN", "token")
-			c, err := atlasexec.NewClient(e.WorkDir, "atlas")
-			if err != nil {
-				return err
-			}
-			// Create a new actions for each test.
-			e.Values[atlasKey{}] = &atlasClient{c}
 			return nil
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
-			"atlas-action": atlasAction,
-			"mock-atlas":   mockAtlasOutput,
 			"output": func(ts *testscript.TestScript, neg bool, args []string) {
 				if len(args) == 0 {
 					_, err := os.Stat(ts.MkAbs(".env"))

@@ -27,6 +27,7 @@ import (
 
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-action/atlasaction/cloud"
+	"ariga.io/atlas-action/internal/cmdapi"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
 	_ "github.com/mattn/go-sqlite3"
@@ -2181,12 +2182,22 @@ func renderTemplate[T any](ts *testscript.TestScript, neg bool, args []string) {
 	ts.Check(err)
 }
 
+func TestMain(m *testing.M) {
+	os.Exit(testscript.RunMain(m, map[string]func() int{
+		"atlas-action": func() int {
+			return cmdapi.Main(context.Background(), "testscript", "dev")
+		},
+	}))
+}
+
 func TestGitHubActions(t *testing.T) {
 	var (
 		actions = "actions"
 		output  = filepath.Join(actions, "output.txt")
 		summary = filepath.Join(actions, "summary.txt")
 	)
+	wd, err := os.Getwd()
+	require.NoError(t, err)
 	testscript.Run(t, testscript.Params{
 		Dir: filepath.Join("testdata", "github"),
 		Setup: func(e *testscript.Env) (err error) {
@@ -2194,21 +2205,14 @@ func TestGitHubActions(t *testing.T) {
 			if err := os.Mkdir(dir, 0700); err != nil {
 				return err
 			}
+			e.Setenv("MOCK_ATLAS", filepath.Join(wd, "mock-atlas.sh"))
 			e.Setenv("GITHUB_ACTIONS", "true")
 			e.Setenv("GITHUB_ENV", filepath.Join(dir, "env.txt"))
 			e.Setenv("GITHUB_OUTPUT", filepath.Join(dir, "output.txt"))
 			e.Setenv("GITHUB_STEP_SUMMARY", filepath.Join(dir, "summary.txt"))
-			c, err := atlasexec.NewClient(e.WorkDir, "atlas")
-			if err != nil {
-				return err
-			}
-			// Create a new actions for each test.
-			e.Values[atlasKey{}] = &atlasClient{c}
 			return nil
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
-			"atlas-action": atlasAction,
-			"mock-atlas":   mockAtlasOutput,
 			"summary": func(ts *testscript.TestScript, neg bool, args []string) {
 				if len(args) == 0 {
 					_, err := os.Stat(ts.MkAbs(summary))
@@ -2245,63 +2249,6 @@ func TestGitHubActions(t *testing.T) {
 			},
 		},
 	})
-}
-
-type (
-	atlasKey    struct{}
-	atlasClient struct {
-		atlasaction.AtlasExec
-	}
-)
-
-func atlasAction(ts *testscript.TestScript, neg bool, args []string) {
-	if len(args) != 1 {
-		ts.Fatalf("usage: atlas-action <action>")
-	}
-	client, ok := ts.Value(atlasKey{}).(*atlasClient)
-	if !ok || client == nil {
-		ts.Fatalf("client not found")
-	}
-	// The action need to be create for each call to read correct inputs
-	act, err := atlasaction.New(
-		atlasaction.WithGetenv(ts.Getenv),
-		atlasaction.WithOut(ts.Stdout()),
-		atlasaction.WithAtlas(client.AtlasExec),
-		atlasaction.WithVersion("testscript"),
-	)
-	ts.Check(err)
-	action := args[0]
-	ts.Setenv("ATLAS_ACTION_COMMAND", action)
-	ts.Defer(func() {
-		ts.Setenv("ATLAS_ACTION_COMMAND", "")
-	})
-	// Run the action!
-	switch err := act.Run(context.Background(), action); {
-	case !neg:
-		ts.Check(err)
-	case err == nil:
-		ts.Fatalf("expected fail")
-	case neg:
-		// Print the error to asserting on the testscript
-		fmt.Fprint(ts.Stderr(), err.Error())
-	}
-}
-
-func mockAtlasOutput(ts *testscript.TestScript, neg bool, args []string) {
-	if len(args) != 1 {
-		ts.Fatalf("usage: mock-atlas <dir>")
-	}
-	client, ok := ts.Value(atlasKey{}).(*atlasClient)
-	if !ok || client == nil {
-		ts.Fatalf("client not found")
-	}
-	m, err := atlasexec.NewClient("", "./mock-atlas.sh")
-	ts.Check(err)
-	ts.Check(m.SetEnv(map[string]string{
-		"TEST_BATCH": args[0],
-	}))
-	// Replace the atlas client with a mock client.
-	client.AtlasExec = m
 }
 
 func cmpFiles(ts *testscript.TestScript, neg bool, name1, name2 string) {

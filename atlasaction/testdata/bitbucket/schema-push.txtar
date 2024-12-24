@@ -1,15 +1,15 @@
 # Mock atlas command outputs
-mock-atlas $WORK/schema-push
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-push
 # Setup the action input variables
 env ATLAS_INPUT_ENV=test
 env ATLAS_INPUT_LATEST=true
 
 # Run the action without a tag
-atlas-action schema/push
+atlas-action --action=schema/push
 
 # Run the action with a tag
 env ATLAS_INPUT_TAG=98765
-atlas-action schema/push
+atlas-action --action=schema/push
 
 exec cat .atlas-action/outputs.sh
 output outputs.sh

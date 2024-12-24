@@ -1,9 +1,9 @@
 # Mock the atlas command outputs
-mock-atlas $WORK/schema-apply
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-apply
 # Setup the action input variables
 env INPUT_ENV=test
 # Run the action
-! atlas-action schema/apply
+! atlas-action --action=schema/apply
 
 summary summary.html
 output output.txt
