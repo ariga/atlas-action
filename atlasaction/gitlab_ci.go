@@ -6,16 +6,14 @@ package atlasaction
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
+	"ariga.io/atlas-action/internal/gitlab"
 	"ariga.io/atlas-go-sdk/atlasexec"
 )
 
@@ -81,54 +79,32 @@ func (a *gitlabCI) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	return ctx, nil
 }
 
-var _ Action = (*gitlabCI)(nil)
-
-type gitlabTransport struct {
-	Token string
+type glClient struct {
+	*gitlab.Client
 }
 
-func (t *gitlabTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("PRIVATE-TOKEN", t.Token)
-	return http.DefaultTransport.RoundTrip(req)
-}
-
-type gitlabAPI struct {
-	baseURL string
-	project string
-	client  *http.Client
-}
-
-func gitlabClient(project, baseURL, token string) *gitlabAPI {
-	httpClient := &http.Client{Timeout: time.Second * 30}
-	if token != "" {
-		httpClient.Transport = &gitlabTransport{Token: token}
+func GitLabClient(project, baseURL, token string) (*glClient, error) {
+	c, err := gitlab.NewClient(project,
+		gitlab.WithBaseURL(baseURL),
+		gitlab.WithToken(token),
+	)
+	if err != nil {
+		return nil, err
 	}
-	return &gitlabAPI{
-		baseURL: baseURL,
-		project: project,
-		client:  httpClient,
-	}
+	return &glClient{Client: c}, nil
 }
-
-type GitlabComment struct {
-	ID     int    `json:"id"`
-	Body   string `json:"body"`
-	System bool   `json:"system"`
-}
-
-var _ SCMClient = (*gitlabAPI)(nil)
 
 // CommentLint implements SCMClient.
-func (c *gitlabAPI) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
+func (c *glClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
 	comment, err := RenderTemplate("migrate-lint.tmpl", r)
 	if err != nil {
 		return err
 	}
-	return c.comment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
+	return c.upsertComment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
 }
 
 // CommentPlan implements SCMClient.
-func (c *gitlabAPI) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
+func (c *glClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
 	// Report the schema plan to the user and add a comment to the PR.
 	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
 		"Plan": p,
@@ -136,86 +112,23 @@ func (c *gitlabAPI) CommentPlan(ctx context.Context, tc *TriggerContext, p *atla
 	if err != nil {
 		return fmt.Errorf("failed to generate schema plan comment: %w", err)
 	}
-	return c.comment(ctx, tc.PullRequest, p.File.Name, comment)
+	return c.upsertComment(ctx, tc.PullRequest, p.File.Name, comment)
 }
 
-func (c *gitlabAPI) comment(ctx context.Context, pr *PullRequest, id, comment string) error {
-	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", c.baseURL, c.project, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func (c *glClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	comments, err := c.PullRequestNotes(ctx, pr.Number)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	res, err := c.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("error querying gitlab comments with %v/%v, %w", c.project, pr.Number, err)
-	}
-	defer res.Body.Close()
-	buf, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("error reading PR issue comments from %v/%v, %v", c.project, pr.Number, err)
-	}
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code %v when calling Gitlab API. body: %s", res.StatusCode, string(buf))
-	}
-	var comments []GitlabComment
-	if err = json.Unmarshal(buf, &comments); err != nil {
-		return fmt.Errorf("error parsing gitlab notes with %v/%v from %v, %w", c.project, pr.Number, string(buf), err)
-	}
-	var (
-		marker = commentMarker(id)
-		body   = fmt.Sprintf(`{"body": %q}`, comment+"\n"+marker)
-	)
-	if found := slices.IndexFunc(comments, func(c GitlabComment) bool {
+	marker := commentMarker(id)
+	comment += "\n" + marker
+	if found := slices.IndexFunc(comments, func(c gitlab.Note) bool {
 		return !c.System && strings.Contains(c.Body, marker)
 	}); found != -1 {
-		return c.updateComment(ctx, pr, comments[found].ID, body)
+		return c.UpdateNote(ctx, pr.Number, comments[found].ID, comment)
 	}
-	return c.createComment(ctx, pr, comment)
+	return c.CreateNote(ctx, pr.Number, comment)
 }
 
-func (c *gitlabAPI) createComment(ctx context.Context, pr *PullRequest, comment string) error {
-	body := strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment))
-	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes", c.baseURL, c.project, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	res, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusCreated {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	return err
-}
-
-func (c *gitlabAPI) updateComment(ctx context.Context, pr *PullRequest, NoteId int, comment string) error {
-	body := strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment))
-	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes/%v", c.baseURL, c.project, pr.Number, NoteId)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, body)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	res, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	return err
-}
+var _ Action = (*gitlabCI)(nil)
+var _ SCMClient = (*glClient)(nil)

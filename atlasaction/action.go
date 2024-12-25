@@ -1050,11 +1050,11 @@ func (tc *TriggerContext) SCMClient() (SCMClient, error) {
 		if token == "" {
 			tc.Act.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
 		}
-		return gitlabClient(
+		return GitLabClient(
 			tc.Act.Getenv("CI_PROJECT_ID"),
 			tc.SCM.APIURL,
 			token,
-		), nil
+		)
 	case atlasexec.SCMTypeBitbucket:
 		token := tc.Act.Getenv("BITBUCKET_ACCESS_TOKEN")
 		if token == "" {
