@@ -7,7 +7,7 @@ stdout 'No schema plan found'
 
 # One pending plan.
 atlas-action --action=schema/plan/approve
-output expected-output.env
+output .env.expected-output
 
 # Multiple pending plans.
 ! atlas-action --action=schema/plan/approve
@@ -15,12 +15,12 @@ stdout 'No plan URL provided, searching for the pending plan'
 stdout 'Found schema plan: atlas://plans/1234'
 stdout 'Found schema plan: atlas://plans/5678'
 stdout 'found multiple schema plans, please approve or delete the existing plans'
-output expected-output.env
+output .env.expected-output
 
--- expected-output.env --
-link=https://test.atlasgo.cloud/schemas/123/plans/456
-plan=atlas://plans/1234
-status=
+-- .env.expected-output --
+ATLAS_OUTPUT_SCHEMA_PLAN_APPROVE_LINK="https://test.atlasgo.cloud/schemas/123/plans/456"
+ATLAS_OUTPUT_SCHEMA_PLAN_APPROVE_PLAN="atlas://plans/1234"
+ATLAS_OUTPUT_SCHEMA_PLAN_APPROVE_STATUS=""
 -- schema-plan-approve/1/args --
 schema plan list --format {{ json . }} --context {"scmType":"GITLAB"} --pending --auto-approve
 

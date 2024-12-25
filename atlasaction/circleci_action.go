@@ -44,9 +44,8 @@ func (a *circleCIOrb) GetInput(name string) string {
 // SetOutput implements the Action interface.
 func (a *circleCIOrb) SetOutput(name, value string) {
 	if bashEnv := a.getenv("BASH_ENV"); bashEnv != "" {
-		cmd := a.getenv("ATLAS_ACTION_COMMAND")
-		err := writeBashEnv(bashEnv, toEnvVar(
-			fmt.Sprintf("ATLAS_OUTPUT_%s_%s", cmd, name)), value)
+		err := fprintln(bashEnv,
+			"export", toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
 		if err != nil {
 			a.Fatalf("failed to write env to file %s: %v", bashEnv, err)
 		}

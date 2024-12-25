@@ -104,9 +104,8 @@ func (a *bbPipe) SetOutput(name, value string) {
 		a.Errorf("failed to create output directory %s: %v", dir, err)
 		return
 	}
-	cmd := a.getenv("ATLAS_ACTION_COMMAND")
-	err := writeBashEnv(filepath.Join(dir, "outputs.sh"), toEnvVar(
-		fmt.Sprintf("ATLAS_OUTPUT_%s_%s", cmd, name)), value)
+	err := fprintln(filepath.Join(dir, "outputs.sh"),
+		"export", toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
 	if err != nil {
 		a.Errorf("failed to write output to file %s: %v", dir, err)
 	}
