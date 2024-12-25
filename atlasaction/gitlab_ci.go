@@ -39,7 +39,7 @@ func (a *gitlabCI) Getenv(key string) string {
 
 // GetInput implements the Action interface.
 func (a *gitlabCI) GetInput(name string) string {
-	return strings.TrimSpace(a.getenv(toEnvVar("ATLAS_INPUT_" + name)))
+	return strings.TrimSpace(a.getenv(toInputVarName(name)))
 }
 
 // SetOutput implements the Action interface.
