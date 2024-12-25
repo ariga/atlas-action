@@ -96,11 +96,18 @@ func (a *circleCIOrb) GetTriggerContext(ctx context.Context) (*TriggerContext, e
 			tc.Branch = tag
 			return tc, nil
 		}
-		c := githubClient(tc.Repo, tc.SCM.APIURL, ghToken)
-		var err error
-		tc.PullRequest, err = c.OpeningPullRequest(ctx, tc.Branch)
+		c, err := GitHubClient(tc.Repo, tc.SCM.APIURL, ghToken)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+		}
+		pr, err := c.OpeningPullRequest(ctx, tc.Branch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
+		}
+		tc.PullRequest = &PullRequest{
+			Number: pr.Number,
+			URL:    pr.URL,
+			Commit: pr.Commit,
 		}
 	}
 	return tc, nil

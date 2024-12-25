@@ -5,23 +5,18 @@
 package atlasaction
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"path"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
-	"golang.org/x/oauth2"
-
+	"ariga.io/atlas-action/internal/github"
 	"ariga.io/atlas-go-sdk/atlasexec"
-	"github.com/mitchellh/mapstructure"
 	"github.com/sethvargo/go-githubactions"
+	"golang.org/x/oauth2"
 )
 
 // ghAction is an implementation of the Action interface for GitHub Actions.
@@ -96,7 +91,7 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	ev, err := extractEvent(ctx.Event)
+	ev, err := github.ExtractEvent(ctx.Event)
 	if err != nil {
 		return nil, err
 	}
@@ -161,72 +156,36 @@ func (a *ghAction) addChecks(lint *atlasexec.SummaryReport) error {
 	return nil
 }
 
-var _ Action = (*ghAction)(nil)
-var _ Reporter = (*ghAction)(nil)
-
-const defaultGHApiUrl = "https://api.github.com"
-
-// githubClient returns a new GitHub client for the given repository.
-// If the GITHUB_TOKEN is set, it will be used for authentication.
-func githubClient(repo, baseURL string, token string) *githubAPI {
-	if baseURL == "" {
-		baseURL = defaultGHApiUrl
-	}
-	httpClient := &http.Client{Timeout: time.Second * 30}
-	if token != "" {
-		httpClient.Transport = &oauth2.Transport{
-			Base: http.DefaultTransport,
-			Source: oauth2.StaticTokenSource(&oauth2.Token{
-				AccessToken: token,
-			}),
-		}
-	}
-	return &githubAPI{
-		baseURL: baseURL,
-		repo:    repo,
-		client:  httpClient,
-	}
+type ghClient struct {
+	*github.Client
 }
 
-type (
-	// ghAPI is an implementation of the SCMClient interface for GitHub Actions.
-	githubAPI struct {
-		baseURL string
-		repo    string
-		client  *http.Client
+func GitHubClient(repo, baseURL, token string) (*ghClient, error) {
+	c, err := github.NewClient(repo,
+		github.WithBaseURL(baseURL),
+		github.WithToken(&oauth2.Token{AccessToken: token}),
+	)
+	if err != nil {
+		return nil, err
 	}
-	githubIssueComment struct {
-		ID   int    `json:"id"`
-		Body string `json:"body"`
-	}
-	pullRequestComment struct {
-		ID        int    `json:"id,omitempty"`
-		Body      string `json:"body"`
-		Path      string `json:"path"`
-		CommitID  string `json:"commit_id,omitempty"`
-		StartLine int    `json:"start_line,omitempty"`
-		Line      int    `json:"line,omitempty"`
-	}
-	pullRequestFile struct {
-		Name string `json:"filename"`
-	}
-)
+	return &ghClient{Client: c}, nil
+}
 
 // CommentLint implements SCMClient.
-func (c *githubAPI) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
+func (c *ghClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
 	comment, err := RenderTemplate("migrate-lint.tmpl", r)
 	if err != nil {
 		return err
 	}
-	err = c.comment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
+	err = c.upsertComment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
 	if err != nil {
 		return err
 	}
-	switch files, err := c.listPullRequestFiles(ctx, tc.PullRequest); {
+	switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest.Number); {
 	case err != nil:
 		tc.Act.Errorf("failed to list pull request files: %w", err)
 	default:
-		err = addSuggestions(tc.Act, r, func(s *Suggestion) error {
+		err = addSuggestions(tc.Act.GetInput("working-directory"), r, func(s *Suggestion) error {
 			// Add suggestion only if the file is part of the pull request.
 			if slices.Contains(files, s.Path) {
 				return c.upsertSuggestion(ctx, tc.PullRequest, s)
@@ -241,7 +200,7 @@ func (c *githubAPI) CommentLint(ctx context.Context, tc *TriggerContext, r *atla
 }
 
 // CommentPlan implements SCMClient.
-func (c *githubAPI) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
+func (c *ghClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
 	// Report the schema plan to the user and add a comment to the PR.
 	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
 		"Plan":         p,
@@ -250,285 +209,54 @@ func (c *githubAPI) CommentPlan(ctx context.Context, tc *TriggerContext, p *atla
 	if err != nil {
 		return err
 	}
-	return c.comment(ctx, tc.PullRequest, p.File.Name, comment)
+	return c.upsertComment(ctx, tc.PullRequest, p.File.Name, comment)
 }
 
-func (c *githubAPI) comment(ctx context.Context, pr *PullRequest, id, comment string) error {
-	comments, err := c.getIssueComments(ctx, pr)
+func (c *ghClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	comments, err := c.IssueComments(ctx, pr.Number)
+	if err != nil {
+		return err
+	}
+	marker := commentMarker(id)
+	comment += "\n" + marker
+	if found := slices.IndexFunc(comments, func(c github.IssueComment) bool {
+		return strings.Contains(c.Body, marker)
+	}); found != -1 {
+		err = c.UpdateIssueComment(ctx, comments[found].ID, comment)
+	} else {
+		err = c.CreateIssueComment(ctx, pr.Number, comment)
+	}
+	return err
+}
+
+func (c *ghClient) upsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
+	// TODO: Listing the comments only once and updating the comment in the same call.
+	comments, err := c.ReviewComments(ctx, pr.Number)
 	if err != nil {
 		return err
 	}
 	var (
-		marker = commentMarker(id)
-		body   = strings.NewReader(fmt.Sprintf(`{"body": %q}`, comment+"\n"+marker))
+		marker  = commentMarker(s.ID)
+		comment = s.Comment + "\n" + marker
 	)
-	if found := slices.IndexFunc(comments, func(c githubIssueComment) bool {
-		return strings.Contains(c.Body, marker)
-	}); found != -1 {
-		return c.updateIssueComment(ctx, comments[found].ID, body)
-	}
-	return c.createIssueComment(ctx, pr, body)
-}
-
-func (c *githubAPI) getIssueComments(ctx context.Context, pr *PullRequest) ([]githubIssueComment, error) {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", c.baseURL, c.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error querying github comments with %v/%v, %w", c.repo, pr.Number, err)
-	}
-	defer res.Body.Close()
-	buf, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading PR issue comments from %v/%v, %v", c.repo, pr.Number, err)
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code %v when calling GitHub API", res.StatusCode)
-	}
-	var comments []githubIssueComment
-	if err = json.Unmarshal(buf, &comments); err != nil {
-		return nil, fmt.Errorf("error parsing github comments with %v/%v from %v, %w", c.repo, pr.Number, string(buf), err)
-	}
-	return comments, nil
-}
-
-func (c *githubAPI) createIssueComment(ctx context.Context, pr *PullRequest, content io.Reader) error {
-	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", c.baseURL, c.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, content)
-	if err != nil {
-		return err
-	}
-	res, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusCreated {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	return err
-}
-
-// updateIssueComment updates issue comment with the given id.
-func (c *githubAPI) updateIssueComment(ctx context.Context, id int, content io.Reader) error {
-	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", c.baseURL, c.repo, id)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, content)
-	if err != nil {
-		return err
-	}
-	res, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	return err
-}
-
-// upsertSuggestion creates or updates a suggestion review comment on trigger event pull request.
-func (c *githubAPI) upsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
-	marker := commentMarker(s.ID)
-	body := fmt.Sprintf("%s\n%s", s.Comment, marker)
-	// TODO: Listing the comments only once and updating the comment in the same call.
-	comments, err := c.listReviewComments(ctx, pr)
-	if err != nil {
-		return err
-	}
-	// Search for the comment marker in the comments list.
-	// If found, update the comment with the new suggestion.
-	// If not found, create a new suggestion comment.
-	found := slices.IndexFunc(comments, func(c pullRequestComment) bool {
+	if found := slices.IndexFunc(comments, func(c github.PullRequestComment) bool {
 		return c.Path == s.Path && strings.Contains(c.Body, marker)
-	})
-	if found != -1 {
-		if err := c.updateReviewComment(ctx, comments[found].ID, body); err != nil {
-			return err
-		}
-		return nil
-	}
-	buf, err := json.Marshal(pullRequestComment{
-		Body:      body,
-		Path:      s.Path,
-		CommitID:  pr.Commit,
-		Line:      s.Line,
-		StartLine: s.StartLine,
-	})
-	if err != nil {
-		return err
-	}
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", c.baseURL, c.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(buf))
-	if err != nil {
-		return err
-	}
-	res, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusCreated {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}); found != -1 {
+		err = c.UpdateReviewComment(ctx, comments[found].ID, comment)
+	} else {
+		err = c.CreateReviewComment(ctx, pr.Number, &github.PullRequestComment{
+			CommitID:  pr.Commit,
+			Body:      comment,
+			Path:      s.Path,
+			Line:      s.Line,
+			StartLine: s.StartLine,
+		})
 	}
 	return err
-}
-
-// listReviewComments for the trigger event pull request.
-func (c *githubAPI) listReviewComments(ctx context.Context, pr *PullRequest) ([]pullRequestComment, error) {
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", c.baseURL, c.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	var comments []pullRequestComment
-	if err = json.NewDecoder(res.Body).Decode(&comments); err != nil {
-		return nil, err
-	}
-	return comments, nil
-}
-
-// updateReviewComment updates the review comment with the given id.
-func (c *githubAPI) updateReviewComment(ctx context.Context, id int, body string) error {
-	type pullRequestUpdate struct {
-		Body string `json:"body"`
-	}
-	b, err := json.Marshal(pullRequestUpdate{Body: body})
-	if err != nil {
-		return err
-	}
-	url := fmt.Sprintf("%v/repos/%v/pulls/comments/%v", c.baseURL, c.repo, id)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-	res, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	return err
-}
-
-// listPullRequestFiles return paths of the files in the trigger event pull request.
-func (c *githubAPI) listPullRequestFiles(ctx context.Context, pr *PullRequest) ([]string, error) {
-	url := fmt.Sprintf("%v/repos/%v/pulls/%v/files", c.baseURL, c.repo, pr.Number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
-		}
-		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
-	var files []pullRequestFile
-	if err = json.NewDecoder(res.Body).Decode(&files); err != nil {
-		return nil, err
-	}
-	paths := make([]string, len(files))
-	for i := range files {
-		paths[i] = files[i].Name
-	}
-	return paths, nil
-}
-
-// OpeningPullRequest returns the latest open pull request for the given branch.
-func (c *githubAPI) OpeningPullRequest(ctx context.Context, branch string) (*PullRequest, error) {
-	owner, _, err := c.ownerRepo()
-	if err != nil {
-		return nil, err
-	}
-	// Get open pull requests for the branch.
-	url := fmt.Sprintf("%s/repos/%s/pulls?state=open&head=%s:%s&sort=created&direction=desc&per_page=1&page=1",
-		c.baseURL, c.repo, owner, branch)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error calling GitHub API: %w", err)
-	}
-	defer res.Body.Close()
-	switch buf, err := io.ReadAll(res.Body); {
-	case err != nil:
-		return nil, fmt.Errorf("error reading open pull requests: %w", err)
-	case res.StatusCode != http.StatusOK:
-		return nil, fmt.Errorf("unexpected status code: %d when calling GitHub API", res.StatusCode)
-	default:
-		var resp []struct {
-			Url    string `json:"url"`
-			Number int    `json:"number"`
-			Head   struct {
-				Sha string `json:"sha"`
-			} `json:"head"`
-		}
-		if err = json.Unmarshal(buf, &resp); err != nil {
-			return nil, err
-		}
-		if len(resp) == 0 {
-			return nil, nil
-		}
-		return &PullRequest{
-			Number: resp[0].Number,
-			URL:    resp[0].Url,
-			Commit: resp[0].Head.Sha,
-		}, nil
-	}
-}
-
-func (c *githubAPI) ownerRepo() (string, string, error) {
-	s := strings.Split(c.repo, "/")
-	if len(s) != 2 {
-		return "", "", fmt.Errorf("GITHUB_REPOSITORY must be in the format of 'owner/repo'")
-	}
-	return s[0], s[1], nil
 }
 
 type Suggestion struct {
-	ID        string // Unique identifier for the suggestion.
+	ID        string // Suggestion ID.
 	Path      string // File path.
 	StartLine int    // Start line numbers for the suggestion.
 	Line      int    // End line number for the suggestion.
@@ -536,16 +264,15 @@ type Suggestion struct {
 }
 
 // addSuggestions returns the suggestions from the lint report.
-func addSuggestions(a Action, lint *atlasexec.SummaryReport, fn func(*Suggestion) error) (err error) {
+func addSuggestions(cw string, lint *atlasexec.SummaryReport, fn func(*Suggestion) error) (err error) {
 	if !slices.ContainsFunc(lint.Files, func(f *atlasexec.FileReport) bool {
 		return len(f.Reports) > 0
 	}) {
 		// No reports to add suggestions.
 		return nil
 	}
-	dir := a.GetInput("working-directory")
 	for _, file := range lint.Files {
-		filePath := path.Join(dir, lint.Env.Dir, file.Name)
+		filePath := path.Join(cw, lint.Env.Dir, file.Name)
 		for reportIdx, report := range file.Reports {
 			for _, f := range report.SuggestedFixes {
 				if f.TextEdit == nil {
@@ -601,26 +328,6 @@ func addSuggestions(a Action, lint *atlasexec.SummaryReport, fn func(*Suggestion
 	return nil
 }
 
-// githubTriggerEvent is the structure of the GitHub trigger event.
-type githubTriggerEvent struct {
-	PullRequest struct {
-		Number int    `mapstructure:"number"`
-		Body   string `mapstructure:"body"`
-		URL    string `mapstructure:"html_url"`
-		Head   struct {
-			SHA string `mapstructure:"sha"`
-		} `mapstructure:"head"`
-	} `mapstructure:"pull_request"`
-	Repository struct {
-		URL string `mapstructure:"html_url"`
-	} `mapstructure:"repository"`
-}
-
-// extractEvent extracts the trigger event data from the raw event.
-func extractEvent(raw map[string]any) (*githubTriggerEvent, error) {
-	var event githubTriggerEvent
-	if err := mapstructure.Decode(raw, &event); err != nil {
-		return nil, fmt.Errorf("failed to parse push event: %v", err)
-	}
-	return &event, nil
-}
+var _ Action = (*ghAction)(nil)
+var _ Reporter = (*ghAction)(nil)
+var _ SCMClient = (*ghClient)(nil)
