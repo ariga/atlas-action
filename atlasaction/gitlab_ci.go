@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -40,17 +39,15 @@ func (a *gitlabCI) Getenv(key string) string {
 
 // GetInput implements the Action interface.
 func (a *gitlabCI) GetInput(name string) string {
-	return strings.TrimSpace(a.getenv(toEnvVar("ATLAS_INPUT_" + name)))
+	return strings.TrimSpace(a.getenv(toInputVarName(name)))
 }
 
 // SetOutput implements the Action interface.
 func (a *gitlabCI) SetOutput(name, value string) {
-	f, err := os.OpenFile(".env", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	err := fprintln(".env", toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
 	if err != nil {
-		return
+		a.Errorf("failed to write output to file .env: %v", err)
 	}
-	defer f.Close()
-	fmt.Fprintf(f, "%s=%s\n", name, value)
 }
 
 // GetTriggerContext implements the Action interface.

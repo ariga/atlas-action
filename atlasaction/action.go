@@ -1240,26 +1240,35 @@ func RenderTemplate(name string, data any) (string, error) {
 	return buf.String(), nil
 }
 
-// toEnvVar converts the given string to an environment variable name.
-func toEnvVar(s string) string {
+// toEnvName converts the given string to an environment variable name.
+func toEnvName(s string) string {
 	return strings.ToUpper(strings.NewReplacer(
 		" ", "_", "-", "_", "/", "_",
 	).Replace(s))
 }
 
-// writeBashEnv writes the given name and value to the bash environment file.
-func writeBashEnv(path, name, value string) error {
+// toInputVarName converts the given string to an input variable name.
+func toInputVarName(input string) string {
+	return fmt.Sprintf("ATLAS_INPUT_%s", toEnvName(input))
+}
+
+// toOutputVar converts the given values to an output variable.
+// The action and output are used to create the output variable name with the format:
+// ATLAS_OUTPUT_<ACTION>_<OUTPUT>="<value>"
+func toOutputVar(action, output, value string) string {
+	return fmt.Sprintf("ATLAS_OUTPUT_%s=%q", toEnvName(action+"_"+output), value)
+}
+
+// fprintln writes the given values to the file using fmt.Fprintln.
+func fprintln(name string, val ...any) error {
 	// Write the output to a file.
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(name, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
 	defer f.Close()
-	_, err = fmt.Fprintf(f, "export %s=%q\n", name, value)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err = fmt.Fprintln(f, val...)
+	return err
 }
 
 // commentMarker creates a hidden marker to identify the comment as one created by this action.

@@ -80,7 +80,7 @@ func (a *bbPipe) GetTriggerContext(context.Context) (*TriggerContext, error) {
 
 // GetInput implements the Action interface.
 func (a *bbPipe) GetInput(name string) string {
-	return strings.TrimSpace(a.getenv("ATLAS_INPUT_" + toEnvVar(name)))
+	return strings.TrimSpace(a.getenv(toInputVarName(name)))
 }
 
 // SetOutput implements Action.
@@ -104,11 +104,11 @@ func (a *bbPipe) SetOutput(name, value string) {
 		a.Errorf("failed to create output directory %s: %v", dir, err)
 		return
 	}
-	cmd := a.getenv("ATLAS_ACTION_COMMAND")
-	err := writeBashEnv(filepath.Join(dir, "outputs.sh"), toEnvVar(
-		fmt.Sprintf("ATLAS_OUTPUT_%s_%s", cmd, name)), value)
+	outputs := filepath.Join(dir, "outputs.sh")
+	err := fprintln(outputs,
+		"export", toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
 	if err != nil {
-		a.Errorf("failed to write output to file %s: %v", dir, err)
+		a.Errorf("failed to write output to file %s: %v", outputs, err)
 	}
 }
 

@@ -60,7 +60,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 func TestCircleCI(t *testing.T) {
 	var (
 		actions = "actions"
-		output  = filepath.Join(actions, "output.txt")
+		output  = filepath.Join(actions, "output.sh")
 	)
 	wd, err := os.Getwd()
 	require.NoError(t, err)
@@ -75,7 +75,7 @@ func TestCircleCI(t *testing.T) {
 			e.Setenv("CIRCLECI", "true")
 			e.Setenv("CIRCLE_PROJECT_REPONAME", "atlas-orb")
 			e.Setenv("CIRCLE_SHA1", "1234567890")
-			e.Setenv("BASH_ENV", filepath.Join(dir, "output.txt"))
+			e.Setenv("BASH_ENV", filepath.Join(dir, "output.sh"))
 			return nil
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
