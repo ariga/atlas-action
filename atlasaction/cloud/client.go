@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/vektah/gqlparser/gqlerror"
 )
 
@@ -17,7 +18,7 @@ const cloudURL = "https://api.atlasgo.cloud/query"
 type (
 	// Client is a client for the Atlas Cloud API.
 	Client struct {
-		client   *http.Client
+		client   *retryablehttp.Client
 		endpoint string
 	}
 	// roundTripper is a http.RoundTripper that adds the Authorization header.
@@ -34,19 +35,26 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return http.DefaultTransport.RoundTrip(req)
 }
 
-// New creates a new Client for the Atlas Cloud API.
-func New(token, version, cliVersion string) *Client {
-	return &Client{
-		endpoint: cloudURL,
-		client: &http.Client{
-			Transport: &roundTripper{
-				token:      token,
-				version:    version,
-				cliVersion: cliVersion,
-			},
-			Timeout: time.Second * 30,
-		},
+func newClient(endpoint, token, version, cliVersion string) *Client {
+	if endpoint == "" {
+		endpoint = cloudURL
 	}
+	client := retryablehttp.NewClient()
+	client.HTTPClient.Timeout = time.Second * 30
+	client.HTTPClient.Transport = &roundTripper{
+		token:      token,
+		version:    version,
+		cliVersion: cliVersion,
+	}
+	return &Client{
+		endpoint: endpoint,
+		client:   client,
+	}
+}
+
+// New creates a new Client for the Atlas Cloud API.
+func New (token, version, cliVersion string) *Client {
+	return newClient("", token, version, cliVersion)
 }
 
 type (
@@ -133,7 +141,7 @@ func (c *Client) post(ctx context.Context, query string, vars, data any) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
