@@ -107,10 +107,12 @@ func (a *circleCIOrb) GetTriggerContext(ctx context.Context) (*TriggerContext, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)
 		}
-		tc.PullRequest = &PullRequest{
-			Number: pr.Number,
-			URL:    pr.URL,
-			Commit: pr.Commit,
+		if pr != nil {
+			tc.PullRequest = &PullRequest{
+				Number: pr.Number,
+				URL:    pr.URL,
+				Commit: pr.Commit,
+			}
 		}
 	}
 	return tc, nil
