@@ -181,6 +181,9 @@ func NewClient(workspace, repoSlug string, opts ...ClientOption) (*Client, error
 			return nil, err
 		}
 	}
+	if c.baseURL == "" {
+		c.baseURL = DefaultBaseURL
+	}
 	return c, nil
 }
 
