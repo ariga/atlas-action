@@ -38,10 +38,10 @@ func (a *circleCIOrb) Getenv(key string) string {
 
 // GetInput implements the Action interface.
 func (a *circleCIOrb) GetInput(name string) string {
-	v := a.getenv(toInputVarName(name))
+	v := a.getenv(ToInputVarName(name))
 	if v == "" {
 		// TODO: Remove this fallback once all the actions are updated.
-		v = a.getenv(toEnvName("INPUT_" + name))
+		v = a.getenv(ToEnvName("INPUT_" + name))
 	}
 	return strings.TrimSpace(v)
 }
