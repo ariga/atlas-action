@@ -6,6 +6,8 @@ package atlasaction_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -72,10 +74,36 @@ func TestCircleCI(t *testing.T) {
 			if err := os.Mkdir(dir, 0700); err != nil {
 				return err
 			}
+			m := http.NewServeMux()
+			m.Handle("GET /repos/{owner}/{repo}/pulls", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				require.NoError(t, json.NewEncoder(w).Encode([]struct {
+					URL    string `json:"url"`
+					Number int    `json:"number"`
+				}{
+					{
+						Number: 1,
+						URL: fmt.Sprintf("https://github.com/%s/%s/pull/1",
+							r.PathValue("owner"), r.PathValue("repo")),
+					},
+				}))
+			}))
+			m.Handle("GET /repos/{owner}/{repo}/issues/{num}/comments", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// No comments
+				w.Write([]byte(`[]`))
+			}))
+			m.Handle("POST /repos/{owner}/{repo}/issues/{num}/comments", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Created comment
+				w.WriteHeader(http.StatusCreated)
+			}))
+			m.Handle("GET /repos/{owner}/{repo}/pulls/{num}/files", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// No files
+				w.Write([]byte(`[]`))
+			}))
+			srv := httptest.NewServer(m)
+			e.Defer(srv.Close)
 			e.Setenv("MOCK_ATLAS", filepath.Join(wd, "mock-atlas.sh"))
 			e.Setenv("CIRCLECI", "true")
-			e.Setenv("CIRCLE_PROJECT_REPONAME", "atlas-orb")
-			e.Setenv("CIRCLE_SHA1", "1234567890")
+			e.Setenv("GITHUB_API_URL", srv.URL)
 			e.Setenv("BASH_ENV", filepath.Join(dir, "output.sh"))
 			return nil
 		},

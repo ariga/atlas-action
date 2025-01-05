@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"ariga.io/atlas-action/internal/gitlab"
-	"github.com/gorilla/mux"
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"
 )
@@ -58,71 +57,64 @@ func TestGitlabCI(t *testing.T) {
 
 func mockClientHandler(dir, token string) http.Handler {
 	counter := 1
-	r := mux.NewRouter()
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if t := r.Header.Get("PRIVATE-TOKEN"); t != token {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	})
-	r.Methods(http.MethodGet).Path("/projects/{project}/merge_requests/{mr}/notes").
-		HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			entries, err := os.ReadDir(dir)
+	m := http.NewServeMux()
+	m.HandleFunc("GET /projects/{project}/merge_requests/{mr}/notes", func(w http.ResponseWriter, r *http.Request) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		comments := make([]*gitlab.Note, len(entries))
+		for i, e := range entries {
+			b, err := os.ReadFile(filepath.Join(dir, e.Name()))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
 			}
-			comments := make([]*gitlab.Note, len(entries))
-			for i, e := range entries {
-				b, err := os.ReadFile(filepath.Join(dir, e.Name()))
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-				}
-				id, err := strconv.Atoi(e.Name())
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-				}
-				comments[i] = &gitlab.Note{ID: id, Body: string(b)}
-			}
-			if err = json.NewEncoder(w).Encode(comments); err != nil {
+			id, err := strconv.Atoi(e.Name())
+			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
-		})
-	r.Methods(http.MethodPost).Path("/projects/{project}/merge_requests/{mr}/notes").
-		HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var body struct {
-				Body string `json:"body"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			if err := os.WriteFile(filepath.Join(dir, strconv.Itoa(counter)), []byte(body.Body+"\n"), 0666); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			counter++
-			w.WriteHeader(http.StatusCreated)
-		})
-	r.Methods(http.MethodPut).Path("/projects/{project}/merge_requests/{mr}/notes/{note}").
-		HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			vars := mux.Vars(r)
-			if _, err := os.Stat(filepath.Join(dir, vars["note"])); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-			var body struct {
-				Body string `json:"body"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			if err := os.WriteFile(filepath.Join(dir, vars["note"]), []byte(body.Body+"\n"), 0666); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		})
-	return r
+			comments[i] = &gitlab.Note{ID: id, Body: string(b)}
+		}
+		if err = json.NewEncoder(w).Encode(comments); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+	m.HandleFunc("POST /projects/{project}/merge_requests/{mr}/notes", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Body string `json:"body"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := os.WriteFile(filepath.Join(dir, strconv.Itoa(counter)), []byte(body.Body+"\n"), 0666); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		counter++
+		w.WriteHeader(http.StatusCreated)
+	})
+	m.HandleFunc("PUT /projects/{project}/merge_requests/{mr}/notes/{note}", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := os.Stat(filepath.Join(dir, r.PathValue("note"))); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		var body struct {
+			Body string `json:"body"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := os.WriteFile(filepath.Join(dir, r.PathValue("note")), []byte(body.Body+"\n"), 0666); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if t := r.Header.Get("PRIVATE-TOKEN"); t != token {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		m.ServeHTTP(w, r)
+	})
 }
