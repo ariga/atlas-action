@@ -1,5 +1,8 @@
 # Mock the atlas command outputs
 env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-lint
+# Run context
+env CIRCLE_PROJECT_REPONAME=atlas-orb CIRCLE_SHA1=1234567890 CIRCLE_BRANCH=master
+env GITHUB_TOKEN=foo GITHUB_REPOSITORY=foo/bar
 # Setup the action input variables
 env ATLAS_INPUT_CONFIG=file://testdata/config/atlas.hcl
 env ATLAS_INPUT_ENV=test
@@ -16,7 +19,7 @@ atlas-action --action=migrate/lint
 output output.sh
 
 -- migrate-lint/1/args --
-migrate lint -w --context {"repo":"atlas-orb","path":"file://testdata/migrations","commit":"1234567890"} --env test --config file://testdata/config/atlas.hcl --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --base atlas://pupisu?tag=staging --var var1=value1 --var var2=value2 --format {{ json . }}
+migrate lint -w --context {"repo":"foo/bar","path":"file://testdata/migrations","branch":"master","commit":"1234567890","url":"https://github.com/foo/bar/pull/1","scmType":"GITHUB"} --env test --config file://testdata/config/atlas.hcl --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --base atlas://pupisu?tag=staging --var var1=value1 --var var2=value2 --format {{ json . }}
 -- migrate-lint/1/stdout --
 {"URL":"https://migration-lint-report-url"}
 -- output-pre.sh --
