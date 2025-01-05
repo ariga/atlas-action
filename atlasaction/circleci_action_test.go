@@ -28,6 +28,7 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	ctx, err := orb.GetTriggerContext(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, &atlasaction.TriggerContext{
+		Act:    orb,
 		Repo:   "atlas-orb",
 		Commit: "1234567890",
 	}, ctx)
