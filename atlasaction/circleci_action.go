@@ -61,6 +61,7 @@ func (a *circleCIOrb) SetOutput(name, value string) {
 // https://circleci.com/docs/variables/#built-in-environment-variables
 func (a *circleCIOrb) GetTriggerContext(ctx context.Context) (*TriggerContext, error) {
 	tc := &TriggerContext{
+		Act:     a,
 		RepoURL: a.getenv("CIRCLE_REPOSITORY_URL"),
 		Repo:    a.getenv("CIRCLE_PROJECT_REPONAME"),
 		Branch:  a.getenv("CIRCLE_BRANCH"),
