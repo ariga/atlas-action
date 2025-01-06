@@ -40,7 +40,7 @@ func newClient(endpoint, token, version, cliVersion string) *Client {
 		endpoint = cloudURL
 	}
 	client := retryablehttp.NewClient()
-	client.HTTPClient.Timeout = time.Second * 30
+	client.HTTPClient.Timeout = time.Second * 60
 	client.HTTPClient.Transport = &roundTripper{
 		token:      token,
 		version:    version,
