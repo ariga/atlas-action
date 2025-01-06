@@ -78,7 +78,7 @@ type (
 // PushSnapshot to the cloud, return the url to the schema snapshot in the cloud.
 func (c *Client) PushSnapshot(ctx context.Context, input *PushSnapshotInput) (string, error) {
 	var (
-		req = `mutation ($input: PushSnapshotInput!) {
+		req = `mutation pushSnapshot($input: PushSnapshotInput!) {
 			pushSnapshot(input: $input) {
 				newVersion
 				url
@@ -107,7 +107,7 @@ type SnapshotHashInput struct{ ScopeIdent }
 // SnapshotHash retrieves the hash of the schema snapshot from the cloud.
 func (c *Client) SnapshotHash(ctx context.Context, input *SnapshotHashInput) (string, error) {
 	var (
-		req = `query ($input: SnapshotHashInput!) {
+		req = `query snapshotHash($input: SnapshotHashInput!) {
 			snapshotHash(input: $input) {
 				hash
 			}
