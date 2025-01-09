@@ -459,7 +459,10 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 
 * `cloud-token` - (required) The Atlas Cloud token to use for authentication. To create
   a cloud token see the [docs](https://atlasgo.io/cloud/bots).
-* `url` - (required) The URL of the database to monitor. For example: `mysql://root:pass@localhost:3306/prod`.
+* `url` - (optional) The URL of the database to monitor. For example: `mysql://root:pass@localhost:3306/prod` (mutually exclusive with `config` and `env`).
+* `config` - (optional) The URL of the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl` (mutually exclusive with `url`).
+* `env` - (optional) The environment to use from the Atlas configuration file. For example, `dev` (mutually exclusive with `url`).
 * `slug` - (optional) Unique identifier for the database server.
 * `schemas` - (optional) List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas.
 * `exclude` - (optional) List of exclude patterns from inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas.

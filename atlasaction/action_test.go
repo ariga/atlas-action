@@ -555,11 +555,12 @@ func TestMonitorSchema(t *testing.T) {
 		ctx = context.Background()
 	)
 	for _, tt := range []struct {
-		name, url, slug          string
+		name, url, slug, config  string
 		schemas, exclude         []string
 		latestHash, newHash, hcl string
 		exSnapshot               *cloud.SnapshotInput
 		exMatch                  bool
+		wantErr                  bool
 	}{
 		{
 			name:    "no latest hash",
@@ -628,6 +629,22 @@ func TestMonitorSchema(t *testing.T) {
 			exclude:    []string{"foo.*", "bar.*.*"},
 			exMatch:    true,
 		},
+		{
+			name:    "url and config should rerurn error",
+			url:     u,
+			config:  "config",
+			wantErr: true,
+		},
+		{
+			name:        "hash match old hash func, using config",
+			config:      "file:/atlas.hcl",
+			latestHash:  atlasaction.OldAgentHash("hcl"),
+			newHash:     "hash",
+			hcl:         "hcl",
+			schemas:     []string{},
+			exclude:     []string{},
+			exMatch:     true,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var (
@@ -637,6 +654,7 @@ func TestMonitorSchema(t *testing.T) {
 						"cloud-token": "token",
 						"url":         tt.url,
 						"slug":        tt.slug,
+						"config":      tt.config,
 						"schemas":     strings.Join(tt.schemas, "\n"),
 						"exclude":     strings.Join(tt.exclude, "\n"),
 					},
@@ -647,7 +665,7 @@ func TestMonitorSchema(t *testing.T) {
 						return nil
 					},
 					schemaInspect: func(_ context.Context, p *atlasexec.SchemaInspectParams) (string, error) {
-						return fmt.Sprintf("# %s\n%s", tt.newHash, tt.hcl), nil
+						return fmt.Sprintf("# %s\n%s\n%s", tt.newHash, tt.hcl, ""), nil
 					},
 				}
 				cc      = &mockCloudClient{hash: tt.latestHash}
@@ -660,7 +678,12 @@ func TestMonitorSchema(t *testing.T) {
 				)
 			)
 			require.NoError(t, err)
-			require.NoError(t, as.MonitorSchema(ctx))
+			err = as.MonitorSchema(ctx)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 			require.Equal(t, &cloud.PushSnapshotInput{
 				ScopeIdent: cloud.ScopeIdent{
 					URL:     must(url.Parse(tt.url)).Redacted(),
