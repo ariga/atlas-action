@@ -825,11 +825,10 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		env    = a.GetInput("env")
 	)
 	if (config != "" || env != "") && db.String() != "" {
-		return errors.New("only one of the inputs 'config' or 'url' should be provided")
+		return errors.New("only one of the inputs 'config' or 'url' must be given")
 	}
 	var (
 		id = cloud.ScopeIdent{
-			URL:     db.Redacted(),
 			ExtID:   a.GetInput("slug"),
 			Schemas: a.GetArrayInput("schemas"),
 			Exclude: a.GetArrayInput("exclude"),
@@ -840,28 +839,25 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	}); err != nil {
 		return fmt.Errorf("failed to login to Atlas Cloud: %w", err)
 	}
-	// Get the URL on the indentifier if not provided (needed for the snapshot hash).
-	if id.URL == "" {
-		if id.URL, err =  a.Atlas.SchemaInspect(ctx, &atlasexec.SchemaInspectParams{
-			ConfigURL: config,
-			Env:       env,
-			Format:  `{{ .RedactedURL }}`,
-		}); err != nil {
-			return fmt.Errorf("failed to inspect the schema: %w", err)
-		}
-	}
 	params := &atlasexec.SchemaInspectParams{
-		Schema:  id.Schemas,
-		Exclude: id.Schemas,
-		Format:  `{{ printf "# %s\n%s" .Hash .MarshalHCL }}`,
+		URL:       db.String(),
+		ConfigURL: config,
+		Env:       env,
+		Schema:    id.Schemas,
+		Exclude:   id.Schemas,
+		Format:    `{{ printf "# %s\n# %s\n%s" .RedactedURL .Hash .MarshalHCL }}`,
 	}
-	if db.String() != "" {
-		params.URL = db.String()
+	res, err := a.Atlas.SchemaInspect(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to inspect the schema: %w", err)
 	}
-	if config != "" {
-		params.ConfigURL = config
-		params.Env = env
-	}
+	var (
+		parts = strings.SplitN(res, "\n", 3)
+		url   = strings.TrimPrefix(parts[0], "# ") // redacted URL.
+		hash  = strings.TrimPrefix(parts[1], "# ")
+		hcl   = parts[2]
+	)
+	id.URL = url
 	cc, err := a.cloudClient(ctx, "cloud-token")
 	if err != nil {
 		return err
@@ -870,19 +866,10 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get the schema snapshot hash: %w", err)
 	}
-	res, err := a.Atlas.SchemaInspect(ctx, params)
-	if err != nil {
-		return fmt.Errorf("failed to inspect the schema: %w", err)
+	input := &cloud.PushSnapshotInput{
+		ScopeIdent: id,
+		HashMatch:  strings.HasPrefix(h, "h1:") && OldAgentHash(hcl) == h || hash == h,
 	}
-	var (
-		parts = strings.SplitN(res, "\n", 2)
-		hash  = strings.TrimPrefix(parts[0], "# ")
-		hcl   = parts[1]
-		input = &cloud.PushSnapshotInput{
-			ScopeIdent: id,
-			HashMatch:  strings.HasPrefix(h, "h1:") && OldAgentHash(hcl) == h || hash == h,
-		}
-	)
 	if !input.HashMatch {
 		input.Snapshot = &cloud.SnapshotInput{Hash: hash, HCL: hcl}
 	}

@@ -16,7 +16,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -558,7 +557,6 @@ func TestMonitorSchema(t *testing.T) {
 		name, url, slug, config  string
 		schemas, exclude         []string
 		latestHash, newHash, hcl string
-		exScopeIdent             cloud.ScopeIdent
 		exSnapshot               *cloud.SnapshotInput
 		exMatch                  bool
 		wantErr                  bool
@@ -574,11 +572,6 @@ func TestMonitorSchema(t *testing.T) {
 				Hash: "hash",
 				HCL:  "hcl",
 			},
-			exScopeIdent: cloud.ScopeIdent{
-				URL:     must(url.Parse(u)).Redacted(),
-				Schemas: []string{},
-				Exclude: []string{},
-			},
 		},
 		{
 			name:       "latest hash no match",
@@ -592,11 +585,6 @@ func TestMonitorSchema(t *testing.T) {
 				Hash: "hash",
 				HCL:  "hcl",
 			},
-			exScopeIdent: cloud.ScopeIdent{
-				URL:     must(url.Parse(u)).Redacted(),
-				Schemas: []string{},
-				Exclude: []string{},
-			},
 		},
 		{
 			name:       "hash match old hash func",
@@ -607,11 +595,6 @@ func TestMonitorSchema(t *testing.T) {
 			schemas:    []string{},
 			exclude:    []string{},
 			exMatch:    true,
-			exScopeIdent: cloud.ScopeIdent{
-				URL:     must(url.Parse(u)).Redacted(),
-				Schemas: []string{},
-				Exclude: []string{},
-			},
 		},
 		{
 			name:       "hash match new hash func",
@@ -622,11 +605,6 @@ func TestMonitorSchema(t *testing.T) {
 			schemas:    []string{},
 			exclude:    []string{},
 			exMatch:    true,
-			exScopeIdent: cloud.ScopeIdent{
-				URL:     must(url.Parse(u)).Redacted(),
-				Schemas: []string{},
-				Exclude: []string{},
-			},
 		},
 		{
 			name:       "with slug",
@@ -638,12 +616,6 @@ func TestMonitorSchema(t *testing.T) {
 			schemas:    []string{},
 			exclude:    []string{},
 			exMatch:    true,
-			exScopeIdent: cloud.ScopeIdent{
-				URL:     must(url.Parse(u)).Redacted(),
-				ExtID:   "slug",
-				Schemas: []string{},
-				Exclude: []string{},
-			},
 		},
 		{
 			name:       "with schema and exclude",
@@ -655,12 +627,6 @@ func TestMonitorSchema(t *testing.T) {
 			schemas:    []string{"foo", "bar"},
 			exclude:    []string{"foo.*", "bar.*.*"},
 			exMatch:    true,
-			exScopeIdent: cloud.ScopeIdent{
-				URL:     must(url.Parse(u)).Redacted(),
-				ExtID:   "slug",
-				Schemas: []string{"foo", "bar"},
-				Exclude: []string{"foo.*", "bar.*.*"},
-			},
 		},
 		{
 			name:    "url and config should rerurn error",
@@ -677,11 +643,6 @@ func TestMonitorSchema(t *testing.T) {
 			schemas:    []string{},
 			exclude:    []string{},
 			exMatch:    true,
-			exScopeIdent: cloud.ScopeIdent{
-				URL:     "# hash\nhcl",
-				Schemas: []string{},
-				Exclude: []string{},
-			},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -703,7 +664,7 @@ func TestMonitorSchema(t *testing.T) {
 						return nil
 					},
 					schemaInspect: func(_ context.Context, p *atlasexec.SchemaInspectParams) (string, error) {
-						return fmt.Sprintf("# %s\n%s", tt.newHash, tt.hcl), nil
+						return fmt.Sprintf("# %s\n# %s\n%s", tt.url, tt.newHash, tt.hcl), nil
 					},
 				}
 				cc      = &mockCloudClient{hash: tt.latestHash}
@@ -723,9 +684,14 @@ func TestMonitorSchema(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, &cloud.PushSnapshotInput{
-				ScopeIdent: tt.exScopeIdent,
-				Snapshot:   tt.exSnapshot,
-				HashMatch:  tt.exMatch,
+				ScopeIdent: cloud.ScopeIdent{
+					URL:     tt.url,
+					ExtID:   tt.slug,
+					Schemas: tt.schemas,
+					Exclude: tt.exclude,
+				},
+				Snapshot:  tt.exSnapshot,
+				HashMatch: tt.exMatch,
 			}, cc.lastInput)
 			require.Equal(t, map[string]string{"url": "url"}, act.output)
 		})
