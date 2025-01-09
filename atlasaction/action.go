@@ -856,8 +856,12 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to inspect the schema: %w", err)
 	}
+	fmt.Println("result is:\n", res)
+	parts := strings.SplitN(res, "\n", 3)
+	for _, p := range parts {
+		fmt.Println("part is:\n", p)
+	}
 	var (
-		parts = strings.SplitN(res, "\n", 3)
 		hash  = strings.TrimPrefix(parts[0], "# ")
 		hcl   = parts[1]
 	)
