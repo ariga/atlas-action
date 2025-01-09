@@ -840,10 +840,20 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	}); err != nil {
 		return fmt.Errorf("failed to login to Atlas Cloud: %w", err)
 	}
+	// Get the URL on the indentifier if not provided (needed for the snapshot hash).
+	if id.URL == "" {
+		if id.URL, err =  a.Atlas.SchemaInspect(ctx, &atlasexec.SchemaInspectParams{
+			ConfigURL: config,
+			Env:       env,
+			Format:  `{{ .RedactedURL }}`,
+		}); err != nil {
+			return fmt.Errorf("failed to inspect the schema: %w", err)
+		}
+	}
 	params := &atlasexec.SchemaInspectParams{
 		Schema:  id.Schemas,
 		Exclude: id.Schemas,
-		Format:  `{{ printf "# %s\n%s\n%s" .Hash .MarshalHCL .RedactedURL }}`,
+		Format:  `{{ printf "# %s\n%s" .Hash .MarshalHCL }}`,
 	}
 	if db.String() != "" {
 		params.URL = db.String()
@@ -851,22 +861,6 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	if config != "" {
 		params.ConfigURL = config
 		params.Env = env
-	}
-	res, err := a.Atlas.SchemaInspect(ctx, params)
-	if err != nil {
-		return fmt.Errorf("failed to inspect the schema: %w", err)
-	}
-	fmt.Println("result is:\n", res)
-	parts := strings.SplitN(res, "\n", 3)
-	for _, p := range parts {
-		fmt.Println("part is:\n", p)
-	}
-	var (
-		hash  = strings.TrimPrefix(parts[0], "# ")
-		hcl   = parts[1]
-	)
-	if id.URL == "" {
-		id.URL = parts[2] // Get the URL from the inspect output.
 	}
 	cc, err := a.cloudClient(ctx, "cloud-token")
 	if err != nil {
@@ -876,10 +870,19 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get the schema snapshot hash: %w", err)
 	}
-	input := &cloud.PushSnapshotInput{
-		ScopeIdent: id,
-		HashMatch:  strings.HasPrefix(h, "h1:") && OldAgentHash(hcl) == h || hash == h,
+	res, err := a.Atlas.SchemaInspect(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to inspect the schema: %w", err)
 	}
+	var (
+		parts = strings.SplitN(res, "\n", 2)
+		hash  = strings.TrimPrefix(parts[0], "# ")
+		hcl   = parts[1]
+		input = &cloud.PushSnapshotInput{
+			ScopeIdent: id,
+			HashMatch:  strings.HasPrefix(h, "h1:") && OldAgentHash(hcl) == h || hash == h,
+		}
+	)
 	if !input.HashMatch {
 		input.Snapshot = &cloud.SnapshotInput{Hash: hash, HCL: hcl}
 	}
