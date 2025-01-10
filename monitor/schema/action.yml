@@ -8,8 +8,16 @@ inputs:
     description: 'The token that is used to connect to Atlas Cloud (should be passed as a secret).'
     required: true
   url:
-    description: 'URL of the database to sync.'
-    required: true
+    description: 'URL of the database to sync (mutually exclusive with `config` and `env`).'
+    required: false
+  config:
+    description: 'The URL of the Atlas configuration file (mutually exclusive with `url`).
+      For example, `file://config/atlas.hcl`, learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).'
+    required: false
+  env:
+    description: 'The environment to use from the Atlas configuration file. For example, `dev` 
+    (mutually exclusive with `url`).'
+    required: false
   slug:
     description: 'Optional unique identifier for the database server.'
     required: false

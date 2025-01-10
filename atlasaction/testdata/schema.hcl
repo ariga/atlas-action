@@ -1,8 +1,8 @@
 table "t1" {
-  schema = schema.public
+  schema = schema.main
   column "c1" {
     type = int
   }
 }
 
-schema "public" {}
+schema "main" {}
