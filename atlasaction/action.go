@@ -816,51 +816,46 @@ func (a *Actions) SchemaApply(ctx context.Context) error {
 
 // MonitorSchema runs the Action for "ariga/atlas-action/monitor/schema"
 func (a *Actions) MonitorSchema(ctx context.Context) error {
-	db, err := a.GetURLInput("url")
-	if err != nil {
+	if err := a.RequiredInputs("cloud-token"); err != nil {
 		return err
 	}
-	var (
-		config = a.GetInput("config")
-		env    = a.GetInput("env")
-	)
-	if (config != "" || env != "") && db.String() != "" {
-		return errors.New("only one of the inputs 'config' or 'url' must be given")
-	}
-	var (
-		id = cloud.ScopeIdent{
-			ExtID:   a.GetInput("slug"),
-			Schemas: a.GetArrayInput("schemas"),
-			Exclude: a.GetArrayInput("exclude"),
-		}
-	)
-	if err = a.Atlas.Login(ctx, &atlasexec.LoginParams{
+	if err := a.Atlas.Login(ctx, &atlasexec.LoginParams{
 		Token: a.GetInput("cloud-token"),
 	}); err != nil {
 		return fmt.Errorf("failed to login to Atlas Cloud: %w", err)
 	}
 	params := &atlasexec.SchemaInspectParams{
-		URL:       db.String(),
-		ConfigURL: config,
-		Env:       env,
-		Schema:    id.Schemas,
-		Exclude:   id.Schemas,
+		URL:       a.GetInput("url"),
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Schema:    a.GetArrayInput("schemas"),
+		Exclude:   a.GetArrayInput("exclude"),
 		Format:    `{{ printf "# %s\n# %s\n%s" .RedactedURL .Hash .MarshalHCL }}`,
 	}
-	res, err := a.Atlas.SchemaInspect(ctx, params)
+	if (params.ConfigURL != "" || params.Env != "") && params.URL != "" {
+		return errors.New("only one of the inputs 'config' or 'url' must be given")
+	}
+	hcl, err := a.Atlas.SchemaInspect(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to inspect the schema: %w", err)
 	}
-	var (
-		parts = strings.SplitN(res, "\n", 3)
-		url   = strings.TrimPrefix(parts[0], "# ") // redacted URL.
-		hash  = strings.TrimPrefix(parts[1], "# ")
-		hcl   = parts[2]
-	)
-	id.URL = url
+	var redactedURL, hash string
+	if parts := strings.SplitN(hcl, "\n", 3); len(parts) != 3 {
+		return fmt.Errorf("invalid inspect output, expect 3 lines, got %d", len(parts))
+	} else {
+		redactedURL = strings.TrimPrefix(parts[0], "# ")
+		hash = strings.TrimPrefix(parts[1], "# ")
+		hcl = parts[2]
+	}
 	cc, err := a.cloudClient(ctx, "cloud-token")
 	if err != nil {
 		return err
+	}
+	id := cloud.ScopeIdent{
+		URL:     redactedURL,
+		Schemas: params.Schema,
+		Exclude: params.Exclude,
+		ExtID:   a.GetInput("slug"),
 	}
 	h, err := cc.SnapshotHash(ctx, &cloud.SnapshotHashInput{ScopeIdent: id})
 	if err != nil {
