@@ -15,8 +15,7 @@ inputs:
       For example, `file://config/atlas.hcl`, learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).'
     required: false
   env:
-    description: 'The environment to use from the Atlas configuration file. For example, `dev` 
-    (mutually exclusive with `url`).'
+    description: 'The environment to use from the Atlas configuration file. For example, `dev` (mutually exclusive with `url`).'
     required: false
   slug:
     description: 'Optional unique identifier for the database server.'
