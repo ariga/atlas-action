@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -44,7 +46,15 @@ func (a *gitlabCI) GetInput(name string) string {
 
 // SetOutput implements the Action interface.
 func (a *gitlabCI) SetOutput(name, value string) {
-	err := fprintln(".env", toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
+	dotEnv := ".env"
+	if dir := a.getenv("CI_PROJECT_DIR"); dir != "" {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			a.Errorf("failed to create output directory %s: %v", dir, err)
+			return
+		}
+		dotEnv = filepath.Join(dir, dotEnv)
+	}
+	err := fprintln(dotEnv, toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
 	if err != nil {
 		a.Errorf("failed to write output to file .env: %v", err)
 	}

@@ -28,6 +28,7 @@ func TestGitlabCI(t *testing.T) {
 			e.Defer(srv.Close)
 			e.Setenv("MOCK_ATLAS", filepath.Join(wd, "mock-atlas.sh"))
 			e.Setenv("CI_API_V4_URL", srv.URL)
+			e.Setenv("CI_PROJECT_DIR", filepath.Join(e.WorkDir, "project"))
 			e.Setenv("CI_PROJECT_ID", "1")
 			e.Setenv("GITLAB_CI", "true")
 			e.Setenv("GITLAB_TOKEN", "token")
@@ -36,7 +37,7 @@ func TestGitlabCI(t *testing.T) {
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
 			"output": func(ts *testscript.TestScript, neg bool, args []string) {
 				if len(args) == 0 {
-					_, err := os.Stat(ts.MkAbs(".env"))
+					_, err := os.Stat(ts.MkAbs("./project/.env"))
 					if neg {
 						if !os.IsNotExist(err) {
 							ts.Fatalf("expected no output, but got some")
@@ -49,7 +50,7 @@ func TestGitlabCI(t *testing.T) {
 					}
 					return
 				}
-				cmpFiles(ts, neg, args[0], ".env")
+				cmpFiles(ts, neg, args[0], "./project/.env")
 			},
 		},
 	})
