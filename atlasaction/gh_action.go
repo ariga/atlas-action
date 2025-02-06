@@ -181,8 +181,10 @@ func (c *ghClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlas
 	if err != nil {
 		return err
 	}
-	if _, err := c.GetUser(ctx); err != nil {
+	if co, err := c.IsCoAuthored(ctx, tc.PullRequest.Commit); err != nil {
 		return err
+	} else {
+		fmt.Printf("Commit co-authored: %v\n", co)
 	}
 	switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest.Number); {
 	case err != nil:
