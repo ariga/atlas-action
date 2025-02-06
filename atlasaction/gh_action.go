@@ -181,6 +181,9 @@ func (c *ghClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlas
 	if err != nil {
 		return err
 	}
+	if _, err := c.GetUser(ctx); err != nil {
+		return err
+	}
 	switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest.Number); {
 	case err != nil:
 		tc.Act.Errorf("failed to list pull request files: %w", err)
