@@ -333,6 +333,29 @@ func (c *Client) OpeningPullRequest(ctx context.Context, branch string) (*PullRe
 	}
 }
 
+func (c *Client) GetUser(ctx context.Context) (any, error) {
+	url := fmt.Sprintf("%s/user", c.baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling GitHub API: %w", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d when calling GitHub API", res.StatusCode)
+	}
+	defer res.Body.Close()
+	switch buf, err := io.ReadAll(res.Body); {
+	case err != nil:
+		return nil, fmt.Errorf("error reading open pull requests: %w", err)
+	default:
+		fmt.Println(buf)
+		return nil, nil
+	}
+}
+
 func (c *Client) ownerRepo() (string, string, error) {
 	s := strings.Split(c.repo, "/")
 	if len(s) != 2 {
