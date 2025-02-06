@@ -54,11 +54,10 @@ jobs:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - name: "Run Migrate Lint"
         run: go run cmd/atlas-action/main.go --action migrate/lint
-        with:
-          dir: file://atlasaction/testdata/migrations
-          dev-url: postgres://postgres:pass@localhost:5432/dev?search_path=public&sslmode=disable
-          dir-name: noam-test
         env:
+          INPUT_DIR: file://atlasaction/testdata/migrations
+          INPUT_DEV-URL: postgres://postgres:pass@localhost:5432/dev?search_path=public&sslmode=disable
+          INPUT_DIR-NAME: noam-test
           GITHUB_TOKEN: ${{ github.token }}
       - name: "Run Migrate Push"
         uses: ./migrate/push
