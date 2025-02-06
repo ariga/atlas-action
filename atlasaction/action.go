@@ -483,7 +483,6 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		isLintErr bool
 	)
 	rc := tc.GetRunContext()
-
 	rc.Path = a.GetInput("dir")
 	switch err := a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
 		Context:   rc,
