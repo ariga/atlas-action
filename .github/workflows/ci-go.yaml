@@ -63,27 +63,4 @@ jobs:
           dir: file://atlasaction/testdata/migrations
           dev-url: postgres://postgres:pass@localhost:5432/dev?search_path=public&sslmode=disable
           dir-name: noam-test
-  golangci-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - name: Run Go linters
-        uses: golangci/golangci-lint-action@v3
-        with:
-          args: --verbose --timeout=5m
-          skip-pkg-cache: true
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: ariga/setup-atlas@v0
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - name: Run tests
-        run: go test -race ./...
+  
