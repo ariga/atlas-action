@@ -27,6 +27,20 @@ jobs:
           exit 1
         fi
   shim-e2e:
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: dev
+          POSTGRES_PASSWORD: pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-start-period 10s
+          --health-timeout 5s
+          --health-retries 5
     runs-on: ubuntu-latest
     env:
       ATLAS_ACTION_LOCAL: 0 # Disable local mode
@@ -39,16 +53,16 @@ jobs:
         uses: ./migrate/lint
         with:
           dir: file://atlasaction/testdata/migrations
-          dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir-sqlite
+          dev-url: postgres://postgres:pass@localhost:5432/dev?search_path=public&sslmode=disable
+          dir-name: noam-test
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: "Run Migrate Push"
         uses: ./migrate/push
         with:
           dir: file://atlasaction/testdata/migrations
-          dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir-sqlite
+          dev-url: postgres://postgres:pass@localhost:5432/dev?search_path=public&sslmode=disable
+          dir-name: noam-test
   golangci-lint:
     runs-on: ubuntu-latest
     steps:
