@@ -539,6 +539,7 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 		Env:             a.GetInput("env"),
 		Vars:            a.GetVarsInput("vars"),
 		RevisionsSchema: a.GetInput("revisions-schema"),
+		Paths:           a.GetArrayInput("paths"),
 	})
 	if err != nil {
 		return fmt.Errorf("`atlas migrate test` completed with errors:\n%s", err)
@@ -598,6 +599,7 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
+		Paths:     a.GetArrayInput("paths"),
 	})
 	if err != nil {
 		return fmt.Errorf("`atlas schema test` completed with errors:\n%s", err)

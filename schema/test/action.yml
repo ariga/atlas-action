@@ -34,6 +34,10 @@ inputs:
       Filter tests to run by regexp. For example, `^test_.*` will only run tests that start with `test_`.
       Default is to run all tests.
     required: false
+  paths:
+    description: |
+      the list of directories containing test files. 
+    required: false
 runs:
   using: node20
   main: index.js
