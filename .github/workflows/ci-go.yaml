@@ -447,12 +447,12 @@ jobs:
       - name: sanity using url
         uses: ./monitor/schema
         with:
-          cloud-token: ${{ secrets.ATLAS_AGENT_TOKEN }}
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
           url: 'mysql://root:pass@localhost:3306/dev'
           slug: 'github-action'
       - name: sanity using config
         uses: ./monitor/schema
         with:
-          cloud-token: ${{ secrets.ATLAS_AGENT_TOKEN }}
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
           config: 'file://monitor/schema/atlas.hcl'
           env: 'dev'
