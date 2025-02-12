@@ -39,6 +39,10 @@ inputs:
   revisions-schema:
     description: The name of the schema containing the revisions table.
     required: false
+  paths:
+    description: |
+      the list of directories containing test files. 
+    required: false
 runs:
   using: node20
   main: index.js

@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	ariga.io/atlas v0.21.2-0.20240418081819-02b3f6239b04
-	ariga.io/atlas-go-sdk v0.6.5
+	ariga.io/atlas-go-sdk v0.6.6-0.20250212175821-4ab021f3ab2e
 	github.com/alecthomas/kong v0.8.0
 	github.com/fatih/color v1.17.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
