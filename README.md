@@ -250,6 +250,7 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `url` - The URL of the target database. For example: `mysql://root:pass@localhost:3306/prod`.
 * `dir` - The URL of the migration directory to apply.  For example: `atlas://dir-name` for cloud
    based directories or `file://migrations` for local ones.
+* `amount` - The maximum number of migration files to apply, default is all.
 * `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects). 

@@ -150,6 +150,20 @@ func TestMigrateApply(t *testing.T) {
 		err = tt.newActs(t).MigrateApply(context.Background())
 		require.NoError(t, err)
 	})
+	t.Run("amount", func(t *testing.T) {
+		tt := newT(t, nil)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("amount", "1")
+		err := tt.newActs(t).MigrateApply(context.Background())
+		require.NoError(t, err)
+		// Check only one file was applied.
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Contains(t, string(c), "<td>Migrate to Version</td>\n    <td>\n      <code>20230922132634</code>")
+		require.Contains(t, string(c), "Migration Passed")
+		require.Contains(t, string(c), "1 migration file, 1 statement passed")
+	})
 }
 
 func TestMigrateDown(t *testing.T) {
