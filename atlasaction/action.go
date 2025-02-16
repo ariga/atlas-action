@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/go-git/go-git/v5"
 	"io"
 	"net/url"
 	"os"
@@ -66,6 +67,8 @@ type (
 		CommentLint(context.Context, *TriggerContext, *atlasexec.SummaryReport) error
 		// CommentPlan comments on the pull request with the schema plan.
 		CommentPlan(context.Context, *TriggerContext, *atlasexec.SchemaPlan) error
+		// IsCoAuthored checks if the given commit is co-authored by a bot.
+		IsCoAuthored(ctx context.Context, commit string) (bool, error)
 	}
 	Logger interface {
 		// Infof logs an info message.
@@ -92,6 +95,8 @@ type (
 		MigrateDown(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 		// MigrateLintError runs the `migrate lint` command and fails if there are lint errors.
 		MigrateLintError(context.Context, *atlasexec.MigrateLintParams) error
+		// MigrateHash runs the `migrate lint` command and fails if there are lint errors.
+		MigrateHash(context.Context, *atlasexec.MigrateHashParams) error
 		// MigratePush runs the `migrate push` command.
 		MigratePush(context.Context, *atlasexec.MigratePushParams) (string, error)
 		// MigrateTest runs the `migrate test` command.
@@ -474,9 +479,72 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if dirName == "" {
 		return errors.New("atlasaction: missing required parameter dir-name")
 	}
+	dirURL := a.GetInput("dir")
 	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
+	}
+	if a.GetBoolInput("auto-hash") && tc.PullRequest != nil && strings.HasPrefix(dirURL, "file://") {
+		a.Infof("Checking if scm client exists")
+		scm, err := tc.SCMClient()
+		switch {
+		case errors.Is(err, ErrNoSCM):
+		case err != nil:
+			return err
+		default:
+			dirPath := strings.TrimPrefix(dirURL, "file://")
+			a.Infof("SCM client exists. checking if commit is co-authored")
+			coAuthored, err := scm.IsCoAuthored(ctx, tc.PullRequest.Commit)
+			if err != nil {
+				return err
+			}
+			if !coAuthored {
+				break
+			}
+			a.Infof("commit is co-authored. running migrate hash")
+			if err := a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{
+				DirURL:    dirURL,
+				ConfigURL: a.GetInput("config"),
+				Env:       a.GetInput("env"),
+				Vars:      a.GetVarsInput("vars"),
+			}); err != nil {
+				return err
+			}
+			r, err := git.PlainOpen(".")
+			if err != nil {
+				return err
+			}
+			w, err := r.Worktree()
+			if err != nil {
+				return err
+			}
+			status, err := w.Status()
+			if err != nil {
+				return err
+			}
+			a.Infof("git status: %s", status.String())
+			if f := status.File(dirPath); f == nil || f.Worktree != git.Modified {
+				break
+			}
+			if _, err := w.Add(dirPath); err != nil {
+				return err
+			}
+			conf, err := r.Config()
+			if err != nil {
+				return err
+			}
+			conf.Author.Name = "Atlas Action"
+			conf.Author.Email = "github-action@atlasgo.cloud"
+			if err := r.SetConfig(conf); err != nil {
+				return err
+			}
+			if _, err := w.Commit("fix directory sum file [skip ci]", &git.CommitOptions{}); err != nil {
+				return err
+			}
+			if err := r.PushContext(ctx, &git.PushOptions{}); err != nil {
+				return err
+			}
+		}
 	}
 	var (
 		resp      bytes.Buffer
@@ -487,7 +555,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	switch err := a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
 		Context:   rc,
 		DevURL:    a.GetInput("dev-url"),
-		DirURL:    a.GetInput("dir"),
+		DirURL:    dirURL,
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Base:      a.GetAtlasURLInput("dir-name", "tag"),
