@@ -29,6 +29,9 @@ inputs:
       The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
       based directories or `file://migrations` for local ones.
     required: false
+  amount:
+    description: The maximum number of migration files to apply, default is all.
+    required: false
   dry-run:
     description: Print SQL without executing it. Either "true" or "false".
     required: false

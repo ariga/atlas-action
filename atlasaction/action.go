@@ -331,6 +331,7 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		DryRun:          a.GetBoolInput("dry-run"),
 		RevisionsSchema: a.GetInput("revisions-schema"),
 		AllowDirty:      a.GetBoolInput("allow-dirty"),
+		Amount:          a.GetUin64Input("amount"),
 		TxMode:          a.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: a.GetInput("baseline"), // Hidden param.
 	}
