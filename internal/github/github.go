@@ -335,10 +335,11 @@ func (c *Client) OpeningPullRequest(ctx context.Context, branch string) (*PullRe
 }
 
 func (c *Client) IsCoAuthored(ctx context.Context, commit string) (bool, error) {
-	// Get open pull requests for the branch.
 	url := fmt.Sprintf("%s/repos/%s/commits/%s", c.baseURL, c.repo, commit)
-	fmt.Printf("Calling URL: %s\n", url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, err
+	}
 	res, err := c.client.Do(req)
 	if err != nil {
 		return false, fmt.Errorf("error calling GitHub API: %w", err)

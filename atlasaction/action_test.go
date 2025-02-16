@@ -313,6 +313,11 @@ func (m *mockAtlas) MigrateLintError(context.Context, *atlasexec.MigrateLintPara
 	panic("unimplemented")
 }
 
+// MigrateHash implements AtlasExec.
+func (m *mockAtlas) MigrateHash(context.Context, *atlasexec.MigrateHashParams) error {
+	panic("unimplemented")
+}
+
 // MigratePush implements AtlasExec.
 func (m *mockAtlas) MigratePush(context.Context, *atlasexec.MigratePushParams) (string, error) {
 	panic("unimplemented")
@@ -2160,6 +2165,10 @@ func (m *mockSCM) comment(_ context.Context, _ *atlasaction.PullRequest, id stri
 	req.Header.Set("Authorization", "Bearer token")
 	_, err = http.DefaultClient.Do(req)
 	return err
+}
+
+func (m *mockSCM) IsCoAuthored(context.Context, string) (bool, error) {
+	return false, nil
 }
 
 // Why another testscript for templates?
