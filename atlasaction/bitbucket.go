@@ -332,6 +332,11 @@ func (c *bbClient) upsertComment(ctx context.Context, prID int, id, comment stri
 	return err
 }
 
+func (c *bbClient) IsCoAuthored(context.Context, string) (bool, error) {
+	// Not implemented.
+	return false, nil
+}
+
 // hash returns the SHA-256 hash of the parts.
 // The hash is encoded using base64.RawURLEncoding.
 func hash(parts ...string) (string, error) {

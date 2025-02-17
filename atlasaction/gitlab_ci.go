@@ -137,5 +137,10 @@ func (c *glClient) upsertComment(ctx context.Context, pr *PullRequest, id, comme
 	return c.CreateNote(ctx, pr.Number, comment)
 }
 
+func (c *glClient) IsCoAuthored(context.Context, string) (bool, error) {
+	// Not implemented.
+	return false, nil
+}
+
 var _ Action = (*gitlabCI)(nil)
 var _ SCMClient = (*glClient)(nil)
