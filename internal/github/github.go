@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -331,6 +332,37 @@ func (c *Client) OpeningPullRequest(ctx context.Context, branch string) (*PullRe
 			Commit: resp[0].Head.Sha,
 		}, nil
 	}
+}
+
+func (c *Client) IsCoAuthored(ctx context.Context, commit string) (bool, error) {
+	url := fmt.Sprintf("%s/repos/%s/commits/%s", c.baseURL, c.repo, commit)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, err
+	}
+	res, err := c.client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("error calling GitHub API: %w", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("unexpected status code: %d when calling GitHub API", res.StatusCode)
+	}
+	buf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, fmt.Errorf("error reading open pull requests: %w", err)
+	}
+	var resp struct {
+		Commit struct {
+			Message string
+		}
+	}
+	if err = json.Unmarshal(buf, &resp); err != nil {
+		return false, err
+	}
+	return slices.Contains(strings.Split(resp.Commit.Message, "\n"),
+		"Co-authored-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+	), nil
 }
 
 func (c *Client) ownerRepo() (string, string, error) {
