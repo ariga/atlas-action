@@ -332,7 +332,7 @@ func (c *bbClient) upsertComment(ctx context.Context, prID int, id, comment stri
 	return err
 }
 
-func (c *bbClient) IsCoAuthored(context.Context, string) (bool, error) {
+func (c *bbClient) IsCoAuthored(context.Context, *TriggerContext) (bool, error) {
 	// Not implemented.
 	return false, nil
 }

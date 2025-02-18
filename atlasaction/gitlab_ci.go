@@ -137,7 +137,7 @@ func (c *glClient) upsertComment(ctx context.Context, pr *PullRequest, id, comme
 	return c.CreateNote(ctx, pr.Number, comment)
 }
 
-func (c *glClient) IsCoAuthored(context.Context, string) (bool, error) {
+func (c *glClient) IsCoAuthored(context.Context, *TriggerContext) (bool, error) {
 	// Not implemented.
 	return false, nil
 }

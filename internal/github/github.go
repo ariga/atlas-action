@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 )
 
 type (
-	// ghAPI is an implementation of the SCMClient interface for GitHub Actions.
+	// Client is an implementation of the SCMClient interface for GitHub Actions.
 	Client struct {
 		baseURL string
 		repo    string
@@ -40,8 +39,10 @@ type (
 		StartLine int    `json:"start_line,omitempty"`
 		Line      int    `json:"line,omitempty"`
 	}
-	pullRequestFile struct {
-		Name string `json:"filename"`
+	PullRequestFile struct {
+		Patch  string `json:"patch"`
+		Status string `json:"status"`
+		Name   string `json:"filename"`
 	}
 	PullRequest struct {
 		Number int
@@ -90,7 +91,7 @@ func WithToken(t *oauth2.Token) ClientOption {
 	}
 }
 
-// githubClient returns a new GitHub client for the given repository.
+// NewClient returns a new GitHub client for the given repository.
 // If the GITHUB_TOKEN is set, it will be used for authentication.
 func NewClient(repo string, opts ...ClientOption) (*Client, error) {
 	c := &Client{
@@ -107,6 +108,23 @@ func NewClient(repo string, opts ...ClientOption) (*Client, error) {
 		c.baseURL = DefaultBaseURL
 	}
 	return c, nil
+}
+
+func (c *Client) GetURL(ctx context.Context, path string, dst any) error {
+	url := fmt.Sprintf("%s/%s", c.baseURL, path)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d when calling GitHub API", resp.StatusCode)
+	}
+	return json.NewDecoder(resp.Body).Decode(dst)
 }
 
 func (c *Client) IssueComments(ctx context.Context, prID int) ([]IssueComment, error) {
@@ -156,7 +174,7 @@ func (c *Client) CreateIssueComment(ctx context.Context, prID int, comment strin
 	return err
 }
 
-// updateIssueComment updates issue comment with the given id.
+// UpdateIssueComment updates issue comment with the given id.
 func (c *Client) UpdateIssueComment(ctx context.Context, id int, comment string) error {
 	content := strings.NewReader(fmt.Sprintf(`{"body":%q}`, comment))
 	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", c.baseURL, c.repo, id)
@@ -179,7 +197,7 @@ func (c *Client) UpdateIssueComment(ctx context.Context, id int, comment string)
 	return err
 }
 
-// listReviewComments for the trigger event pull request.
+// ReviewComments for the trigger event pull request.
 func (c *Client) ReviewComments(ctx context.Context, prID int) ([]PullRequestComment, error) {
 	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", c.baseURL, c.repo, prID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -230,7 +248,7 @@ func (c *Client) CreateReviewComment(ctx context.Context, prID int, s *PullReque
 	return err
 }
 
-// updateReviewComment updates the review comment with the given id.
+// UpdateReviewComment updates the review comment with the given id.
 func (c *Client) UpdateReviewComment(ctx context.Context, id int, body string) error {
 	type pullRequestUpdate struct {
 		Body string `json:"body"`
@@ -278,7 +296,7 @@ func (c *Client) ListPullRequestFiles(ctx context.Context, prID int) ([]string, 
 		}
 		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
-	var files []pullRequestFile
+	var files []PullRequestFile
 	if err = json.NewDecoder(res.Body).Decode(&files); err != nil {
 		return nil, err
 	}
@@ -332,37 +350,6 @@ func (c *Client) OpeningPullRequest(ctx context.Context, branch string) (*PullRe
 			Commit: resp[0].Head.Sha,
 		}, nil
 	}
-}
-
-func (c *Client) IsCoAuthored(ctx context.Context, commit string) (bool, error) {
-	url := fmt.Sprintf("%s/repos/%s/commits/%s", c.baseURL, c.repo, commit)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return false, err
-	}
-	res, err := c.client.Do(req)
-	if err != nil {
-		return false, fmt.Errorf("error calling GitHub API: %w", err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("unexpected status code: %d when calling GitHub API", res.StatusCode)
-	}
-	buf, err := io.ReadAll(res.Body)
-	if err != nil {
-		return false, fmt.Errorf("error reading open pull requests: %w", err)
-	}
-	var resp struct {
-		Commit struct {
-			Message string
-		}
-	}
-	if err = json.Unmarshal(buf, &resp); err != nil {
-		return false, err
-	}
-	return slices.Contains(strings.Split(resp.Commit.Message, "\n"),
-		"Co-authored-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-	), nil
 }
 
 func (c *Client) ownerRepo() (string, string, error) {

@@ -33,5 +33,5 @@ jobs:
           INPUT_DEV-URL: sqlite://db?mode=memory
           INPUT_DIR-NAME: noam-test
           INPUT_AUTO-HASH: true
-          GITHUB_TOKEN: ${{ github.token }}
-#          GITHUB_TOKEN: ${{ secrets.BOT_PAT }}
+#          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.BOT_PAT }}

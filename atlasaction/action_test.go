@@ -2181,10 +2181,6 @@ func (m *mockSCM) comment(_ context.Context, _ *atlasaction.PullRequest, id stri
 	return err
 }
 
-func (m *mockSCM) IsCoAuthored(context.Context, string) (bool, error) {
-	return false, nil
-}
-
 // Why another testscript for templates?
 // Because I love to see the output in its full glory.
 // Instead of a mess of quotes and escapes, I can see the actual output.
