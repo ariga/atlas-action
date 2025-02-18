@@ -7,46 +7,12 @@ on:
     types: [opened, synchronize, reopened]
   workflow_call:
 
-permissions:
-  contents: write
-  pull-requests: write
+#permissions:
+#  contents: write
+#  pull-requests: write
 
 jobs:
-#  shim:
-#    runs-on: ubuntu-latest
-#    steps:
-#    - uses: actions/checkout@v3
-#    - uses: actions/setup-node@v3
-#      with:
-#        node-version: 20.x
-#        cache: 'npm'
-#    - name: Install
-#      run: |
-#        npm i
-#        npm run all
-#    - name: verify no git diff
-#      run: |
-#        status=$(git status --porcelain)
-#        if [ -n "$status" ]; then
-#          echo "you need to run 'npm run all' and commit the changes"
-#          echo "$status"
-#          exit 1
-#        fi
   shim-e2e:
-#    services:
-#      postgres:
-#        image: postgres:17
-#        env:
-#          POSTGRES_DB: dev
-#          POSTGRES_PASSWORD: pass
-#        ports:
-#          - 5432:5432
-#        options: >-
-#          --health-cmd pg_isready
-#          --health-interval 10s
-#          --health-start-period 10s
-#          --health-timeout 5s
-#          --health-retries 5
     runs-on: ubuntu-latest
     env:
       ATLAS_ACTION_LOCAL: 0 # Disable local mode
@@ -68,3 +34,4 @@ jobs:
           INPUT_DIR-NAME: noam-test
           INPUT_AUTO-HASH: true
           GITHUB_TOKEN: ${{ github.token }}
+#          GITHUB_TOKEN: ${{ secrets.BOT_PAT }}
