@@ -49,6 +49,10 @@ inputs:
     description: Automatically approve and apply changes. Either "true" or "false".
     required: false
     default: "false"
+  tx-mode:
+    description: |
+      Transaction mode to use. Either "file", "all", or "none". Default is "file".
+    required: false
 outputs:
   error:
     description: The error message if the action fails.

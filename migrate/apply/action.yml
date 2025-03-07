@@ -41,6 +41,10 @@ inputs:
   allow-dirty:
     description: Allow start working on a non-clean database.
     required: false
+  tx-mode:
+    description: |
+      Transaction mode to use. Either "file", "all", or "none". Default is "file".
+    required: false
 outputs:
   current:
     description: The current version of the database. (before applying migrations)
