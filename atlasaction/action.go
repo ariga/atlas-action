@@ -569,7 +569,8 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 
 // MigrateAutoRebase runs the GitHub Action for "ariga/atlas-action/migrate/autorebase"
 func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
-	sumFile, err := os.ReadFile(strings.TrimPrefix(a.GetInput("dir"), "file://") + "/atlas.sum")
+	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
+	sumFile, err := os.ReadFile(dirpath + "/atlas.sum")
 	if err != nil {
 		return fmt.Errorf("failed to read atlas.sum file: %w", err)
 	}
@@ -593,14 +594,24 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err := a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: a.GetInput("dir"), Files: rebaseFiles}); err != nil {
 		return fmt.Errorf("failed to rebase the migrations: %w", err)
 	}
-	if err := a.CmdExecutor(ctx, "git", "add", "atlas.sum").Run(); err != nil {
+	tc, err := a.GetTriggerContext(ctx)
+	if err != nil {
+		return err
+	}
+	branch := tc.GetRunContext().Branch
+	fmt.Println("branch:", branch)
+	// Since running in detached HEAD, we need to switch to the branch.
+	if err := a.CmdExecutor(ctx, "git", "checkout", branch).Run(); err != nil {
+		return fmt.Errorf("failed to checkout to the branch: %w", err)
+	}
+	if err := a.CmdExecutor(ctx, "git", "add", fmt.Sprintf("%s/atlas.sum", dirpath)).Run(); err != nil {
 		return fmt.Errorf("failed to stage the changes: %w", err)
 	}
-	msg := fmt.Sprintf("Rebase the migrations in %s", strings.TrimPrefix(a.GetInput("dir"), "file://"))
+	msg := fmt.Sprintf("Rebase the migrations in %s", dirpath)
 	if err := a.CmdExecutor(ctx, "git", "commit", "-m", msg).Run(); err != nil {
 		return fmt.Errorf("failed to commit the changes: %w", err)
 	}
-	if err := a.CmdExecutor(ctx, "git", "push", "origin", "HEAD").Run(); err != nil {
+	if err := a.CmdExecutor(ctx, "git", "push", "origin", branch).Run(); err != nil {
 		return fmt.Errorf("failed to push the changes: %w", err)
 	}
 	a.Infof("Migrations rebased successfully")
