@@ -569,6 +569,7 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 
 // MigrateAutoRebase runs the Action for "ariga/atlas-action/migrate/autorebase"
 func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
+	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
 	rebaseBranch := a.GetInput("rebase-branch")
 	if rebaseBranch == "" {
 		rebaseBranch = "main"
@@ -578,38 +579,37 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return err
 	}
 	branch := tc.GetRunContext().Branch
+	if err := a.CmdExecutor(ctx, "git", "fetch", "origin", rebaseBranch).Run(); err != nil {
+		return fmt.Errorf("failed to fetch the branch %s: %w", rebaseBranch, err)
+	}
 	// Since running in detached HEAD, we need to switch to the branch.
 	if err := a.CmdExecutor(ctx, "git", "checkout", branch).Run(); err != nil {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
-	if err := a.CmdExecutor(ctx, "git", "fetch", "origin", rebaseBranch).Run(); err != nil {
-		return fmt.Errorf("failed to fetch the branch %s: %w", rebaseBranch, err)
+	incoming, err := a.CmdExecutor(ctx, "git", "show", "origin/"+rebaseBranch+":"+dirpath+"/atlas.sum").Output()
+	if err != nil {
+		return fmt.Errorf("failed to get the atlas.sum file from the rebase branch: %w", err)
+	}
+	base, err := os.ReadFile(dirpath + "/atlas.sum")
+	if err != nil {
+		return fmt.Errorf("failed to read atlas.sum file: %w", err)
+	}
+	rebaseFiles := git.FilesOnlyInBase(string(base), string(incoming))
+	if len(rebaseFiles) == 0 {
+		a.Infof("No files to rebase")
+		return nil
+	}
+	if err := a.CmdExecutor(ctx, "git", "config", "--global", "user.name", "atlas-action").Run(); err != nil {
+		return fmt.Errorf("failed to set the git user name: %w", err)
+	}
+	if err := a.CmdExecutor(ctx, "git", "config", "--global", "user.email", "atlas-action@ariga").Run(); err != nil {
+		return fmt.Errorf("failed to set the git user email: %w", err)
 	}
 	// Try to rebase on top of the rebase branch
 	err = a.CmdExecutor(ctx, "git", "rebase", "origin/"+rebaseBranch).Run()
 	if err == nil {
 		a.Infof("No conflict found in the migrations")
 		return nil
-	}
-	// If there is a conflict, try to rebase the migrations automatically.
-	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
-	sumFile, err := os.ReadFile(dirpath + "/atlas.sum")
-	if err != nil {
-		return fmt.Errorf("failed to read atlas.sum file: %w", err)
-	}
-	conflicts := git.ParseConflicts(string(sumFile))
-	if len(conflicts) == 0 {
-		a.Infof("No conflict found in the %s file", dirpath+"/atlas.sum")
-		return nil
-	}
-	var rebaseFiles []string
-	switch len(conflicts) {
-	case 1:
-		rebaseFiles = conflicts[0].FilesOnlyInBase()
-	case 2:
-		rebaseFiles = conflicts[1].FilesOnlyInBase()
-	default:
-		return fmt.Errorf("found %d conflicts in the atlas.sum file, cannot rebase automatically", len(conflicts))
 	}
 	if err := a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{DirURL: a.GetInput("dir")}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
@@ -626,7 +626,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err := a.CmdExecutor(ctx, "git", "rebase", "--continue").Run(); err != nil {
 		return fmt.Errorf("failed to continue the rebase: %w", err)
 	}
-	if err := a.CmdExecutor(ctx, "git", "push", "origin", branch).Run(); err != nil {
+	if err := a.CmdExecutor(ctx, "git", "push", "--force-with-lease", "origin", branch).Run(); err != nil {
 		return fmt.Errorf("failed to push the changes: %w", err)
 	}
 	a.Infof("Migrations rebased successfully")

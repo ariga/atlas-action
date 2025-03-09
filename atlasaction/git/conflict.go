@@ -41,10 +41,10 @@ func getFileNames(content string) []string {
 }
 
 // FilesOnlyInBase returns filenames that appear only in the base branch.
-func (c *Conflict) FilesOnlyInBase() []string {
-	baseFiles := getFileNames(c.Base)
+func FilesOnlyInBase(base, incoming string) []string {
+	baseFiles := getFileNames(base)
 	incomingFilesSet := make(map[string]struct{})
-	for _, file := range getFileNames(c.Incoming) {
+	for _, file := range getFileNames(incoming) {
 		incomingFilesSet[file] = struct{}{}
 	}
 	var onlyInBase []string
