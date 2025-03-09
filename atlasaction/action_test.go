@@ -317,6 +317,16 @@ func (m *mockAtlas) MigrateStatus(context.Context, *atlasexec.MigrateStatusParam
 	panic("unimplemented")
 }
 
+// MigrateHash implements AtlasExec.
+func (m *mockAtlas) MigrateHash(context.Context, *atlasexec.MigrateHashParams) error {
+	panic("unimplemented")
+}
+
+// MigrateInspect implements AtlasExec.
+func (m *mockAtlas) MigrateRebase(context.Context, *atlasexec.MigrateRebaseParams) error {
+	panic("unimplemented")
+}
+
 // MigrateApplySlice implements AtlasExec.
 func (m *mockAtlas) MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error) {
 	panic("unimplemented")
