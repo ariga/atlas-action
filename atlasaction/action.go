@@ -547,7 +547,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	return nil
 }
 
-// MigrateTest runs the Action for "ariga/atlas-action/migrate/test"
+// MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
 func (a *Actions) MigrateTest(ctx context.Context) error {
 	result, err := a.Atlas.MigrateTest(ctx, &atlasexec.MigrateTestParams{
 		DirURL:          a.GetInput("dir"),
@@ -567,7 +567,7 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 	return nil
 }
 
-// MigrateAutoRebase runs the GitHub Action for "ariga/atlas-action/migrate/autorebase"
+// MigrateAutoRebase runs the Action for "ariga/atlas-action/migrate/autorebase"
 func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
 	sumFile, err := os.ReadFile(dirpath + "/atlas.sum")
@@ -599,7 +599,6 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return err
 	}
 	branch := tc.GetRunContext().Branch
-	fmt.Println("branch:", branch)
 	// Since running in detached HEAD, we need to switch to the branch.
 	if err := a.CmdExecutor(ctx, "git", "checkout", branch).Run(); err != nil {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)

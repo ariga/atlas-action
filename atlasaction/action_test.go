@@ -612,6 +612,9 @@ func TestMigrateAutorebase(t *testing.T) {
 			inputs: map[string]string{
 				"dir": "file://testdata/need_rebase",
 			},
+			trigger: &atlasaction.TriggerContext{
+				Branch: "rebase-branch",
+			},
 			logger: slog.New(slog.NewTextHandler(out, nil)),
 		}
 		newActs := func() *atlasaction.Actions {
@@ -630,13 +633,15 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.Len(t, rebasedFiles, 1)
 		require.Equal(t, "20250309093464_rebase.sql", rebasedFiles[0])
 		// Check that the correct git commands were executed
-		require.Len(t, mockExec.commands, 3)
+		require.Len(t, mockExec.commands, 4)
 		require.Equal(t, "git", mockExec.commands[0].name)
-		require.Equal(t, []string{"add", "testdata/need_rebase/atlas.sum"}, mockExec.commands[0].args)
+		require.Equal(t, []string{"checkout", "rebase-branch"}, mockExec.commands[0].args)
 		require.Equal(t, "git", mockExec.commands[1].name)
-		require.Equal(t, []string{"commit", "-m", "Rebase the migrations in testdata/need_rebase"}, mockExec.commands[1].args)
+		require.Equal(t, []string{"add", "testdata/need_rebase/atlas.sum"}, mockExec.commands[1].args)
 		require.Equal(t, "git", mockExec.commands[2].name)
-		require.Equal(t, []string{"push", "origin", "HEAD"}, mockExec.commands[2].args)
+		require.Equal(t, []string{"commit", "-m", "Rebase the migrations in testdata/need_rebase"}, mockExec.commands[2].args)
+		require.Equal(t, "git", mockExec.commands[3].name)
+		require.Equal(t, []string{"push", "origin", "rebase-branch"}, mockExec.commands[3].args)
 	})
 }
 
