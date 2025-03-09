@@ -632,7 +632,7 @@ func TestMigrateAutorebase(t *testing.T) {
 		// Check that the correct git commands were executed
 		require.Len(t, mockExec.commands, 3)
 		require.Equal(t, "git", mockExec.commands[0].name)
-		require.Equal(t, []string{"add", "atlas.sum"}, mockExec.commands[0].args)
+		require.Equal(t, []string{"add", "testdata/need_rebase/atlas.sum"}, mockExec.commands[0].args)
 		require.Equal(t, "git", mockExec.commands[1].name)
 		require.Equal(t, []string{"commit", "-m", "Rebase the migrations in testdata/need_rebase"}, mockExec.commands[1].args)
 		require.Equal(t, "git", mockExec.commands[2].name)
