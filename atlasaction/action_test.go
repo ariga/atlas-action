@@ -292,6 +292,8 @@ func TestMigrateDown(t *testing.T) {
 type mockAtlas struct {
 	login             func(context.Context, *atlasexec.LoginParams) error
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
+	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
+	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
 	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
@@ -318,13 +320,13 @@ func (m *mockAtlas) MigrateStatus(context.Context, *atlasexec.MigrateStatusParam
 }
 
 // MigrateHash implements AtlasExec.
-func (m *mockAtlas) MigrateHash(context.Context, *atlasexec.MigrateHashParams) error {
-	panic("unimplemented")
+func (m *mockAtlas) MigrateHash(ctx context.Context, params *atlasexec.MigrateHashParams) error {
+	return m.migrateHash(ctx, params)
 }
 
 // MigrateInspect implements AtlasExec.
-func (m *mockAtlas) MigrateRebase(context.Context, *atlasexec.MigrateRebaseParams) error {
-	panic("unimplemented")
+func (m *mockAtlas) MigrateRebase(ctx context.Context, params *atlasexec.MigrateRebaseParams) error {
+	return m.migrateRebase(ctx, params)
 }
 
 // MigrateApplySlice implements AtlasExec.
@@ -553,6 +555,88 @@ func TestMigrateTest(t *testing.T) {
 		tt.setInput("env", "test")
 		tt.setInput("vars", `{"var1": "value1", "var2": "value2"}`)
 		require.NoError(t, tt.newActs(t).MigrateTest(context.Background()))
+	})
+}
+
+type MockCmdExecutor struct {
+	commands []struct {
+		name string
+		args []string
+	}
+}
+
+// ExecCmd is the mocked function compatible with your CmdExecutor.
+func (m *MockCmdExecutor) ExecCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
+	m.commands = append(m.commands, struct {
+		name string
+		args []string
+	}{name: name, args: args})
+	// Return a dummy command that won't run anything harmful.
+	return exec.CommandContext(ctx, "echo")
+}
+
+func TestMigrateAutorebase(t *testing.T) {
+	t.Run("no conflict", func(t *testing.T) {
+		c, err := atlasexec.NewClient("", "atlas")
+		require.NoError(t, err)
+		out := &bytes.Buffer{}
+		act := &mockAction{
+			inputs: map[string]string{
+				"dir": "file://testdata/migrations",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+		newActs := func() *atlasaction.Actions {
+			t.Helper()
+			a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(c))
+			require.NoError(t, err)
+			return a
+		}
+		require.NoError(t, newActs().MigrateAutoRebase(context.Background()))
+		require.Contains(t, out.String(), "No conflict found in the atlas.sum file")
+	})
+	t.Run("conflict in atlas.sum", func(t *testing.T) {
+		var rebasedFiles []string
+		cli := &mockAtlas{
+			migrateHash: func(ctx context.Context, p *atlasexec.MigrateHashParams) error {
+				return nil
+			},
+			migrateRebase: func(ctx context.Context, params *atlasexec.MigrateRebaseParams) error {
+				rebasedFiles = params.Files
+				return nil
+			},
+		}
+		out := &bytes.Buffer{}
+		mockExec := &MockCmdExecutor{}
+		act := &mockAction{
+			inputs: map[string]string{
+				"dir": "file://testdata/need_rebase",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+		newActs := func() *atlasaction.Actions {
+			t.Helper()
+			a, err := atlasaction.New(
+				atlasaction.WithAction(act),
+				atlasaction.WithAtlas(cli),
+				atlasaction.WithCmdExecutor(mockExec.ExecCmd),
+			)
+			require.NoError(t, err)
+			return a
+		}
+		require.NoError(t, newActs().MigrateAutoRebase(context.Background()))
+		require.Contains(t, out.String(), "Migrations rebased successfully")
+		// Check files were rebased
+		require.Len(t, rebasedFiles, 1)
+		require.Equal(t, "20250309093464_rebase.sql", rebasedFiles[0])
+		// Check that the correct git commands were executed
+		require.Len(t, mockExec.commands, 3)
+		require.Equal(t, "git", mockExec.commands[0].name)
+		require.Equal(t, []string{"add", "atlas.sum"}, mockExec.commands[0].args)
+		require.Equal(t, "git", mockExec.commands[1].name)
+		require.Equal(t, []string{"commit", "-m", "Rebase the migrations in testdata/need_rebase"}, mockExec.commands[1].args)
+		require.Equal(t, "git", mockExec.commands[2].name)
+		require.Equal(t, []string{"push", "origin", "HEAD"}, mockExec.commands[2].args)
 	})
 }
 

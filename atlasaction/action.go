@@ -36,6 +36,7 @@ type (
 		Action
 		Version     string
 		Atlas       AtlasExec
+		CmdExecutor func(ctx context.Context, name string, args ...string) *exec.Cmd
 		CloudClient func(string, string, *atlasexec.Version) CloudClient
 	}
 
@@ -193,6 +194,7 @@ func New(opts ...Option) (*Actions, error) {
 		Action:      cfg.action,
 		Atlas:       cfg.atlas,
 		CloudClient: cfg.cloudClient,
+		CmdExecutor: cfg.CmdExecutor,
 		Version:     cfg.version,
 	}, nil
 }
@@ -256,6 +258,11 @@ func WithVersion(v string) Option {
 	return func(c *config) { c.version = v }
 }
 
+// WithCmdExecutor specifies how to execute commands.
+func WithCmdExecutor(exec func(ctx context.Context, name string, args ...string) *exec.Cmd) Option {
+	return func(c *config) { c.CmdExecutor = exec }
+}
+
 // ErrNoSCM is returned when no SCM client is found.
 var ErrNoSCM = errors.New("atlasaction: no SCM client found")
 
@@ -265,6 +272,7 @@ type (
 		out         io.Writer
 		action      Action
 		atlas       AtlasExec
+		CmdExecutor func(context.Context, string, ...string) *exec.Cmd
 		cloudClient func(string, string, *atlasexec.Version) CloudClient
 		version     string
 		err         error // the error occurred during the configuration.
@@ -561,7 +569,7 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 
 // MigrateAutoRebase runs the GitHub Action for "ariga/atlas-action/migrate/autorebase"
 func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
-	sumFile, err := os.ReadFile(a.GetInput("dir") + "/atlas.sum")
+	sumFile, err := os.ReadFile(strings.TrimPrefix(a.GetInput("dir"), "file://") + "/atlas.sum")
 	if err != nil {
 		return fmt.Errorf("failed to read atlas.sum file: %w", err)
 	}
@@ -585,14 +593,14 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err := a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: a.GetInput("dir"), Files: rebaseFiles}); err != nil {
 		return fmt.Errorf("failed to rebase the migrations: %w", err)
 	}
-	if err := exec.CommandContext(ctx, "git", "add", "atlas.sum").Run(); err != nil {
+	if err := a.CmdExecutor(ctx, "git", "add", "atlas.sum").Run(); err != nil {
 		return fmt.Errorf("failed to stage the changes: %w", err)
 	}
-	msg := fmt.Sprintf("Rebase the migrations in %s", a.GetInput("dir"))
-	if err := exec.CommandContext(ctx, "git", "commit", "-m", msg).Run(); err != nil {
+	msg := fmt.Sprintf("Rebase the migrations in %s", strings.TrimPrefix(a.GetInput("dir"), "file://"))
+	if err := a.CmdExecutor(ctx, "git", "commit", "-m", msg).Run(); err != nil {
 		return fmt.Errorf("failed to commit the changes: %w", err)
 	}
-	if err := exec.CommandContext(ctx, "git", "push", "origin", "HEAD").Run(); err != nil {
+	if err := a.CmdExecutor(ctx, "git", "push", "origin", "HEAD").Run(); err != nil {
 		return fmt.Errorf("failed to push the changes: %w", err)
 	}
 	a.Infof("Migrations rebased successfully")
