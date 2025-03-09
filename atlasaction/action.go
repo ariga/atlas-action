@@ -16,6 +16,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	"ariga.io/atlas-action/atlasaction/cloud"
+	"ariga.io/atlas-action/atlasaction/git"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/fatih/color"
 )
@@ -86,6 +88,10 @@ type (
 		Login(ctx context.Context, params *atlasexec.LoginParams) error
 		// MigrateStatus runs the `migrate status` command.
 		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
+		// MigrateHash runs the `migrate hash` command.
+		MigrateHash(context.Context, *atlasexec.MigrateHashParams) error
+		// MigrateRebase runs the `migrate rebase` command.
+		MigrateRebase(context.Context, *atlasexec.MigrateRebaseParams) error
 		// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
 		MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error)
 		// MigrateDown runs the `migrate down` command.
@@ -268,11 +274,12 @@ type (
 
 const (
 	// Versioned workflow Commands
-	CmdMigratePush  = "migrate/push"
-	CmdMigrateLint  = "migrate/lint"
-	CmdMigrateApply = "migrate/apply"
-	CmdMigrateDown  = "migrate/down"
-	CmdMigrateTest  = "migrate/test"
+	CmdMigratePush       = "migrate/push"
+	CmdMigrateLint       = "migrate/lint"
+	CmdMigrateApply      = "migrate/apply"
+	CmdMigrateDown       = "migrate/down"
+	CmdMigrateTest       = "migrate/test"
+	CmdMigrateAutoRebase = "migrate/autorebase"
 	// Declarative workflow Commands
 	CmdSchemaPush        = "schema/push"
 	CmdSchemaTest        = "schema/test"
@@ -302,6 +309,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MigrateLint(ctx)
 	case CmdMigrateTest:
 		return a.MigrateTest(ctx)
+	case CmdMigrateAutoRebase:
+		return a.MigrateAutoRebase(ctx)
 	case CmdSchemaPush:
 		return a.SchemaPush(ctx)
 	case CmdSchemaTest:
@@ -530,7 +539,7 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	return nil
 }
 
-// MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
+// MigrateTest runs the Action for "ariga/atlas-action/migrate/test"
 func (a *Actions) MigrateTest(ctx context.Context) error {
 	result, err := a.Atlas.MigrateTest(ctx, &atlasexec.MigrateTestParams{
 		DirURL:          a.GetInput("dir"),
@@ -547,6 +556,46 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 	}
 	a.Infof("`atlas migrate test` completed successfully, no issues found")
 	a.Infof(result)
+	return nil
+}
+
+// MigrateAutoRebase runs the GitHub Action for "ariga/atlas-action/migrate/autorebase"
+func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
+	sumFile, err := os.ReadFile(a.GetInput("dir") + "/atlas.sum")
+	if err != nil {
+		return fmt.Errorf("failed to read atlas.sum file: %w", err)
+	}
+	conflicts := git.ParseConflicts(string(sumFile))
+	if len(conflicts) == 0 {
+		a.Infof("No conflict found in the atlas.sum file")
+		return nil
+	}
+	var rebaseFiles []string
+	switch len(conflicts) {
+	case 1:
+		rebaseFiles = conflicts[0].FilesOnlyInBase()
+	case 2:
+		rebaseFiles = conflicts[1].FilesOnlyInBase()
+	default:
+		return fmt.Errorf("found %d conflicts in the atlas.sum file, cannot rebase automatically", len(conflicts))
+	}
+	if err := a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{DirURL: a.GetInput("dir")}); err != nil {
+		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
+	}
+	if err := a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: a.GetInput("dir"), Files: rebaseFiles}); err != nil {
+		return fmt.Errorf("failed to rebase the migrations: %w", err)
+	}
+	if err := exec.CommandContext(ctx, "git", "add", "atlas.sum").Run(); err != nil {
+		return fmt.Errorf("failed to stage the changes: %w", err)
+	}
+	msg := fmt.Sprintf("Rebase the migrations in %s", a.GetInput("dir"))
+	if err := exec.CommandContext(ctx, "git", "commit", "-m", msg).Run(); err != nil {
+		return fmt.Errorf("failed to commit the changes: %w", err)
+	}
+	if err := exec.CommandContext(ctx, "git", "push", "origin", "HEAD").Run(); err != nil {
+		return fmt.Errorf("failed to push the changes: %w", err)
+	}
+	a.Infof("Migrations rebased successfully")
 	return nil
 }
 
