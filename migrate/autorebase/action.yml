@@ -1,5 +1,5 @@
 name: 'Migrate Auto Rebase'
-description: 'Fix conflicts in migration directory by rebasing migrations of the current branch on top of the migration directory'
+description: Resolve conflicts in the migration directory by rebasing the current branch's migrations on top of the existing migration directory
 branding:
   icon: database
 author: 'Ariga'
