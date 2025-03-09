@@ -327,12 +327,13 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 ### `ariga/atlas-action/migrate/autorebase`
 
-Resolve conflicts in the migration directory by rebasing the current branch's migrations on top of the existing migration directory.
+Resolve conflicts in the migration directory by rebasing the current branch's migrations on top of the rebase branch migration directory.
 
 #### Inputs
 
 All inputs are optional
 
+* `rebase-branch` - The branch to rebase on. By default: `main`.
 * `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
 
@@ -346,16 +347,16 @@ Add the next job to your workflow to automatically rebase migrations on top of t
       contents: write  # allow pushing changes to repo
     runs-on: ubuntu-latest
     steps:
+    - uses: ariga/setup-atlas@v0
+      with:
+        cloud-token: ${{ secrets.ATLAS_TOKEN }}
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0 # need to fetch the branch history for rebase
-    - name: Configure Git user
-      run: |
-        git config user.name "github-actions"
-        git config user.email "github-actions@github.com"
     - uses: ariga/atlas-action/migrate/autorebase@v1
       with:
-        dir: file://migrations # the URL of the migration directory to rebase on
+        rebase-branch: master
+        dir: file://migrations # the URL of the migration directory to rebase
 ```
 
 ### `ariga/atlas-action/schema/test`
