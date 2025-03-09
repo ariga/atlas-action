@@ -569,6 +569,29 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 
 // MigrateAutoRebase runs the Action for "ariga/atlas-action/migrate/autorebase"
 func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
+	rebaseBranch := a.GetInput("rebase-branch")
+	if rebaseBranch == "" {
+		rebaseBranch = "main"
+	}
+	tc, err := a.GetTriggerContext(ctx)
+	if err != nil {
+		return err
+	}
+	branch := tc.GetRunContext().Branch
+	// Since running in detached HEAD, we need to switch to the branch.
+	if err := a.CmdExecutor(ctx, "git", "checkout", branch).Run(); err != nil {
+		return fmt.Errorf("failed to checkout to the branch: %w", err)
+	}
+	if err := a.CmdExecutor(ctx, "git", "fetch", "origin", rebaseBranch).Run(); err != nil {
+		return fmt.Errorf("failed to fetch the branch %s: %w", rebaseBranch, err)
+	}
+	// Try to rebase on top of the rebase branch
+	err = a.CmdExecutor(ctx, "git", "rebase", "origin/"+rebaseBranch).Run()
+	if err == nil {
+		a.Infof("No conflict found in the migrations")
+		return nil
+	}
+	// If there is a conflict, try to rebase the migrations automatically.
 	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
 	sumFile, err := os.ReadFile(dirpath + "/atlas.sum")
 	if err != nil {
@@ -576,7 +599,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	}
 	conflicts := git.ParseConflicts(string(sumFile))
 	if len(conflicts) == 0 {
-		a.Infof("No conflict found in the atlas.sum file")
+		a.Infof("No conflict found in the %s file", dirpath+"/atlas.sum")
 		return nil
 	}
 	var rebaseFiles []string
@@ -594,21 +617,14 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err := a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: a.GetInput("dir"), Files: rebaseFiles}); err != nil {
 		return fmt.Errorf("failed to rebase the migrations: %w", err)
 	}
-	tc, err := a.GetTriggerContext(ctx)
-	if err != nil {
-		return err
-	}
-	branch := tc.GetRunContext().Branch
-	// Since running in detached HEAD, we need to switch to the branch.
-	if err := a.CmdExecutor(ctx, "git", "checkout", branch).Run(); err != nil {
-		return fmt.Errorf("failed to checkout to the branch: %w", err)
-	}
-	if err := a.CmdExecutor(ctx, "git", "add", fmt.Sprintf("%s/atlas.sum", dirpath)).Run(); err != nil {
+	if err := a.CmdExecutor(ctx, "git", "add", dirpath).Run(); err != nil {
 		return fmt.Errorf("failed to stage the changes: %w", err)
 	}
-	msg := fmt.Sprintf("Rebase the migrations in %s", dirpath)
-	if err := a.CmdExecutor(ctx, "git", "commit", "-m", msg).Run(); err != nil {
+	if err := a.CmdExecutor(ctx, "git", "commit", "-m", fmt.Sprintf("Rebase the migrations in %s", dirpath)).Run(); err != nil {
 		return fmt.Errorf("failed to commit the changes: %w", err)
+	}
+	if err := a.CmdExecutor(ctx, "git", "rebase", "--continue").Run(); err != nil {
+		return fmt.Errorf("failed to continue the rebase: %w", err)
 	}
 	if err := a.CmdExecutor(ctx, "git", "push", "origin", branch).Run(); err != nil {
 		return fmt.Errorf("failed to push the changes: %w", err)
