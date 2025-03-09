@@ -578,19 +578,39 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return err
 	}
 	branch := tc.GetRunContext().Branch
+	if err := a.CmdExecutor(ctx, "git", "fetch", "origin", rebaseBranch).Run(); err != nil {
+		return fmt.Errorf("failed to fetch the branch %s: %w", rebaseBranch, err)
+	}
 	// Since running in detached HEAD, we need to switch to the branch.
 	if err := a.CmdExecutor(ctx, "git", "checkout", branch).Run(); err != nil {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
-	if err := a.CmdExecutor(ctx, "git", "fetch", "origin", rebaseBranch).Run(); err != nil {
-		return fmt.Errorf("failed to fetch the branch %s: %w", rebaseBranch, err)
+	// CmdExecutor(ctx, "git", "branch", "--show-current")
+	out, err := a.CmdExecutor(ctx, "git", "branch", "--show-current").Output()
+	if err != nil {
+		return fmt.Errorf("failed to get the current branch: %w", err)
 	}
+	fmt.Println("current branch:", string(out))
+
 	// Try to rebase on top of the rebase branch
-	err = a.CmdExecutor(ctx, "git", "rebase", "origin/"+rebaseBranch).Run()
+	fmt.Println("running: git rebase origin/" + rebaseBranch)
+	out ,err  = a.CmdExecutor(ctx, "git", "rebase", "--no-autostash", "origin/"+rebaseBranch).Output()
 	if err == nil {
 		a.Infof("No conflict found in the migrations")
 		return nil
 	}
+	fmt.Println("rebase output:\n", string(out))
+	// get all conflict files
+	out ,err = a.CmdExecutor(ctx, "git", "diff", "--name-only", "--diff-filter=U").Output()
+	if err != nil {
+		return fmt.Errorf("failed to get the conflict files: %w", err)
+	}
+	fmt.Println("conflict files:\n", string(out))
+	out, err = a.CmdExecutor(ctx, "git", "status").Output()
+	if err != nil {
+		return fmt.Errorf("failed to get the git status: %w", err)
+	}
+	fmt.Println("Git status:\n", string(out))
 	// If there is a conflict, try to rebase the migrations automatically.
 	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
 	sumFile, err := os.ReadFile(dirpath + "/atlas.sum")
