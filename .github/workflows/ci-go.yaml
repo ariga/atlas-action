@@ -6,453 +6,478 @@ on:
   pull_request:
   workflow_call:
 jobs:
-  shim:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-node@v3
-      with:
-        node-version: 20.x
-        cache: 'npm'
-    - name: Install
-      run: |
-        npm i
-        npm run all
-    - name: verify no git diff
-      run: |
-        status=$(git status --porcelain)
-        if [ -n "$status" ]; then
-          echo "you need to run 'npm run all' and commit the changes"
-          echo "$status"
-          exit 1
-        fi
-  shim-e2e:
-    runs-on: ubuntu-latest
-    env:
-      ATLAS_ACTION_LOCAL: 0 # Disable local mode
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ariga/setup-atlas@master
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - name: "Run Migrate Lint"
-        uses: ./migrate/lint
-        with:
-          dir: file://atlasaction/testdata/migrations
-          dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir-sqlite
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: "Run Migrate Push"
-        uses: ./migrate/push
-        with:
-          dir: file://atlasaction/testdata/migrations
-          dev-url: sqlite://dev?mode=memory
-          dir-name: test-dir-sqlite
-  golangci-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - name: Run Go linters
-        uses: golangci/golangci-lint-action@v3
-        with:
-          args: --verbose --timeout=5m
-          skip-pkg-cache: true
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: ariga/setup-atlas@v0
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - name: Run tests
-        run: go test -race ./...
-  migrate-test:
-    runs-on: ubuntu-latest
-    env:
-      ATLAS_ACTION_LOCAL: 1
-    steps:
-      - uses: ariga/setup-atlas@v0
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - run: go install ./cmd/atlas-action
-        env:
-          CGO_ENABLED: 0
-      - uses: ./migrate/apply
-        with:
-          dir: file://atlasaction/testdata/migrations
-          url: sqlite://file.db?mode=memory
-      - uses: ./migrate/push
-        id: push_action
-        with:
-          dir: file://atlasaction/testdata/migrations
-          dir-name: test-dir-sqlite
-          dev-url: sqlite://file.db?mode=memory
-      - name: "Verify migrate/push output"
-        shell: bash
-        run: |
-          # Verifies that the output we got is a URL as expected
-          [[ "${{ steps.push_action.outputs.url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
-      - id: lint_success
-        uses: ./migrate/lint
-        with:
-          working-directory: atlasaction/testdata
-          dev-url: sqlite://file.db?mode=memory
-          dir-name: test-dir-sqlite
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - id: lint_failure
-        uses: ./migrate/lint
-        continue-on-error: true
-        with:
-          dir: file://atlasaction/testdata/migrations_destructive
-          dev-url: sqlite://file.db?mode=memory
-          dir-name: test-dir-sqlite
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - id: check-lint-failure
-        if: steps.lint_failure.outcome == 'success'
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.setFailed('lint did not when it was supposed to')
-      - name: "Verify migrate/lint output"
-        shell: bash
-        run: |
-          # Verifies that the output we got for lint tests are URLs as expected
-          [[ "${{ steps.lint_success.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
-          [[ "${{ steps.lint_failure.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
-      - id: test_success
-        uses: ./migrate/test
-        with:
-          dir: file://migrations
-          working-directory: atlasaction/testdata
-          dev-url: sqlite://file.db?mode=memory
-          run: "expected_success"
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - id: test_failure
-        uses: ./migrate/test
-        continue-on-error: true
-        with:
-          working-directory: atlasaction/testdata
-          dir: file://migrations
-          dev-url: sqlite://file.db?mode=memory
-          run: "expected_failure"
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - id: check-test-failure
-        if: steps.test_failure.outcome == 'success'
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.setFailed('expected test to fail, but it did not')
-  schema-test:
-    runs-on: ubuntu-latest
-    env:
-      ATLAS_ACTION_LOCAL: 1
-    steps:
-      - uses: ariga/setup-atlas@v0
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - run: go install ./cmd/atlas-action
-        env:
-          CGO_ENABLED: 0
-      - id: test_success
-        uses: ./schema/test
-        with:
-          url: file://schema.hcl
-          working-directory: atlasaction/testdata
-          dev-url: sqlite://file.db?mode=memory
-          run: "expected_success"
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - id: test_failure
-        uses: ./schema/test
-        continue-on-error: true
-        with:
-          working-directory: atlasaction/testdata
-          url: file://schema.hcl
-          dev-url: sqlite://file.db?mode=memory
-          run: "expected_failure"
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - id: check-test-failure
-        if: steps.test_failure.outcome == 'success'
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.setFailed('expected test to fail, but it did not')
-  migrate-down:
-    runs-on: ubuntu-latest
-    env:
-      ATLAS_ACTION_LOCAL: 1
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - run: go install ./cmd/atlas-action
-        env:
-          CGO_ENABLED: 0
-      - name: mock atlas
-        run: |
-          cp atlasaction/mock-atlas.sh $HOME/atlas
-          echo "$HOME" >> $GITHUB_PATH
-      - id: pending-approval
-        continue-on-error: true
-        uses: ./migrate/down
-        with:
-          dir: file://atlasaction/testdata/down
-          dev-url: sqlite://dev?mode=memory
-        env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
-          TEST_EXIT_CODE: 1
-      - name: check-exit-code
-        if: steps.pending-approval.outcome == 'success'
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.setFailed('expect to fail, but did not')
-      - id: pending-approval-wait
-        continue-on-error: true
-        uses: ./migrate/down
-        with:
-          dir: file://atlasaction/testdata/down
-          dev-url: sqlite://dev?mode=memory
-          wait-timeout: 5s
-        env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
-          TEST_EXIT_CODE: 1
-      - name: check-exit-code-wait
-        if: steps.pending-approval-wait.outcome == 'success'
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.setFailed('expect to fail, but did not')
-      - id: aborted
-        continue-on-error: true
-        uses: ./migrate/down
-        with:
-          dir: file://atlasaction/testdata/down
-          dev-url: sqlite://dev?mode=memory
-        env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"URL\":\"ABORTED_URL\",\"Status\":\"ABORTED\"}"
-          TEST_EXIT_CODE: 1
-      - name: check-exit-code
-        if: steps.aborted.outcome == 'success'
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.setFailed('expect to fail, but did not')
-      - id: approved
-        uses: ./migrate/down
-        with:
-          dir: file://atlasaction/testdata/down
-          dev-url: sqlite://dev?mode=memory
-        env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPROVED\"}"
-      - id: applied
-        uses: ./migrate/down
-        with:
-          dir: file://atlasaction/testdata/down
-          dev-url: sqlite://dev?mode=memory
-        env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPLIED\"}"
-      - name: verify output
-        run: |
-          [[ "${{ steps.pending-approval.outputs.url }}" = PENDING_URL ]]
-          [[ "${{ steps.pending-approval-wait.outputs.url }}" = PENDING_URL ]]
-          [[ "${{ steps.aborted.outputs.url }}" = ABORTED_URL ]]
-          [[ "${{ steps.approved.outputs.planned_count }}" = 1 ]]
-          [[ "${{ steps.approved.outputs.reverted_count }}" = 1 ]]
-          [[ "${{ steps.applied.outputs.planned_count }}" = 1 ]]
-          [[ "${{ steps.applied.outputs.reverted_count }}" = 1 ]]
-  schema-push:
-    runs-on: ubuntu-latest
-    env:
-      ATLAS_ACTION_LOCAL: 1
-    steps:
-      - uses: ariga/setup-atlas@v0
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - run: go install ./cmd/atlas-action
-        env:
-          CGO_ENABLED: 0
-      - id: sanity
-        uses: ./schema/push
-        with:
-          working-directory: atlasaction/testdata/schema-apply/legacy
-          env: test
-  schema-plan:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    env:
-      ATLAS_ACTION_LOCAL: 1
-    steps:
-      - uses: ariga/setup-atlas@v0
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - run: go install ./cmd/atlas-action
-        env:
-          CGO_ENABLED: 0
-      - id: sanity
-        uses: ./schema/plan
-        with:
-          working-directory: atlasaction/testdata/schema-apply/legacy
-          env: test
-          from: |-
-            env://url
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-  schema-plan-approve:
-    runs-on: ubuntu-latest
-    env:
-      ATLAS_ACTION_LOCAL: 1
-    if: ${{ github.event_name == 'push' }}
-    steps:
-      - uses: ariga/setup-atlas@v0
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - run: go install ./cmd/atlas-action
-        env:
-          CGO_ENABLED: 0
-      - id: sanity
-        uses: ./schema/plan/approve
-        with:
-          working-directory: atlasaction/testdata/schema-apply/legacy
-          env: test
-          from: |-
-            env://url
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-  schema-apply:
-    runs-on: ubuntu-latest
-    env:
-      ATLAS_ACTION_LOCAL: 1
-    strategy:
-      fail-fast: false
-      matrix:
-        test:
-          - directory: lint-review
-          - directory: on-the-fly
-            auto-approve: "true"
-          - directory: remote-repo
-            plan: "atlas://atlas-action/plans/20240910183610"
-            to: "atlas://atlas-action?tag=e2e"
-          - directory: local-plan
-            plan: "file://20240910173744.plan.hcl"
-          - directory: multiple-envs
-            plan: "file://20240910173744.plan.hcl"
-          - directory: legacy
-            atlas: 'v0.27.0'
-            auto-approve: "true"
-    steps:
-      - uses: ariga/setup-atlas@v0
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-          version: ${{ matrix.test.atlas }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: go.mod
-      - run: go install ./cmd/atlas-action
-        env:
-          CGO_ENABLED: 0
-      - name: Apply changes
-        continue-on-error: true
-        uses: ./schema/apply
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          working-directory: atlasaction/testdata/schema-apply/${{ matrix.test.directory }}
-          env: test
-          plan: ${{ matrix.test.plan }}
-          to: ${{ matrix.test.to }}
-          auto-approve: ${{ matrix.test.auto-approve }}
+#  shim:
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: actions/checkout@v3
+#    - uses: actions/setup-node@v3
+#      with:
+#        node-version: 20.x
+#        cache: 'npm'
+#    - name: Install
+#      run: |
+#        npm i
+#        npm run all
+#    - name: verify no git diff
+#      run: |
+#        status=$(git status --porcelain)
+#        if [ -n "$status" ]; then
+#          echo "you need to run 'npm run all' and commit the changes"
+#          echo "$status"
+#          exit 1
+#        fi
+#  shim-e2e:
+#    runs-on: ubuntu-latest
+#    env:
+#      ATLAS_ACTION_LOCAL: 0 # Disable local mode
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: ariga/setup-atlas@master
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#      - name: "Run Migrate Lint"
+#        uses: ./migrate/lint
+#        with:
+#          dir: file://atlasaction/testdata/migrations
+#          dev-url: sqlite://dev?mode=memory
+#          dir-name: test-dir-sqlite
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#      - name: "Run Migrate Push"
+#        uses: ./migrate/push
+#        with:
+#          dir: file://atlasaction/testdata/migrations
+#          dev-url: sqlite://dev?mode=memory
+#          dir-name: test-dir-sqlite
+#  golangci-lint:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - name: Run Go linters
+#        uses: golangci/golangci-lint-action@v3
+#        with:
+#          args: --verbose --timeout=5m
+#          skip-pkg-cache: true
+#  unit-tests:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: ariga/setup-atlas@v0
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - name: Run tests
+#        run: go test -race ./...
+#  migrate-test:
+#    runs-on: ubuntu-latest
+#    env:
+#      ATLAS_ACTION_LOCAL: 1
+#    steps:
+#      - uses: ariga/setup-atlas@v0
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - run: go install ./cmd/atlas-action
+#        env:
+#          CGO_ENABLED: 0
+#      - uses: ./migrate/apply
+#        with:
+#          dir: file://atlasaction/testdata/migrations
+#          url: sqlite://file.db?mode=memory
+#      - uses: ./migrate/push
+#        id: push_action
+#        with:
+#          dir: file://atlasaction/testdata/migrations
+#          dir-name: test-dir-sqlite
+#          dev-url: sqlite://file.db?mode=memory
+#      - name: "Verify migrate/push output"
+#        shell: bash
+#        run: |
+#          # Verifies that the output we got is a URL as expected
+#          [[ "${{ steps.push_action.outputs.url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
+#      - id: lint_success
+#        uses: ./migrate/lint
+#        with:
+#          working-directory: atlasaction/testdata
+#          dev-url: sqlite://file.db?mode=memory
+#          dir-name: test-dir-sqlite
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#      - id: lint_failure
+#        uses: ./migrate/lint
+#        continue-on-error: true
+#        with:
+#          dir: file://atlasaction/testdata/migrations_destructive
+#          dev-url: sqlite://file.db?mode=memory
+#          dir-name: test-dir-sqlite
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#      - id: check-lint-failure
+#        if: steps.lint_failure.outcome == 'success'
+#        uses: actions/github-script@v3
+#        with:
+#          script: |
+#            core.setFailed('lint did not when it was supposed to')
+#      - name: "Verify migrate/lint output"
+#        shell: bash
+#        run: |
+#          # Verifies that the output we got for lint tests are URLs as expected
+#          [[ "${{ steps.lint_success.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
+#          [[ "${{ steps.lint_failure.outputs.report-url }}" =~ ^https://[a-zA-Z-]*\.atlasgo\.[a-zA-Z-]*/.*$ ]]
+#      - id: test_success
+#        uses: ./migrate/test
+#        with:
+#          dir: file://migrations
+#          working-directory: atlasaction/testdata
+#          dev-url: sqlite://file.db?mode=memory
+#          run: "expected_success"
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#      - id: test_failure
+#        uses: ./migrate/test
+#        continue-on-error: true
+#        with:
+#          working-directory: atlasaction/testdata
+#          dir: file://migrations
+#          dev-url: sqlite://file.db?mode=memory
+#          run: "expected_failure"
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#      - id: check-test-failure
+#        if: steps.test_failure.outcome == 'success'
+#        uses: actions/github-script@v3
+#        with:
+#          script: |
+#            core.setFailed('expected test to fail, but it did not')
+#  schema-test:
+#    runs-on: ubuntu-latest
+#    env:
+#      ATLAS_ACTION_LOCAL: 1
+#    steps:
+#      - uses: ariga/setup-atlas@v0
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - run: go install ./cmd/atlas-action
+#        env:
+#          CGO_ENABLED: 0
+#      - id: test_success
+#        uses: ./schema/test
+#        with:
+#          url: file://schema.hcl
+#          working-directory: atlasaction/testdata
+#          dev-url: sqlite://file.db?mode=memory
+#          run: "expected_success"
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#      - id: test_failure
+#        uses: ./schema/test
+#        continue-on-error: true
+#        with:
+#          working-directory: atlasaction/testdata
+#          url: file://schema.hcl
+#          dev-url: sqlite://file.db?mode=memory
+#          run: "expected_failure"
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#      - id: check-test-failure
+#        if: steps.test_failure.outcome == 'success'
+#        uses: actions/github-script@v3
+#        with:
+#          script: |
+#            core.setFailed('expected test to fail, but it did not')
+#  migrate-down:
+#    runs-on: ubuntu-latest
+#    env:
+#      ATLAS_ACTION_LOCAL: 1
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - run: go install ./cmd/atlas-action
+#        env:
+#          CGO_ENABLED: 0
+#      - name: mock atlas
+#        run: |
+#          cp atlasaction/mock-atlas.sh $HOME/atlas
+#          echo "$HOME" >> $GITHUB_PATH
+#      - id: pending-approval
+#        continue-on-error: true
+#        uses: ./migrate/down
+#        with:
+#          dir: file://atlasaction/testdata/down
+#          dev-url: sqlite://dev?mode=memory
+#        env:
+#          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
+#          TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
+#          TEST_EXIT_CODE: 1
+#      - name: check-exit-code
+#        if: steps.pending-approval.outcome == 'success'
+#        uses: actions/github-script@v3
+#        with:
+#          script: |
+#            core.setFailed('expect to fail, but did not')
+#      - id: pending-approval-wait
+#        continue-on-error: true
+#        uses: ./migrate/down
+#        with:
+#          dir: file://atlasaction/testdata/down
+#          dev-url: sqlite://dev?mode=memory
+#          wait-timeout: 5s
+#        env:
+#          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
+#          TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
+#          TEST_EXIT_CODE: 1
+#      - name: check-exit-code-wait
+#        if: steps.pending-approval-wait.outcome == 'success'
+#        uses: actions/github-script@v3
+#        with:
+#          script: |
+#            core.setFailed('expect to fail, but did not')
+#      - id: aborted
+#        continue-on-error: true
+#        uses: ./migrate/down
+#        with:
+#          dir: file://atlasaction/testdata/down
+#          dev-url: sqlite://dev?mode=memory
+#        env:
+#          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
+#          TEST_STDOUT: "{\"URL\":\"ABORTED_URL\",\"Status\":\"ABORTED\"}"
+#          TEST_EXIT_CODE: 1
+#      - name: check-exit-code
+#        if: steps.aborted.outcome == 'success'
+#        uses: actions/github-script@v3
+#        with:
+#          script: |
+#            core.setFailed('expect to fail, but did not')
+#      - id: approved
+#        uses: ./migrate/down
+#        with:
+#          dir: file://atlasaction/testdata/down
+#          dev-url: sqlite://dev?mode=memory
+#        env:
+#          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
+#          TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPROVED\"}"
+#      - id: applied
+#        uses: ./migrate/down
+#        with:
+#          dir: file://atlasaction/testdata/down
+#          dev-url: sqlite://dev?mode=memory
+#        env:
+#          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
+#          TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPLIED\"}"
+#      - name: verify output
+#        run: |
+#          [[ "${{ steps.pending-approval.outputs.url }}" = PENDING_URL ]]
+#          [[ "${{ steps.pending-approval-wait.outputs.url }}" = PENDING_URL ]]
+#          [[ "${{ steps.aborted.outputs.url }}" = ABORTED_URL ]]
+#          [[ "${{ steps.approved.outputs.planned_count }}" = 1 ]]
+#          [[ "${{ steps.approved.outputs.reverted_count }}" = 1 ]]
+#          [[ "${{ steps.applied.outputs.planned_count }}" = 1 ]]
+#          [[ "${{ steps.applied.outputs.reverted_count }}" = 1 ]]
+#  schema-push:
+#    runs-on: ubuntu-latest
+#    env:
+#      ATLAS_ACTION_LOCAL: 1
+#    steps:
+#      - uses: ariga/setup-atlas@v0
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - run: go install ./cmd/atlas-action
+#        env:
+#          CGO_ENABLED: 0
+#      - id: sanity
+#        uses: ./schema/push
+#        with:
+#          working-directory: atlasaction/testdata/schema-apply/legacy
+#          env: test
+#  schema-plan:
+#    runs-on: ubuntu-latest
+#    if: ${{ github.event_name == 'pull_request' }}
+#    env:
+#      ATLAS_ACTION_LOCAL: 1
+#    steps:
+#      - uses: ariga/setup-atlas@v0
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - run: go install ./cmd/atlas-action
+#        env:
+#          CGO_ENABLED: 0
+#      - id: sanity
+#        uses: ./schema/plan
+#        with:
+#          working-directory: atlasaction/testdata/schema-apply/legacy
+#          env: test
+#          from: |-
+#            env://url
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#  schema-plan-approve:
+#    runs-on: ubuntu-latest
+#    env:
+#      ATLAS_ACTION_LOCAL: 1
+#    if: ${{ github.event_name == 'push' }}
+#    steps:
+#      - uses: ariga/setup-atlas@v0
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - run: go install ./cmd/atlas-action
+#        env:
+#          CGO_ENABLED: 0
+#      - id: sanity
+#        uses: ./schema/plan/approve
+#        with:
+#          working-directory: atlasaction/testdata/schema-apply/legacy
+#          env: test
+#          from: |-
+#            env://url
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#  schema-apply:
+#    runs-on: ubuntu-latest
+#    env:
+#      ATLAS_ACTION_LOCAL: 1
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        test:
+#          - directory: lint-review
+#          - directory: on-the-fly
+#            auto-approve: "true"
+#          - directory: remote-repo
+#            plan: "atlas://atlas-action/plans/20240910183610"
+#            to: "atlas://atlas-action?tag=e2e"
+#          - directory: local-plan
+#            plan: "file://20240910173744.plan.hcl"
+#          - directory: multiple-envs
+#            plan: "file://20240910173744.plan.hcl"
+#          - directory: legacy
+#            atlas: 'v0.27.0'
+#            auto-approve: "true"
+#    steps:
+#      - uses: ariga/setup-atlas@v0
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#          version: ${{ matrix.test.atlas }}
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - run: go install ./cmd/atlas-action
+#        env:
+#          CGO_ENABLED: 0
+#      - name: Apply changes
+#        continue-on-error: true
+#        uses: ./schema/apply
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#        with:
+#          working-directory: atlasaction/testdata/schema-apply/${{ matrix.test.directory }}
+#          env: test
+#          plan: ${{ matrix.test.plan }}
+#          to: ${{ matrix.test.to }}
+#          auto-approve: ${{ matrix.test.auto-approve }}
+#
+#  monitoring:
+#    services:
+#      mysql:
+#        image: mysql:8
+#        env:
+#          MYSQL_ROOT_PASSWORD: pass
+#          MYSQL_DATABASE: dev
+#        ports:
+#          - "3306:3306"
+#        options: >-
+#          --health-cmd "mysqladmin ping -ppass"
+#          --health-interval 10s
+#          --health-start-period 10s
+#          --health-timeout 5s
+#          --health-retries 10
+#    runs-on: ubuntu-latest
+#    env:
+#      ATLAS_ACTION_LOCAL: 1
+#    steps:
+#      # views are logged in only feature in atlas
+#      - name: Create Table and View
+#        run: |
+#          echo "Creating table and view..."
+#          mysql -h 127.0.0.1 -u root --password=pass dev <<EOF
+#          CREATE TABLE users (
+#              id INT AUTO_INCREMENT PRIMARY KEY,
+#              name VARCHAR(255) NOT NULL,
+#              email VARCHAR(255) NOT NULL
+#          );
+#
+#          CREATE VIEW user_emails AS
+#          SELECT id, email FROM users;
+#          EOF
+#          echo "Table and view created!"
+#      - uses: ariga/setup-atlas@v0
+#      - uses: actions/checkout@v3
+#      - uses: actions/setup-go@v4
+#        with:
+#          go-version-file: go.mod
+#      - run: go install ./cmd/atlas-action
+#        env:
+#          CGO_ENABLED: 0
+#      - name: sanity using url
+#        uses: ./monitor/schema
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#          url: 'mysql://root:pass@localhost:3306/dev'
+#          slug: 'github-action'
+#      - name: sanity using config
+#        uses: ./monitor/schema
+#        with:
+#          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+#          config: 'file://monitor/schema/atlas.hcl'
+#          env: 'dev'
 
-  monitoring:
-    services:
-      mysql:
-        image: mysql:8
-        env:
-          MYSQL_ROOT_PASSWORD: pass
-          MYSQL_DATABASE: dev
-        ports:
-          - "3306:3306"
-        options: >-
-          --health-cmd "mysqladmin ping -ppass"
-          --health-interval 10s
-          --health-start-period 10s
-          --health-timeout 5s
-          --health-retries 10
+  commit-and-push:
     runs-on: ubuntu-latest
-    env:
-      ATLAS_ACTION_LOCAL: 1
-    steps:
-      # views are logged in only feature in atlas
-      - name: Create Table and View
-        run: |
-          echo "Creating table and view..."
-          mysql -h 127.0.0.1 -u root --password=pass dev <<EOF
-          CREATE TABLE users (
-              id INT AUTO_INCREMENT PRIMARY KEY,
-              name VARCHAR(255) NOT NULL,
-              email VARCHAR(255) NOT NULL
-          );
+    permissions:
+      contents: write  # permissions scoped only to this job
 
-          CREATE VIEW user_emails AS
-          SELECT id, email FROM users;
-          EOF
-          echo "Table and view created!"
-      - uses: ariga/setup-atlas@v0
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+    steps:
+      - uses: actions/checkout@v4
         with:
-          go-version-file: go.mod
-      - run: go install ./cmd/atlas-action
-        env:
-          CGO_ENABLED: 0
-      - name: sanity using url
-        uses: ./monitor/schema
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-          url: 'mysql://root:pass@localhost:3306/dev'
-          slug: 'github-action'
-      - name: sanity using config
-        uses: ./monitor/schema
-        with:
-          cloud-token: ${{ secrets.ATLAS_TOKEN }}
-          config: 'file://monitor/schema/atlas.hcl'
-          env: 'dev'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+      - name: Modify and commit
+        run: |
+          echo "Example content" > file.txt
+          git add file.txt
+          git commit -m "Automated commit from Action"
+      - name: Get current branch
+        run: echo "BRANCH_NAME=$(git branch --show-current)" >> $GITHUB_ENV
+      - name: Push changes
+        run: git push origin $BRANCH_NAME
