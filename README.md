@@ -17,6 +17,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply)            | Apply migrations to a database                                                      |
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Revert migrations to a database                                                     |
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                                                       |
+| [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase) | Fix conflicts in migration directory                                                |
 | [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                                                           |
 | [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema to [Atlas Registry](https://atlasgo.io/registry)                      |
 | [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition                                |
@@ -322,6 +323,40 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
    For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
+
+
+### `ariga/atlas-action/migrate/autorebase`
+
+Resolve conflicts in the migration directory by rebasing the current branch's migrations on top of the existing migration directory.
+
+#### Inputs
+
+All inputs are optional
+
+* `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
+* `working-directory` - The working directory to run from.  Defaults to project root.
+
+#### Example usage
+
+Add the next job to your workflow to automatically rebase migrations on top of the migration directory in case of conflicts:
+
+```yaml
+  migrate-auto-rebase:
+    permissions:
+      contents: write  # allow pushing changes to repo
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # need to fetch the branch history for rebase
+    - name: Configure Git user
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+    - uses: ariga/atlas-action/migrate/autorebase@v1
+      with:
+        dir: file://migrations # the URL of the migration directory to rebase on
+```
 
 ### `ariga/atlas-action/schema/test`
 
