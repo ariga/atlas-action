@@ -353,6 +353,10 @@ Add the next job to your workflow to automatically rebase migrations on top of t
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0 # need to fetch the branch history for rebase
+    - name: config git to commit changes # skip this step if you have git account configured in the CI
+      run: |
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"    
     - uses: ariga/atlas-action/migrate/autorebase@v1
       with:
         rebase-branch: master

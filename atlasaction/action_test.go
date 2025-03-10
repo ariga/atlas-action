@@ -608,13 +608,11 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.NoError(t, newActs().MigrateAutoRebase(context.Background()))
 		require.Contains(t, out.String(), "No conflict found when merging main into my-branch")
 		// Check that the correct git commands were executed
-		require.Len(t, mockExec.ran, 6)
+		require.Len(t, mockExec.ran, 4)
 		require.Equal(t, []string{"fetch", "origin", "main"}, mockExec.ran[0].args)
 		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
 		require.Equal(t, []string{"show", "origin/main:testdata/migrations/atlas.sum"}, mockExec.ran[2].args)
-		require.Equal(t, []string{"config", "--global", "user.name", "atlas-action"}, mockExec.ran[3].args)
-		require.Equal(t, []string{"config", "--global", "user.email", "atlas-action@ariga"}, mockExec.ran[4].args)
-		require.Equal(t, []string{"rebase", "origin/main"}, mockExec.ran[5].args)
+		require.Equal(t, []string{"rebase", "origin/main"}, mockExec.ran[3].args)
 	})
 	t.Run("conflict in atlas.sum", func(t *testing.T) {
 		var rebasedFiles []string
@@ -673,17 +671,15 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.Len(t, rebasedFiles, 1)
 		require.Equal(t, "20250309093464_rebase.sql", rebasedFiles[0])
 		// Check that the correct git commands were executed
-		require.Len(t, mockExec.ran, 10)
+		require.Len(t, mockExec.ran, 8)
 		require.Equal(t, []string{"fetch", "origin", "rebase-branch"}, mockExec.ran[0].args)
 		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
 		require.Equal(t, []string{"show", "origin/rebase-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[2].args)
-		require.Equal(t, []string{"config", "--global", "user.name", "atlas-action"}, mockExec.ran[3].args)
-		require.Equal(t, []string{"config", "--global", "user.email", "atlas-action@ariga"}, mockExec.ran[4].args)
-		require.Equal(t, []string{"rebase", "origin/rebase-branch"}, mockExec.ran[5].args)
-		require.Equal(t, []string{"add", "testdata/need_rebase"}, mockExec.ran[6].args)
-		require.Equal(t, []string{"commit", "-m", "Rebase the migrations in testdata/need_rebase"}, mockExec.ran[7].args)
-		require.Equal(t, []string{"rebase", "--continue"}, mockExec.ran[8].args)
-		require.Equal(t, []string{"push", "--force-with-lease", "origin", "my-branch"}, mockExec.ran[9].args)
+		require.Equal(t, []string{"rebase", "origin/rebase-branch"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"add", "testdata/need_rebase"}, mockExec.ran[4].args)
+		require.Equal(t, []string{"commit", "-m", "Rebase the migrations in testdata/need_rebase"}, mockExec.ran[5].args)
+		require.Equal(t, []string{"rebase", "--continue"}, mockExec.ran[6].args)
+		require.Equal(t, []string{"push", "--force-with-lease", "origin", "my-branch"}, mockExec.ran[7].args)
 	})
 }
 

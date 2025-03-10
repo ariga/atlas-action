@@ -599,12 +599,6 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Infof("No files to rebase")
 		return nil
 	}
-	if err := a.CmdExecutor(ctx, "git", "config", "--global", "user.name", "atlas-action").Run(); err != nil {
-		return fmt.Errorf("failed to set the git user name: %w", err)
-	}
-	if err := a.CmdExecutor(ctx, "git", "config", "--global", "user.email", "atlas-action@ariga").Run(); err != nil {
-		return fmt.Errorf("failed to set the git user email: %w", err)
-	}
 	// Try to rebase on top of the rebase branch
 	err = a.CmdExecutor(ctx, "git", "rebase", "origin/"+rebaseBranch).Run()
 	if err == nil {
