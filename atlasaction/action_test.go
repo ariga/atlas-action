@@ -559,20 +559,20 @@ func TestMigrateTest(t *testing.T) {
 }
 
 type MockCmdExecutor struct {
-	commands []struct {
+	ran []struct {
 		name string
 		args []string
 	}
+	onCommand func(ctx context.Context, name string, args ...string) *exec.Cmd
 }
 
 // ExecCmd is the mocked function compatible with your CmdExecutor.
 func (m *MockCmdExecutor) ExecCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
-	m.commands = append(m.commands, struct {
+	m.ran = append(m.ran, struct {
 		name string
 		args []string
 	}{name: name, args: args})
-	// Return a dummy command that won't run anything harmful.
-	return exec.CommandContext(ctx, "echo")
+	return m.onCommand(ctx, name, args...)
 }
 
 func TestMigrateAutorebase(t *testing.T) {
@@ -580,20 +580,41 @@ func TestMigrateAutorebase(t *testing.T) {
 		c, err := atlasexec.NewClient("", "atlas")
 		require.NoError(t, err)
 		out := &bytes.Buffer{}
+		mockExec := &MockCmdExecutor{
+			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+				// Dummy command to avoid errors
+				return exec.CommandContext(ctx, "echo")
+			},
+		}
 		act := &mockAction{
 			inputs: map[string]string{
 				"dir": "file://testdata/migrations",
+			},
+			trigger: &atlasaction.TriggerContext{
+				Branch: "my-branch",
 			},
 			logger: slog.New(slog.NewTextHandler(out, nil)),
 		}
 		newActs := func() *atlasaction.Actions {
 			t.Helper()
-			a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(c))
+			a, err := atlasaction.New(
+				atlasaction.WithAction(act),
+				atlasaction.WithAtlas(c),
+				atlasaction.WithCmdExecutor(mockExec.ExecCmd),
+			)
 			require.NoError(t, err)
 			return a
 		}
 		require.NoError(t, newActs().MigrateAutoRebase(context.Background()))
-		require.Contains(t, out.String(), "No conflict found in the atlas.sum file")
+		require.Contains(t, out.String(), "No conflict found when merging main into my-branch")
+		// Check that the correct git commands were executed
+		require.Len(t, mockExec.ran, 6)
+		require.Equal(t, []string{"fetch", "origin", "main"}, mockExec.ran[0].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
+		require.Equal(t, []string{"show", "origin/main:testdata/migrations/atlas.sum"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"config", "--global", "user.name", "atlas-action"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"config", "--global", "user.email", "atlas-action@ariga"}, mockExec.ran[4].args)
+		require.Equal(t, []string{"rebase", "origin/main"}, mockExec.ran[5].args)
 	})
 	t.Run("conflict in atlas.sum", func(t *testing.T) {
 		var rebasedFiles []string
@@ -607,13 +628,32 @@ func TestMigrateAutorebase(t *testing.T) {
 			},
 		}
 		out := &bytes.Buffer{}
-		mockExec := &MockCmdExecutor{}
+		mockExec := &MockCmdExecutor{
+			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+				// Dummy command to avoid errors
+				cmd := exec.CommandContext(ctx, "echo")
+				switch {
+				// Simulate a conflict when running `git rebase origin/rebase-branch`
+				case len(args) > 1 && args[0] == "rebase" && args[1] == "origin/rebase-branch":
+					cmd.Err = errors.New("CONFLICT")
+				// Simulate result when running: git show origin/rebase-branch:testdata/need_rebase/atlas.sum
+				case len(args) > 0 && args[0] == "show":
+					res := `h1:OBdzlZYBlTgWANMK27EiJUZeVVT/SYmbNYRC0QA31LE=
+							20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+							20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
+					// print the result to the stdout
+					cmd = exec.CommandContext(ctx, "echo", res)
+				}
+				return cmd
+			},
+		}
 		act := &mockAction{
 			inputs: map[string]string{
-				"dir": "file://testdata/need_rebase",
+				"dir":           "file://testdata/need_rebase",
+				"rebase-branch": "rebase-branch",
 			},
 			trigger: &atlasaction.TriggerContext{
-				Branch: "rebase-branch",
+				Branch: "my-branch",
 			},
 			logger: slog.New(slog.NewTextHandler(out, nil)),
 		}
@@ -633,15 +673,17 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.Len(t, rebasedFiles, 1)
 		require.Equal(t, "20250309093464_rebase.sql", rebasedFiles[0])
 		// Check that the correct git commands were executed
-		require.Len(t, mockExec.commands, 4)
-		require.Equal(t, "git", mockExec.commands[0].name)
-		require.Equal(t, []string{"checkout", "rebase-branch"}, mockExec.commands[0].args)
-		require.Equal(t, "git", mockExec.commands[1].name)
-		require.Equal(t, []string{"add", "testdata/need_rebase/atlas.sum"}, mockExec.commands[1].args)
-		require.Equal(t, "git", mockExec.commands[2].name)
-		require.Equal(t, []string{"commit", "-m", "Rebase the migrations in testdata/need_rebase"}, mockExec.commands[2].args)
-		require.Equal(t, "git", mockExec.commands[3].name)
-		require.Equal(t, []string{"push", "origin", "rebase-branch"}, mockExec.commands[3].args)
+		require.Len(t, mockExec.ran, 10)
+		require.Equal(t, []string{"fetch", "origin", "rebase-branch"}, mockExec.ran[0].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
+		require.Equal(t, []string{"show", "origin/rebase-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"config", "--global", "user.name", "atlas-action"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"config", "--global", "user.email", "atlas-action@ariga"}, mockExec.ran[4].args)
+		require.Equal(t, []string{"rebase", "origin/rebase-branch"}, mockExec.ran[5].args)
+		require.Equal(t, []string{"add", "testdata/need_rebase"}, mockExec.ran[6].args)
+		require.Equal(t, []string{"commit", "-m", "Rebase the migrations in testdata/need_rebase"}, mockExec.ran[7].args)
+		require.Equal(t, []string{"rebase", "--continue"}, mockExec.ran[8].args)
+		require.Equal(t, []string{"push", "--force-with-lease", "origin", "my-branch"}, mockExec.ran[9].args)
 	})
 }
 

@@ -5,29 +5,7 @@ import (
 	"strings"
 )
 
-type Conflict struct {
-	Base     string
-	Incoming string
-}
-
-var conflictRegex = regexp.MustCompile(`(?ms)^<<<<<<< .+?\n(.*?)\n=======\n(.*?)\n>>>>>>> .+?$`)
-
-// ParseConflicts parses the git conflicts from the input.
-func ParseConflicts(input string) []Conflict {
-	matches := conflictRegex.FindAllStringSubmatch(input, -1)
-	conflicts := make([]Conflict, 0, len(matches))
-	for _, m := range matches {
-		baseContent := strings.TrimSpace(m[1])
-		incomingContent := strings.TrimSpace(m[2])
-		conflicts = append(conflicts, Conflict{
-			Base:     baseContent,
-			Incoming: incomingContent,
-		})
-	}
-	return conflicts
-}
-
-var filenameRegex = regexp.MustCompile(`^\S+\.sql`)
+var filenameRegex = regexp.MustCompile(`\b\d+_[\w-]+\.sql\b`)
 
 // getFileNames extracts the filenames from the given branch content.
 func getFileNames(content string) []string {
@@ -40,7 +18,7 @@ func getFileNames(content string) []string {
 	return filenames
 }
 
-// FilesOnlyInBase returns filenames that appear only in the base branch.
+// FilesOnlyInBase returns filenames that appear only in the base branch and not in the incoming branch.
 func FilesOnlyInBase(base, incoming string) []string {
 	baseFiles := getFileNames(base)
 	incomingFilesSet := make(map[string]struct{})
