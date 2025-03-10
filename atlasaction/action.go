@@ -16,6 +16,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	"ariga.io/atlas-action/atlasaction/cloud"
+	"ariga.io/atlas-action/atlasaction/git"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"github.com/fatih/color"
 )
@@ -34,6 +36,7 @@ type (
 		Action
 		Version     string
 		Atlas       AtlasExec
+		CmdExecutor func(ctx context.Context, name string, args ...string) *exec.Cmd
 		CloudClient func(string, string, *atlasexec.Version) CloudClient
 	}
 
@@ -86,6 +89,10 @@ type (
 		Login(ctx context.Context, params *atlasexec.LoginParams) error
 		// MigrateStatus runs the `migrate status` command.
 		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
+		// MigrateHash runs the `migrate hash` command.
+		MigrateHash(context.Context, *atlasexec.MigrateHashParams) error
+		// MigrateRebase runs the `migrate rebase` command.
+		MigrateRebase(context.Context, *atlasexec.MigrateRebaseParams) error
 		// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
 		MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error)
 		// MigrateDown runs the `migrate down` command.
@@ -187,6 +194,7 @@ func New(opts ...Option) (*Actions, error) {
 		Action:      cfg.action,
 		Atlas:       cfg.atlas,
 		CloudClient: cfg.cloudClient,
+		CmdExecutor: cfg.CmdExecutor,
 		Version:     cfg.version,
 	}, nil
 }
@@ -250,6 +258,11 @@ func WithVersion(v string) Option {
 	return func(c *config) { c.version = v }
 }
 
+// WithCmdExecutor specifies how to execute commands.
+func WithCmdExecutor(exec func(ctx context.Context, name string, args ...string) *exec.Cmd) Option {
+	return func(c *config) { c.CmdExecutor = exec }
+}
+
 // ErrNoSCM is returned when no SCM client is found.
 var ErrNoSCM = errors.New("atlasaction: no SCM client found")
 
@@ -259,6 +272,7 @@ type (
 		out         io.Writer
 		action      Action
 		atlas       AtlasExec
+		CmdExecutor func(context.Context, string, ...string) *exec.Cmd
 		cloudClient func(string, string, *atlasexec.Version) CloudClient
 		version     string
 		err         error // the error occurred during the configuration.
@@ -268,11 +282,12 @@ type (
 
 const (
 	// Versioned workflow Commands
-	CmdMigratePush  = "migrate/push"
-	CmdMigrateLint  = "migrate/lint"
-	CmdMigrateApply = "migrate/apply"
-	CmdMigrateDown  = "migrate/down"
-	CmdMigrateTest  = "migrate/test"
+	CmdMigratePush       = "migrate/push"
+	CmdMigrateLint       = "migrate/lint"
+	CmdMigrateApply      = "migrate/apply"
+	CmdMigrateDown       = "migrate/down"
+	CmdMigrateTest       = "migrate/test"
+	CmdMigrateAutoRebase = "migrate/autorebase"
 	// Declarative workflow Commands
 	CmdSchemaPush        = "schema/push"
 	CmdSchemaTest        = "schema/test"
@@ -302,6 +317,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MigrateLint(ctx)
 	case CmdMigrateTest:
 		return a.MigrateTest(ctx)
+	case CmdMigrateAutoRebase:
+		return a.MigrateAutoRebase(ctx)
 	case CmdSchemaPush:
 		return a.SchemaPush(ctx)
 	case CmdSchemaTest:
@@ -547,6 +564,72 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 	}
 	a.Infof("`atlas migrate test` completed successfully, no issues found")
 	a.Infof(result)
+	return nil
+}
+
+// MigrateAutoRebase runs the Action for "ariga/atlas-action/migrate/autorebase"
+func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
+	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
+	rebaseBranch := a.GetInput("rebase-branch")
+	if rebaseBranch == "" {
+		rebaseBranch = "main"
+	}
+	tc, err := a.GetTriggerContext(ctx)
+	if err != nil {
+		return err
+	}
+	branch := tc.GetRunContext().Branch
+	if err := a.CmdExecutor(ctx, "git", "fetch", "origin", rebaseBranch).Run(); err != nil {
+		return fmt.Errorf("failed to fetch the branch %s: %w", rebaseBranch, err)
+	}
+	// Since running in detached HEAD, we need to switch to the branch.
+	if err := a.CmdExecutor(ctx, "git", "checkout", branch).Run(); err != nil {
+		return fmt.Errorf("failed to checkout to the branch: %w", err)
+	}
+	incoming, err := a.CmdExecutor(ctx, "git", "show", "origin/"+rebaseBranch+":"+dirpath+"/atlas.sum").Output()
+	if err != nil {
+		return fmt.Errorf("failed to get the atlas.sum file from the rebase branch: %w", err)
+	}
+	base, err := os.ReadFile(dirpath + "/atlas.sum")
+	if err != nil {
+		return fmt.Errorf("failed to read atlas.sum file: %w", err)
+	}
+	rebaseFiles := git.FilesOnlyInBase(string(base), string(incoming))
+	if len(rebaseFiles) == 0 {
+		a.Infof("No files to rebase")
+		return nil
+	}
+	if err := a.CmdExecutor(ctx, "git", "config", "--global", "user.name", "atlas-action").Run(); err != nil {
+		return fmt.Errorf("failed to set the git user name: %w", err)
+	}
+	if err := a.CmdExecutor(ctx, "git", "config", "--global", "user.email", "atlas-action@ariga").Run(); err != nil {
+		return fmt.Errorf("failed to set the git user email: %w", err)
+	}
+	// Try to rebase on top of the rebase branch
+	err = a.CmdExecutor(ctx, "git", "rebase", "origin/"+rebaseBranch).Run()
+	if err == nil {
+		a.Infof("No conflict found when merging %s into %s", rebaseBranch, branch)
+		return nil
+	}
+	if err := a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{DirURL: a.GetInput("dir")}); err != nil {
+		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
+	}
+	if err := a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: a.GetInput("dir"), Files: rebaseFiles}); err != nil {
+		return fmt.Errorf("failed to rebase the migrations: %w", err)
+	}
+	if err := a.CmdExecutor(ctx, "git", "add", dirpath).Run(); err != nil {
+		return fmt.Errorf("failed to stage the changes: %w", err)
+	}
+	if err := a.CmdExecutor(ctx, "git", "commit", "-m", fmt.Sprintf("Rebase the migrations in %s", dirpath)).Run(); err != nil {
+		return fmt.Errorf("failed to commit the changes: %w", err)
+	}
+	if err := a.CmdExecutor(ctx, "git", "rebase", "--continue").Run(); err != nil {
+		return fmt.Errorf("failed to continue the rebase: %w", err)
+	}
+	if err := a.CmdExecutor(ctx, "git", "push", "--force-with-lease", "origin", branch).Run(); err != nil {
+		return fmt.Errorf("failed to push the changes: %w", err)
+	}
+	a.Infof("Migrations rebased successfully")
 	return nil
 }
 
