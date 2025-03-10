@@ -608,7 +608,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	// Try to rebase on top of the rebase branch
 	err = a.CmdExecutor(ctx, "git", "rebase", "origin/"+rebaseBranch).Run()
 	if err == nil {
-		a.Infof("No conflict found in the migrations")
+		a.Infof("No conflict found when merging %s into %s", rebaseBranch, branch)
 		return nil
 	}
 	if err := a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{DirURL: a.GetInput("dir")}); err != nil {
