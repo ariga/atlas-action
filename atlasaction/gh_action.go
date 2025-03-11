@@ -92,6 +92,8 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 		return nil, err
 	}
 	ev, err := github.ExtractEvent(ctx.Event)
+	fmt.Println("head ref: ", ctx.HeadRef)
+	fmt.Println("base ref: ", ctx.BaseRef)
 	if err != nil {
 		return nil, err
 	}
