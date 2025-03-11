@@ -1,12 +1,9 @@
 name: 'Migrate Auto Rebase'
-description: Resolve conflicts in the migration directory by rebasing the current branch's migrations on top of the rebase branch migration directory.
+description: Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch.
 branding:
   icon: database
 author: 'Ariga'
 inputs:
-  rebase-branch:
-    description: The branch to rebase on, default is `main`.
-    required: false
   working-directory:
     description: Atlas working directory, default is project root
     required: false

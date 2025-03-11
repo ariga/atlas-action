@@ -111,10 +111,11 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	}
 	if ctx.EventName == "pull_request" {
 		tc.PullRequest = &PullRequest{
-			Number: ev.PullRequest.Number,
-			URL:    ev.PullRequest.URL,
-			Commit: ev.PullRequest.Head.SHA,
-			Body:   ev.PullRequest.Body,
+			Number:     ev.PullRequest.Number,
+			URL:        ev.PullRequest.URL,
+			Commit:     ev.PullRequest.Head.SHA,
+			Body:       ev.PullRequest.Body,
+			BaseBranch: ctx.BaseRef,
 		}
 	}
 	return tc, nil
