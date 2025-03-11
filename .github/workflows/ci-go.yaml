@@ -456,3 +456,30 @@ jobs:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
           config: 'file://monitor/schema/atlas.hcl'
           env: 'dev'
+
+  migrate-auto-rebase:
+    permissions:
+      contents: write  # allow pushing changes to repo
+    runs-on: ubuntu-latest
+    env:
+      ATLAS_ACTION_LOCAL: 1
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - name: config git to commit changes # skip this step if you have git account configured in the CI
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+      - uses: ./migrate/autorebase
+        with:
+          dir: file://atlasaction/testdata/test_rebase
