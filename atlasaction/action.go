@@ -155,7 +155,7 @@ type (
 		URL        string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
 		Commit     string // Latest commit SHA.
 		Body       string // Body (description) of the pull request.
-		BaseBranch string // BaseBranch is the base branch name.
+		BaseBranch string // base branch name of the pull request.
 	}
 )
 
@@ -572,15 +572,21 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 // MigrateAutoRebase runs the Action for "ariga/atlas-action/migrate/autorebase"
 func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
+	if dirpath == "" {
+		dirpath = "migrations"
+	}
+	sumpath := filepath.Join(dirpath, "atlas.sum")
 	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
 	}
-	branch := tc.Branch
 	if tc.PullRequest == nil {
 		return errors.New("cannot run `migrate autorebase` outside of a pull request")
 	}
-	baseBranch := tc.PullRequest.BaseBranch
+	var (
+		branch     = tc.Branch
+		baseBranch = tc.PullRequest.BaseBranch
+	)
 	if err := a.CmdExecutor(ctx, "git", "fetch", "origin", baseBranch).Run(); err != nil {
 		return fmt.Errorf("failed to fetch the branch %s: %w", baseBranch, err)
 	}
@@ -588,11 +594,11 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err := a.CmdExecutor(ctx, "git", "checkout", branch).Run(); err != nil {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
-	incoming, err := a.CmdExecutor(ctx, "git", "show", "origin/"+baseBranch+":"+dirpath+"/atlas.sum").Output()
+	incoming, err := a.CmdExecutor(ctx, "git", "show", "origin/"+baseBranch+":"+sumpath).Output()
 	if err != nil {
 		return fmt.Errorf("failed to get the atlas.sum file from the rebase branch: %w", err)
 	}
-	base, err := os.ReadFile(filepath.Join(dirpath, "atlas.sum"))
+	base, err := os.ReadFile(sumpath)
 	if err != nil {
 		return fmt.Errorf("failed to read atlas.sum file: %w", err)
 	}
@@ -607,6 +613,16 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Infof("No conflict found when merging %s into %s", baseBranch, branch)
 		return nil
 	}
+	// If rebase failed, check that the conflict only in atlas.sum file.
+	diff, err := a.CmdExecutor(ctx, "git", "diff", "--name-only", "--diff-filter=U").Output()
+	if err != nil {
+		return fmt.Errorf("failed to get conflicting files: %w", err)
+	}
+	conflictFiles := strings.Split(strings.TrimSpace(string(diff)), "\n")
+	if len(conflictFiles) != 1 || conflictFiles[0] != sumpath {
+		return fmt.Errorf("conflict found in files other than %s, conflict files: %v", sumpath, conflictFiles)
+	}
+	// Re-hash the migrations and rebase the migrations.
 	if err := a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{DirURL: a.GetInput("dir")}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
 	}
