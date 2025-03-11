@@ -327,13 +327,14 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 ### `ariga/atlas-action/migrate/autorebase`
 
-Resolve conflicts in the migration directory by rebasing the current branch's migrations on top of the rebase branch migration directory.
+Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch. 
+
+Note: Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
 
 #### Inputs
 
 All inputs are optional
 
-* `rebase-branch` - The branch to rebase on. By default: `main`.
 * `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
 
@@ -359,7 +360,6 @@ Add the next job to your workflow to automatically rebase migrations on top of t
         git config user.name "github-actions[bot]"    
     - uses: ariga/atlas-action/migrate/autorebase@v1
       with:
-        rebase-branch: master
         dir: file://migrations # the URL of the migration directory to rebase
 ```
 
