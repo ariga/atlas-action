@@ -120,6 +120,8 @@ type (
 		SchemaPlanApprove(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 		// SchemaApplySlice runs the `schema apply` command.
 		SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error)
+		// Whoami runs the `whoami` command.
+		WhoAmI(context.Context) (*atlasexec.WhoAmI, error)
 	}
 
 	// CloudClient lets an action talk to Atlas Cloud.

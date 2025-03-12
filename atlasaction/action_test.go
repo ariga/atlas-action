@@ -300,6 +300,7 @@ type mockAtlas struct {
 	schemaPlanList    func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
 	schemaPlanLint    func(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
 	schemaPlanApprove func(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
+	whoAmI            func(context.Context) (*atlasexec.WhoAmI, error)
 }
 
 var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
@@ -391,6 +392,11 @@ func (m *mockAtlas) SchemaApplySlice(ctx context.Context, params *atlasexec.Sche
 // MigrateDown implements AtlasExec.
 func (m *mockAtlas) MigrateDown(ctx context.Context, params *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error) {
 	return m.migrateDown(ctx, params)
+}
+
+// WhoAmI implements AtlasExec.
+func (m *mockAtlas) WhoAmI(ctx context.Context) (*atlasexec.WhoAmI, error) {
+	return m.whoAmI(ctx)
 }
 
 func TestMigratePush(t *testing.T) {
