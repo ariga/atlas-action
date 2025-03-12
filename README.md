@@ -333,8 +333,8 @@ Automatically resolves `atlas.sum` conflicts and rebases the migration directory
 > 
 > Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
 > 
-> After rebase is done, and commit is pushed by the action, no other workflows will be triggered.
-> To avoid this run `actions/checkout` with PAT:
+> After rebase is done and commit is pushed by the action, no other workflows will be triggered.
+> Unless running with personal access token (PAT).
 >```
 >   - uses: actions/checkout@v4
 >     with:
@@ -372,6 +372,7 @@ jobs:
         cloud-token: ${{ secrets.ATLAS_TOKEN }}
     - uses: actions/checkout@v4
       with:
+        token: ${{ secrets.PAT }} # use personal access token to trigger workflows after pushing rebase changes
         fetch-depth: 0 # need to fetch the branch history for rebase
     - name: config git to commit changes # skip this step if you have git account configured in the CI
       run: |
