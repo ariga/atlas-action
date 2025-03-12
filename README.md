@@ -17,7 +17,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply)            | Apply migrations to a database                                                      |
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Revert migrations to a database                                                     |
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                                                       |
-| [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase)  | Fix conflicts in migration directory                                                |
+| [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase)  | Fix `atlas.sum` conflicts in migration directory                                    |
 | [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                                                           |
 | [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema to [Atlas Registry](https://atlasgo.io/registry)                      |
 | [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition                                |
@@ -333,8 +333,7 @@ Automatically resolves `atlas.sum` conflicts and rebases the migration directory
 > 
 > Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
 > 
-> After rebase is done and commit is pushed by the action, no other workflows will be triggered.
-> Unless running with personal access token (PAT).
+> After the rebase is done and a commit is pushed by the action, no other workflows will be triggered unless the action is running with a personal access token (PAT).
 >```
 >   - uses: actions/checkout@v4
 >     with:
@@ -347,8 +346,8 @@ Automatically resolves `atlas.sum` conflicts and rebases the migration directory
 All inputs are optional
 
 * `base-branch` - The branch to rebase on. Defaults to repository's default branch.
-* `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
-* `working-directory` - The working directory to run from.  Defaults to project root.
+* `dir` - The URL of the migration directory to rebase on. Defaults to `file://migrations`.
+* `working-directory` - The working directory to run from. Defaults to project root.
 
 #### Example usage
 
@@ -364,7 +363,8 @@ on:
 jobs:
   migrate-auto-rebase:
     permissions:
-      contents: write  # allow pushing changes to repo
+      # Allow pushing changes to repo
+      contents: write
     runs-on: ubuntu-latest
     steps:
     - uses: ariga/setup-atlas@v0
@@ -372,16 +372,19 @@ jobs:
         cloud-token: ${{ secrets.ATLAS_TOKEN }}
     - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PAT }} # use personal access token to trigger workflows after pushing rebase changes
-        fetch-depth: 0 # need to fetch the branch history for rebase
-    - name: config git to commit changes # skip this step if you have git account configured in the CI
+        # Use personal access token to trigger workflows after commits are pushed by the action.
+        token: ${{ secrets.PAT }}
+        # Need to fetch the branch history for rebase.
+        fetch-depth: 0
+    # Skip the step below if your CI is already configured with a Git account.
+    - name: config git to commit changes
       run: |
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git config user.name "github-actions[bot]"    
     - uses: ariga/atlas-action/migrate/autorebase@v1
       with:
-        base-branch: master # the branch to rebase on
-        dir: file://migrations # the URL of the migration directory to rebase
+        base-branch: master
+        dir: file://migrations
 ```
 
 ### `ariga/atlas-action/schema/test`
