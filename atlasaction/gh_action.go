@@ -95,6 +95,7 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("github context:\n", ctx)
 	tc := &TriggerContext{
 		Act:      a,
 		SCM:      SCM{Type: atlasexec.SCMTypeGithub, APIURL: ctx.APIURL},

@@ -60,6 +60,7 @@ type (
 		} `mapstructure:"pull_request"`
 		Repository struct {
 			URL string `mapstructure:"html_url"`
+			DefaultBranch string `mapstructure:"default_branch"`
 		} `mapstructure:"repository"`
 	}
 )
@@ -347,5 +348,6 @@ func ExtractEvent(raw map[string]any) (*TriggerEvent, error) {
 	if err := mapstructure.Decode(raw, &event); err != nil {
 		return nil, fmt.Errorf("failed to parse push event: %v", err)
 	}
+	fmt.Println("trigger event:\n", event)
 	return &event, nil
 }
