@@ -576,16 +576,6 @@ func (m *MockCmdExecutor) ExecCmd(ctx context.Context, name string, args ...stri
 }
 
 func TestMigrateAutorebase(t *testing.T) {
-	t.Run("not a pull request", func(t *testing.T) {
-		a, err := atlasaction.New(
-			atlasaction.WithAction(&mockAction{
-				trigger: &atlasaction.TriggerContext{},
-			}),
-		)
-		require.NoError(t, err)
-		err = a.MigrateAutoRebase(context.Background())
-		require.EqualError(t, err, "cannot run `migrate autorebase` outside of a pull request")
-	})
 	t.Run("no conflict", func(t *testing.T) {
 		c, err := atlasexec.NewClient("", "atlas")
 		require.NoError(t, err)
@@ -602,9 +592,7 @@ func TestMigrateAutorebase(t *testing.T) {
 			},
 			trigger: &atlasaction.TriggerContext{
 				Branch: "my-branch",
-				PullRequest: &atlasaction.PullRequest{
-					BaseBranch: "main",
-				},
+				DefaultBranch:  "main",
 			},
 			logger: slog.New(slog.NewTextHandler(out, nil)),
 		}
@@ -661,12 +649,10 @@ func TestMigrateAutorebase(t *testing.T) {
 		act := &mockAction{
 			inputs: map[string]string{
 				"dir": "file://testdata/need_rebase",
+				"base-branch": "rebase-branch",
 			},
 			trigger: &atlasaction.TriggerContext{
 				Branch: "my-branch",
-				PullRequest: &atlasaction.PullRequest{
-					BaseBranch: "rebase-branch",
-				},
 			},
 			logger: slog.New(slog.NewTextHandler(out, nil)),
 		}
@@ -720,12 +706,10 @@ func TestMigrateAutorebase(t *testing.T) {
 		act := &mockAction{
 			inputs: map[string]string{
 				"dir": "file://testdata/need_rebase",
+				"base-branch": "rebase-branch",
 			},
 			trigger: &atlasaction.TriggerContext{
 				Branch: "my-branch",
-				PullRequest: &atlasaction.PullRequest{
-					BaseBranch: "rebase-branch",
-				},
 			},
 		}
 		acts, err := atlasaction.New(

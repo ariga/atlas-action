@@ -335,6 +335,7 @@ Note: Users should set the `migrate/lint` action to ensure no logical conflicts 
 
 All inputs are optional
 
+* `base-branch` - The branch to rebase on. Defaults to repository's default branch.
 * `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
 
@@ -343,6 +344,13 @@ All inputs are optional
 Add the next job to your workflow to automatically rebase migrations on top of the migration directory in case of conflicts:
 
 ```yaml
+name: Rebase Atlas Migrations
+on:
+  # Run on push event and not pull request because github action does not run when there is a conflict in the PR.
+  push:
+    branches-ignore:
+      - master
+jobs:
   migrate-auto-rebase:
     permissions:
       contents: write  # allow pushing changes to repo
@@ -360,6 +368,7 @@ Add the next job to your workflow to automatically rebase migrations on top of t
         git config user.name "github-actions[bot]"    
     - uses: ariga/atlas-action/migrate/autorebase@v1
       with:
+        base-branch: master # the branch to rebase on
         dir: file://migrations # the URL of the migration directory to rebase
 ```
 

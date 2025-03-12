@@ -96,14 +96,15 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 		return nil, err
 	}
 	tc := &TriggerContext{
-		Act:      a,
-		SCM:      SCM{Type: atlasexec.SCMTypeGithub, APIURL: ctx.APIURL},
-		Repo:     ctx.Repository,
-		Branch:   ctx.HeadRef,
-		Commit:   ctx.SHA,
-		RepoURL:  ev.Repository.URL,
-		Actor:    &Actor{Name: ctx.Actor, ID: ctx.ActorID},
-		RerunCmd: fmt.Sprintf("gh run rerun %d", ctx.RunID),
+		Act:           a,
+		SCM:           SCM{Type: atlasexec.SCMTypeGithub, APIURL: ctx.APIURL},
+		Repo:          ctx.Repository,
+		Branch:        ctx.HeadRef,
+		Commit:        ctx.SHA,
+		RepoURL:       ev.Repository.URL,
+		DefaultBranch: ev.Repository.DefaultBranch,
+		Actor:         &Actor{Name: ctx.Actor, ID: ctx.ActorID},
+		RerunCmd:      fmt.Sprintf("gh run rerun %d", ctx.RunID),
 	}
 	if tc.Branch == "" {
 		// HeadRef will be empty for push events, so we use RefName instead.
@@ -111,11 +112,10 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	}
 	if ctx.EventName == "pull_request" {
 		tc.PullRequest = &PullRequest{
-			Number:     ev.PullRequest.Number,
-			URL:        ev.PullRequest.URL,
-			Commit:     ev.PullRequest.Head.SHA,
-			Body:       ev.PullRequest.Body,
-			BaseBranch: ctx.BaseRef,
+			Number: ev.PullRequest.Number,
+			URL:    ev.PullRequest.URL,
+			Commit: ev.PullRequest.Head.SHA,
+			Body:   ev.PullRequest.Body,
 		}
 	}
 	return tc, nil
