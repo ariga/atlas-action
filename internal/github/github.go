@@ -60,6 +60,7 @@ type (
 		} `mapstructure:"pull_request"`
 		Repository struct {
 			URL string `mapstructure:"html_url"`
+			DefaultBranch string `mapstructure:"default_branch"`
 		} `mapstructure:"repository"`
 	}
 )

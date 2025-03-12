@@ -132,15 +132,16 @@ type (
 
 	// TriggerContext holds the context of the environment the action is running in.
 	TriggerContext struct {
-		Act         Action       // Act is the action that is running.
-		SCM         SCM          // SCM is the source control management system.
-		Repo        string       // Repo is the repository name. e.g. "ariga/atlas-action".
-		RepoURL     string       // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
-		Branch      string       // Currnet Branch name.
-		Commit      string       // Commit SHA.
-		PullRequest *PullRequest // PullRequest will be available if the event is "pull_request".
-		Actor       *Actor       // Actor is the user who triggered the action.
-		RerunCmd    string       // RerunCmd is the command to rerun the action.
+		Act           Action       // Act is the action that is running.
+		SCM           SCM          // SCM is the source control management system.
+		Repo          string       // Repo is the repository name. e.g. "ariga/atlas-action".
+		RepoURL       string       // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
+		DefaultBranch string       // DefaultBranch is the default branch of the repository.
+		Branch        string       // Currnet Branch name.
+		Commit        string       // Commit SHA.
+		PullRequest   *PullRequest // PullRequest will be available if the event is "pull_request".
+		Actor         *Actor       // Actor is the user who triggered the action.
+		RerunCmd      string       // RerunCmd is the command to rerun the action.
 	}
 
 	// Actor holds the actor information.
@@ -151,11 +152,10 @@ type (
 
 	// PullRequest holds the pull request information.
 	PullRequest struct {
-		Number     int    // Pull Request Number
-		URL        string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
-		Commit     string // Latest commit SHA.
-		Body       string // Body (description) of the pull request.
-		BaseBranch string // base branch name of the pull request.
+		Number int    // Pull Request Number
+		URL    string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
+		Commit string // Latest commit SHA.
+		Body   string // Body (description) of the pull request.
 	}
 )
 
@@ -580,18 +580,18 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if tc.PullRequest == nil {
-		return errors.New("cannot run `migrate autorebase` outside of a pull request")
-	}
 	var (
-		branch     = tc.Branch
-		baseBranch = tc.PullRequest.BaseBranch
+		currBranch = tc.Branch
+		baseBranch = a.GetInput("base-branch")
 	)
+	if baseBranch == "" {
+		baseBranch = tc.DefaultBranch
+	}
 	if err := a.CmdExecutor(ctx, "git", "fetch", "origin", baseBranch).Run(); err != nil {
 		return fmt.Errorf("failed to fetch the branch %s: %w", baseBranch, err)
 	}
 	// Since running in detached HEAD, we need to switch to the branch.
-	if err := a.CmdExecutor(ctx, "git", "checkout", branch).Run(); err != nil {
+	if err := a.CmdExecutor(ctx, "git", "checkout", currBranch).Run(); err != nil {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
 	incoming, err := a.CmdExecutor(ctx, "git", "show", "origin/"+baseBranch+":"+sumpath).Output()
@@ -610,7 +610,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	// Try to rebase on top of the rebase branch
 	err = a.CmdExecutor(ctx, "git", "rebase", "origin/"+baseBranch).Run()
 	if err == nil {
-		a.Infof("No conflict found when merging %s into %s", baseBranch, branch)
+		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
 		return nil
 	}
 	// If rebase failed, check that the conflict only in atlas.sum file.
@@ -638,7 +638,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err := a.CmdExecutor(ctx, "git", "rebase", "--continue").Run(); err != nil {
 		return fmt.Errorf("failed to continue rebase: %w", err)
 	}
-	if err := a.CmdExecutor(ctx, "git", "push", "--force-with-lease", "origin", branch).Run(); err != nil {
+	if err := a.CmdExecutor(ctx, "git", "push", "--force-with-lease", "origin", currBranch).Run(); err != nil {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Migrations rebased successfully")
