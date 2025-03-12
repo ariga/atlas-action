@@ -383,37 +383,28 @@ func (a *Actions) MigrateDown(ctx context.Context) (err error) {
 		Amount:          a.GetUin64Input("amount"),
 		RevisionsSchema: a.GetInput("revisions-schema"),
 	}
-	// Based on the retry configuration values, retry the action if there is an error.
-	var (
-		interval = a.GetDurationInput("wait-interval")
-		timeout  = a.GetDurationInput("wait-timeout")
-	)
-	if interval == 0 {
-		interval = time.Second // Default interval is 1 second.
-	}
 	var run *atlasexec.MigrateDown
-	for started, printed := time.Now(), false; ; {
+	printed := false
+	if err := a.waitingForApproval(func() (bool, error) {
 		run, err = a.Atlas.MigrateDown(ctx, params)
 		if err != nil {
 			a.SetOutput("error", err.Error())
-			return err
+			return false, err
 		}
 		if run.Error != "" {
 			a.SetOutput("error", run.Error)
-			return errors.New(run.Error)
+			return false, errors.New(run.Error)
 		}
-		// Break the loop if no wait / retry is configured.
-		if run.Status != StatePending || timeout == 0 || time.Since(started) >= timeout {
-			if timeout != 0 {
-				a.Warningf("plan has not been approved in configured waiting period, exiting")
-			}
-			break
+		if run.Status != StatePending {
+			return true, nil
 		}
 		if !printed {
 			printed = true
 			a.Infof("plan approval pending, review here: %s", run.URL)
 		}
-		time.Sleep(interval)
+		return false, nil
+	}); err != nil {
+		return err
 	}
 	if run.URL != "" {
 		a.SetOutput("url", run.URL)
@@ -892,6 +883,35 @@ func (a *Actions) cloudClient(ctx context.Context, tokenInput string) (CloudClie
 		return nil, fmt.Errorf("failed to get the atlas version: %w", err)
 	}
 	return a.CloudClient(t, a.Version, v), nil
+}
+
+// waitingForApproval waits for the plan to be approved.
+func (a *Actions) waitingForApproval(isStop func() (bool, error)) error {
+	// Based on the retry configuration values, retry the action if there is an error.
+	var (
+		interval = a.GetDurationInput("wait-interval")
+		timeout  = a.GetDurationInput("wait-timeout")
+	)
+	if interval == 0 {
+		interval = time.Second // Default interval is 1 second.
+	}
+	for started := time.Now(); ; {
+		stop, err := isStop()
+		if err != nil {
+			return err
+		}
+		if stop || timeout == 0 {
+			break
+		}
+		if time.Since(started) >= timeout {
+			if timeout != 0 {
+				a.Warningf("plan has not been approved in configured waiting period, exiting")
+			}
+			break
+		}
+		time.Sleep(interval)
+	}
+	return nil
 }
 
 // OldAgentHash computes a hash of the input. Used by the agent to determine if a new snapshot is needed.
