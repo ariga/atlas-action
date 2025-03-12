@@ -30,4 +30,4 @@ jobs:
       - uses: ./migrate/autorebase
         with:
           dir: file://atlasaction/testdata/test_rebase
-          base-branch: test_rebase
+          base-branch: test_auth-rebase-action
