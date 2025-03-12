@@ -17,6 +17,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply)            | Apply migrations to a database                                                      |
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Revert migrations to a database                                                     |
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                                                       |
+| [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase)  | Fix `atlas.sum` conflicts in migration directory                                    |
 | [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                                                           |
 | [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema to [Atlas Registry](https://atlasgo.io/registry)                      |
 | [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition                                |
@@ -322,6 +323,69 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
    For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
+
+
+### `ariga/atlas-action/migrate/autorebase`
+
+Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch. 
+
+> **Note**
+> 
+> Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
+> 
+> After the rebase is done and a commit is pushed by the action, no other workflows will be triggered unless the action is running with a personal access token (PAT).
+>```
+>   - uses: actions/checkout@v4
+>     with:
+>       token: ${{ secrets.PAT }}
+>```
+
+
+#### Inputs
+
+All inputs are optional
+
+* `base-branch` - The branch to rebase on. Defaults to repository's default branch.
+* `dir` - The URL of the migration directory to rebase on. Defaults to `file://migrations`.
+* `working-directory` - The working directory to run from. Defaults to project root.
+
+#### Example usage
+
+Add the next job to your workflow to automatically rebase migrations on top of the migration directory in case of conflicts:
+
+```yaml
+name: Rebase Atlas Migrations
+on:
+  # Run on push event and not pull request because github action does not run when there is a conflict in the PR.
+  push:
+    branches-ignore:
+      - master
+jobs:
+  migrate-auto-rebase:
+    permissions:
+      # Allow pushing changes to repo
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: ariga/setup-atlas@v0
+      with:
+        cloud-token: ${{ secrets.ATLAS_TOKEN }}
+    - uses: actions/checkout@v4
+      with:
+        # Use personal access token to trigger workflows after commits are pushed by the action.
+        token: ${{ secrets.PAT }}
+        # Need to fetch the branch history for rebase.
+        fetch-depth: 0
+    # Skip the step below if your CI is already configured with a Git account.
+    - name: config git to commit changes
+      run: |
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"    
+    - uses: ariga/atlas-action/migrate/autorebase@v1
+      with:
+        base-branch: master
+        dir: file://migrations
+```
 
 ### `ariga/atlas-action/schema/test`
 

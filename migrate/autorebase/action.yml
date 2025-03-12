@@ -1,0 +1,20 @@
+name: 'Migrate Auto Rebase'
+description: Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch.
+branding:
+  icon: database
+author: 'Ariga'
+inputs:
+  base-branch:
+    description: |
+      The base branch to rebase the migration directory onto. Default to the default branch of the repository.
+    required: false
+  working-directory:
+    description: Atlas working directory, default is project root
+    required: false
+  dir:
+    description: |
+      The URL of the migration directory to rebase on. By default: `file://migrations`.
+    required: false
+runs:
+  using: node20
+  main: index.js

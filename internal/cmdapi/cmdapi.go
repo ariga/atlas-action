@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-action/atlasaction/cloud"
@@ -28,6 +29,7 @@ func Main(ctx context.Context, version, commit string) int {
 	act, err := atlasaction.New(
 		atlasaction.WithAtlasPath(atlasPath),
 		atlasaction.WithCloudClient(cloud.New),
+		atlasaction.WithCmdExecutor(exec.CommandContext),
 		atlasaction.WithVersion(version),
 	)
 	if err != nil {
