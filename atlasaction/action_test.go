@@ -395,7 +395,7 @@ func (m *mockAtlas) MigrateDown(ctx context.Context, params *atlasexec.MigrateDo
 }
 
 // WhoAmI implements AtlasExec.
-func (m *mockAtlas) WhoAmI(ctx context.Context) (*atlasexec.WhoAmI, error) {
+func (m *mockAtlas) WhoAmI(ctx context.Context, params *atlasexec.WhoAmIParams) (*atlasexec.WhoAmI, error) {
 	return m.whoAmI(ctx)
 }
 
