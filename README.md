@@ -329,7 +329,18 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch. 
 
-Note: Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
+> **Note**
+> 
+> Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
+> 
+> After rebase is done, and commit is pushed by the action, no other workflows will be triggered.
+> To avoid this run `actions/checkout` with PAT:
+>```
+>   - uses: actions/checkout@v4
+>     with:
+>       token: ${{ secrets.PAT }}
+>```
+
 
 #### Inputs
 
