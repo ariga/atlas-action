@@ -587,10 +587,12 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err := a.CmdExecutor(ctx, "git", "checkout", currBranch).Run(); err != nil {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
+	fmt.Println("running: git show origin/" + baseBranch + ":" + sumpath)
 	incoming, err := a.CmdExecutor(ctx, "git", "show", "origin/"+baseBranch+":"+sumpath).Output()
 	if err != nil {
 		return fmt.Errorf("failed to get the atlas.sum file from the rebase branch: %w", err)
 	}
+	fmt.Println("running: git show origin/" + currBranch + ":" + sumpath)
 	base, err := a.CmdExecutor(ctx, "git", "show", "origin/"+currBranch+":"+sumpath).Output()
 	if  err != nil {
 		return fmt.Errorf("failed to get the atlas.sum file from current branch: %w", err)
