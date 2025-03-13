@@ -568,7 +568,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if dirpath == "" {
 		dirpath = "migrations"
 	}
-	sumpath := filepath.Join(dirpath, "atlas.sum")
+	sumpath := filepath.Join(a.WorkingDir(), dirpath, "atlas.sum")
 	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
@@ -591,9 +591,9 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get the atlas.sum file from the rebase branch: %w", err)
 	}
-	base, err := os.ReadFile(sumpath)
-	if err != nil {
-		return fmt.Errorf("failed to read atlas.sum file: %w", err)
+	base, err := a.CmdExecutor(ctx, "git", "show", "origin/"+currBranch+":"+sumpath).Output()
+	if  err != nil {
+		return fmt.Errorf("failed to get the atlas.sum file from current branch: %w", err)
 	}
 	rebaseFiles := git.FilesOnlyInBase(string(base), string(incoming))
 	if len(rebaseFiles) == 0 {
