@@ -600,13 +600,12 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Infof("No files to rebase")
 		return nil
 	}
-	// Try to rebase on top of the rebase branch
-	err = a.CmdExecutor(ctx, "git", "rebase", "origin/"+baseBranch).Run()
-	if err == nil {
-		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
+	// Try to merge the base branch into the current branch.
+	if err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Run(); err != nil {
+        a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
 		return nil
-	}
-	// If rebase failed, check that the conflict only in atlas.sum file.
+    }
+	// If merge failed, check that the conflict only in atlas.sum file.
 	diff, err := a.CmdExecutor(ctx, "git", "diff", "--name-only", "--diff-filter=U").Output()
 	if err != nil {
 		return fmt.Errorf("failed to get conflicting files: %w", err)
@@ -627,9 +626,6 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	}
 	if err := a.CmdExecutor(ctx, "git", "commit", "-m", fmt.Sprintf("Rebase migrations in %s", dirpath)).Run(); err != nil {
 		return fmt.Errorf("failed to commit changes: %w", err)
-	}
-	if err := a.CmdExecutor(ctx, "git", "rebase", "--continue").Run(); err != nil {
-		return fmt.Errorf("failed to continue rebase: %w", err)
 	}
 	if err := a.CmdExecutor(ctx, "git", "push", "--force-with-lease", "origin", currBranch).Run(); err != nil {
 		return fmt.Errorf("failed to push changes: %w", err)
