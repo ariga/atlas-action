@@ -376,7 +376,7 @@ jobs:
           - directory: multiple-envs
             plan: "file://20240910173744.plan.hcl"
           - directory: legacy
-            atlas: 'v0.27.0'
+            atlas: 'v0.28.0'
             auto-approve: "true"
     steps:
       - uses: ariga/setup-atlas@v0
