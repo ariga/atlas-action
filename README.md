@@ -430,6 +430,9 @@ Apply a declarative migrations to a database.
   For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
 * `tx-mode` - The transaction mode for migrations. It can be either `file`, `all`, or `none`. The default is `file`.
+* `approval-policy` - Specifies the approval policy for applying migrations. It can be set to either `ALWAYS` or `REVIEW`. If set, the action will automatically create a plan if one does not exist and wait for approval. Note: If `auto-approve` is set to `true` and a `plan` is provided, the approval policy will be ignored.
+* `wait-timeout` - Time after which no other retry attempt is made and the action exits. If not set, only one attempt is made. Used when `approval-policy` is set.
+* `wait-interval` - Time in seconds between different apply attempts, useful when waiting for plan approval, defaults to 1s. Used when `approval-policy` is set.
 
 #### Outputs
 
