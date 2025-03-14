@@ -866,20 +866,19 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 }
 
 // SchemaApply runs the GitHub Action for "ariga/atlas-action/schema/apply"
-func (a *Actions) SchemaApply(ctx context.Context) error {
-	params := &atlasexec.SchemaApplyParams{
-		ConfigURL:   a.GetInput("config"),
-		Env:         a.GetInput("env"),
-		Vars:        a.GetVarsInput("vars"),
-		DevURL:      a.GetInput("dev-url"),
-		URL:         a.GetInput("url"),
-		To:          a.GetInput("to"),
-		Schema:      a.GetArrayInput("schema"),
-		DryRun:      a.GetBoolInput("dry-run"),
-		AutoApprove: a.GetBoolInput("auto-approve"),
-		PlanURL:     a.GetInput("plan"),
-		TxMode:      a.GetInput("tx-mode"), // Hidden param.
+func (a *Actions) SchemaApply(ctx context.Context) (err error) {
+	var approvalPlan string
+	// Using approval process only if the user is authenticated and the repo is provided.
+	if a.GetInput("auto-generate-plan") != "" {
+		if approvalPlan, err = a.schemaApprovedPlan(ctx); err != nil {
+			return err
+		}
 	}
+	params := a.schemaApplyParams(func(p *atlasexec.SchemaApplyParams) {
+		if approvalPlan != "" {
+			p.PlanURL = approvalPlan
+		}
+	})
 	results, err := a.Atlas.SchemaApplySlice(ctx, params)
 	// Any errors will print at the end of execution.
 	if mErr := (&atlasexec.SchemaApplyError{}); errors.As(err, &mErr) {
@@ -903,6 +902,86 @@ func (a *Actions) SchemaApply(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// schemaApprovedPlan returns the URL of the approved schema plan.
+func (a *Actions) schemaApprovedPlan(ctx context.Context) (string, error) {
+	params := a.schemaPlanListParams(
+		func(p *atlasexec.SchemaPlanListParams) {
+			p.From = []string{a.GetInput("url")}
+			p.To = []string{a.GetInput("to")}
+			p.Pending = true
+		},
+	)
+	createApprovalPlan := func() (string, error) {
+		// Extract tag for plan name.
+		tag, err := a.Atlas.SchemaInspect(ctx, a.schemaInspectParams(
+			func(p *atlasexec.SchemaInspectParams) {
+				p.URL = a.GetInput("url")
+				p.Format = `{{ .Hash | base64url }}`
+			},
+		))
+		if err != nil {
+			return "", fmt.Errorf("failed to inspect the schema: %w", err)
+		}
+		// Create a new schema plan.
+		plan, err := a.Atlas.SchemaPlan(ctx, a.schemaPlanParams(
+			func(p *atlasexec.SchemaPlanParams) {
+				p.From = []string{a.GetInput("url")}
+				p.To = []string{a.GetInput("to")}
+				p.Name = fmt.Sprintf("atlas-action-plan-%.8s", strings.ToLower(tag))
+				p.Pending = true
+			},
+		))
+		if err != nil {
+			return "", fmt.Errorf("failed to create schema plan: %w", err)
+		}
+		// Wait for the plan to be approved.
+		if err := a.waitingForApproval(func() (bool, error) {
+			plans, err := a.Atlas.SchemaPlanList(ctx, params)
+			if err != nil {
+				return false, err
+			}
+			if len(plans) == 0 || (len(plans) == 1 && plans[0].Name != plan.File.Name) {
+				return false, errors.New("schema plan not found")
+			}
+			return plans[0].Status == "APPROVED", nil
+		}); err != nil {
+			return "", err
+		}
+		return plan.File.URL, nil
+	}
+	// Check existing plans and decide to create a new plan.
+	genPlan := a.GetInput("auto-generate-plan")
+	switch plans, err := a.Atlas.SchemaPlanList(ctx, params); {
+	case err != nil:
+		return "", fmt.Errorf("failed to list schema plans: %w", err)
+	// There are multiple pending plans. This is an unexpected state.
+	case len(plans) > 1:
+		return "", errors.New("found multiple schema pending plans, please approve or delete the existing plans")
+	// There are no pending plans or the policy is set to "ALWAYS". Create a new plan.
+	case len(plans) == 0 && genPlan == "ALWAYS":
+		return createApprovalPlan()
+	// There are no pending plans and generate plan option is set to "REVIEW".
+	// In this case, we need to apply the schema. If there are any errors or warnings
+	// caused by the lint policy, we will create an approval plan.
+	case len(plans) == 0 && genPlan == "REVIEW":
+		_, err := a.Atlas.SchemaApplySlice(ctx, a.schemaApplyParams())
+		if err != nil && strings.HasPrefix(err.Error(), "Rejected by review policy") {
+			return createApprovalPlan()
+		}
+	// There is a case that the pending plan already exists.
+	// Or it's provided by the user as an input ("plan_url").
+	// In this case, we start the approval process.
+	case len(plans) == 1 && plans[0].Status == "PENDING":
+	// There is a case that the plan is already approved.
+	// In this case, we return the URL of the approved plan.
+	case len(plans) == 1 && plans[0].Status == "APPROVED":
+		return plans[0].URL, nil
+	default:
+		return "", errors.New("unexpected state")
+	}
+	return "", nil
 }
 
 // MonitorSchema runs the Action for "ariga/atlas-action/monitor/schema"
@@ -1160,6 +1239,84 @@ func (a *Actions) RequiredInputs(input ...string) error {
 		}
 	}
 	return nil
+}
+
+// schemaApplyParams returns the parameters for the schema apply action based on the inputs.
+func (a *Actions) schemaApplyParams(withParams ...func(*atlasexec.SchemaApplyParams)) *atlasexec.SchemaApplyParams {
+	params := &atlasexec.SchemaApplyParams{
+		ConfigURL:   a.GetInput("config"),
+		Env:         a.GetInput("env"),
+		Vars:        a.GetVarsInput("vars"),
+		DevURL:      a.GetInput("dev-url"),
+		URL:         a.GetInput("url"),
+		To:          a.GetInput("to"),
+		Schema:      a.GetArrayInput("schema"),
+		DryRun:      a.GetBoolInput("dry-run"),
+		AutoApprove: a.GetBoolInput("auto-approve"),
+		PlanURL:     a.GetInput("plan"),
+		TxMode:      a.GetInput("tx-mode"), // Hidden param.
+	}
+	for _, f := range withParams {
+		f(params)
+	}
+	return params
+}
+
+// schemaPlanListParams returns the parameters for the schema plan list action based on the inputs.
+func (a *Actions) schemaPlanListParams(
+	withParams ...func(*atlasexec.SchemaPlanListParams),
+) *atlasexec.SchemaPlanListParams {
+	params := &atlasexec.SchemaPlanListParams{
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		Repo:      a.GetInput("repo"),
+		DevURL:    a.GetInput("dev-url"),
+		Schema:    a.GetArrayInput("schema"),
+		From:      a.GetArrayInput("from"),
+		To:        a.GetArrayInput("to"),
+	}
+	for _, f := range withParams {
+		f(params)
+	}
+	return params
+}
+
+// schemaPlanParams returns the parameters for the schema plan action based on the inputs.
+func (a *Actions) schemaPlanParams(
+	withParams ...func(*atlasexec.SchemaPlanParams),
+) *atlasexec.SchemaPlanParams {
+	params := &atlasexec.SchemaPlanParams{
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		Schema:    a.GetArrayInput("schema"),
+		From:      a.GetArrayInput("from"),
+		To:        a.GetArrayInput("to"),
+		Repo:      a.GetInput("repo"),
+		Name:      a.GetInput("name"),
+	}
+	for _, f := range withParams {
+		f(params)
+	}
+	return params
+}
+
+// schemaInspectParams returns the parameters for the schema inspect action based on the inputs.
+func (a *Actions) schemaInspectParams(
+	withParams ...func(*atlasexec.SchemaInspectParams),
+) *atlasexec.SchemaInspectParams {
+	params := &atlasexec.SchemaInspectParams{
+		URL:       a.GetInput("url"),
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Schema:    a.GetArrayInput("schema"),
+		Exclude:   a.GetArrayInput("exclude"),
+	}
+	for _, f := range withParams {
+		f(params)
+	}
+	return params
 }
 
 // SCMClient returns a Client to interact with the SCM.
