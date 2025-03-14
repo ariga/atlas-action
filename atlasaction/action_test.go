@@ -16,13 +16,16 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-action/atlasaction/cloud"
@@ -287,6 +290,300 @@ func TestMigrateDown(t *testing.T) {
 		require.EqualError(t, actions.MigrateDown(context.Background()), "plan approval pending, review here: URL")
 		require.GreaterOrEqual(t, counter, 3)
 	})
+}
+
+func TestSchemaApplyWithApproval(t *testing.T) {
+	setup := func(t *testing.T) *test {
+		tt := newT(t, nil)
+		tt.setInput("url", "sqlite://"+tt.db)
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.cloud.AddSchema("example", `schema "main" {}
+		table "t1" {
+			schema = schema.main
+			column "id" {
+				type = int
+				null = true
+			}
+		}`)
+		httpMock := tt.cloud.Start(t, "token")
+		tt.setupConfigWithLogin(t, httpMock.URL, "token")
+		tt.cloudServer = httpMock
+		return tt
+	}
+
+	t.Run("generate an approval plan on every schema changes", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("to", "atlas://example")
+		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "cannot apply a migration plan in a PENDING state")
+	})
+
+	t.Run("generating an approval plan that have an existing pending plan", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("to", "atlas://example")
+		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
+		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "cannot apply a migration plan in a PENDING state")
+		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "atlas schema plan approve --url atlas://repo/schema/example/plans/pr-0-r1cgcsfo")
+	})
+
+	t.Run("generating an approval plan when having > 1 pending plan", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("to", "atlas://example")
+		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
+		tt.cloud.AddPlan("pr-0-r1cgcsfo-2", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
+		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "multiple pre-planned migrations were found in the registry for this schema transition")
+		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "atlas://repo/schema/example/plans/pr-0-r1cgcsfo")
+	})
+
+	t.Run("generating an approval plan that have an existing approved plan", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("to", "atlas://example")
+		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "APPROVED", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
+		require.NoError(t, tt.newActs(t).SchemaApply(context.Background()))
+	})
+
+	t.Run("generating an approval plan based on review policy with lint review = 'ALWAYS'", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("approval-policy", "REVIEW")
+		tt.setInput("to", "atlas://example")
+		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "enabled when review policy is set to WARNING or ERROR")
+	})
+
+	t.Run("generating an approval plan with wait-timeout", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("to", "atlas://example")
+		tt.setInput("wait-timeout", "3s")
+		tt.setInput("wait-interval", "1s")
+		tt.cloud.ApproveAllPlanAfter(t, time.Second*2)
+		require.NoError(t, tt.newActs(t).SchemaApply(context.Background()))
+	})
+
+	t.Run("generating an approval plan and reaching wait timeout", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("to", "atlas://example")
+		tt.setInput("wait-timeout", "1s")
+		require.ErrorContains(
+			t,
+			tt.newActs(t).SchemaApply(context.Background()),
+			`was not approved within the specified waiting period. Please review the plan and re-run the action.
+You can approve the plan by visiting: https://a8m.atlasgo.cloud/schemas/1/plans/1`,
+		)
+	})
+
+	t.Run("generating an approval plan based on review policy with lint review = 'ERROR'", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("approval-policy", "REVIEW")
+		tt.setInput("to", "atlas://example")
+		db, err := sql.Open("sqlite3", tt.db)
+		require.NoError(t, err)
+		_, err = db.Exec("CREATE TABLE t2 (id INTEGER PRIMARY KEY)")
+		require.NoError(t, err)
+		// Override the config to set the review policy to ERROR.
+		config, err := url.Parse(tt.configUrl)
+		require.NoError(t, err)
+		file, err := os.OpenFile(config.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		require.NoError(t, err)
+		file.WriteString(`
+		lint {
+			review = ERROR
+			destructive {
+				error = true
+			}
+		}`)
+		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "cannot apply a migration plan in a PENDING state")
+	})
+}
+
+type (
+	mockAtlasCloud struct {
+		schemas             map[string]Schema
+		plans               map[string]Plan
+		planFromHashes      map[string][]Plan
+		planCount           int
+		schemaCount         int
+		approveAllPlanAfter time.Duration
+
+		mu sync.Mutex
+	}
+	Schema struct {
+		ID  int
+		HCL string
+	}
+	Plan struct {
+		ID         int    `json:"id"`
+		Name       string `json:"name"`
+		SchemaSlug string `json:"schemaSlug"`
+		Status     string `json:"status"`
+		FromHash   string `json:"fromHash"`
+		ToHash     string `json:"toHash"`
+		Link       string `json:"link"`
+		URL        string `json:"url"`
+	}
+)
+
+func NewMockAtlasCloud() *mockAtlasCloud {
+	return &mockAtlasCloud{
+		schemas:        make(map[string]Schema),
+		plans:          make(map[string]Plan),
+		planFromHashes: make(map[string][]Plan),
+	}
+}
+
+func (m *mockAtlasCloud) AddSchema(name, schema string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.schemaCount++
+	m.schemas[name] = Schema{
+		ID:  m.schemaCount,
+		HCL: schema,
+	}
+}
+
+func (m *mockAtlasCloud) AddPlan(name, schemaSlug, status, fromHash, toHash string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.planCount++
+	link := fmt.Sprintf("https://a8m.atlasgo.cloud/schemas/%d/plans/%d", m.schemaCount, m.planCount)
+	url := fmt.Sprintf("atlas://repo/schema/%s/plans/%s", schemaSlug, name)
+	plan := Plan{
+		ID:         m.planCount,
+		Name:       name,
+		SchemaSlug: schemaSlug,
+		Status:     status,
+		FromHash:   fromHash,
+		ToHash:     toHash,
+		Link:       link,
+		URL:        url,
+	}
+	m.plans[name] = plan
+	hash := fmt.Sprintf("%s-%s", fromHash, toHash)
+	m.planFromHashes[hash] = append(m.planFromHashes[hash], plan)
+}
+
+func (m *mockAtlasCloud) ApproveAllPlanAfter(t *testing.T, after time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.approveAllPlanAfter = after
+}
+
+func (m *mockAtlasCloud) Start(t *testing.T, token string) *httptest.Server {
+	type (
+		SchemaStateInput struct {
+			Slug string `json:"slug"`
+		}
+		DeclarativePlanByHashesInput struct {
+			SchemaSlug string `json:"schemaSlug"`
+			FromHash   string `json:"fromHash"`
+			ToHash     string `json:"toHash"`
+		}
+		DeclarativePlanByNameInput struct {
+			SchemaSlug string `json:"schemaSlug"`
+			Name       string `json:"name"`
+		}
+		CreateDeclarativePlanInput struct {
+			Name       string `json:"name"`
+			SchemaSlug string `json:"schemaSlug"`
+			Status     string `json:"status"`
+			FromHash   string `json:"fromHash"`
+			ToHash     string `json:"toHash"`
+		}
+		graphQLQuery struct {
+			Query                string          `json:"query"`
+			Variables            json.RawMessage `json:"variables"`
+			SchemaStateVariables struct {
+				SchemaStateInput SchemaStateInput `json:"input"`
+			}
+			DeclarativePlanByHashesVariables struct {
+				DeclarativePlanByHashesInput DeclarativePlanByHashesInput `json:"input"`
+			}
+			DeclarativePlanByNameVariables struct {
+				DeclarativePlanByNameInput DeclarativePlanByNameInput `json:"input"`
+			}
+			CreateDeclarativePlanVariables struct {
+				CreateDeclarativePlanInput CreateDeclarativePlanInput `json:"input"`
+			}
+		}
+	)
+	now := time.Now()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if m.approveAllPlanAfter > 0 && time.Since(now) > m.approveAllPlanAfter {
+			for name, plan := range m.plans {
+				plan.Status = "APPROVED"
+				m.plans[name] = plan
+			}
+			for hash, plans := range m.planFromHashes {
+				for i, p := range plans {
+					p.Status = "APPROVED"
+					m.planFromHashes[hash][i] = p
+				}
+			}
+		}
+		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+		var query graphQLQuery
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&query))
+		switch {
+		case strings.Contains(query.Query, "schemaState"):
+			require.NoError(t, json.Unmarshal(query.Variables, &query.SchemaStateVariables))
+			schema, ok := m.schemas[query.SchemaStateVariables.SchemaStateInput.Slug]
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			fmt.Fprintf(w, `{"data":{"schemaState": {"hcl": %q }}}`, schema.HCL)
+		case strings.Contains(query.Query, "CreateDeclarativePlan"):
+			require.NoError(t, json.Unmarshal(query.Variables, &query.CreateDeclarativePlanVariables))
+			input := query.CreateDeclarativePlanVariables.CreateDeclarativePlanInput
+			schema, ok := m.schemas[input.SchemaSlug]
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			m.planCount++
+			link := fmt.Sprintf("https://a8m.atlasgo.cloud/schemas/%d/plans/%d", schema.ID, m.planCount)
+			url := fmt.Sprintf("atlas://%s/plans/%s", input.SchemaSlug, input.Name)
+			plan := Plan{
+				ID:         m.planCount,
+				Name:       input.Name,
+				SchemaSlug: input.SchemaSlug,
+				Status:     input.Status,
+				FromHash:   input.FromHash,
+				ToHash:     input.ToHash,
+				Link:       link,
+				URL:        url,
+			}
+			m.plans[input.Name] = plan
+			hash := fmt.Sprintf("%s-%s", input.FromHash, input.ToHash)
+			m.planFromHashes[hash] = append(m.planFromHashes[hash], plan)
+			fmt.Fprintf(w, `{"data":{"CreateDeclarativePlan": {"link": %q, "url": %q}}}`, link, url)
+		case strings.Contains(query.Query, "DeclarativePlanByHashes"):
+			require.NoError(t, json.Unmarshal(query.Variables, &query.DeclarativePlanByHashesVariables))
+			input := query.DeclarativePlanByHashesVariables.DeclarativePlanByHashesInput
+			hash := fmt.Sprintf("%s-%s", input.FromHash, input.ToHash)
+			plan, ok := m.planFromHashes[hash]
+			if !ok {
+				fmt.Fprintf(w, `{"data":{"DeclarativePlanByHashes": []}}`)
+				return
+			}
+			fmt.Fprintf(w, `{"data":{"DeclarativePlanByHashes": %s}}`, must(json.Marshal(plan)))
+		case strings.Contains(query.Query, "DeclarativePlanByName"):
+			require.NoError(t, json.Unmarshal(query.Variables, &query.DeclarativePlanByNameVariables))
+			input := query.DeclarativePlanByNameVariables.DeclarativePlanByNameInput
+			plan, ok := m.plans[input.Name]
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			fmt.Fprintf(w, `{"data":{"DeclarativePlanByName": %s}}`, must(json.Marshal(plan)))
+		}
+	}))
+
 }
 
 type mockAtlas struct {
@@ -1821,6 +2118,10 @@ type test struct {
 	cli       atlasaction.AtlasExec
 	act       atlasaction.Action
 	configUrl string
+	// Mock Atlas Cloud
+	cloud *mockAtlasCloud
+	// Initialized in the test setup
+	cloudServer *httptest.Server
 }
 
 func newT(t *testing.T, w io.Writer) *test {
@@ -1850,6 +2151,7 @@ func newT(t *testing.T, w io.Writer) *test {
 	cli, err := atlasexec.NewClient("", "atlas")
 	require.NoError(t, err)
 	tt.cli = cli
+	tt.cloud = NewMockAtlasCloud()
 	return tt
 }
 
