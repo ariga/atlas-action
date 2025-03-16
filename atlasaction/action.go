@@ -592,7 +592,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return fmt.Errorf("failed to get the atlas.sum file from the rebase branch: %w", err)
 	}
 	base, err := a.CmdExecutor(ctx, "git", "show", "origin/"+currBranch+":"+sumpath).Output()
-	if  err != nil {
+	if err != nil {
 		return fmt.Errorf("failed to get the atlas.sum file from current branch: %w", err)
 	}
 	rebaseFiles := git.FilesOnlyInBase(string(base), string(incoming))
@@ -601,11 +601,18 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return nil
 	}
 	// Try to merge the base branch into the current branch.
-	if err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Run(); err != nil {
-        a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
+	merge, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Output()
+	hasConflict := strings.Contains(string(merge), "CONFLICT")
+	switch {
+	case hasConflict:
+		break
+	case err == nil:
+		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
 		return nil
-    }
-	// If merge failed, check that the conflict only in atlas.sum file.
+	default:
+		return fmt.Errorf("failed to merge the base branch: %w", err)
+	}
+	// If merge failed due to conflict, check that the conflict is only in atlas.sum file.
 	diff, err := a.CmdExecutor(ctx, "git", "diff", "--name-only", "--diff-filter=U").Output()
 	if err != nil {
 		return fmt.Errorf("failed to get conflicting files: %w", err)
@@ -627,7 +634,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err := a.CmdExecutor(ctx, "git", "commit", "-m", fmt.Sprintf("Rebase migrations in %s", dirpath)).Run(); err != nil {
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
-	if err := a.CmdExecutor(ctx, "git", "push", "--force-with-lease", "origin", currBranch).Run(); err != nil {
+	if err := a.CmdExecutor(ctx, "git", "push", "origin", currBranch).Run(); err != nil {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Migrations rebased successfully")
