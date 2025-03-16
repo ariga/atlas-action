@@ -600,12 +600,15 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Infof("No files to rebase")
 		return nil
 	}
-	// Try to merge the base branch into the current branch.
-	if err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Run(); err != nil {
-        a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
-		return nil
-    }
-	// If merge failed, check that the conflict only in atlas.sum file.
+	merge, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Output();
+	switch {
+	case err == nil:
+		 a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
+		 return nil
+	case !strings.Contains(string(merge), "CONFLICT"):
+		return fmt.Errorf("failed to merge the base branch: %w", err)
+	}
+	// If merge failed due to conflict, check that the conflict is only in atlas.sum file.
 	diff, err := a.CmdExecutor(ctx, "git", "diff", "--name-only", "--diff-filter=U").Output()
 	if err != nil {
 		return fmt.Errorf("failed to get conflicting files: %w", err)
