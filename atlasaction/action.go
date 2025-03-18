@@ -423,7 +423,10 @@ func (a *Actions) MigrateDown(ctx context.Context) (err error) {
 		}
 		return false, nil
 	}); err != nil {
-		return err
+		if !errors.Is(err, ErrApprovalTimeout) {
+			return err
+		}
+		a.Warningf("plan has not been approved in configured waiting period, exiting")
 	}
 	if run.URL != "" {
 		a.SetOutput("url", run.URL)
@@ -983,6 +986,9 @@ func (a *Actions) cloudClient(ctx context.Context, tokenInput string) (CloudClie
 	return a.CloudClient(t, a.Version, v), nil
 }
 
+// ErrApprovalTimeout is returned when the timeout is exceeded in the approval process.
+var ErrApprovalTimeout = errors.New("approval process timed out")
+
 // waitingForApproval waits for the plan to be approved.
 func (a *Actions) waitingForApproval(isStop func() (bool, error)) error {
 	// Based on the retry configuration values, retry the action if there is an error.
@@ -1002,10 +1008,7 @@ func (a *Actions) waitingForApproval(isStop func() (bool, error)) error {
 			break
 		}
 		if time.Since(started) >= timeout {
-			if timeout != 0 {
-				a.Warningf("plan has not been approved in configured waiting period, exiting")
-			}
-			break
+			return ErrApprovalTimeout
 		}
 		time.Sleep(interval)
 	}
