@@ -376,8 +376,10 @@ jobs:
             plan: "file://20240910173744.plan.hcl"
           - directory: multiple-envs
             plan: "file://20240910173744.plan.hcl"
+            error: "iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE="
           - directory: legacy
             auto-approve: "true"
+            version: "v0.29.0"
             error: 'multiple pre-planned migrations were found'
     steps:
       - uses: ariga/setup-atlas@v0
