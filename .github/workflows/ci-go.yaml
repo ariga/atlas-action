@@ -366,6 +366,7 @@ jobs:
       matrix:
         test:
           - directory: lint-review
+            error: 'errors or warnings were found'
           - directory: on-the-fly
             auto-approve: "true"
           - directory: remote-repo
@@ -376,8 +377,8 @@ jobs:
           - directory: multiple-envs
             plan: "file://20240910173744.plan.hcl"
           - directory: legacy
-            atlas: 'v0.28.0'
             auto-approve: "true"
+            error: 'multiple pre-planned migrations were found'
     steps:
       - uses: ariga/setup-atlas@v0
         with:
@@ -392,6 +393,7 @@ jobs:
           CGO_ENABLED: 0
       - name: Apply changes
         continue-on-error: true
+        id: apply_changes
         uses: ./schema/apply
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -401,7 +403,24 @@ jobs:
           plan: ${{ matrix.test.plan }}
           to: ${{ matrix.test.to }}
           auto-approve: ${{ matrix.test.auto-approve }}
-
+      - name: Verify error
+        if: matrix.test.error != ''
+        shell: bash
+        run: |
+          # contains the error message
+          if ! echo "${{ steps.apply_changes.outputs.error }}" | grep -q "${{ matrix.test.error }}"; then
+            echo "Expected error: ${{ matrix.test.error }}"
+            echo "Actual error: ${{ steps.apply_changes.outputs.error }}"
+            exit 1
+          fi
+      - name: Verify no error
+        if: matrix.test.error == ''
+        shell: bash
+        run: |
+          if [ -n "${{ steps.apply_changes.outputs.error }}" ]; then
+            echo "Expected no error, but got: ${{steps.apply_changes.outputs.error}}"
+            exit 1
+          fi
   monitoring:
     services:
       mysql:
