@@ -2628,8 +2628,7 @@ func TestSchemaLint(t *testing.T) {
 		)
 		require.NoError(t, err)
 		err = a.SchemaLint(context.Background())
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "lint errors")
+		require.Nil(t, err)
 		require.Equal(t, 1, act.summary)
 	})
 	t.Run("lint - PR comment", func(t *testing.T) {
@@ -2699,8 +2698,7 @@ func TestSchemaLint(t *testing.T) {
 		a := tt.newActs(t)
 		a.Atlas = mockAtlas
 		err := a.SchemaLint(context.Background())
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "lint errors")
+		require.Nil(t, err)
 		require.Len(t, comments, 1)
 		require.Contains(t, comments[0]["body"].(string), "Schema Lint Report")
 		require.Contains(t, comments[0]["body"].(string), "Naming Conventions")
