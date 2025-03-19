@@ -32,7 +32,8 @@ inputs:
       Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
     required: true
   schema:
-    description: The database schema(s) to include. For example: `public`.
+    description: |
+      The database schema(s) to include. For example: `public`.
     required: false
 runs:
   using: node20

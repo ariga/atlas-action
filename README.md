@@ -19,6 +19,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                                                       |
 | [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase)  | Fix `atlas.sum` conflicts in migration directory                                    |
 | [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                                                           |
+| [ariga/atlas-action/schema/lint](#arigaatlas-actionschemalint)                | Lint database schema with Atlas                                                     |
 | [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema to [Atlas Registry](https://atlasgo.io/registry)                      |
 | [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration for a schema transition                                |
 | [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a declarative migration plan                                                |
@@ -438,6 +439,25 @@ Apply a declarative migrations to a database.
 #### Outputs
 
 * `error` - The error message if the action fails.
+
+### `ariga/atlas-action/schema/lint`
+
+Lint database schema with Atlas.
+
+#### Inputs
+
+* `url` - (Required) Schema URL(s) to lint. For example: `file://schema.hcl`.
+  Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+* `dev-url` - (Required) The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+* `schema` - (Optional) The database schema(s) to include. For example: `public`.
+* `config` - (Optional) The path to the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - (Optional) The environment to use from the Atlas configuration file. For example, `dev`.
+* `vars` - (Optional) Stringify JSON object containing variables to be used inside the Atlas configuration file.
+  For example: `'{"var1": "value1", "var2": "value2"}'`.
+* `working-directory` - (Optional) The working directory to run from. Defaults to project root.
 
 ### `ariga/atlas-action/schema/push`
 
