@@ -598,6 +598,7 @@ type mockAtlas struct {
 	schemaPlanLint    func(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
 	schemaPlanApprove func(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 	whoAmI            func(context.Context, *atlasexec.WhoAmIParams) (*atlasexec.WhoAmI, error)
+	schemaLint        func(context.Context, *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error)
 }
 
 var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
@@ -2675,6 +2676,14 @@ func (m *mockSCM) CommentLint(ctx context.Context, tc *atlasaction.TriggerContex
 	return m.comment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
 }
 
+func (m *mockSCM) CommentSchemaLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasexec.SchemaLintReport) error {
+	comment, err := atlasaction.RenderTemplate("schema-lint.tmpl", r)
+	if err != nil {
+		return err
+	}
+	return m.comment(ctx, tc.PullRequest, "schema-lint", comment)
+}
+
 func (m *mockSCM) CommentPlan(ctx context.Context, tc *atlasaction.TriggerContext, p *atlasexec.SchemaPlan) error {
 	return m.comment(ctx, tc.PullRequest, p.File.Name, "")
 }
@@ -2718,6 +2727,7 @@ func TestRenderTemplates(t *testing.T) {
 			"render-schema-plan":   renderTemplate[*atlasexec.SchemaPlan],
 			"render-lint":          renderTemplate[*atlasexec.SummaryReport],
 			"render-migrate-apply": renderTemplate[*atlasexec.MigrateApply],
+			"render-schema-lint":   renderTemplate[*atlasexec.SchemaLintReport],
 		},
 	})
 }
@@ -2826,4 +2836,200 @@ func cmpFiles(ts *testscript.TestScript, neg bool, name1, name2 string) {
 	unifiedDiff := diff.Diff(name1, []byte(text1), name2, data)
 	ts.Logf("%s", unifiedDiff)
 	ts.Fatalf("%s and %s differ", name1, name2)
+}
+
+// SchemaLint implements AtlasExec.
+func (m *mockAtlas) SchemaLint(ctx context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {
+	return m.schemaLint(ctx, p)
+}
+
+// SchemaLint implements atlasaction.Reporter.
+func (m *mockAction) SchemaLint(context.Context, *atlasexec.SchemaLintReport) {
+	m.summary++
+}
+
+func TestSchemaLint(t *testing.T) {
+	token := "123456789"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+	}))
+	t.Run("lint - missing dev-url", func(t *testing.T) {
+		tt := newT(t, nil)
+		tt.setupConfigWithLogin(t, srv.URL, token)
+		tt.setInput("url", "file://schema.hcl")
+		err := tt.newActs(t).SchemaLint(context.Background())
+		require.ErrorContains(t, err, "dev-url")
+	})
+	t.Run("lint - success", func(t *testing.T) {
+		m := &mockAtlas{}
+		m.schemaLint = func(_ context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {
+			require.Equal(t, "test", p.Env)
+			require.Equal(t, "file://testdata/config/atlas.hcl", p.ConfigURL)
+			require.Equal(t, "sqlite://file?mode=memory", p.DevURL)
+			require.Equal(t, []string{"file://schema.hcl"}, p.URL)
+			require.Equal(t, []string{"users", "posts"}, p.Schema)
+			return &atlasexec.SchemaLintReport{
+				Steps: []atlasexec.Report{},
+			}, nil
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"url":     "file://schema.hcl",
+				"dev-url": "sqlite://file?mode=memory",
+				"schema":  "users\nposts",
+				"config":  "file://testdata/config/atlas.hcl",
+				"env":     "test",
+				"vars":    `{"var1": "value1", "var2": "value2"}`,
+			},
+			output: map[string]string{},
+			trigger: &atlasaction.TriggerContext{
+				PullRequest: &atlasaction.PullRequest{
+					URL: "http://test",
+				},
+				SCM: atlasaction.SCM{Type: "NONE"},
+			},
+			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		}
+		a, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(m),
+		)
+		require.NoError(t, err)
+		err = a.SchemaLint(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, 1, act.summary)
+	})
+	t.Run("lint - with issues", func(t *testing.T) {
+		m := &mockAtlas{}
+		m.schemaLint = func(_ context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {
+			require.Equal(t, "test", p.Env)
+			require.Equal(t, "file://testdata/config/atlas.hcl", p.ConfigURL)
+			require.Equal(t, "sqlite://file?mode=memory", p.DevURL)
+			require.Equal(t, []string{"file://schema.hcl"}, p.URL)
+			return &atlasexec.SchemaLintReport{
+				Steps: []atlasexec.Report{
+					{
+						Text: "Issue found",
+						Diagnostics: []atlasexec.Diagnostic{
+							{
+								Text: "Issue detail",
+								Code: "LINT001",
+							},
+						},
+					},
+				},
+			}, nil
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"url":     "file://schema.hcl",
+				"dev-url": "sqlite://file?mode=memory",
+				"config":  "file://testdata/config/atlas.hcl",
+				"env":     "test",
+			},
+			output: map[string]string{},
+			trigger: &atlasaction.TriggerContext{
+				PullRequest: &atlasaction.PullRequest{
+					URL: "http://test",
+				},
+				SCM: atlasaction.SCM{Type: "NONE"},
+			},
+			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		}
+		a, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(m),
+		)
+		require.NoError(t, err)
+		err = a.SchemaLint(context.Background())
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "lint errors")
+		require.Equal(t, 1, act.summary)
+	})
+	t.Run("lint - PR comment", func(t *testing.T) {
+		tt := newT(t, nil)
+		var comments []map[string]any
+		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			var (
+				path   = request.URL.Path
+				method = request.Method
+			)
+			switch {
+			case path == "/repos/test-owner/test-repository/issues/42/comments" && method == http.MethodGet:
+				b, err := json.Marshal(comments)
+				require.NoError(t, err)
+				_, err = writer.Write(b)
+				require.NoError(t, err)
+				return
+			case path == "/repos/test-owner/test-repository/issues/42/comments" && method == http.MethodPost:
+				var payload map[string]any
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+				payload["id"] = 123
+				comments = append(comments, payload)
+				writer.WriteHeader(http.StatusCreated)
+				return
+			}
+		}))
+		tt.env["GITHUB_API_URL"] = ghMock.URL
+		tt.env["GITHUB_REPOSITORY"] = "test-owner/test-repository"
+		tt.setEvent(t, `{
+			"pull_request": {
+				"number": 42
+			}
+		}`)
+		mockAtlas := &mockAtlas{}
+		mockAtlas.schemaLint = func(_ context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {
+			return &atlasexec.SchemaLintReport{
+				Steps: []atlasexec.Report{
+					{
+						Text: "Naming Conventions",
+						Diagnostics: []atlasexec.Diagnostic{
+							{
+								Text: "Schema name violates the naming convention",
+								Code: "DS102",
+							},
+							{
+								Text: "Table name violates the naming convention",
+								Code: "DS103",
+							},
+						},
+					},
+					{
+						Text: "rule \"primary-key-required\"",
+						Desc: "All tables must have a primary key",
+						Diagnostics: []atlasexec.Diagnostic{
+							{
+								Text: "Table t1 must have a primary key",
+							},
+						},
+					},
+				},
+			}, nil
+		}
+		tt.env["GITHUB_TOKEN"] = "very-secret-gh-token"
+		tt.setInput("dev-url", "sqlite://file?mode=memory")
+		tt.setInput("url", "file://schema.hcl")
+		tt.setInput("schema-name", "test-schema")
+		a := tt.newActs(t)
+		a.Atlas = mockAtlas
+		err := a.SchemaLint(context.Background())
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "lint errors")
+		require.Len(t, comments, 1)
+		require.Contains(t, comments[0]["body"].(string), "Schema Lint Report")
+		require.Contains(t, comments[0]["body"].(string), "Naming Conventions")
+		require.Contains(t, comments[0]["body"].(string), "rule \"primary-key-required\"")
+		// Schema lint has no steps, return Success
+		comments = []map[string]any{}
+		mockAtlas.schemaLint = func(_ context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {
+			return &atlasexec.SchemaLintReport{
+				Steps: []atlasexec.Report{},
+			}, nil
+		}
+		err = a.SchemaLint(context.Background())
+		require.NoError(t, err)
+		require.Len(t, comments, 1)
+		require.Contains(t, comments[0]["body"].(string), "Schema Lint Report")
+		require.Contains(t, comments[0]["body"].(string), "No issues found, your schema is valid!")
+	})
 }

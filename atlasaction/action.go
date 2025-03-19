@@ -66,6 +66,7 @@ type (
 		MigrateLint(context.Context, *atlasexec.SummaryReport)
 		SchemaPlan(context.Context, *atlasexec.SchemaPlan)
 		SchemaApply(context.Context, *atlasexec.SchemaApply)
+		SchemaLint(context.Context, *atlasexec.SchemaLintReport)
 	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
@@ -73,6 +74,8 @@ type (
 		CommentLint(context.Context, *TriggerContext, *atlasexec.SummaryReport) error
 		// CommentPlan comments on the pull request with the schema plan.
 		CommentPlan(context.Context, *TriggerContext, *atlasexec.SchemaPlan) error
+		// CommentSchemaLint comments on the pull request with the schema lint report.
+		CommentSchemaLint(context.Context, *TriggerContext, *atlasexec.SchemaLintReport) error
 	}
 	Logger interface {
 		// Infof logs an info message.
@@ -115,6 +118,8 @@ type (
 		SchemaTest(context.Context, *atlasexec.SchemaTestParams) (string, error)
 		// SchemaPlan runs the `schema plan` command.
 		SchemaPlan(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
+		// SchemaLint runs the `schema lint` command.
+		SchemaLint(context.Context, *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error)
 		// SchemaPlanList runs the `schema plan list` command.
 		SchemaPlanList(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error)
 		// SchemaPlanLint runs the `schema plan lint` command.
@@ -297,6 +302,7 @@ const (
 	CmdMigrateAutoRebase = "migrate/autorebase"
 	// Declarative workflow Commands
 	CmdSchemaPush        = "schema/push"
+	CmdSchemaLint        = "schema/lint"
 	CmdSchemaTest        = "schema/test"
 	CmdSchemaPlan        = "schema/plan"
 	CmdSchemaPlanApprove = "schema/plan/approve"
@@ -328,6 +334,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MigrateAutoRebase(ctx)
 	case CmdSchemaPush:
 		return a.SchemaPush(ctx)
+	case CmdSchemaLint:
+		return a.SchemaLint(ctx)
 	case CmdSchemaTest:
 		return a.SchemaTest(ctx)
 	case CmdSchemaPlan:
@@ -722,6 +730,45 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 	a.SetOutput("link", resp.Link)
 	a.SetOutput("slug", resp.Slug)
 	a.SetOutput("url", resp.URL)
+	return nil
+}
+
+// SchemaLint runs the GitHub Action for "ariga/atlas-action/schema/lint"
+func (a *Actions) SchemaLint(ctx context.Context) error {
+	tc, err := a.GetTriggerContext(ctx)
+	switch {
+	case err != nil:
+		return fmt.Errorf("unable to get the trigger context: %w", err)
+	}
+	params := &atlasexec.SchemaLintParams{
+		ConfigURL: a.GetInput("config"),
+		Vars:      a.GetVarsInput("vars"),
+		Env:       a.GetInput("env"),
+		URL:       a.GetArrayInput("url"),
+		Schema:    a.GetArrayInput("schema"),
+		DevURL:    a.GetInput("dev-url"),
+	}
+	report, err := a.Atlas.SchemaLint(ctx, params)
+	if err != nil {
+		a.SetOutput("error", err.Error())
+		return fmt.Errorf("`atlas schema lint` completed with errors:\n%s", err)
+	}
+	if r, ok := a.Action.(Reporter); ok {
+		r.SchemaLint(ctx, report)
+	}
+	if tc.PullRequest != nil {
+		switch c, err := tc.SCMClient(); {
+		case errors.Is(err, ErrNoSCM):
+			a.Infof("No SCM client available, skipping PR comment")
+		case err != nil:
+			a.Errorf("failed to get SCM client: %v", err)
+		default:
+			if err = c.CommentSchemaLint(ctx, tc, report); err != nil {
+				a.Errorf("failed to comment on the pull request: %v", err)
+			}
+		}
+	}
+	a.Infof("`atlas schema lint` completed successfully, no issues found")
 	return nil
 }
 
