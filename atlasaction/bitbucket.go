@@ -116,6 +116,10 @@ func (a *bbPipe) SetOutput(name, value string) {
 func (a *bbPipe) MigrateApply(context.Context, *atlasexec.MigrateApply) {
 }
 
+// SchemaLint implements Reporter.
+func (a *bbPipe) SchemaLint(ctx context.Context, r *atlasexec.SchemaLintReport) {
+}
+
 // MigrateLint implements Reporter.
 func (a *bbPipe) MigrateLint(ctx context.Context, r *atlasexec.SummaryReport) {
 	c, err := a.reportClient()
@@ -313,6 +317,11 @@ func (c *bbClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlas
 		return err
 	}
 	return c.upsertComment(ctx, tc.PullRequest.Number, p.File.Name, comment)
+}
+
+// CommentSchemaLint implements SCMClient.
+func (c *bbClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SchemaLintReport) error {
+	return nil
 }
 
 func (c *bbClient) upsertComment(ctx context.Context, prID int, id, comment string) error {

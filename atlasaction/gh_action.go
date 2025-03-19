@@ -80,6 +80,19 @@ func (a *ghAction) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
 	a.AddStepSummary(summary)
 }
 
+// SchemaLint implements Reporter.
+func (a *ghAction) SchemaLint(_ context.Context, r *atlasexec.SchemaLintReport) {
+	if err := a.addChecksSchemaLint(r); err != nil {
+		a.Errorf("failed to add checks: %v", err)
+	}
+	summary, err := RenderTemplate("schema-lint.tmpl", r)
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
+
 // GetType implements the Action interface.
 func (*ghAction) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeGithubAction
@@ -151,6 +164,27 @@ func (a *ghAction) addChecks(lint *atlasexec.SummaryReport) error {
 				} else {
 					logger.Warningf(msg) //nolint:govet
 				}
+			}
+		}
+	}
+	return nil
+}
+
+// addChecksSchemaLint runs annotations to the trigger event pull request for the given schema lint report.
+func (a *ghAction) addChecksSchemaLint(lint *atlasexec.SchemaLintReport) error {
+	for _, step := range lint.Steps {
+		for _, diag := range step.Diagnostics {
+			msg := diag.Text
+			if diag.Code != "" {
+				msg = fmt.Sprintf("%v (%v)\n\nDetails: https://atlasgo.io/lint/analyzers#%v", msg, diag.Code, diag.Code)
+			}
+			logger := a.WithFieldsMap(map[string]string{
+				"title": step.Text,
+			})
+			if step.Text != "" {
+				logger.Warningf(msg)
+			} else {
+				logger.Warningf(msg)
 			}
 		}
 	}
@@ -327,6 +361,19 @@ func addSuggestions(cw string, lint *atlasexec.SummaryReport, fn func(*Suggestio
 		}
 	}
 	return nil
+}
+
+// CommentSchemaLint implements SCMClient.
+func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SchemaLintReport) error {
+	comment, err := RenderTemplate("schema-lint.tmpl", r)
+	if err != nil {
+		return err
+	}
+	id := "schema-lint"
+	if schema := tc.Act.GetInput("schema"); schema != "" {
+		id = schema
+	}
+	return c.upsertComment(ctx, tc.PullRequest, id, comment)
 }
 
 var _ Action = (*ghAction)(nil)
