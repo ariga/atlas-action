@@ -381,6 +381,24 @@ jobs:
             auto-approve: "true"
             version: "v0.29.0"
             error: 'multiple pre-planned migrations were found'
+          - directory: approval/no-changes
+            approval-policy: "ALWAYS"
+          - directory: approval/approved
+            approval-policy: "ALWAYS"
+          - directory: approval/pending
+            approval-policy: "ALWAYS"
+            error: 'cannot apply a migration plan in a PENDING state'
+          - directory: approval/pending
+            approval-policy: "ALWAYS"
+            error: 'was not approved within the specified waiting period'
+            wait-timeout: 5s
+          - directory: approval/lint-review
+            approval-policy: "REVIEW"
+            error: 'cannot apply a migration plan in a PENDING state'
+          - directory: approval/lint-review
+            approval-policy: "REVIEW"
+            error: 'was not approved within the specified waiting period'
+            wait-timeout: 5s
     steps:
       - uses: ariga/setup-atlas@v0
         with:
@@ -393,18 +411,24 @@ jobs:
       - run: go install ./cmd/atlas-action
         env:
           CGO_ENABLED: 0
+      - name: Get unix current timestamp
+        id: timestamp
+        run: echo "::set-output name=timestamp::$(date +%s)"
       - name: Apply changes
         continue-on-error: true
         id: apply_changes
         uses: ./schema/apply
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          CURRENT_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
         with:
           working-directory: atlasaction/testdata/schema-apply/${{ matrix.test.directory }}
           env: test
           plan: ${{ matrix.test.plan }}
           to: ${{ matrix.test.to }}
           auto-approve: ${{ matrix.test.auto-approve }}
+          approval-policy: ${{ matrix.test.approval-policy }}
+          wait-timeout: ${{ matrix.test.wait-timeout }}
       - name: Verify error
         if: matrix.test.error != ''
         shell: bash
