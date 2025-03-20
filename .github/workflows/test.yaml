@@ -1,0 +1,26 @@
+name: Testing Workflow
+on:
+  push:
+jobs:
+  schema-apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - name: Apply changes
+        id: apply_changes
+        uses: ./schema/apply
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          working-directory: atlasaction/testdata/schema-apply/approval/example
+          env: test
+          approval-policy: ALWAYS
