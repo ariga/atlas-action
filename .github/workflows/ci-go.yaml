@@ -24,4 +24,4 @@ jobs:
         with:
           working-directory: atlasaction/testdata/schema-apply/approval/example
           env: test
-          approval-policy: ALWAYS
+          approval-policy: "ALWAYS"
