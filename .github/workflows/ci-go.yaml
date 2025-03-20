@@ -27,4 +27,4 @@ jobs:
           working-directory: atlasaction/testdata/schema-apply/approval/example
           env: test
           approval-policy: ALWAYS
-          wait-time: 1m
+          wait-timeout: 1m
