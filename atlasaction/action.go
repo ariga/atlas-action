@@ -974,7 +974,7 @@ You can approve the plan by visiting: %s`, f.Name, f.Link)
 		hash := generateRandomHash()
 		// Build plan name based on the pull request number or commit SHA.
 		// Commit SHA is used as a fallback if user setups the action to run on push event.
-		name := fmt.Sprintf("commit-%s-%08x", tc.Commit, hash)
+		name := fmt.Sprintf("commit-%.8s-%08x", tc.Commit, hash)
 		if tc.PullRequest != nil {
 			name = fmt.Sprintf("pr-%d-%08x", tc.PullRequest.Number, hash)
 		}
