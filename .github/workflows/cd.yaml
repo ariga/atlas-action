@@ -20,6 +20,8 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+    env:
+      ATLAS_ACTION_LOCAL: 1
     permissions:
       contents: read
       packages: write
