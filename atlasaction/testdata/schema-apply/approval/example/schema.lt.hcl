@@ -29,4 +29,7 @@ table "t4" {
   column "c2" {
     type = integer
   }
+  column "c3" {
+    type = integer
+  }
 }

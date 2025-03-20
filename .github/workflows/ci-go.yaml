@@ -1,6 +1,7 @@
 name: Testing Workflow
 on:
   push:
+  pull_request:
 jobs:
   schema-apply:
     runs-on: ubuntu-latest
