@@ -637,7 +637,7 @@ func TestMigrateAutorebase(t *testing.T) {
 				switch {
 				// Simulate a conflict when running `git merge --no-ff origin/rebase-branch`
 				case len(args) > 2 && args[0] == "merge" && args[2] == "origin/rebase-branch":
-					cmd = exec.CommandContext(ctx, "echo", "CONFLICT")
+					cmd.Err = errors.New("conflict")
 				// Simulate result when running: git show
 				case len(args) > 1 && args[0] == "show":
 					var res string
@@ -702,7 +702,7 @@ func TestMigrateAutorebase(t *testing.T) {
 				switch {
 				// Simulate a conflict when running `git merge --no-ff origin/rebase-branch`
 				case len(args) > 2 && args[0] == "merge" && args[2] == "origin/rebase-branch":
-					cmd = exec.CommandContext(ctx, "echo", "CONFLICT")
+					cmd.Err = errors.New("conflict")
 				// Simulate result when running: git show
 				case len(args) > 1 && args[0] == "show":
 					var res string
