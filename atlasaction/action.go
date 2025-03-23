@@ -606,6 +606,11 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	// Try to merge the base branch into the current branch.
 	merge, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Output()
 	hasConflict := strings.Contains(string(merge), "CONFLICT")
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			a.Infof("Merge exit code: %d", exitErr.ExitCode)
+		}
+	}
 	switch {
 	case hasConflict:
 		break
