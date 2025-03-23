@@ -604,16 +604,9 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return nil
 	}
 	// Try to merge the base branch into the current branch.
-	merge, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Output()
-	hasConflict := strings.Contains(string(merge), "CONFLICT")
-	switch {
-	case hasConflict:
-		break
-	case err == nil:
+	if err = a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Run(); err == nil {
 		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
 		return nil
-	default:
-		return fmt.Errorf("failed to merge the base branch: %w", err)
 	}
 	// If merge failed due to conflict, check that the conflict is only in atlas.sum file.
 	diff, err := a.CmdExecutor(ctx, "git", "diff", "--name-only", "--diff-filter=U").Output()
