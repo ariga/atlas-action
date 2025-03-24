@@ -733,6 +733,7 @@ func TestMigrateAutorebase(t *testing.T) {
 			trigger: &atlasaction.TriggerContext{
 				Branch: "my-branch",
 			},
+			logger: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 		}
 		acts, err := atlasaction.New(
 			atlasaction.WithAction(act),
