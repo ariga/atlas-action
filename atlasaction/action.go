@@ -927,6 +927,7 @@ func (a *Actions) schemaApplyWithApproval(ctx context.Context) ([]*atlasexec.Sch
 		repo = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 	}
 	// Wait for the schema plan to be approved and apply the changes.
+	printed := false
 	waitAndApplyPlan := func(f *atlasexec.SchemaPlanFile) ([]*atlasexec.SchemaApply, error) {
 		if err := a.waitingForApproval(func() (bool, error) {
 			plans, err := a.Atlas.SchemaPlanList(ctx, a.schemaPlanListParams(
@@ -953,7 +954,10 @@ func (a *Actions) schemaApplyWithApproval(ctx context.Context) ([]*atlasexec.Sch
 			if cloudPlan.Status == "APPROVED" {
 				return true, nil
 			}
-			a.Warningf("Schema plan is pending approval, review here: %s", f.Link)
+			if !printed {
+				printed = true
+				a.Warningf("Schema plan is pending approval, review here: %s", f.Link)
+			}
 			return false, nil
 		}); err != nil {
 			if err == ErrApprovalTimeout {
