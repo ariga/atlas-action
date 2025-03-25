@@ -1,7 +1,8 @@
 package git
 
 import (
-	"regexp"
+	"fmt"
+"regexp"
 	"strings"
 )
 
@@ -21,6 +22,8 @@ func getFileNames(content string) []string {
 // FilesOnlyInBase returns filenames that appear only in the base branch and not in the incoming branch.
 func FilesOnlyInBase(base, incoming string) []string {
 	baseFiles := getFileNames(base)
+	fmt.Println("base files names: ", baseFiles)
+	fmt.Println("incoming files names: ", getFileNames(incoming))
 	incomingFilesSet := make(map[string]struct{})
 	for _, file := range getFileNames(incoming) {
 		incomingFilesSet[file] = struct{}{}

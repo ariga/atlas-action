@@ -567,6 +567,7 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 
 // MigrateAutoRebase runs the Action for "ariga/atlas-action/migrate/autorebase"
 func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
+	a.Infof("running custom binary")
 	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
 	if dirpath == "" {
 		dirpath = "migrations"
@@ -602,6 +603,8 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Errorf(string(base))
 		return fmt.Errorf("failed to get the atlas.sum file from current branch: %w", err)
 	}
+	a.Infof("incoming:\n", string(incoming))
+	a.Infof("base:\n", string(base))
 	rebaseFiles := git.FilesOnlyInBase(string(base), string(incoming))
 	if len(rebaseFiles) == 0 {
 		a.Infof("No files to rebase")
