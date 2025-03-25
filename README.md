@@ -346,6 +346,7 @@ Automatically resolves `atlas.sum` conflicts and rebases the migration directory
 All inputs are optional
 
 * `base-branch` - The branch to rebase on. Defaults to repository's default branch.
+* `remote` - The remote to fetch from. Defaults to `origin`.
 * `dir` - The URL of the migration directory to rebase on. Defaults to `file://migrations`.
 * `working-directory` - The working directory to run from. Defaults to project root.
 

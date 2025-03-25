@@ -580,11 +580,15 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	var (
 		currBranch = tc.Branch
 		baseBranch = a.GetInput("base-branch")
+		remote     = a.GetInput("remote")
 	)
 	if baseBranch == "" {
 		baseBranch = tc.DefaultBranch
 	}
-	if out, err := a.CmdExecutor(ctx, "git", "fetch", "origin", baseBranch).Output(); err != nil {
+	if remote == "" {
+		remote = "origin"
+	}
+	if out, err := a.CmdExecutor(ctx, "git", "fetch", remote, baseBranch).Output(); err != nil {
 		a.Errorf(string(out))
 		return fmt.Errorf("failed to fetch the branch %s: %w", baseBranch, err)
 	}
@@ -593,12 +597,12 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Errorf(string(out))
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
-	incoming, err := a.CmdExecutor(ctx, "git", "show", "origin/"+baseBranch+":"+sumpath).Output()
+	incoming, err := a.CmdExecutor(ctx, "git", "show", fmt.Sprintf("%s/%s:%s", remote, baseBranch, sumpath)).Output()
 	if err != nil {
 		a.Errorf(string(incoming))
 		return fmt.Errorf("failed to get the atlas.sum file from the rebase branch: %w", err)
 	}
-	base, err := a.CmdExecutor(ctx, "git", "show", "origin/"+currBranch+":"+sumpath).Output()
+	base, err := a.CmdExecutor(ctx, "git", "show", fmt.Sprintf("%s/%s:%s", remote, currBranch, sumpath)).Output()
 	if err != nil {
 		a.Errorf(string(base))
 		return fmt.Errorf("failed to get the atlas.sum file from current branch: %w", err)
@@ -630,7 +634,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return nil
 	}
 	// Try to merge the base branch into the current branch.
-	out, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Output()
+	out, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", fmt.Sprintf("%s/%s", remote, baseBranch)).Output()
 	if err == nil {
 		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
 		return nil
@@ -661,7 +665,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Errorf(string(out))
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
-	if out, err = a.CmdExecutor(ctx, "git", "push", "origin", currBranch).Output(); err != nil {
+	if out, err = a.CmdExecutor(ctx, "git", "push", remote, currBranch).Output(); err != nil {
 		a.Errorf(string(out))
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
