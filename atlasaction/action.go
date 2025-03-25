@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"ariga.io/atlas-action/atlasaction/cloud"
-	"ariga.io/atlas-action/atlasaction/git"
 	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/sql/migrate"
 	"github.com/fatih/color"
 )
 
@@ -571,7 +571,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if dirpath == "" {
 		dirpath = "migrations"
 	}
-	sumpath := filepath.Join(a.WorkingDir(), dirpath, "atlas.sum")
+	sumpath := filepath.Join(a.WorkingDir(), dirpath, migrate.HashFileName)
 	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
@@ -602,13 +602,34 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Errorf(string(base))
 		return fmt.Errorf("failed to get the atlas.sum file from current branch: %w", err)
 	}
-	rebaseFiles := git.FilesOnlyInBase(string(base), string(incoming))
-	if len(rebaseFiles) == 0 {
+	var incomingHash, baseHash migrate.HashFile
+	if err := incomingHash.UnmarshalText(incoming); err != nil {
+		return fmt.Errorf("failed to unmarshal incoming atlas.sum: %w", err)
+	}
+	if err := baseHash.UnmarshalText(base); err != nil {
+		return fmt.Errorf("failed to unmarshal base atlas.sum: %w", err)
+	}
+	incomingFilesSet := make(map[string]struct{})
+	for _, v := range incomingHash {
+		incomingFilesSet[v.N] = struct{}{}
+	}
+	baseNames := make([]string, len(baseHash))
+	for i, v := range baseHash {
+		baseNames[i] = v.N
+	}
+	// Get all the file names the exists only in the base branch atlas.sum file.
+	var onlyInBase []string
+	for _, file := range baseNames {
+		if _, ok := incomingFilesSet[file]; !ok {
+			onlyInBase = append(onlyInBase, file)
+		}
+	}
+	if len(onlyInBase) == 0 {
 		a.Infof("No files to rebase")
 		return nil
 	}
 	// Try to merge the base branch into the current branch.
-	out, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Output();
+	out, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", "origin/"+baseBranch).Output()
 	if err == nil {
 		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
 		return nil
@@ -628,7 +649,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err = a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{DirURL: a.GetInput("dir")}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
 	}
-	if err = a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: a.GetInput("dir"), Files: rebaseFiles}); err != nil {
+	if err = a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: a.GetInput("dir"), Files: onlyInBase}); err != nil {
 		return fmt.Errorf("failed to rebase migrations: %w", err)
 	}
 	if out, err = a.CmdExecutor(ctx, "git", "add", dirpath).Output(); err != nil {

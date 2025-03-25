@@ -588,6 +588,14 @@ func TestMigrateAutorebase(t *testing.T) {
 		out := &bytes.Buffer{}
 		mockExec := &MockCmdExecutor{
 			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+				// Simulate result when running: git show
+				if len(args) > 1 && args[0] == "show" {
+					res := `h1:I/42uUoInXTRcwooAuTKQpGPF4jfNmEqDD1L66btb+E=
+                    		20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+                    		20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
+					// print the result to the stdout
+					return exec.CommandContext(ctx, "echo", res)
+				}
 				// Dummy command to avoid errors
 				return exec.CommandContext(ctx, "echo")
 			},
@@ -643,13 +651,13 @@ func TestMigrateAutorebase(t *testing.T) {
 					var res string
 					switch args[1] {
 					case "origin/rebase-branch:testdata/need_rebase/atlas.sum":
-						res = `h1:OBdzlZYBlTgWANMK27EiJUZeVVT/SYmbNYRC0QA31LE=
-							20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-							20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
+						res = `h1:I/42uUoInXTRcwooAuTKQpGPF4jfNmEqDD1L66btb+E=
+                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+                               20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
 					case "origin/my-branch:testdata/need_rebase/atlas.sum":
-						res = `h1:GplzCB5bzYwaRyf6zllMDN5xUpp139MxS/9lPRBbXwg=
-                        20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-                        20250309093464_rebase.sql h1:hPxhaSbvanrHft0l8BTxVZe+284tY68vJh3hDV7YxHs=`
+						res = `h1:U12LVflnyphPTk0O6cKIbrbaea0L3nJx+DJ8nRVuvn8=
+                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+                               20250309093464_rebase.sql h1:H7yD0qrDOB7HQvUUkyrX2N4qspo6/Mro+Od+l8XCX+c=`
 					}
 					// print the result to the stdout
 					cmd = exec.CommandContext(ctx, "echo", res)
@@ -694,7 +702,7 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.Equal(t, []string{"commit", "-m", "Rebase migrations in testdata/need_rebase"}, mockExec.ran[7].args)
 		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[8].args)
 	})
-	t.Run("conflict, but not in atlas.sum", func(t *testing.T) {
+	t.Run("conflict, but not only in atlas.sum", func(t *testing.T) {
 		mockExec := &MockCmdExecutor{
 			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 				// Dummy command to avoid errors
@@ -708,13 +716,13 @@ func TestMigrateAutorebase(t *testing.T) {
 					var res string
 					switch args[1] {
 					case "origin/rebase-branch:testdata/need_rebase/atlas.sum":
-						res = `h1:OBdzlZYBlTgWANMK27EiJUZeVVT/SYmbNYRC0QA31LE=
-							20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-							20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
+						res = `h1:I/42uUoInXTRcwooAuTKQpGPF4jfNmEqDD1L66btb+E=
+                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+                               20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
 					case "origin/my-branch:testdata/need_rebase/atlas.sum":
-						res = `h1:GplzCB5bzYwaRyf6zllMDN5xUpp139MxS/9lPRBbXwg=
-                        20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-                        20250309093464_rebase.sql h1:hPxhaSbvanrHft0l8BTxVZe+284tY68vJh3hDV7YxHs=`
+						res = `h1:U12LVflnyphPTk0O6cKIbrbaea0L3nJx+DJ8nRVuvn8=
+                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+                               20250309093464_rebase.sql h1:H7yD0qrDOB7HQvUUkyrX2N4qspo6/Mro+Od+l8XCX+c=`
 					}
 					// print the result to the stdout
 					cmd = exec.CommandContext(ctx, "echo", res)
