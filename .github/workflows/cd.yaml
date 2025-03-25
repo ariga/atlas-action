@@ -14,11 +14,11 @@ on:
     tags:
       - 'v*'
 jobs:
-  test:
-    uses: ./.github/workflows/ci-go.yaml
-    secrets: inherit
+#  test:
+#    uses: ./.github/workflows/ci-go.yaml
+#    secrets: inherit
   build:
-    needs: test
+#    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read

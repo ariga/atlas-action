@@ -593,18 +593,19 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Errorf(string(out))
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
+	fmt.Println("running command: git show origin/"+baseBranch+":"+sumpath)
 	incoming, err := a.CmdExecutor(ctx, "git", "show", "origin/"+baseBranch+":"+sumpath).Output()
 	if err != nil {
 		a.Errorf(string(incoming))
 		return fmt.Errorf("failed to get the atlas.sum file from the rebase branch: %w", err)
 	}
+	fmt.Println("running command: git show origin/"+currBranch+":"+sumpath)
 	base, err := a.CmdExecutor(ctx, "git", "show", "origin/"+currBranch+":"+sumpath).Output()
 	if err != nil {
 		a.Errorf(string(base))
 		return fmt.Errorf("failed to get the atlas.sum file from current branch: %w", err)
 	}
-	a.Infof("incoming:\n", string(incoming))
-	a.Infof("base:\n", string(base))
+	fmt.Printf("incoming:\n%s\nbase:\n%s\n", string(incoming), string(base))
 	rebaseFiles := git.FilesOnlyInBase(string(base), string(incoming))
 	if len(rebaseFiles) == 0 {
 		a.Infof("No files to rebase")
