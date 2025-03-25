@@ -13,6 +13,16 @@ func TestFilesOnlyInBase(t *testing.T) {
 		want           []string
 	}{
 		{
+			name: "file name have only timestamp",
+			base: `h1:GplzCB5bzYwaRyf6zllMDN5xUpp139MxS/9lPRBbXwg=
+	  20250309093454.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+`,
+			incoming: `h1:OBdzlZYBlTgWANMK27EiJUZeVVT/SYmbNYRC0QA31LE=
+	2025030900000.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+`,
+			want: []string{"20250309093454.sql"},
+		},
+		{
 			name: "1 unique file only in base",
 			base: `h1:GplzCB5bzYwaRyf6zllMDN5xUpp139MxS/9lPRBbXwg=
 20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=

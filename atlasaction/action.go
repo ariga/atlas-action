@@ -624,6 +624,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.Errorf(string(diff))
 		return fmt.Errorf("failed to get conflicting files: %w", err)
 	}
+	fmt.Printf("diff: %s\n", diff)
 	conflictFiles := strings.Split(strings.TrimSpace(string(diff)), "\n")
 	if len(conflictFiles) != 1 || conflictFiles[0] != sumpath {
 		return fmt.Errorf("conflict found in files other than %s, conflict files: %v", sumpath, conflictFiles)
