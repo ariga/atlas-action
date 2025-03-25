@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-var filenameRegex = regexp.MustCompile(`\b\d+_[\w-]+\.sql\b`)
+var filenameRegex = regexp.MustCompile(`\b\d+(?:_[\w-]+)?\.sql\b`)
 
 // getFileNames extracts the filenames from the given branch content.
 func getFileNames(content string) []string {
