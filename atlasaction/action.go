@@ -15,6 +15,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
+	"maps"
 	"net/url"
 	"os"
 	"os/exec"
@@ -568,123 +570,118 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 
 // MigrateAutoRebase runs the Action for "ariga/atlas-action/migrate/autorebase"
 func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
-	gitVer, err := a.CmdExecutor(ctx, "git", "--version").Output()
-	switch err := err.(type) {
-	case nil:
-		a.Infof("running with git version: %s", string(gitVer))
-	case *exec.ExitError:
-		return fmt.Errorf("failed to get git version: stderr %s", string(err.Stderr))
-	default:
-		return fmt.Errorf("failed to get git version: %w", err)
-	}
-	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
-	if dirpath == "" {
-		dirpath = "migrations"
-	}
-	sumpath := filepath.Join(a.WorkingDir(), dirpath, migrate.HashFileName)
 	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
 	}
 	var (
+		remote     = a.GetInputDefault("remote", "origin")
+		baseBranch = a.GetInputDefault("base-branch", tc.DefaultBranch)
 		currBranch = tc.Branch
-		baseBranch = a.GetInput("base-branch")
-		remote     = a.GetInput("remote")
 	)
-	if baseBranch == "" {
-		baseBranch = tc.DefaultBranch
+	if v, err := a.exec(ctx, "git", "--version"); err != nil {
+		return fmt.Errorf("failed to get git version: %w", err)
+	} else {
+		a.Infof("auto-rebase with %s", v)
 	}
-	if remote == "" {
-		remote = "origin"
-	}
-	if out, err := a.CmdExecutor(ctx, "git", "fetch", remote, baseBranch).Output(); err != nil {
-		a.Errorf(string(out))
+	if _, err := a.exec(ctx, "git", "fetch", remote, baseBranch); err != nil {
 		return fmt.Errorf("failed to fetch the branch %s: %w", baseBranch, err)
 	}
 	// Since running in detached HEAD, we need to switch to the branch.
-	if out, err := a.CmdExecutor(ctx, "git", "checkout", currBranch).Output(); err != nil {
-		a.Errorf(string(out))
+	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
-	incoming, err := a.CmdExecutor(ctx, "git", "show", fmt.Sprintf("%s/%s:%s", remote, baseBranch, sumpath)).Output()
+	dirURL := a.GetInputDefault("dir", "file://migrations")
+	u, err := url.Parse(dirURL)
 	if err != nil {
-		a.Errorf(string(incoming))
-		return fmt.Errorf("failed to get the atlas.sum file from the rebase branch: %w", err)
+		return fmt.Errorf("failed to parse dir URL: %w", err)
 	}
-	base, err := a.CmdExecutor(ctx, "git", "show", fmt.Sprintf("%s/%s:%s", remote, currBranch, sumpath)).Output()
+	dirPath := filepath.Join(u.Host, u.Path)
+	sumPath := filepath.Join(a.WorkingDir(), dirPath, migrate.HashFileName)
+	baseHash, err := a.hashFileFrom(ctx, remote, baseBranch, sumPath)
 	if err != nil {
-		a.Errorf(string(base))
-		return fmt.Errorf("failed to get the atlas.sum file from current branch: %w", err)
+		return fmt.Errorf("failed to get the atlas.sum file from the base branch: %w", err)
 	}
-	var incomingHash, baseHash migrate.HashFile
-	if err := incomingHash.UnmarshalText(incoming); err != nil {
-		return fmt.Errorf("failed to unmarshal incoming atlas.sum: %w", err)
+	currHash, err := a.hashFileFrom(ctx, remote, currBranch, sumPath)
+	if err != nil {
+		return fmt.Errorf("failed to get the atlas.sum file from the current branch: %w", err)
 	}
-	if err := baseHash.UnmarshalText(base); err != nil {
-		return fmt.Errorf("failed to unmarshal base atlas.sum: %w", err)
-	}
-	incomingFilesSet := make(map[string]struct{})
-	for _, v := range incomingHash {
-		incomingFilesSet[v.N] = struct{}{}
-	}
-	baseNames := make([]string, len(baseHash))
-	for i, v := range baseHash {
-		baseNames[i] = v.N
-	}
-	// Get all the file names the exists only in the base branch atlas.sum file.
-	var onlyInBase []string
-	for _, file := range baseNames {
-		if _, ok := incomingFilesSet[file]; !ok {
-			onlyInBase = append(onlyInBase, file)
-		}
-	}
-	if len(onlyInBase) == 0 {
-		a.Infof("No files to rebase")
+	files := newFiles(baseHash, currHash)
+	if len(files) == 0 {
+		a.Infof("No new migration files to rebase")
 		return nil
 	}
 	// Try to merge the base branch into the current branch.
-	out, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", fmt.Sprintf("%s/%s", remote, baseBranch)).Output()
-	switch err := err.(type) {
-	case nil:
+	if _, err := a.exec(ctx, "git", "merge", "--no-ff",
+		fmt.Sprintf("%s/%s", remote, baseBranch)); err == nil {
 		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
 		return nil
-	case *exec.ExitError:
-		a.Infof("Running `git merge` got following error: %s", string(err.Stderr))
-		a.Infof("git merge output: %s", string(out))
-	default:
-		return fmt.Errorf("receive unexpected error %w", err)
 	}
 	// If merge failed due to conflict, check that the conflict is only in atlas.sum file.
-	diff, err := a.CmdExecutor(ctx, "git", "diff", "--name-only", "--diff-filter=U").Output()
-	if err != nil {
-		a.Errorf(string(diff))
+	switch out, err := a.exec(ctx, "git", "diff", "--name-only", "--diff-filter=U"); {
+	case err != nil:
 		return fmt.Errorf("failed to get conflicting files: %w", err)
-	}
-	conflictFiles := strings.Split(strings.TrimSpace(string(diff)), "\n")
-	if len(conflictFiles) != 1 || conflictFiles[0] != sumpath {
-		return fmt.Errorf("conflict found in files other than %s, conflict files: %v", sumpath, conflictFiles)
+	case len(out) == 0:
+		return errors.New("conflict found but no conflicting files found")
+	case strings.TrimSpace(string(out)) != sumPath:
+		a.Infof("Conflict files are:\n%s", out)
+		return fmt.Errorf("conflict found in files other than %s", sumPath)
 	}
 	// Re-hash the migrations and rebase the migrations.
-	if err = a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{DirURL: a.GetInput("dir")}); err != nil {
+	if err = a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{
+		DirURL: dirURL,
+	}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
 	}
-	if err = a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: a.GetInput("dir"), Files: onlyInBase}); err != nil {
+	if err = a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{
+		DirURL: dirURL,
+		Files:  files,
+	}); err != nil {
 		return fmt.Errorf("failed to rebase migrations: %w", err)
 	}
-	if out, err = a.CmdExecutor(ctx, "git", "add", dirpath).CombinedOutput(); err != nil {
-		a.Errorf(string(out))
+	if _, err = a.exec(ctx, "git", "add", dirPath); err != nil {
 		return fmt.Errorf("failed to stage changes: %w", err)
 	}
-	if out, err = a.CmdExecutor(ctx, "git", "commit", "-m", fmt.Sprintf("Rebase migrations in %s", dirpath)).CombinedOutput(); err != nil {
-		a.Errorf(string(out))
+	if _, err = a.exec(ctx, "git", "commit", "--message",
+		fmt.Sprintf("%s: rebase migration files", dirPath)); err != nil {
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
-	if out, err = a.CmdExecutor(ctx, "git", "push", remote, currBranch).CombinedOutput(); err != nil {
-		a.Errorf(string(out))
+	if _, err = a.exec(ctx, "git", "push", remote, currBranch); err != nil {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Migrations rebased successfully")
 	return nil
+}
+
+// hashFileFrom returns the hash file from the remote branch.
+func (a *Actions) hashFileFrom(ctx context.Context, remote, branch, path string) (migrate.HashFile, error) {
+	data, err := a.exec(ctx, "git", "show",
+		fmt.Sprintf("%s/%s:%s", remote, branch, path))
+	if err != nil {
+		return nil, err
+	}
+	var hf migrate.HashFile
+	if err := hf.UnmarshalText(data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal atlas.sum: %w", err)
+	}
+	return hf, nil
+}
+
+// exec runs the command and returns the output.
+func (a *Actions) exec(ctx context.Context, name string, args ...string) ([]byte, error) {
+	cmd := a.CmdExecutor(ctx, name, args...)
+	out, err := cmd.Output()
+	switch err := err.(type) {
+	case nil:
+		return out, nil
+	case *exec.ExitError:
+		if err.Stderr != nil {
+			a.Infof("Running %q got following error: %s", cmd.String(), string(err.Stderr))
+		}
+		return nil, fmt.Errorf("failed to run %s: %w", name, err)
+	default:
+		return nil, fmt.Errorf("failed to run %s: %w", name, err)
+	}
 }
 
 // SchemaPush runs the GitHub Action for "ariga/atlas-action/schema/push"
@@ -1315,6 +1312,15 @@ func (a *Actions) GetArrayInput(name string) []string {
 	})
 }
 
+// GetInputDefault returns the input with the given name.
+// If the input is empty, it returns the default value.
+func (a *Actions) GetInputDefault(name, def string) string {
+	if v := a.GetInput(name); v != "" {
+		return v
+	}
+	return def
+}
+
 // DeployRunContext returns the run context for the `migrate/apply`, and `migrate/down` actions.
 func (a *Actions) DeployRunContext() *atlasexec.DeployRunContext {
 	return &atlasexec.DeployRunContext{
@@ -1445,6 +1451,25 @@ func (tc *TriggerContext) GetRunContext() *atlasexec.RunContext {
 		rc.Username, rc.UserID = a.Name, a.ID
 	}
 	return rc
+}
+
+// newFiles returns the files that only exists in the current hash.
+func newFiles(base, current migrate.HashFile) []string {
+	m := maps.Collect(hashIter(current))
+	for k := range hashIter(base) {
+		delete(m, k)
+	}
+	return slices.Collect(maps.Keys(m))
+}
+
+func hashIter(hf migrate.HashFile) iter.Seq2[string, string] {
+	return func(yield func(string, string) bool) {
+		for _, v := range hf {
+			if !yield(v.N, v.H) {
+				return
+			}
+		}
+	}
 }
 
 func execTime(start, end time.Time) string {

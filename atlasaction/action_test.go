@@ -878,7 +878,7 @@ func (m *MockCmdExecutor) ExecCmd(ctx context.Context, name string, args ...stri
 	return m.onCommand(ctx, name, args...)
 }
 
-func TestMigrateAutorebase(t *testing.T) {
+func TestMigrateAutoRebase(t *testing.T) {
 	t.Run("no conflict", func(t *testing.T) {
 		c, err := atlasexec.NewClient("", "atlas")
 		require.NoError(t, err)
@@ -915,7 +915,7 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, acts.MigrateAutoRebase(context.Background()))
-		require.Contains(t, out.String(), "No files to rebase")
+		require.Contains(t, out.String(), "No new migration files to rebase")
 		// Check that the correct git commands were executed
 		require.Len(t, mockExec.ran, 5)
 		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
@@ -998,7 +998,7 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.Equal(t, []string{"merge", "--no-ff", "origin/rebase-branch"}, mockExec.ran[5].args)
 		require.Equal(t, []string{"diff", "--name-only", "--diff-filter=U"}, mockExec.ran[6].args)
 		require.Equal(t, []string{"add", "testdata/need_rebase"}, mockExec.ran[7].args)
-		require.Equal(t, []string{"commit", "-m", "Rebase migrations in testdata/need_rebase"}, mockExec.ran[8].args)
+		require.Equal(t, []string{"commit", "--message", "testdata/need_rebase: rebase migration files"}, mockExec.ran[8].args)
 		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[9].args)
 	})
 	t.Run("conflict, but not only in atlas.sum", func(t *testing.T) {
@@ -1049,7 +1049,7 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.NoError(t, err)
 
 		err = acts.MigrateAutoRebase(context.Background())
-		require.EqualError(t, err, "conflict found in files other than testdata/need_rebase/atlas.sum, conflict files: [testdata/need_rebase/atlas.sum  not_atlas.sum]")
+		require.EqualError(t, err, "conflict found in files other than testdata/need_rebase/atlas.sum")
 		// Check that the correct git commands were executed
 		require.Len(t, mockExec.ran, 7)
 		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
