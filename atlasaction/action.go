@@ -568,6 +568,15 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 
 // MigrateAutoRebase runs the Action for "ariga/atlas-action/migrate/autorebase"
 func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
+	gitVer, err := a.CmdExecutor(ctx, "git", "--version").Output()
+	switch err := err.(type) {
+	case nil:
+		a.Infof("running with git version: %s", string(gitVer))
+	case *exec.ExitError:
+		return fmt.Errorf("failed to get git version: stderr %s", string(err.Stderr))
+	default:
+		return fmt.Errorf("failed to get git version: %w", err)
+	}
 	dirpath := strings.TrimPrefix(a.GetInput("dir"), "file://")
 	if dirpath == "" {
 		dirpath = "migrations"
@@ -635,11 +644,16 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	}
 	// Try to merge the base branch into the current branch.
 	out, err := a.CmdExecutor(ctx, "git", "merge", "--no-ff", fmt.Sprintf("%s/%s", remote, baseBranch)).Output()
-	if err == nil {
+	switch err := err.(type) {
+	case nil:
 		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
 		return nil
+	case *exec.ExitError:
+		a.Infof("Running `git merge` got following error: %s", string(err.Stderr))
+		a.Infof("git merge output: %s", string(out))
+	default:
+		return fmt.Errorf("receive unexpected error %w", err)
 	}
-	a.Infof(string(out))
 	// If merge failed due to conflict, check that the conflict is only in atlas.sum file.
 	diff, err := a.CmdExecutor(ctx, "git", "diff", "--name-only", "--diff-filter=U").Output()
 	if err != nil {
@@ -657,15 +671,15 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err = a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: a.GetInput("dir"), Files: onlyInBase}); err != nil {
 		return fmt.Errorf("failed to rebase migrations: %w", err)
 	}
-	if out, err = a.CmdExecutor(ctx, "git", "add", dirpath).Output(); err != nil {
+	if out, err = a.CmdExecutor(ctx, "git", "add", dirpath).CombinedOutput(); err != nil {
 		a.Errorf(string(out))
 		return fmt.Errorf("failed to stage changes: %w", err)
 	}
-	if out, err = a.CmdExecutor(ctx, "git", "commit", "-m", fmt.Sprintf("Rebase migrations in %s", dirpath)).Output(); err != nil {
+	if out, err = a.CmdExecutor(ctx, "git", "commit", "-m", fmt.Sprintf("Rebase migrations in %s", dirpath)).CombinedOutput(); err != nil {
 		a.Errorf(string(out))
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
-	if out, err = a.CmdExecutor(ctx, "git", "push", remote, currBranch).Output(); err != nil {
+	if out, err = a.CmdExecutor(ctx, "git", "push", remote, currBranch).CombinedOutput(); err != nil {
 		a.Errorf(string(out))
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
