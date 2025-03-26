@@ -19,19 +19,41 @@ exec git add .
 exec git commit --quiet --message 'first commit'
 exec sleep 5s
 exec atlas migrate new v2 --edit
+writeFile $WORK/hello.txt 'Xin chào'
 exec git add .
 exec git commit --quiet --message 'second commit'
 exec git push --quiet -u $ATLAS_INPUT_REMOTE $ATLAS_INPUT_BASE_BRANCH
 exec git log --oneline
-
-# Reset one commit, add new migration, then create new branch
+# Create new branch with without one commit
 exec git reset --quiet HEAD~1 --hard
 exec git checkout --quiet -b $CIRCLE_BRANCH
+exec git push --quiet -u $ATLAS_INPUT_REMOTE $CIRCLE_BRANCH
+
+# Add new migration, also edit hello.txt to create conflict
+exec sleep 5s
+exec atlas migrate new v3 --edit
+writeFile $WORK/hello.txt 'Hello Foo'
+exec git add .
+exec git commit --quiet --message 'commit two conflict files'
+exec git push --quiet
+# Print the git history before rebase
+exec git log --oneline
+hashFile ./migrations/atlas.sum
+stdout '\[\d{14}_v1\.sql \d{14}_v3\.sql\]'
+
+# Run the rebase action should failure
+! atlas-action --action=migrate/autorebase
+stdout 'conflict found in files other than migrations/atlas.sum'
+
+
+# Reset one commit, add new migration
+exec git reset --quiet HEAD~1 --hard
+exec git push --quiet --force
 exec sleep 5s
 exec atlas migrate new v3 --edit
 exec git add .
-exec git commit --quiet --message 'commit the conflict files'
-exec git push --quiet -u $ATLAS_INPUT_REMOTE $CIRCLE_BRANCH --force
+exec git commit --quiet --message 'commit the conflict file'
+exec git push --quiet
 # Print the git history before rebase
 exec git log --oneline
 hashFile ./migrations/atlas.sum
@@ -45,7 +67,7 @@ stdout 'Migrations rebased successfully'
 # The git history now is correct with the new file
 exec git log --oneline
 stdout 'migrations: rebase migration files'
-stdout 'commit the conflict files'
+stdout 'commit the conflict file'
 stdout 'second commit'
 stdout 'first commit'
 
@@ -56,6 +78,8 @@ stdout '\[\d{14}_v1\.sql \d{14}_v2\.sql \d{14}_v3\.sql\]'
 # Run again will has no effect
 atlas-action --action=migrate/autorebase
 stdout 'No conflict found when merging master into conflict'
+-- hello.txt --
+Hello World
 -- .gitignore --
 remote
 -- .git/config --

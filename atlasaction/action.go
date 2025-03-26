@@ -675,7 +675,9 @@ func (a *Actions) exec(ctx context.Context, name string, args ...string) ([]byte
 	case nil:
 		return out, nil
 	case *exec.ExitError:
-		a.Infof("Running %q got following error: %s", cmd.String(), string(err.Stderr))
+		if err.Stderr != nil {
+			a.Infof("Running %q got following error: %s", cmd.String(), string(err.Stderr))
+		}
 		return nil, fmt.Errorf("failed to run %s: %w", name, err)
 	default:
 		return nil, fmt.Errorf("failed to run %s: %w", name, err)

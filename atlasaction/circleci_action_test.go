@@ -141,6 +141,14 @@ func TestCircleCI(t *testing.T) {
 				}
 				fmt.Fprintf(ts.Stdout(), "%v", files)
 			},
+			"writeFile": func(ts *testscript.TestScript, neg bool, args []string) {
+				if len(args) != 2 {
+					ts.Fatalf("usage: writeFile <file> <content>")
+				}
+				if err := os.WriteFile(args[0], []byte(args[1]), 0600); err != nil {
+					ts.Fatalf("failed to write file: %v", err)
+				}
+			},
 		},
 	})
 }
