@@ -44,7 +44,7 @@ stdout 'Migrations rebased successfully'
 
 # The git history now is correct with the new file
 exec git log --oneline
-stdout 'Rebase migrations in migrations'
+stdout 'migrations: rebase migration files'
 stdout 'commit the conflict files'
 stdout 'second commit'
 stdout 'first commit'
