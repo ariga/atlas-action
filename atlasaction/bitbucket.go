@@ -117,7 +117,7 @@ func (a *bbPipe) MigrateApply(context.Context, *atlasexec.MigrateApply) {
 }
 
 // SchemaLint implements Reporter.
-func (a *bbPipe) SchemaLint(ctx context.Context, r *atlasexec.SchemaLintReport) {
+func (a *bbPipe) SchemaLint(ctx context.Context, r *SchemaLintReport) {
 }
 
 // MigrateLint implements Reporter.

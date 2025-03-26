@@ -81,7 +81,7 @@ func (a *ghAction) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
 }
 
 // SchemaLint implements Reporter.
-func (a *ghAction) SchemaLint(_ context.Context, r *atlasexec.SchemaLintReport) {
+func (a *ghAction) SchemaLint(_ context.Context, r *SchemaLintReport) {
 	if err := a.addChecksSchemaLint(r); err != nil {
 		a.Errorf("failed to add checks: %v", err)
 	}
@@ -171,7 +171,7 @@ func (a *ghAction) addChecks(lint *atlasexec.SummaryReport) error {
 }
 
 // addChecksSchemaLint runs annotations to the trigger event pull request for the given schema lint report.
-func (a *ghAction) addChecksSchemaLint(lint *atlasexec.SchemaLintReport) error {
+func (a *ghAction) addChecksSchemaLint(lint *SchemaLintReport) error {
 	for _, step := range lint.Steps {
 		for _, diag := range step.Diagnostics {
 			msg := diag.Text

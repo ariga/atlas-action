@@ -2844,7 +2844,7 @@ func (m *mockAtlas) SchemaLint(ctx context.Context, p *atlasexec.SchemaLintParam
 }
 
 // SchemaLint implements atlasaction.Reporter.
-func (m *mockAction) SchemaLint(context.Context, *atlasexec.SchemaLintReport) {
+func (m *mockAction) SchemaLint(context.Context, *atlasaction.SchemaLintReport) {
 	m.summary++
 }
 
@@ -2981,7 +2981,7 @@ func TestSchemaLint(t *testing.T) {
 			return &atlasexec.SchemaLintReport{
 				Steps: []atlasexec.Report{
 					{
-						Text: "Naming Conventions",
+						Text: "naming conventions",
 						Diagnostics: []atlasexec.Diagnostic{
 							{
 								Text: "Schema name violates the naming convention",
@@ -3015,8 +3015,8 @@ func TestSchemaLint(t *testing.T) {
 		require.Nil(t, err)
 		require.Len(t, comments, 1)
 		require.Contains(t, comments[0]["body"].(string), "Schema Lint Report")
-		require.Contains(t, comments[0]["body"].(string), "Naming Conventions")
-		require.Contains(t, comments[0]["body"].(string), "rule \"primary-key-required\"")
+		require.Contains(t, comments[0]["body"].(string), "Naming conventions")
+		require.Contains(t, comments[0]["body"].(string), "Rule \"primary-key-required\"")
 		// Schema lint has no steps, return Success
 		comments = []map[string]any{}
 		mockAtlas.schemaLint = func(_ context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {

@@ -30,6 +30,7 @@ import (
 	"ariga.io/atlas-action/atlasaction/cloud"
 	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
+	"ariga.io/atlas/sql/sqlclient"
 	"github.com/fatih/color"
 )
 
@@ -66,7 +67,7 @@ type (
 		MigrateLint(context.Context, *atlasexec.SummaryReport)
 		SchemaPlan(context.Context, *atlasexec.SchemaPlan)
 		SchemaApply(context.Context, *atlasexec.SchemaApply)
-		SchemaLint(context.Context, *atlasexec.SchemaLintReport)
+		SchemaLint(context.Context, *SchemaLintReport)
 	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
@@ -166,6 +167,10 @@ type (
 		URL    string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
 		Commit string // Latest commit SHA.
 		Body   string // Body (description) of the pull request.
+	}
+	SchemaLintReport struct {
+		URL []string `json:"URL,omitempty"` // Redacted schema URLs
+		*atlasexec.SchemaLintReport
 	}
 )
 
@@ -754,7 +759,18 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 		return fmt.Errorf("`atlas schema lint` completed with errors:\n%s", err)
 	}
 	if r, ok := a.Action.(Reporter); ok {
-		r.SchemaLint(ctx, report)
+		redactedURLs := make([]string, len(params.URL))
+		for i, u := range params.URL {
+			redacted, err := redactedURL(u)
+			if err != nil {
+				a.Errorf("failed to redact URL: %v", err)
+			}
+			redactedURLs[i] = redacted
+		}
+		r.SchemaLint(ctx, &SchemaLintReport{
+			URL:              redactedURLs,
+			SchemaLintReport: report,
+		})
 	}
 	if tc.PullRequest != nil {
 		switch c, err := tc.SCMClient(); {
@@ -1700,6 +1716,14 @@ func fprintln(name string, val ...any) error {
 	defer f.Close()
 	_, err = fmt.Fprintln(f, val...)
 	return err
+}
+
+func redactedURL(s string) (string, error) {
+	u, err := sqlclient.ParseURL(s)
+	if err != nil {
+		return "", err
+	}
+	return u.Redacted(), nil
 }
 
 // commentMarker creates a hidden marker to identify the comment as one created by this action.

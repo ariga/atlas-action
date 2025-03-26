@@ -12,12 +12,7 @@ cmp stdout golden-2.html
 -- golden-0.html --
 <h3> Schema Lint Report</h3>
 
-<div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1">
-    <img width="24px" height="24px" src="https://release.ariga.io/images/assets/success.svg?v=1"/>
-  </picture>
-  <br/>
+<div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture><br/>
   <b>Success</b> — No issues found, your schema is valid! 🎉
 </div>
 -- data-2.json --
@@ -30,21 +25,16 @@ cmp stdout golden-2.html
   <thead>
     <tr>
       <th>Status</th>
-      <th>Step</th>
+      <th>Rule</th>
       <th>Result</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>
-        <div align="center">
-          <picture>
-            <source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1">
-            <img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/>
-          </picture>
-        </div>
+        <div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div>
       </td>
-      <td><b>naming violations detected</b></td>
+      <td><b>Naming violations detected</b></td>
       <td>
         Table "t1" violates the naming policy <a href="https://atlasgo.io/lint/analyzers#NM102" target="_blank">(NM102)</a><br/>
         Table "t2" violates the naming policy <a href="https://atlasgo.io/lint/analyzers#NM102" target="_blank">(NM102)</a><br/>
@@ -52,14 +42,9 @@ cmp stdout golden-2.html
     </tr>
     <tr>
       <td>
-        <div align="center">
-          <picture>
-            <source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1">
-            <img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/>
-          </picture>
-        </div>
+        <div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div>
       </td>
-      <td><b>rule "primary-key-required"</b></td>
+      <td><b>Rule "primary-key-required"</b></td>
       <td>
         Table t1 must have a primary key<br/>
       </td>

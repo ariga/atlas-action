@@ -1,36 +1,30 @@
 <h3> Schema Lint Report</h3>
-{{if and .Steps (gt (len .Steps) 0) }}
+{{ if and .Steps (gt (len .Steps) 0) }}
 <table>
   <thead>
     <tr>
       <th>Status</th>
-      <th>Step</th>
+      <th>Rule</th>
       <th>Result</th>
     </tr>
   </thead>
-  <tbody>{{range $step := .Steps }}
+  <tbody>{{ range $step := .Steps }}
     <tr>
       <td>
         <div align="center">
-          <picture>
-            <source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1">
-            <img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/>
-          </picture>
+          {{- template "lint-check" "error.svg" -}}
         </div>
       </td>
-      <td><b>{{$step.Text}}</b></td>
-      <td>{{range $diag := $step.Diagnostics}}
-        {{$diag.Text}}{{if $diag.Code}} <a href="https://atlasgo.io/lint/analyzers#{{$diag.Code}}" target="_blank">({{$diag.Code}})</a>{{end}}<br/>{{end}}
+      <td><b>{{ $step.Text | firstUpper }}</b></td>
+      <td>{{ range $diag := $step.Diagnostics}}
+        {{ $diag.Text }}{{ if $diag.Code }} <a href="https://atlasgo.io/lint/analyzers#{{ $diag.Code }}" target="_blank">({{ $diag.Code }})</a>{{ end }}<br/>{{ end }}
       </td>
-    </tr>{{end}}
+    </tr>{{ end }}
   </tbody>
-</table>{{else}}
+</table>{{ else }}
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1">
-    <img width="24px" height="24px" src="https://release.ariga.io/images/assets/success.svg?v=1"/>
-  </picture>
+  {{- template "lint-check" "success.svg" -}}
   <br/>
   <b>Success</b> — No issues found, your schema is valid! 🎉
 </div>
-{{end}}
+{{ end }}
