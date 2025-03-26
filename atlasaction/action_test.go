@@ -917,11 +917,12 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.NoError(t, acts.MigrateAutoRebase(context.Background()))
 		require.Contains(t, out.String(), "No files to rebase")
 		// Check that the correct git commands were executed
-		require.Len(t, mockExec.ran, 4)
-		require.Equal(t, []string{"fetch", "origin", "main"}, mockExec.ran[0].args)
-		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
-		require.Equal(t, []string{"show", "origin/main:testdata/migrations/atlas.sum"}, mockExec.ran[2].args)
-		require.Equal(t, []string{"show", "origin/my-branch:testdata/migrations/atlas.sum"}, mockExec.ran[3].args)
+		require.Len(t, mockExec.ran, 5)
+		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
+		require.Equal(t, []string{"fetch", "origin", "main"}, mockExec.ran[1].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"show", "origin/main:testdata/migrations/atlas.sum"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"show", "origin/my-branch:testdata/migrations/atlas.sum"}, mockExec.ran[4].args)
 	})
 	t.Run("conflict in atlas.sum", func(t *testing.T) {
 		var rebasedFiles []string
@@ -942,7 +943,7 @@ func TestMigrateAutorebase(t *testing.T) {
 				switch {
 				// Simulate a conflict when running `git merge --no-ff origin/rebase-branch`
 				case len(args) > 2 && args[0] == "merge" && args[2] == "origin/rebase-branch":
-					cmd.Err = errors.New("conflict")
+					cmd.Err = &exec.ExitError{Stderr: []byte("conflict")}
 				// Simulate result when running: git show
 				case len(args) > 1 && args[0] == "show":
 					var res string
@@ -988,16 +989,17 @@ func TestMigrateAutorebase(t *testing.T) {
 		require.Len(t, rebasedFiles, 1)
 		require.Equal(t, "20250309093464_rebase.sql", rebasedFiles[0])
 		// Check that the correct git commands were executed
-		require.Len(t, mockExec.ran, 9)
-		require.Equal(t, []string{"fetch", "origin", "rebase-branch"}, mockExec.ran[0].args)
-		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
-		require.Equal(t, []string{"show", "origin/rebase-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[2].args)
-		require.Equal(t, []string{"show", "origin/my-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[3].args)
-		require.Equal(t, []string{"merge", "--no-ff", "origin/rebase-branch"}, mockExec.ran[4].args)
-		require.Equal(t, []string{"diff", "--name-only", "--diff-filter=U"}, mockExec.ran[5].args)
-		require.Equal(t, []string{"add", "testdata/need_rebase"}, mockExec.ran[6].args)
-		require.Equal(t, []string{"commit", "-m", "Rebase migrations in testdata/need_rebase"}, mockExec.ran[7].args)
-		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[8].args)
+		require.Len(t, mockExec.ran, 10)
+		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
+		require.Equal(t, []string{"fetch", "origin", "rebase-branch"}, mockExec.ran[1].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"show", "origin/rebase-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"show", "origin/my-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[4].args)
+		require.Equal(t, []string{"merge", "--no-ff", "origin/rebase-branch"}, mockExec.ran[5].args)
+		require.Equal(t, []string{"diff", "--name-only", "--diff-filter=U"}, mockExec.ran[6].args)
+		require.Equal(t, []string{"add", "testdata/need_rebase"}, mockExec.ran[7].args)
+		require.Equal(t, []string{"commit", "-m", "Rebase migrations in testdata/need_rebase"}, mockExec.ran[8].args)
+		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[9].args)
 	})
 	t.Run("conflict, but not only in atlas.sum", func(t *testing.T) {
 		mockExec := &MockCmdExecutor{
@@ -1007,7 +1009,7 @@ func TestMigrateAutorebase(t *testing.T) {
 				switch {
 				// Simulate a conflict when running `git merge --no-ff origin/rebase-branch`
 				case len(args) > 2 && args[0] == "merge" && args[2] == "origin/rebase-branch":
-					cmd.Err = errors.New("conflict")
+					cmd.Err = &exec.ExitError{Stderr: []byte("conflict")}
 				// Simulate result when running: git show
 				case len(args) > 1 && args[0] == "show":
 					var res string
@@ -1049,13 +1051,14 @@ func TestMigrateAutorebase(t *testing.T) {
 		err = acts.MigrateAutoRebase(context.Background())
 		require.EqualError(t, err, "conflict found in files other than testdata/need_rebase/atlas.sum, conflict files: [testdata/need_rebase/atlas.sum  not_atlas.sum]")
 		// Check that the correct git commands were executed
-		require.Len(t, mockExec.ran, 6)
-		require.Equal(t, []string{"fetch", "origin", "rebase-branch"}, mockExec.ran[0].args)
-		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
-		require.Equal(t, []string{"show", "origin/rebase-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[2].args)
-		require.Equal(t, []string{"show", "origin/my-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[3].args)
-		require.Equal(t, []string{"merge", "--no-ff", "origin/rebase-branch"}, mockExec.ran[4].args)
-		require.Equal(t, []string{"diff", "--name-only", "--diff-filter=U"}, mockExec.ran[5].args)
+		require.Len(t, mockExec.ran, 7)
+		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
+		require.Equal(t, []string{"fetch", "origin", "rebase-branch"}, mockExec.ran[1].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"show", "origin/rebase-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"show", "origin/my-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[4].args)
+		require.Equal(t, []string{"merge", "--no-ff", "origin/rebase-branch"}, mockExec.ran[5].args)
+		require.Equal(t, []string{"diff", "--name-only", "--diff-filter=U"}, mockExec.ran[6].args)
 	})
 
 }
