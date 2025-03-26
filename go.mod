@@ -1,6 +1,6 @@
 module ariga.io/atlas-action
 
-go 1.23
+go 1.24
 
 require (
 	ariga.io/atlas v0.21.2-0.20240418081819-02b3f6239b04
