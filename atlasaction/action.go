@@ -579,10 +579,10 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		baseBranch = a.GetInputDefault("base-branch", tc.DefaultBranch)
 		currBranch = tc.Branch
 	)
-	if gitVer, err := a.exec(ctx, "git", "--version"); err != nil {
+	if v, err := a.exec(ctx, "git", "--version"); err != nil {
 		return fmt.Errorf("failed to get git version: %w", err)
 	} else {
-		a.Infof("running with git: %s", string(gitVer))
+		a.Infof("auto-rebase with %s", v)
 	}
 	if _, err := a.exec(ctx, "git", "fetch", remote, baseBranch); err != nil {
 		return fmt.Errorf("failed to fetch the branch %s: %w", baseBranch, err)
