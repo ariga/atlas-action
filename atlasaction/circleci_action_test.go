@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"ariga.io/atlas-action/atlasaction"
+	"ariga.io/atlas/sql/migrate"
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"
 )
@@ -124,6 +125,21 @@ func TestCircleCI(t *testing.T) {
 					return
 				}
 				cmpFiles(ts, neg, args[0], output)
+			},
+			"hashFile": func(ts *testscript.TestScript, neg bool, args []string) {
+				if len(args) != 1 {
+					ts.Fatalf("usage: hashFile <file>")
+				}
+				var hf migrate.HashFile
+				if err := hf.UnmarshalText([]byte(ts.ReadFile(args[0]))); err != nil {
+					ts.Fatalf("failed to unmarshal hash file: %v", err)
+					return
+				}
+				var files []string
+				for _, f := range hf {
+					files = append(files, f.N)
+				}
+				fmt.Fprintf(ts.Stdout(), "%v", files)
 			},
 		},
 	})
