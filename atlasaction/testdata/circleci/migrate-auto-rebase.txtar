@@ -46,3 +46,10 @@ stdout 'second commit'
 stdout 'first commit'
 -- .gitignore --
 remote
+-- .git/config --
+[user]
+	email = testscript@example.com
+	name = 'Your Test Script'
+-- remote/.git/config --
+[receive]
+	denyCurrentBranch = ignore
