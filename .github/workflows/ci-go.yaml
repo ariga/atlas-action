@@ -72,7 +72,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run tests
-        run: go test -race ./...
+        run: go test -v -race ./...
   migrate-test:
     runs-on: ubuntu-latest
     env:
