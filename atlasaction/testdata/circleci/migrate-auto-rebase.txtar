@@ -1,0 +1,48 @@
+# Run context
+env CIRCLE_PROJECT_REPONAME=atlas-orb CIRCLE_SHA1=1234567890 CIRCLE_BRANCH=conflict
+env GITHUB_TOKEN=foo GITHUB_REPOSITORY=atlas/atlas-action
+# The content of migration files
+env EDITOR='echo ''-- Comment'' >>'
+
+# Setup the action input variables
+env ATLAS_INPUT_BASE_BRANCH=master ATLAS_INPUT_REMOTE=origin
+
+# Init another git for remote
+exec git init --quiet $WORK/remote
+
+# Setup a git history with two commits on the master branch
+exec git init --quiet
+exec git remote add $ATLAS_INPUT_REMOTE file://$WORK/remote
+exec git branch --quiet -M $ATLAS_INPUT_BASE_BRANCH
+exec atlas migrate new foo --edit
+exec git add .
+exec git commit --quiet --message 'first commit'
+exec atlas migrate new bar --edit
+exec git add .
+exec git commit --quiet --message 'second commit'
+exec git push --quiet -u $ATLAS_INPUT_REMOTE $ATLAS_INPUT_BASE_BRANCH
+exec git log --oneline
+
+# Reset one commit, add new migration, then create new branch
+exec git reset --quiet HEAD~1 --hard
+exec git checkout --quiet -b $CIRCLE_BRANCH
+exec atlas migrate new boo --edit
+exec git add .
+exec git commit --quiet --message 'commit the conflict files'
+exec git push --quiet -u $ATLAS_INPUT_REMOTE $CIRCLE_BRANCH --force
+# Print the git history before rebase
+exec git log --oneline
+
+# Now, we're on the conflict branch,
+# run the rebase action should fix the conflict
+atlas-action --action=migrate/autorebase
+stdout 'Migrations rebased successfully'
+
+# The git history now is correct with the new file
+exec git log --oneline
+stdout 'Rebase migrations in migrations'
+stdout 'commit the conflict files'
+stdout 'second commit'
+stdout 'first commit'
+-- .gitignore --
+remote
