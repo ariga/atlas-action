@@ -1,24 +1,29 @@
 name: Build and Upload to CDN
 on:
-  workflow_dispatch:
-    inputs:
-      commit:
-        description: 'Commit SHA'
-        required: false
-      version:
-        description: 'Version (should follow semver v1.2.3)'
-        required: false
   push:
     branches:
       - master
-    tags:
-      - 'v*'
 jobs:
   test:
     uses: ./.github/workflows/ci-go.yaml
     secrets: inherit
-  build:
+  release:
     needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      created: ${{ steps.create-release.outputs.release_created }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.0.2
+      - name: Run Make Release
+        id: create-release
+        run: make release
+        shell: bash
+  build:
+    needs: release
+    if: needs.release.outputs.created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,8 +37,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.0.2
-        with:
-          ref: ${{ github.event.inputs.commit || 'master' }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to Docker Hub (${{ env.REGISTRY }})
@@ -42,19 +45,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern=v{{major}}
-            type=sha
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -67,38 +57,12 @@ jobs:
           go-version-file: go.mod
       - name: Install Atlas
         uses: ariga/setup-atlas@v0
-      - name: Set BINARY_NAME
-        id: set_binary_name
-        env:
-          VERSION: ${{ github.event.inputs.version || github.ref_name }}
-        run: |
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "BINARY_NAME=atlas-action-$VERSION" >> $GITHUB_ENV
-      - name: Compile Go Binary
-        run: |
-          COMMIT=$(git rev-parse --short HEAD)
-          go build -o atlas-action -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT" ./cmd/atlas-action
-          OUTPUT=$(./atlas-action --version)
-          if [[ $(echo $OUTPUT | grep -i "^atlas-action version $VERSION-$COMMIT") ]]; then
-            echo "Version=$OUTPUT"
-          else
-            echo "unexpected output: $OUTPUT, expected: atlas-action version $VERSION-$COMMIT"
-            exit 1
-          fi
+      - name: Build assets
+        run: make atlas-action test s3-upload docker DOCKER_IMAGE=$DOCKER_IMAGE
         env:
           CGO_ENABLED: 0
-      - name: Upload binary to S3
-        run: |
-          aws s3 cp ./atlas-action s3://release.ariga.io/atlas-action/$BINARY_NAME
-        env:
           AWS_REGION: us-east-1
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
-          push: true
+          DOCKER_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
   # Run end-to-end test on the published binary.
   e2e-test:
     needs: build
@@ -113,7 +77,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         uses: jenseng/dynamic-uses@v1
         with:
-          uses: ariga/atlas-action/migrate/lint@${{ github.event.inputs.version || 'v1' }}
+          uses: ariga/atlas-action/migrate/lint@v1
           with: '{
             "dir": "file://atlasaction/testdata/migrations",
             "dev-url": "sqlite://dev?mode=memory",
@@ -122,7 +86,7 @@ jobs:
       - name: Run Migrate Push
         uses: jenseng/dynamic-uses@v1
         with:
-          uses: ariga/atlas-action/migrate/push@${{ github.event.inputs.version || 'v1' }}
+          uses: ariga/atlas-action/migrate/push@v1
           with: '{
             "dir": "file://atlasaction/testdata/migrations",
             "dev-url": "sqlite://dev?mode=memory",
