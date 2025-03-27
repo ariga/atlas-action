@@ -971,8 +971,8 @@ func (a *Actions) schemaApplyWithApproval(ctx context.Context) ([]*atlasexec.Sch
 		if err := a.waitingForApproval(func() (bool, error) {
 			plans, err := a.Atlas.SchemaPlanList(ctx, a.schemaPlanListParams(
 				func(p *atlasexec.SchemaPlanListParams) {
-					p.From = []string{a.GetInput("url")}
-					p.To = []string{a.GetInput("to")}
+					p.From = a.GetArrayInput("url")
+					p.To = a.GetArrayInput("to")
 					p.Repo = repo
 				},
 			))
@@ -982,7 +982,7 @@ func (a *Actions) schemaApplyWithApproval(ctx context.Context) ([]*atlasexec.Sch
 			// Check the created plan is exists and approved.
 			var cloudPlan *atlasexec.SchemaPlanFile
 			for _, plan := range plans {
-				if plan.Name == f.Name {
+				if plan.URL == f.URL {
 					cloudPlan = &plan
 					break
 				}
@@ -1023,8 +1023,8 @@ You can approve the plan by visiting: %s`, f.Name, f.Link)
 		}
 		plan, err := a.Atlas.SchemaPlan(ctx, a.schemaPlanParams(
 			func(p *atlasexec.SchemaPlanParams) {
-				p.From = []string{a.GetInput("url")}
-				p.To = []string{a.GetInput("to")}
+				p.From = a.GetArrayInput("url")
+				p.To = a.GetArrayInput("to")
 				p.Repo = repo
 				p.Name = name
 				p.Pending = true
@@ -1044,8 +1044,8 @@ You can approve the plan by visiting: %s`, f.Name, f.Link)
 	policy := a.GetInput("approval-policy")
 	switch plans, err := a.Atlas.SchemaPlanList(ctx, a.schemaPlanListParams(
 		func(p *atlasexec.SchemaPlanListParams) {
-			p.From = []string{a.GetInput("url")}
-			p.To = []string{a.GetInput("to")}
+			p.From = a.GetArrayInput("url")
+			p.To = a.GetArrayInput("to")
 			p.Repo = repo
 		},
 	)); {
