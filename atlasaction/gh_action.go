@@ -364,14 +364,14 @@ func addSuggestions(cw string, lint *atlasexec.SummaryReport, fn func(*Suggestio
 }
 
 // CommentSchemaLint implements SCMClient.
-func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SchemaLintReport) error {
+func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
 	comment, err := RenderTemplate("schema-lint.tmpl", r)
 	if err != nil {
 		return err
 	}
 	id := "schema-lint"
-	if schema := tc.Act.GetInput("schema"); schema != "" {
-		id = schema
+	if url := tc.Act.GetInput("url"); url != "" {
+		id = url
 	}
 	return c.upsertComment(ctx, tc.PullRequest, id, comment)
 }

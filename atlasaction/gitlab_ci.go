@@ -123,7 +123,7 @@ func (c *glClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlas
 }
 
 // CommentSchemaLint implements SCMClient.
-func (c *glClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SchemaLintReport) error {
+func (c *glClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
 	return nil
 }
 

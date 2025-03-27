@@ -2676,7 +2676,7 @@ func (m *mockSCM) CommentLint(ctx context.Context, tc *atlasaction.TriggerContex
 	return m.comment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
 }
 
-func (m *mockSCM) CommentSchemaLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasexec.SchemaLintReport) error {
+func (m *mockSCM) CommentSchemaLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasaction.SchemaLintReport) error {
 	comment, err := atlasaction.RenderTemplate("schema-lint.tmpl", r)
 	if err != nil {
 		return err
@@ -2727,7 +2727,7 @@ func TestRenderTemplates(t *testing.T) {
 			"render-schema-plan":   renderTemplate[*atlasexec.SchemaPlan],
 			"render-lint":          renderTemplate[*atlasexec.SummaryReport],
 			"render-migrate-apply": renderTemplate[*atlasexec.MigrateApply],
-			"render-schema-lint":   renderTemplate[*atlasexec.SchemaLintReport],
+			"render-schema-lint":   renderTemplate[*atlasaction.SchemaLintReport],
 		},
 	})
 }
@@ -3028,6 +3028,6 @@ func TestSchemaLint(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, comments, 1)
 		require.Contains(t, comments[0]["body"].(string), "Schema Lint Report")
-		require.Contains(t, comments[0]["body"].(string), "No issues found, your schema is valid!")
+		require.Contains(t, comments[0]["body"].(string), "No issues found — your schema is pristine and valid!")
 	})
 }

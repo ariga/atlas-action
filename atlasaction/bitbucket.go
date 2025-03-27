@@ -320,7 +320,7 @@ func (c *bbClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlas
 }
 
 // CommentSchemaLint implements SCMClient.
-func (c *bbClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SchemaLintReport) error {
+func (c *bbClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
 	return nil
 }
 

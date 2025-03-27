@@ -1,5 +1,5 @@
-<h3> Schema Lint Report</h3>
-{{ if and .Steps (gt (len .Steps) 0) }}
+<code>atlas schema lint</code> on <strong>{{ join .URL ", " }}</strong>
+{{- if and .Steps (gt (len .Steps) 0) }}
 <table>
   <thead>
     <tr>
@@ -16,8 +16,15 @@
         </div>
       </td>
       <td><b>{{ $step.Text | firstUpper }}</b></td>
-      <td>{{ range $diag := $step.Diagnostics}}
-        {{ $diag.Text }}{{ if $diag.Code }} <a href="https://atlasgo.io/lint/analyzers#{{ $diag.Code }}" target="_blank">({{ $diag.Code }})</a>{{ end }}<br/>{{ end }}
+      <td>
+        {{- if $step.Desc }}
+        <strong>{{ $step.Desc }}</strong><br/>
+        {{- end }}
+        {{- range $diag := $step.Diagnostics}}
+        {{ $diag.Text }}{{ if $diag.Code }} <a href="https://atlasgo.io/lint/analyzers#{{ $diag.Code }}" target="_blank">({{ $diag.Code }})</a>{{ end }}
+        {{- if $diag.Pos }}
+        <code>{{ $diag.Pos.Filename }}:{{ $diag.Pos.Start.Line }}:{{ $diag.Pos.Start.Column }}</code>{{- end }}<br/>
+        {{- end}}
       </td>
     </tr>{{ end }}
   </tbody>
@@ -25,6 +32,7 @@
 <div align="center">
   {{- template "lint-check" "success.svg" -}}
   <br/>
-  <b>Success</b> — No issues found, your schema is valid! 🎉
+  <h3>🎉 Success! 🎉</h3>
+  <p>No issues found — your schema is pristine and valid!</p>
 </div>
 {{ end }}

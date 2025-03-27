@@ -359,6 +359,11 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
   schema-lint:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test:
+          - url: sqlite://schemarule.db
+          - url: file://ok.lt.hcl
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
@@ -378,7 +383,7 @@ jobs:
           working-directory: atlasaction/testdata/schema-lint
           config: file://atlas.hcl
           dev-url: sqlite://file?mode=memory
-          url: sqlite://schemarule.db
+          url: ${{ matrix.test.url }}
           vars: '{"rulefile":"schema.rule.hcl"}'
         env:
           GITHUB_TOKEN: ${{ github.token }}

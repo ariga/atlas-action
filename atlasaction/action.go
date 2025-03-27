@@ -76,7 +76,7 @@ type (
 		// CommentPlan comments on the pull request with the schema plan.
 		CommentPlan(context.Context, *TriggerContext, *atlasexec.SchemaPlan) error
 		// CommentSchemaLint comments on the pull request with the schema lint report.
-		CommentSchemaLint(context.Context, *TriggerContext, *atlasexec.SchemaLintReport) error
+		CommentSchemaLint(context.Context, *TriggerContext, *SchemaLintReport) error
 	}
 	Logger interface {
 		// Infof logs an info message.
@@ -758,19 +758,20 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 		a.SetOutput("error", err.Error())
 		return fmt.Errorf("`atlas schema lint` completed with errors:\n%s", err)
 	}
-	if r, ok := a.Action.(Reporter); ok {
-		redactedURLs := make([]string, len(params.URL))
-		for i, u := range params.URL {
-			redacted, err := redactedURL(u)
-			if err != nil {
-				a.Errorf("failed to redact URL: %v", err)
-			}
-			redactedURLs[i] = redacted
+	redactedURLs := make([]string, len(params.URL))
+	for i, u := range params.URL {
+		redacted, err := redactedURL(u)
+		if err != nil {
+			a.Errorf("failed to redact URL: %v", err)
 		}
-		r.SchemaLint(ctx, &SchemaLintReport{
-			URL:              redactedURLs,
-			SchemaLintReport: report,
-		})
+		redactedURLs[i] = redacted
+	}
+	rp := &SchemaLintReport{
+		URL:              redactedURLs,
+		SchemaLintReport: report,
+	}
+	if r, ok := a.Action.(Reporter); ok {
+		r.SchemaLint(ctx, rp)
 	}
 	if tc.PullRequest != nil {
 		switch c, err := tc.SCMClient(); {
@@ -779,7 +780,7 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 		case err != nil:
 			a.Errorf("failed to get SCM client: %v", err)
 		default:
-			if err = c.CommentSchemaLint(ctx, tc, report); err != nil {
+			if err = c.CommentSchemaLint(ctx, tc, rp); err != nil {
 				a.Errorf("failed to comment on the pull request: %v", err)
 			}
 		}
