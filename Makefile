@@ -52,8 +52,7 @@ release:
 	else \
 		echo "Creating new release for version $(VERSION)"; \
 		gh release create "$(VERSION)" \
-			--notes-start-tag="$$LATEST_VERSION" \
-			--generate-notes --draft; \
+			--notes-start-tag="$$LATEST_VERSION" --generate-notes; \
 		echo "Updating major version tag to $(MAJOR_VER)"; \
 		git tag -fa "$(MAJOR_VER)" -m "release: update $(MAJOR_VER) tag"; \
 		git push origin "$(MAJOR_VER)" --force; \
