@@ -182,9 +182,9 @@ func (a *ghAction) addChecksSchemaLint(lint *SchemaLintReport) error {
 				"title": step.Text,
 			})
 			if step.Text != "" {
-				logger.Warningf(msg)
+				logger.Warningf("%s", msg)
 			} else {
-				logger.Warningf(msg)
+				logger.Errorf("%s", msg)
 			}
 		}
 	}
