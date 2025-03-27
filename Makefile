@@ -22,8 +22,8 @@ test:
 
 .PHONY: s3-upload
 s3-upload:
-	aws s3 cp ./atlas-action s3://xxxx/atlas-action/$(BINARY_NAME)-$(VERSION); \
-	aws s3 cp ./atlas-action s3://xxxx/atlas-action/$(BINARY_NAME)-$(MAJOR_VER);
+	aws s3 cp ./atlas-action s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(VERSION); \
+	aws s3 cp ./atlas-action s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(MAJOR_VER);
 
 .PHONY: docker-build
 docker-build:
