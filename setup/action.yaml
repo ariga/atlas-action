@@ -1,0 +1,43 @@
+name: "Setup Atlas Action"
+description: "Build and run the atlas-action"
+inputs:
+  token:
+    description: "The GitHub token"
+    default: ${{ github.server_url == 'https://github.com' && github.token || '' }}
+    required: false
+runs:
+  using: "composite"
+  steps:
+    - id: cache-meta
+      run: |
+        echo "key=${{ runner.os }}-atlas-action-$ACTION_REF" >> "$GITHUB_OUTPUT"
+        echo "path=$HOME/atlas-action" >> "$GITHUB_OUTPUT"
+      shell: bash
+      env:
+        ACTION_REF: ${{ github.action_ref }}
+    - uses: actions/cache@v4
+      id: cache
+      with:
+        key: ${{ steps.cache-meta.outputs.key }}
+        path: ${{ steps.cache-meta.outputs.path }}
+    - if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: ${{ github.action_path }}/../go.mod
+        cache: false
+        token: ${{ inputs.token }}
+    - if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      run: make -C .. install COMMIT=$(echo $ACTION_REF | cut -c1-7)
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        ACTION_REF: ${{ github.action_ref }}
+        GOBIN: ${{ steps.cache-meta.outputs.path }}
+    - run: |
+        # Add the binary path to the PATH
+        echo "${{ steps.cache-meta.outputs.path }}" >> "$GITHUB_PATH"
+        # This ENV tell the shimjs to use the local binary instead of downloading it
+        echo "ATLAS_ACTION_LOCAL=1" >> "$GITHUB_ENV"
+      shell: bash
+    - run: atlas-action --version
+      shell: bash

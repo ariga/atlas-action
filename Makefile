@@ -1,6 +1,6 @@
 BUILD_DATE = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 VERSION    = $(shell cat VERSION.txt)
-COMMIT     = $(shell git rev-parse --short HEAD)
+COMMIT    ?= $(shell git rev-parse --short HEAD)
 MAJOR_VER  = $(shell echo "$(VERSION)" | cut -d. -f1)
 LDFLAGS    = "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}"
 

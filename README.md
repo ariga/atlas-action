@@ -577,6 +577,49 @@ In case the database URL is subject to change, the `slug` parameter can use to i
             app
 ```
 
+### `ariga/atlas-action/setup`
+
+This action builds the binary of atlas-action on your pipeline, instead of downloading it from the internet. So you can pin it and other actions to specified commit.
+
+#### Inputs
+
+* `token` - (Optional) The GitHub Token for GitHub Enterprise usage only.
+
+#### Example usage
+
+The following example demonstrates how to pin the `ariga/atlas-action/setup` action to a specific commit for better security and reproducibility:
+
+```yaml
+name: Setup Atlas CLI
+on:
+  push:
+    branches:
+      - main
+jobs:
+  migrate-apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      # This action builds the binary locally
+      - uses: ariga/atlas-action/setup@<commit-sha>
+      # Pin other actions without `atlas-action/setup` won't work
+      - uses: ariga/atlas-action/migrate/apply@<commit-sha>
+        with:
+          url: 'mysql://user:${{ secrets.DB_PASSWORD }}@db.hostname.io:3306/db'
+          dir: 'atlas://my-project' # A directory stored in Atlas Cloud, use ?tag=<tag> to specify a tag
+```
+
+Replace `<commit-sha>` with the specific commit hash you want to pin the action to. Pinning to a commit ensures that the action's behavior does not change unexpectedly due to updates in the repository.
+
+### Why Pin Actions to a Commit?
+
+Pinning actions to a specific commit provides the following benefits:
+- **Security**: Prevents the action from being modified by unauthorized changes in the repository.
+- **Reproducibility**: Ensures that workflows behave consistently across runs, even if the action is updated in the future.
+
+For more details, see the [GitHub Actions security best practices](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions).
+
 ### Development
 
 To release the new version of atlas-action, bump the version in `VERSION.txt` and open the Pull Request to the master branch.
