@@ -13,7 +13,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      created: ${{ steps.create-release.outputs.release_created }}
+      status: ${{ steps.create-release.outputs.status }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.0.2
@@ -29,8 +29,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
   build:
-    needs: release
-    if: ${{ needs.release.outputs.created }}
+    needs: [release]
+    if: ${{ needs.release.outputs.status == 'created' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

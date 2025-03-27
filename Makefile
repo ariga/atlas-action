@@ -47,7 +47,7 @@ release:
 	if [ "$$LATEST_VERSION" = "$(VERSION)" ]; then \
 		echo "Latest release is already $(VERSION). No action needed."; \
 		if [ ! -z "$$GITHUB_OUTPUT" ]; then \
-			echo "release_created=false" >> "$$GITHUB_OUTPUT"; \
+			echo "status=skipped" >> "$$GITHUB_OUTPUT"; \
 		fi; \
 	else \
 		echo "Creating new release for version $(VERSION)"; \
@@ -58,6 +58,6 @@ release:
 		git tag -fa "$(MAJOR_VER)" -m "release: update $(MAJOR_VER) tag"; \
 		git push origin "$(MAJOR_VER)" --force; \
 		if [ ! -z "$$GITHUB_OUTPUT" ]; then \
-			echo "release_created=true" >> "$$GITHUB_OUTPUT"; \
+			echo "status=created" >> "$$GITHUB_OUTPUT"; \
 		fi; \
 	fi
