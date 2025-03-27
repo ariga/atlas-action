@@ -357,6 +357,37 @@ jobs:
             env://url
         env:
           GITHUB_TOKEN: ${{ github.token }}
+  schema-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test:
+          - url: sqlite://schemarule.db
+          - url: file://ok.lt.hcl
+          - url: file://schema.lt.hcl
+    env:
+      ATLAS_ACTION_LOCAL: 1
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - id: schema_lint_test
+        uses: ./schema/lint
+        with:
+          working-directory: atlasaction/testdata/schema-lint
+          config: file://atlas.hcl
+          dev-url: sqlite://file?mode=memory
+          url: ${{ matrix.test.url }}
+          vars: '{"rulefile":"schema.rule.hcl"}'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
   schema-apply:
     runs-on: ubuntu-latest
     env:

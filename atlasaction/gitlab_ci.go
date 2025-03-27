@@ -122,6 +122,11 @@ func (c *glClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlas
 	return c.upsertComment(ctx, tc.PullRequest, p.File.Name, comment)
 }
 
+// CommentSchemaLint implements SCMClient.
+func (c *glClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
+	return nil
+}
+
 func (c *glClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
 	comments, err := c.PullRequestNotes(ctx, pr.Number)
 	if err != nil {
