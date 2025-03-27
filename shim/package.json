@@ -1,18 +1,18 @@
 {
-  "name": "atlasci-action",
+  "name": "shimjs",
   "version": "0.1.1",
-  "description": "atlasci github action",
-  "main": "lib/src/main.js",
+  "description": "the shim logic to download the action binary",
+  "main": "dist/index.js",
   "scripts": {
-    "format": "prettier --write shim/*.js",
-    "format-check": "prettier --check shim/*.js",
-    "lint": "eslint shim/*.js",
-    "shim": "ncc build shim -o shim/dist",
+    "format": "prettier --write *.js",
+    "format-check": "prettier --check *.js",
+    "lint": "eslint *.js",
+    "shim": "ncc build index.js -o dist",
     "all": "npm run format && npm run lint && npm run shim"
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/ariga/ariga.git"
+    "url": "git+ssh://git@github.com/ariga/atlas-action.git"
   },
   "keywords": [
     "atlas",
@@ -23,9 +23,9 @@
   "author": "ariga",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/ariga/ariga/issues"
+    "url": "https://github.com/ariga/atlas/issues"
   },
-  "homepage": "https://github.com/ariga/ariga#readme",
+  "homepage": "https://github.com/ariga/atlas#readme",
   "devDependencies": {
     "@vercel/ncc": "0.38.1",
     "eslint-config-prettier": "^8.3.0",

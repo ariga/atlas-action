@@ -1,6 +1,63 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
+/***/ 2932:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const childProcess = __nccwpck_require__(2081);
+const fs = __nccwpck_require__(7147);
+const path = __nccwpck_require__(1017);
+const core = __nccwpck_require__(2186);
+const toolCache = __nccwpck_require__(7784);
+
+module.exports = async function run(action) {
+  const binaryName = "atlas-action";
+  // Check for local mode (for testing)
+  if (process.env.ATLAS_ACTION_LOCAL == 1) {
+    // In the local mode, the atlas-action binary is expected to be in the PATH
+    core.info("Running in local mode");
+  } else {
+    // Download the binary if not in local mode
+    const version = process.env.GITHUB_ACTION_REF || "master";
+    if (!version.startsWith("v") && version !== "master") {
+      throw new Error(`Invalid version: ${version}`);
+    }
+    core.info(`Using version ${version}`);
+    const toolName = "atlas-action";
+    // We only cache the binary between steps of a single run.
+    const cacheVersion = `${version}-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
+    let toolPath = toolCache.find(toolName, cacheVersion);
+    // Tool Path is the directory where the binary is located. If it is not found, download it.
+    if (!toolPath || !fs.existsSync(path.join(toolPath, binaryName))) {
+      const url = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
+      const dest = path.join(process.cwd(), "atlas-action");
+      // The action can be run in the same job multiple times.
+      // And the cache in only updated after the job is done.
+      if (fs.existsSync(dest)) {
+        core.debug(`Using downloaded binary: ${dest}`);
+      } else {
+        core.info(`Downloading atlas-action binary: ${url} to ${dest}`);
+        await toolCache.downloadTool(url, dest);
+        fs.chmodSync(dest, "700");
+      }
+      toolPath = await toolCache.cacheFile(dest, binaryName, toolName, cacheVersion);
+    }
+    core.addPath(toolPath);
+  }
+  const { status, error } = childProcess.spawnSync(binaryName, ["--action", action], {
+    stdio: "inherit"
+  });
+  if (status !== 0 || error) {
+    core.error(error);
+    core.setFailed(`The process exited with code ${status}`);
+    // Always exit with an error code to fail the action
+    process.exit(status || 1);
+  }
+};
+
+
+/***/ }),
+
 /***/ 7351:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -7181,63 +7238,6 @@ exports["default"] = _default;
 
 /***/ }),
 
-/***/ 5592:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const childProcess = __nccwpck_require__(2081);
-const fs = __nccwpck_require__(7147);
-const path = __nccwpck_require__(1017);
-const core = __nccwpck_require__(2186);
-const toolCache = __nccwpck_require__(7784);
-
-module.exports = async function run(action) {
-  const binaryName = "atlas-action";
-  // Check for local mode (for testing)
-  if (process.env.ATLAS_ACTION_LOCAL == 1) {
-    // In the local mode, the atlas-action binary is expected to be in the PATH
-    core.info("Running in local mode");
-  } else {
-    // Download the binary if not in local mode
-    const version = process.env.GITHUB_ACTION_REF || "master";
-    if (!version.startsWith("v") && version !== "master") {
-      throw new Error(`Invalid version: ${version}`);
-    }
-    core.info(`Using version ${version}`);
-    const toolName = "atlas-action";
-    // We only cache the binary between steps of a single run.
-    const cacheVersion = `${version}-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`;
-    let toolPath = toolCache.find(toolName, cacheVersion);
-    // Tool Path is the directory where the binary is located. If it is not found, download it.
-    if (!toolPath || !fs.existsSync(path.join(toolPath, binaryName))) {
-      const url = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
-      const dest = path.join(process.cwd(), "atlas-action");
-      // The action can be run in the same job multiple times.
-      // And the cache in only updated after the job is done.
-      if (fs.existsSync(dest)) {
-        core.debug(`Using downloaded binary: ${dest}`);
-      } else {
-        core.info(`Downloading atlas-action binary: ${url} to ${dest}`);
-        await toolCache.downloadTool(url, dest);
-        fs.chmodSync(dest, "700");
-      }
-      toolPath = await toolCache.cacheFile(dest, binaryName, toolName, cacheVersion);
-    }
-    core.addPath(toolPath);
-  }
-  const { status, error } = childProcess.spawnSync(binaryName, ["--action", action], {
-    stdio: "inherit"
-  });
-  if (status !== 0 || error) {
-    core.error(error);
-    core.setFailed(`The process exited with code ${status}`);
-    // Always exit with an error code to fail the action
-    process.exit(status || 1);
-  }
-};
-
-
-/***/ }),
-
 /***/ 9491:
 /***/ ((module) => {
 
@@ -7400,7 +7400,7 @@ module.exports = require("util");
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module is referenced by other modules so it can't be inlined
-/******/ 	var __webpack_exports__ = __nccwpck_require__(5592);
+/******/ 	var __webpack_exports__ = __nccwpck_require__(2932);
 /******/ 	module.exports = __webpack_exports__;
 /******/ 	
 /******/ })()
