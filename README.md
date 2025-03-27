@@ -577,7 +577,11 @@ In case the database URL is subject to change, the `slug` parameter can use to i
             app
 ```
 
-### Legal 
+### Development
+
+To release the new version of atlas-action, bump the version in `VERSION.txt` and open the Pull Request to the master branch.
+
+### Legal
 
 The source code for this GitHub Action is released under the Apache 2.0
 License, see [LICENSE](LICENSE).
