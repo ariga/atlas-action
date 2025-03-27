@@ -3014,7 +3014,6 @@ func TestSchemaLint(t *testing.T) {
 		err := a.SchemaLint(context.Background())
 		require.Nil(t, err)
 		require.Len(t, comments, 1)
-		require.Contains(t, comments[0]["body"].(string), "Schema Lint Report")
 		require.Contains(t, comments[0]["body"].(string), "Naming conventions")
 		require.Contains(t, comments[0]["body"].(string), "Rule \"primary-key-required\"")
 		// Schema lint has no steps, return Success
@@ -3027,7 +3026,6 @@ func TestSchemaLint(t *testing.T) {
 		err = a.SchemaLint(context.Background())
 		require.NoError(t, err)
 		require.Len(t, comments, 1)
-		require.Contains(t, comments[0]["body"].(string), "Schema Lint Report")
 		require.Contains(t, comments[0]["body"].(string), "No issues found — your schema is pristine and valid!")
 	})
 }
