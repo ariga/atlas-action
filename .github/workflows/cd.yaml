@@ -17,13 +17,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.0.2
+      - name: Setup Git for GitHub bot
+        run:
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+        shell: bash
       - name: Run Make Release
         id: create-release
         run: make release
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
   build:
     needs: release
-    if: needs.release.outputs.created == 'true'
+    if: needs.release.outputs.created
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -63,6 +70,7 @@ jobs:
           CGO_ENABLED: 0
           AWS_REGION: us-east-1
           DOCKER_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          GH_TOKEN: ${{ github.token }}
   # Run end-to-end test on the published binary.
   e2e-test:
     needs: build
@@ -79,16 +87,16 @@ jobs:
         with:
           uses: ariga/atlas-action/migrate/lint@v1
           with: '{
-            "dir": "file://atlasaction/testdata/migrations",
-            "dev-url": "sqlite://dev?mode=memory",
-            "dir-name": "test-dir-sqlite"
+              "dir": "file://atlasaction/testdata/migrations",
+              "dev-url": "sqlite://dev?mode=memory",
+              "dir-name": "test-dir-sqlite"
             }'
       - name: Run Migrate Push
         uses: jenseng/dynamic-uses@v1
         with:
           uses: ariga/atlas-action/migrate/push@v1
           with: '{
-            "dir": "file://atlasaction/testdata/migrations",
-            "dev-url": "sqlite://dev?mode=memory",
-            "dir-name": "test-dir-sqlite"
+              "dir": "file://atlasaction/testdata/migrations",
+              "dev-url": "sqlite://dev?mode=memory",
+              "dir-name": "test-dir-sqlite"
             }'
