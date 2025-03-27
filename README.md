@@ -2,8 +2,6 @@
 
 This repository contains GitHub Actions for working with [Atlas](https://atlasgo.io).
 
-> If you are looking for the old TypeScript-based action, please see the old [README](doc/typescript-action.md). 
-
 To learn more about the recommended way to build workflows, read our guide on 
 [Modern CI/CD for Databases](https://atlasgo.io/guides/modern-database-ci-cd).
 
