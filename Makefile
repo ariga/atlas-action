@@ -18,12 +18,12 @@ atlas-action:
 .PHONY: test
 test:
 	@OUTPUT=$$(./atlas-action --version); \
-	echo $$OUTPUT | grep -iq "$(VERSION)" && echo Version=$$OUTPUT || (echo "unexpected output: $$OUTPUT, expected to include: $(VERSION)"; exit 1)
+	echo "$$OUTPUT" | grep -iq "$(VERSION)" && echo "Version=$$OUTPUT" || (echo "unexpected output: $$OUTPUT, expected to include: $(VERSION)"; exit 1)
 
 .PHONY: s3-upload
 s3-upload:
-	aws s3 cp ./atlas-action s3://xxxx/atlas-action/$(BINARY_NAME)-$(VERSION); \
-	aws s3 cp ./atlas-action s3://xxxx/atlas-action/$(BINARY_NAME)-$(MAJOR_VER);
+	aws s3 cp ./atlas-action s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(VERSION); \
+	aws s3 cp ./atlas-action s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(MAJOR_VER);
 
 .PHONY: docker-build
 docker-build:
@@ -44,9 +44,9 @@ docker: docker-build docker-push
 .PHONY: release
 release:
 	@LATEST_VERSION=$$(gh release view --json tagName -q '.tagName' || echo "none"); \
-	if [ "$$LATEST_VERSION" == "$(VERSION)" ]; then \
+	if [ "$$LATEST_VERSION" = "$(VERSION)" ]; then \
 		echo "Latest release is already $(VERSION). No action needed."; \
-		if [ -n "$$GITHUB_OUTPUT" ]; then \
+		if [ ! -z "$$GITHUB_OUTPUT" ]; then \
 			echo "release_created=false" >> "$$GITHUB_OUTPUT"; \
 		fi; \
 	else \
@@ -57,7 +57,7 @@ release:
 		echo "Updating major version tag to $(MAJOR_VER)"; \
 		git tag -fa "$(MAJOR_VER)" -m "release: update $(MAJOR_VER) tag"; \
 		git push origin "$(MAJOR_VER)" --force; \
-		if [ -n "$$GITHUB_OUTPUT" ]; then \
+		if [ ! -z "$$GITHUB_OUTPUT" ]; then \
 			echo "release_created=true" >> "$$GITHUB_OUTPUT"; \
 		fi; \
 	fi
