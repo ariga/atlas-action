@@ -2897,7 +2897,7 @@ func TestSchemaLint(t *testing.T) {
 		require.NoError(t, err)
 		err = a.SchemaLint(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, 1, act.summary)
+		require.Equal(t, 0, act.summary)
 	})
 	t.Run("lint - with issues", func(t *testing.T) {
 		m := &mockAtlas{}
@@ -3025,7 +3025,6 @@ func TestSchemaLint(t *testing.T) {
 		}
 		err = a.SchemaLint(context.Background())
 		require.NoError(t, err)
-		require.Len(t, comments, 1)
-		require.Contains(t, comments[0]["body"].(string), "No issues found — your schema is pristine and valid!")
+		require.Len(t, comments, 0)
 	})
 }

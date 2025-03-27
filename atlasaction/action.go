@@ -758,7 +758,11 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 		a.SetOutput("error", err.Error())
 		return fmt.Errorf("`atlas schema lint` completed with errors:\n%s", err)
 	}
-	redactedURLs := make([]string, 0, len(params.URL))
+	if len(report.Steps) == 0 {
+		a.Infof("`atlas schema lint` completed successfully, no issues found")
+		return nil
+	}
+	redactedURLs := make([]string, len(params.URL))
 	for _, u := range params.URL {
 		redacted, err := redactedURL(u)
 		if err != nil {

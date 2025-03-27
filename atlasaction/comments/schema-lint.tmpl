@@ -15,7 +15,7 @@
           {{- template "lint-check" "error.svg" -}}
         </div>
       </td>
-      <td><b>{{ $step.Text | firstUpper }}</b></td>
+      <td>{{ $step.Text | firstUpper }}</td>
       <td>
         {{- if $step.Desc }}
         <strong>{{ $step.Desc }}</strong><br/>
@@ -28,11 +28,5 @@
       </td>
     </tr>{{ end }}
   </tbody>
-</table>{{ else }}
-<div align="center">
-  {{- template "lint-check" "success.svg" -}}
-  <br/>
-  <h3>🎉 Success! 🎉</h3>
-  <p>No issues found — your schema is pristine and valid!</p>
-</div>
+</table>
 {{ end }}
