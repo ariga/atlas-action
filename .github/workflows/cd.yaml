@@ -30,7 +30,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
   build:
     needs: release
-    if: needs.release.outputs.created
+    if: ${{ needs.release.outputs.created }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
