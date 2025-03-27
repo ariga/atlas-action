@@ -381,8 +381,8 @@ jobs:
     # Skip the step below if your CI is already configured with a Git account.
     - name: config git to commit changes
       run: |
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git config user.name "github-actions[bot]"    
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
     - uses: ariga/atlas-action/migrate/autorebase@v1
       with:
         base-branch: master
