@@ -305,6 +305,7 @@ const (
 	CmdMigrateDown       = "migrate/down"
 	CmdMigrateTest       = "migrate/test"
 	CmdMigrateAutoRebase = "migrate/autorebase"
+	CmdMigratePlan       = "migrate/plan"
 	// Declarative workflow Commands
 	CmdSchemaPush        = "schema/push"
 	CmdSchemaLint        = "schema/lint"
@@ -337,6 +338,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MigrateTest(ctx)
 	case CmdMigrateAutoRebase:
 		return a.MigrateAutoRebase(ctx)
+	case CmdMigratePlan:
+		return a.MigratePlan(ctx)
 	case CmdSchemaPush:
 		return a.SchemaPush(ctx)
 	case CmdSchemaLint:
@@ -665,6 +668,36 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	a.Infof("Migrations rebased successfully")
 	return nil
 }
+
+// MigratePlan runs the GitHub Action for "ariga/atlas-action/migrate/plan"
+func (a *Actions) MigratePlan(ctx context.Context) error {
+	tc, err := a.GetTriggerContext(ctx)
+	if err != nil {
+		return err
+	}
+	var (
+		remote     = a.GetInputDefault("remote", "origin")
+		dirURL = a.GetInputDefault("dir", "file://migrations")
+		currBranch = tc.Branch
+	)
+	if v, err := a.exec(ctx, "git", "--version"); err != nil {
+		return fmt.Errorf("failed to get git version: %w", err)
+	} else {
+		a.Infof("migrate plan with %s", v)
+	}
+	// Since running in detached HEAD, we need to switch to the branch.
+	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
+		return fmt.Errorf("failed to checkout to the branch: %w", err)
+	}
+	// run migrate diff on the current branch.
+	params := &atlasexec.MigrateLintParams{
+		DirURL:          dirURL,
+		DevURL:          a.GetInput("dev-url"),
+	}
+
+	return nil
+}
+
 
 // hashFileFrom returns the hash file from the remote branch.
 func (a *Actions) hashFileFrom(ctx context.Context, remote, branch, path string) (migrate.HashFile, error) {
