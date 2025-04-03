@@ -99,6 +99,8 @@ type (
 		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
 		// MigrateHash runs the `migrate hash` command.
 		MigrateHash(context.Context, *atlasexec.MigrateHashParams) error
+		// MigrateDiff runs the `migrate diff --dry-run` command.
+		MigrateDiff(ctx context.Context, params *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
 		// MigrateRebase runs the `migrate rebase` command.
 		MigrateRebase(context.Context, *atlasexec.MigrateRebaseParams) error
 		// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
@@ -677,7 +679,7 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 	}
 	var (
 		remote     = a.GetInputDefault("remote", "origin")
-		dirURL = a.GetInputDefault("dir", "file://migrations")
+		dirURL     = a.GetInputDefault("dir", "file://migrations")
 		currBranch = tc.Branch
 	)
 	if v, err := a.exec(ctx, "git", "--version"); err != nil {
@@ -689,15 +691,62 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
-	// run migrate diff on the current branch.
-	params := &atlasexec.MigrateLintParams{
-		DirURL:          dirURL,
-		DevURL:          a.GetInput("dev-url"),
+	params := &atlasexec.MigrateDiffParams{
+		DirURL:    dirURL,
+		DevURL:    a.GetInput("dev-url"),
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
 	}
-
+	diff, err := a.Atlas.MigrateDiff(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to run `atlas migrate diff`: %w", err)
+	}
+	if len(diff.Files) == 0 {
+		a.Infof("The migration directory is synced with the desired state, no changes to be made")
+		return nil
+	}
+	// If there is a diff, add the files to the migration directory, run `migrate hash`, lint the directory
+	// and commit the changes.
+	if v, err := a.exec(ctx, "git", "--version"); err != nil {
+		return fmt.Errorf("failed to get git version: %w", err)
+	} else {
+		a.Infof("migrate plan with %s", v)
+	}
+	// Since running in detached HEAD, we need to switch to the branch.
+	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
+		return fmt.Errorf("failed to checkout to the branch: %w", err)
+	}
+	u, err := url.Parse(dirURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse dir URL: %w", err)
+	}
+	dirPath := filepath.Join(u.Host, u.Path)
+	for _, f := range diff.Files {
+		os.WriteFile(filepath.Join(dirPath, f.Name), []byte(f.Content), 0644)
+	}
+	if err = a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{
+		DirURL: dirURL,
+	}); err != nil {
+		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
+	}
+	// Run lint on the new migration files.
+	if err := a.MigrateLint(ctx); err != nil {
+		return fmt.Errorf("failed to run `atlas migrate lint`: %w", err)
+	}
+	if _, err = a.exec(ctx, "git", "add", dirPath); err != nil {
+		return fmt.Errorf("failed to stage changes: %w", err)
+	}
+	if _, err = a.exec(ctx, "git", "commit", "--message",
+		fmt.Sprintf("%s: add new migration file", dirPath)); err != nil {
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+	if _, err = a.exec(ctx, "git", "push", remote, currBranch); err != nil {
+		return fmt.Errorf("failed to push changes: %w", err)
+	}
+	a.Infof("Migrate plan completed successfully")
 	return nil
 }
-
 
 // hashFileFrom returns the hash file from the remote branch.
 func (a *Actions) hashFileFrom(ctx context.Context, remote, branch, path string) (migrate.HashFile, error) {

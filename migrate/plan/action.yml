@@ -31,6 +31,9 @@ inputs:
       The URL of the migration directory to lint. For example: `file://migrations`.
       Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
     required: false
+  dir-name:
+    description: The name (slug) of the project in Atlas Cloud.
+    required: true
   remote:
     description: | 
       The remote to push changes to. Defaults to `origin`.

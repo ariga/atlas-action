@@ -588,6 +588,7 @@ func (m *mockAtlasCloud) Start(t *testing.T, token string) *httptest.Server {
 
 type mockAtlas struct {
 	login             func(context.Context, *atlasexec.LoginParams) error
+	migrateDiff       func(context.Context, *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
 	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
@@ -611,6 +612,11 @@ func (m *mockAtlas) Version(context.Context) (*atlasexec.Version, error) {
 // Login implements AtlasExec.
 func (m *mockAtlas) Login(ctx context.Context, params *atlasexec.LoginParams) error {
 	return m.login(ctx, params)
+}
+
+//  MigrateDiff implements AtlasExec.
+func (m *mockAtlas) MigrateDiff(ctx context.Context, params *atlasexec.MigrateDiffParams) ( *atlasexec.MigrateDiff,  error) {
+	return m.migrateDiff(ctx, params)
 }
 
 // MigrateStatus implements AtlasExec.
