@@ -21,6 +21,10 @@ inputs:
       A JSON object containing variables to be used in the Atlas configuration file.
       For example, `{"var1": "value1", "var2": "value2"}`.
     required: false
+  to:
+    description: |
+      The URL of the desired state.
+    required: false
   dev-url:
     description: |
       The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.

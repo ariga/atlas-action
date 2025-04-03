@@ -693,6 +693,7 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 	}
 	params := &atlasexec.MigrateDiffParams{
 		DirURL:    dirURL,
+		ToURL:     a.GetInput("to"),
 		DevURL:    a.GetInput("dev-url"),
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
@@ -708,22 +709,13 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 	}
 	// If there is a diff, add the files to the migration directory, run `migrate hash`, lint the directory
 	// and commit the changes.
-	if v, err := a.exec(ctx, "git", "--version"); err != nil {
-		return fmt.Errorf("failed to get git version: %w", err)
-	} else {
-		a.Infof("migrate plan with %s", v)
-	}
-	// Since running in detached HEAD, we need to switch to the branch.
-	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
-		return fmt.Errorf("failed to checkout to the branch: %w", err)
-	}
 	u, err := url.Parse(dirURL)
 	if err != nil {
 		return fmt.Errorf("failed to parse dir URL: %w", err)
 	}
 	dirPath := filepath.Join(u.Host, u.Path)
 	for _, f := range diff.Files {
-		os.WriteFile(filepath.Join(dirPath, f.Name), []byte(f.Content), 0644)
+		a.exec(ctx, "echo", f.Content, ">", filepath.Join(dirPath, f.Name))
 	}
 	if err = a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{
 		DirURL: dirURL,

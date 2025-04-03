@@ -592,6 +592,7 @@ type mockAtlas struct {
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
 	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
+	migrateLintError  func(context.Context, *atlasexec.MigrateLintParams) error
 	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
@@ -614,8 +615,8 @@ func (m *mockAtlas) Login(ctx context.Context, params *atlasexec.LoginParams) er
 	return m.login(ctx, params)
 }
 
-//  MigrateDiff implements AtlasExec.
-func (m *mockAtlas) MigrateDiff(ctx context.Context, params *atlasexec.MigrateDiffParams) ( *atlasexec.MigrateDiff,  error) {
+// MigrateDiff implements AtlasExec.
+func (m *mockAtlas) MigrateDiff(ctx context.Context, params *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error) {
 	return m.migrateDiff(ctx, params)
 }
 
@@ -640,8 +641,8 @@ func (m *mockAtlas) MigrateApplySlice(context.Context, *atlasexec.MigrateApplyPa
 }
 
 // MigrateLintError implements AtlasExec.
-func (m *mockAtlas) MigrateLintError(context.Context, *atlasexec.MigrateLintParams) error {
-	panic("unimplemented")
+func (m *mockAtlas) MigrateLintError(ctx context.Context, params *atlasexec.MigrateLintParams) error {
+	return m.migrateLintError(ctx, params)
 }
 
 // MigratePush implements AtlasExec.
@@ -1067,7 +1068,108 @@ func TestMigrateAutoRebase(t *testing.T) {
 		require.Equal(t, []string{"merge", "--no-ff", "origin/rebase-branch"}, mockExec.ran[5].args)
 		require.Equal(t, []string{"diff", "--name-only", "--diff-filter=U"}, mockExec.ran[6].args)
 	})
+}
 
+func TestMigratePlan(t *testing.T) {
+	t.Run("no diff", func(t *testing.T) {
+		c, err := atlasexec.NewClient("", "atlas")
+		require.NoError(t, err)
+		out := &bytes.Buffer{}
+		mockExec := &MockCmdExecutor{
+			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+				// Dummy command to avoid errors
+				return exec.CommandContext(ctx, "echo")
+			},
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"to":      "file://testdata/migrations",
+				"dir":     "file://testdata/migrations",
+				"dev-url": "sqlite://file?mode=memory",
+			},
+			trigger: &atlasaction.TriggerContext{
+				Branch: "my-branch",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+		acts, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(c),
+			atlasaction.WithCmdExecutor(mockExec.ExecCmd),
+		)
+		require.NoError(t, err)
+
+		require.NoError(t, acts.MigratePlan(context.Background()))
+		require.Contains(t, out.String(), "The migration directory is synced with the desired state")
+		// Check that the correct git commands were executed
+		require.Len(t, mockExec.ran, 2)
+		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
+	})
+	t.Run("diff with lint", func(t *testing.T) {
+		cli := &mockAtlas{
+			migrateDiff: func(ctx context.Context, p *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error) {
+				return &atlasexec.MigrateDiff{
+					Files: []atlasexec.File{
+						{Content: "create table t1 ( c int );", Name: "t1.sql"},
+					},
+				}, nil
+			},
+			migrateHash: func(ctx context.Context, p *atlasexec.MigrateHashParams) error {
+				return nil
+			},
+			migrateLintError: func(ctx context.Context, params *atlasexec.MigrateLintParams) error {
+				res := &atlasexec.SummaryReport{Files: []*atlasexec.FileReport{}}
+				b, err := json.Marshal(res)
+				require.NoError(t, err)
+				_, err = params.Writer.Write(b)
+				require.NoError(t, err)
+				return nil
+			},
+		}
+		var (
+			out = &bytes.Buffer{}
+			td  = t.TempDir()
+		)
+		mockExec := &MockCmdExecutor{
+			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+				// Dummy command to avoid errors
+				return exec.CommandContext(ctx, "echo")
+			},
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"to":       fmt.Sprintf("file://%s/schema.sql", td),
+				"dir":      "file://testdata/migrations",
+				"dir-name": "test-dir",
+				"dev-url":  "sqlite://file?mode=memory",
+			},
+			trigger: &atlasaction.TriggerContext{
+				Branch:        "my-branch",
+				DefaultBranch: "main",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+		acts, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(cli),
+			atlasaction.WithCmdExecutor(mockExec.ExecCmd),
+		)
+		require.NoError(t, err)
+
+		require.NoError(t, acts.MigratePlan(context.Background()))
+		require.Contains(t, out.String(), "Migrate plan completed successfully")
+		require.Contains(t, out.String(), "atlas migrate lint` completed successfully, no issues found")
+		// Check that the correct commands were executed
+		require.Len(t, mockExec.ran, 6)
+		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
+		require.Equal(t, "echo", mockExec.ran[2].name)
+		require.Equal(t, []string{"create table t1 ( c int );", ">", "testdata/migrations/t1.sql"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"add", "testdata/migrations"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"commit", "--message", "testdata/migrations: add new migration file"}, mockExec.ran[4].args)
+		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[5].args)
+	})
 }
 
 type mockCloudClient struct {
