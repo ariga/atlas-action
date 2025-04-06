@@ -495,7 +495,7 @@ func (a *Actions) MigratePush(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to push dir tag: %w", err)
 	}
-	a.Infof(`"atlas migrate push" completed successfully, pushed dir %q to Atlas Cloud`, params.Name)
+	a.Infof(`"atlas migrate push" completed successfully, pushed directory %q to Atlas Cloud`, params.Name)
 	a.SetOutput("url", resp)
 	return nil
 }
