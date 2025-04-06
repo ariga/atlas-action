@@ -734,7 +734,7 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 	if _, err = a.exec(ctx, "git", "push", remote, currBranch); err != nil {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
-	a.Infof("Migrate diff completed successfully")
+	a.Infof("Run migrate/diff completed successfully")
 	return nil
 }
 

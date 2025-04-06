@@ -1137,7 +1137,7 @@ func TestMigrateDiff(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, acts.MigrateDiff(context.Background()))
-		require.Contains(t, out.String(), "Migrate diff completed successfully")
+		require.Contains(t, out.String(), "Run migrate/diff completed successfully")
 		// Check that the correct commands were executed
 		require.Len(t, mockExec.ran, 5)
 		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
