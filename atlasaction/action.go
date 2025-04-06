@@ -707,15 +707,15 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 		a.Infof("The migration directory is synced with the desired state, no changes to be made")
 		return nil
 	}
-	// If there is a diff, add the files to the migration directory, run `migrate hash`, lint the directory
-	// and commit the changes.
+	// If there is a diff, add the files to the migration directory, run `migrate hash`, commit the push the changes
+	// and lint the new migration files.
 	u, err := url.Parse(dirURL)
 	if err != nil {
 		return fmt.Errorf("failed to parse dir URL: %w", err)
 	}
 	dirPath := filepath.Join(u.Host, u.Path)
 	for _, f := range diff.Files {
-		if _, err := a.exec(ctx, "echo", f.Content, ">", filepath.Join(dirPath, f.Name)); err != nil {
+		if err := os.WriteFile(filepath.Join(dirPath, f.Name), []byte(f.Content), 0644); err != nil {
 			return fmt.Errorf("failed to write file %s: %w", f.Name, err)
 		}
 	}
@@ -723,10 +723,6 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 		DirURL: dirURL,
 	}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
-	}
-	// Run lint on the new migration files.
-	if err := a.MigrateLint(ctx); err != nil {
-		return fmt.Errorf("failed to run `atlas migrate lint`: %w", err)
 	}
 	// Add the new migration files to the git index and commit the changes.
 	if _, err = a.exec(ctx, "git", "add", dirPath); err != nil {
@@ -740,6 +736,10 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Migrate plan completed successfully")
+	// Run lint on the new migration files.
+	if err := a.MigrateLint(ctx); err != nil {
+		return fmt.Errorf("failed to run `atlas migrate lint`: %w", err)
+	}
 	return nil
 }
 

@@ -1161,14 +1161,17 @@ func TestMigratePlan(t *testing.T) {
 		require.Contains(t, out.String(), "Migrate plan completed successfully")
 		require.Contains(t, out.String(), "atlas migrate lint` completed successfully, no issues found")
 		// Check that the correct commands were executed
-		require.Len(t, mockExec.ran, 6)
+		require.Len(t, mockExec.ran, 5)
 		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
 		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
-		require.Equal(t, "echo", mockExec.ran[2].name)
-		require.Equal(t, []string{"create table t1 ( c int );", ">", "testdata/migrations/t1.sql"}, mockExec.ran[2].args)
-		require.Equal(t, []string{"add", "testdata/migrations"}, mockExec.ran[3].args)
-		require.Equal(t, []string{"commit", "--message", "testdata/migrations: add new migration file"}, mockExec.ran[4].args)
-		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[5].args)
+		require.Equal(t, []string{"add", "testdata/migrations"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"commit", "--message", "testdata/migrations: add new migration file"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[4].args)
+		// Ensure migration file was created
+		require.FileExists(t, filepath.Join("testdata/migrations", "t1.sql"))
+		t.Cleanup(func() {
+			_ = os.Remove(filepath.Join("testdata/migrations", "t1.sql"))
+		})
 	})
 }
 
