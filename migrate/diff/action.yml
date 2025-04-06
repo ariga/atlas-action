@@ -1,4 +1,4 @@
-name: 'Migrate Apply'
+name: 'Migrate Diff'
 description: 'Run Migrate diff and commit the changes to the migration directory and run lint on the changes.'
 branding:
   icon: database

@@ -307,7 +307,7 @@ const (
 	CmdMigrateDown       = "migrate/down"
 	CmdMigrateTest       = "migrate/test"
 	CmdMigrateAutoRebase = "migrate/autorebase"
-	CmdMigratePlan       = "migrate/plan"
+	CmdMigrateDiff       = "migrate/diff"
 	// Declarative workflow Commands
 	CmdSchemaPush        = "schema/push"
 	CmdSchemaLint        = "schema/lint"
@@ -340,8 +340,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MigrateTest(ctx)
 	case CmdMigrateAutoRebase:
 		return a.MigrateAutoRebase(ctx)
-	case CmdMigratePlan:
-		return a.MigratePlan(ctx)
+	case CmdMigrateDiff:
+		return a.MigrateDiff(ctx)
 	case CmdSchemaPush:
 		return a.SchemaPush(ctx)
 	case CmdSchemaLint:
@@ -671,8 +671,8 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	return nil
 }
 
-// MigratePlan runs the GitHub Action for "ariga/atlas-action/migrate/plan"
-func (a *Actions) MigratePlan(ctx context.Context) error {
+// MigrateDiff runs the GitHub Action for "ariga/atlas-action/migrate/diff"
+func (a *Actions) MigrateDiff(ctx context.Context) error {
 	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
@@ -718,7 +718,7 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 	if v, err := a.exec(ctx, "git", "--version"); err != nil {
 		return fmt.Errorf("failed to get git version: %w", err)
 	} else {
-		a.Infof("migrate plan with %s", v)
+		a.Infof("migrate diff with %s", v)
 	}
 	// Since running in detached HEAD, we need to switch to the branch.
 	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
@@ -735,7 +735,7 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 	if _, err = a.exec(ctx, "git", "push", remote, currBranch); err != nil {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
-	a.Infof("Migrate plan completed successfully")
+	a.Infof("Migrate diff completed successfully")
 	return a.MigrateLint(ctx)
 }
 

@@ -16,7 +16,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Revert migrations to a database                                                     |
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                                                       |
 | [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase)  | Fix `atlas.sum` conflicts in migration directory                                    |
-| [ariga/atlas-action/migrate/plan](#arigaatlas-actionmigrateplan)              | Run Migrate diff and commit the changes to the migration directory                  |
+| [ariga/atlas-action/migrate/diff](#arigaatlas-actionmigratediff)              | Run Migrate diff and commit the changes to the migration directory                  |
 | [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                                                           |
 | [ariga/atlas-action/schema/lint](#arigaatlas-actionschemalint)                | Lint database schema with Atlas                                                     |
 | [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema to [Atlas Registry](https://atlasgo.io/registry)                      |
@@ -388,10 +388,9 @@ jobs:
         dir: file://migrations
 ```
 
-### `ariga/atlas-action/migrate/plan`
+### `ariga/atlas-action/migrate/diff`
 
-Automatically generate a migration plan and commit the changes to the migration directory.
-And run lint on the changes.
+Generate and lint migrations automatically, then commit the changes to the migration directory.
 
 > **Note**
 >
@@ -430,7 +429,7 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 ```yaml
 jobs:
-  migrate-plan:
+  migrate-diff:
     permissions:
       # Allow pushing changes to repo and comments on the pull request
       contents: write
@@ -452,7 +451,7 @@ jobs:
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-    - uses: ariga/atlas-action/migrate/plan@v1
+    - uses: ariga/atlas-action/migrate/diff@v1
       with:
         dir-name: 'my-project' # The name of the project in Atlas Cloud
         dev-url: "mysql://root:pass@localhost:3306/dev"

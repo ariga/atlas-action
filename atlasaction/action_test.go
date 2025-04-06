@@ -1070,7 +1070,7 @@ func TestMigrateAutoRebase(t *testing.T) {
 	})
 }
 
-func TestMigratePlan(t *testing.T) {
+func TestMigrateDiff(t *testing.T) {
 	t.Run("no diff", func(t *testing.T) {
 		c, err := atlasexec.NewClient("", "atlas")
 		require.NoError(t, err)
@@ -1092,7 +1092,7 @@ func TestMigratePlan(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		require.NoError(t, acts.MigratePlan(context.Background()))
+		require.NoError(t, acts.MigrateDiff(context.Background()))
 		require.Contains(t, out.String(), "The migration directory is synced with the desired state")
 	})
 	t.Run("diff with lint", func(t *testing.T) {
@@ -1146,8 +1146,8 @@ func TestMigratePlan(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		require.NoError(t, acts.MigratePlan(context.Background()))
-		require.Contains(t, out.String(), "Migrate plan completed successfully")
+		require.NoError(t, acts.MigrateDiff(context.Background()))
+		require.Contains(t, out.String(), "Migrate diff completed successfully")
 		require.Contains(t, out.String(), "atlas migrate lint` completed successfully, no issues found")
 		// Check that the correct commands were executed
 		require.Len(t, mockExec.ran, 5)
