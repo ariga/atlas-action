@@ -393,6 +393,16 @@ jobs:
 Automatically generate a migration plan and commit the changes to the migration directory.
 And run lint on the changes.
 
+> **Note**
+>
+> After pushing the changes to the migration directory,
+> no other workflows will be triggered unless the action is running with a personal access token (PAT).
+>```
+>   - uses: actions/checkout@v4
+>     with:
+>       token: ${{ secrets.PAT }}
+>```
+
 #### Inputs
 
 All inputs are optional as they may be specified in the Atlas configuration file.
@@ -434,6 +444,8 @@ jobs:
         cloud-token: ${{ secrets.ATLAS_TOKEN }}
     - uses: actions/checkout@v4
       with:
+        # Use personal access token to trigger workflows after commits are pushed by the action.
+        token: ${{ secrets.PAT }}
         fetch-depth: 0
     # Skip the step below if your CI is already configured with a Git account.
     - name: config git to commit changes
