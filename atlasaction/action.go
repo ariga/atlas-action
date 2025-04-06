@@ -736,11 +736,7 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Migrate plan completed successfully")
-	// Run lint on the new migration files.
-	if err := a.MigrateLint(ctx); err != nil {
-		return fmt.Errorf("failed to run `atlas migrate lint`: %w", err)
-	}
-	return nil
+	return a.MigrateLint(ctx)
 }
 
 // hashFileFrom returns the hash file from the remote branch.
