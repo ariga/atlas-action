@@ -715,7 +715,9 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 	}
 	dirPath := filepath.Join(u.Host, u.Path)
 	for _, f := range diff.Files {
-		a.exec(ctx, "echo", f.Content, ">", filepath.Join(dirPath, f.Name))
+		if _, err := a.exec(ctx, "echo", f.Content, ">", filepath.Join(dirPath, f.Name)); err != nil {
+			return fmt.Errorf("failed to write file %s: %w", f.Name, err)
+		}
 	}
 	if err = a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{
 		DirURL: dirURL,
@@ -726,6 +728,7 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 	if err := a.MigrateLint(ctx); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate lint`: %w", err)
 	}
+	// Add the new migration files to the git index and commit the changes.
 	if _, err = a.exec(ctx, "git", "add", dirPath); err != nil {
 		return fmt.Errorf("failed to stage changes: %w", err)
 	}
