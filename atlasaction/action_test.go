@@ -592,7 +592,6 @@ type mockAtlas struct {
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
 	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
-	migrateLintError  func(context.Context, *atlasexec.MigrateLintParams) error
 	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
@@ -641,8 +640,8 @@ func (m *mockAtlas) MigrateApplySlice(context.Context, *atlasexec.MigrateApplyPa
 }
 
 // MigrateLintError implements AtlasExec.
-func (m *mockAtlas) MigrateLintError(ctx context.Context, params *atlasexec.MigrateLintParams) error {
-	return m.migrateLintError(ctx, params)
+func (m *mockAtlas) MigrateLintError(context.Context, *atlasexec.MigrateLintParams) error {
+	panic("unimplemented")
 }
 
 // MigratePush implements AtlasExec.
@@ -1095,7 +1094,7 @@ func TestMigrateDiff(t *testing.T) {
 		require.NoError(t, acts.MigrateDiff(context.Background()))
 		require.Contains(t, out.String(), "The migration directory is synced with the desired state")
 	})
-	t.Run("diff with lint", func(t *testing.T) {
+	t.Run("there is diff", func(t *testing.T) {
 		cli := &mockAtlas{
 			migrateDiff: func(ctx context.Context, p *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error) {
 				return &atlasexec.MigrateDiff{
@@ -1105,14 +1104,6 @@ func TestMigrateDiff(t *testing.T) {
 				}, nil
 			},
 			migrateHash: func(ctx context.Context, p *atlasexec.MigrateHashParams) error {
-				return nil
-			},
-			migrateLintError: func(ctx context.Context, params *atlasexec.MigrateLintParams) error {
-				res := &atlasexec.SummaryReport{Files: []*atlasexec.FileReport{}}
-				b, err := json.Marshal(res)
-				require.NoError(t, err)
-				_, err = params.Writer.Write(b)
-				require.NoError(t, err)
 				return nil
 			},
 		}
@@ -1128,10 +1119,9 @@ func TestMigrateDiff(t *testing.T) {
 		}
 		act := &mockAction{
 			inputs: map[string]string{
-				"to":       fmt.Sprintf("file://%s/schema.sql", td),
-				"dir":      "file://testdata/migrations",
-				"dir-name": "test-dir",
-				"dev-url":  "sqlite://file?mode=memory",
+				"to":      fmt.Sprintf("file://%s/schema.sql", td),
+				"dir":     "file://testdata/migrations",
+				"dev-url": "sqlite://file?mode=memory",
 			},
 			trigger: &atlasaction.TriggerContext{
 				Branch:        "my-branch",
@@ -1148,7 +1138,6 @@ func TestMigrateDiff(t *testing.T) {
 
 		require.NoError(t, acts.MigrateDiff(context.Background()))
 		require.Contains(t, out.String(), "Migrate diff completed successfully")
-		require.Contains(t, out.String(), "atlas migrate lint` completed successfully, no issues found")
 		// Check that the correct commands were executed
 		require.Len(t, mockExec.ran, 5)
 		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)

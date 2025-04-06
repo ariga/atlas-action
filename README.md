@@ -390,12 +390,10 @@ jobs:
 
 ### `ariga/atlas-action/migrate/diff`
 
-Generate and lint migrations automatically, then commit the changes to the migration directory.
-
+Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory.
 > **Note**
 >
-> After pushing the changes to the migration directory,
-> no other workflows will be triggered unless the action is running with a personal access token (PAT).
+> After committing the changes to the migration directory, no other workflows will be triggered unless the action is run with a personal access token (PAT).
 >```
 >   - uses: actions/checkout@v4
 >     with:
@@ -404,11 +402,10 @@ Generate and lint migrations automatically, then commit the changes to the migra
 
 #### Inputs
 
-All inputs are optional as they may be specified in the Atlas configuration file.
+`dir`, `to`  and `dev-url` are required, but they can be specified in the Atlas configuration file via `config` and `env`.
 
 * `dir` - The URL of the migration directory. For example: `file://migrations`.
 * `to` - The URL of the desired schema state to transition to. For example: `file://schema.hcl`.
-* `dir-name` - The name (slug) of the project in Atlas Cloud.
 * `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
   Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 * `config` - The path to the Atlas configuration file. By default, Atlas will look for a file
@@ -419,11 +416,6 @@ All inputs are optional as they may be specified in the Atlas configuration file
    For example: `'{"var1": "value1", "var2": "value2"}'`.
 * `working-directory` - The working directory to run from.  Defaults to project root.
 * `remote` - The remote to fetch from. Defaults to `origin`.
-
-#### Outputs
-
-* `url` - The URL of the CI report in Atlas Cloud, containing an ERD visualization 
-   and analysis of the schema migrations.
 
 #### Example usage
 
@@ -453,7 +445,6 @@ jobs:
         git config --local user.name "github-actions[bot]"
     - uses: ariga/atlas-action/migrate/diff@v1
       with:
-        dir-name: 'my-project' # The name of the project in Atlas Cloud
         dev-url: "mysql://root:pass@localhost:3306/dev"
         dir: file://migrations
         to:  file://schema.sql # The desired schema state to transition to.

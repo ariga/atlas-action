@@ -698,8 +698,7 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 		a.Infof("The migration directory is synced with the desired state, no changes to be made")
 		return nil
 	}
-	// If there is a diff, add the files to the migration directory, run `migrate hash`, commit the push the changes
-	// and lint the new migration files.
+	// If there is a diff, add the files to the migration directory, run `migrate hash` commit and push the changes.
 	u, err := url.Parse(dirURL)
 	if err != nil {
 		return fmt.Errorf("failed to parse dir URL: %w", err)
@@ -736,7 +735,7 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Migrate diff completed successfully")
-	return a.MigrateLint(ctx)
+	return nil
 }
 
 // hashFileFrom returns the hash file from the remote branch.

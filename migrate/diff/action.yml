@@ -1,5 +1,5 @@
 name: 'Migrate Diff'
-description: 'Run Migrate diff and commit the changes to the migration directory and run lint on the changes.'
+description: 'Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory.'
 branding:
   icon: database
 author: 'Ariga'
@@ -32,12 +32,9 @@ inputs:
     required: false
   dir:
     description: |
-      The URL of the migration directory to lint. For example: `file://migrations`.
+      The URL of the migration directory. For example: `file://migrations`.
       Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
     required: false
-  dir-name:
-    description: The name (slug) of the project in Atlas Cloud.
-    required: true
   remote:
     description: | 
       The remote to push changes to. Defaults to `origin`.
