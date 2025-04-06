@@ -1075,12 +1075,6 @@ func TestMigratePlan(t *testing.T) {
 		c, err := atlasexec.NewClient("", "atlas")
 		require.NoError(t, err)
 		out := &bytes.Buffer{}
-		mockExec := &MockCmdExecutor{
-			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
-				// Dummy command to avoid errors
-				return exec.CommandContext(ctx, "echo")
-			},
-		}
 		act := &mockAction{
 			inputs: map[string]string{
 				"to":      "file://testdata/migrations",
@@ -1095,16 +1089,11 @@ func TestMigratePlan(t *testing.T) {
 		acts, err := atlasaction.New(
 			atlasaction.WithAction(act),
 			atlasaction.WithAtlas(c),
-			atlasaction.WithCmdExecutor(mockExec.ExecCmd),
 		)
 		require.NoError(t, err)
 
 		require.NoError(t, acts.MigratePlan(context.Background()))
 		require.Contains(t, out.String(), "The migration directory is synced with the desired state")
-		// Check that the correct git commands were executed
-		require.Len(t, mockExec.ran, 2)
-		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
-		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
 	})
 	t.Run("diff with lint", func(t *testing.T) {
 		cli := &mockAtlas{

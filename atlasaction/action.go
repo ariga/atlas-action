@@ -682,15 +682,6 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 		dirURL     = a.GetInputDefault("dir", "file://migrations")
 		currBranch = tc.Branch
 	)
-	if v, err := a.exec(ctx, "git", "--version"); err != nil {
-		return fmt.Errorf("failed to get git version: %w", err)
-	} else {
-		a.Infof("migrate plan with %s", v)
-	}
-	// Since running in detached HEAD, we need to switch to the branch.
-	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
-		return fmt.Errorf("failed to checkout to the branch: %w", err)
-	}
 	params := &atlasexec.MigrateDiffParams{
 		DirURL:    dirURL,
 		ToURL:     a.GetInput("to"),
@@ -723,6 +714,15 @@ func (a *Actions) MigratePlan(ctx context.Context) error {
 		DirURL: dirURL,
 	}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
+	}
+	if v, err := a.exec(ctx, "git", "--version"); err != nil {
+		return fmt.Errorf("failed to get git version: %w", err)
+	} else {
+		a.Infof("migrate plan with %s", v)
+	}
+	// Since running in detached HEAD, we need to switch to the branch.
+	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
+		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
 	// Add the new migration files to the git index and commit the changes.
 	if _, err = a.exec(ctx, "git", "add", dirPath); err != nil {
