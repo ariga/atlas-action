@@ -16,6 +16,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Revert migrations to a database                                                     |
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                                                       |
 | [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase)  | Fix `atlas.sum` conflicts in migration directory                                    |
+| [ariga/atlas-action/migrate/diff](#arigaatlas-actionmigratediff)              | Run Migrate diff and commit the changes to the migration directory                  |
 | [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                                                           |
 | [ariga/atlas-action/schema/lint](#arigaatlas-actionschemalint)                | Lint database schema with Atlas                                                     |
 | [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema to [Atlas Registry](https://atlasgo.io/registry)                      |
@@ -385,6 +386,68 @@ jobs:
       with:
         base-branch: master
         dir: file://migrations
+```
+
+### `ariga/atlas-action/migrate/diff`
+
+Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory.
+> **Note**
+>
+> After committing the changes to the migration directory, no other workflows will be triggered unless the action is run with a personal access token (PAT).
+>```
+>   - uses: actions/checkout@v4
+>     with:
+>       token: ${{ secrets.PAT }}
+>```
+
+#### Inputs
+
+`dir`, `to`  and `dev-url` are required, but they can be specified in the Atlas configuration file via `config` and `env`.
+
+* `dir` - The URL of the migration directory. For example: `file://migrations`.
+* `to` - The URL of the desired schema state to transition to. For example: `file://schema.hcl`.
+* `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+* `config` - The path to the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
+* `vars` - Stringify JSON object containing variables to be used inside the Atlas configuration file.
+   For example: `'{"var1": "value1", "var2": "value2"}'`.
+* `working-directory` - The working directory to run from.  Defaults to project root.
+* `remote` - The remote to fetch from. Defaults to `origin`.
+
+#### Example usage
+
+```yaml
+jobs:
+  migrate-diff:
+    permissions:
+      # Allow pushing changes to repo and comments on the pull request
+      contents: write
+      pull-requests: write
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: ariga/setup-atlas@v0
+      with:
+        cloud-token: ${{ secrets.ATLAS_TOKEN }}
+    - uses: actions/checkout@v4
+      with:
+        # Use personal access token to trigger workflows after commits are pushed by the action.
+        token: ${{ secrets.PAT }}
+        fetch-depth: 0
+    # Skip the step below if your CI is already configured with a Git account.
+    - name: config git to commit changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+    - uses: ariga/atlas-action/migrate/diff@v1
+      with:
+        dev-url: "mysql://root:pass@localhost:3306/dev"
+        dir: file://migrations
+        to:  file://schema.sql # The desired schema state to transition to.
 ```
 
 ### `ariga/atlas-action/schema/test`

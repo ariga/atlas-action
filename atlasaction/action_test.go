@@ -588,6 +588,7 @@ func (m *mockAtlasCloud) Start(t *testing.T, token string) *httptest.Server {
 
 type mockAtlas struct {
 	login             func(context.Context, *atlasexec.LoginParams) error
+	migrateDiff       func(context.Context, *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
 	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
@@ -611,6 +612,11 @@ func (m *mockAtlas) Version(context.Context) (*atlasexec.Version, error) {
 // Login implements AtlasExec.
 func (m *mockAtlas) Login(ctx context.Context, params *atlasexec.LoginParams) error {
 	return m.login(ctx, params)
+}
+
+// MigrateDiff implements AtlasExec.
+func (m *mockAtlas) MigrateDiff(ctx context.Context, params *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error) {
+	return m.migrateDiff(ctx, params)
 }
 
 // MigrateStatus implements AtlasExec.
@@ -1061,7 +1067,90 @@ func TestMigrateAutoRebase(t *testing.T) {
 		require.Equal(t, []string{"merge", "--no-ff", "origin/rebase-branch"}, mockExec.ran[5].args)
 		require.Equal(t, []string{"diff", "--name-only", "--diff-filter=U"}, mockExec.ran[6].args)
 	})
+}
 
+func TestMigrateDiff(t *testing.T) {
+	t.Run("no diff", func(t *testing.T) {
+		c, err := atlasexec.NewClient("", "atlas")
+		require.NoError(t, err)
+		out := &bytes.Buffer{}
+		act := &mockAction{
+			inputs: map[string]string{
+				"to":      "file://testdata/migrations",
+				"dir":     "file://testdata/migrations",
+				"dev-url": "sqlite://file?mode=memory",
+			},
+			trigger: &atlasaction.TriggerContext{
+				Branch: "my-branch",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+		acts, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(c),
+		)
+		require.NoError(t, err)
+
+		require.NoError(t, acts.MigrateDiff(context.Background()))
+		require.Contains(t, out.String(), "The migration directory is synced with the desired state")
+	})
+	t.Run("there is diff", func(t *testing.T) {
+		cli := &mockAtlas{
+			migrateDiff: func(ctx context.Context, p *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error) {
+				return &atlasexec.MigrateDiff{
+					Files: []atlasexec.File{
+						{Content: "create table t1 ( c int );", Name: "t1.sql"},
+					},
+				}, nil
+			},
+			migrateHash: func(ctx context.Context, p *atlasexec.MigrateHashParams) error {
+				return nil
+			},
+		}
+		var (
+			out = &bytes.Buffer{}
+			td  = t.TempDir()
+		)
+		mockExec := &MockCmdExecutor{
+			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+				// Dummy command to avoid errors
+				return exec.CommandContext(ctx, "echo")
+			},
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"to":      fmt.Sprintf("file://%s/schema.sql", td),
+				"dir":     "file://testdata/migrations",
+				"dev-url": "sqlite://file?mode=memory",
+			},
+			trigger: &atlasaction.TriggerContext{
+				Branch:        "my-branch",
+				DefaultBranch: "main",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+		acts, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(cli),
+			atlasaction.WithCmdExecutor(mockExec.ExecCmd),
+		)
+		require.NoError(t, err)
+
+		require.NoError(t, acts.MigrateDiff(context.Background()))
+		require.Contains(t, out.String(), "Run migrate/diff completed successfully")
+		// Check that the correct commands were executed
+		require.Len(t, mockExec.ran, 5)
+		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
+		require.Equal(t, []string{"add", "testdata/migrations"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"commit", "--message", "testdata/migrations: add new migration file"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[4].args)
+		// Ensure migration file was created
+		require.FileExists(t, filepath.Join("testdata/migrations", "t1.sql"))
+		t.Cleanup(func() {
+			_ = os.Remove(filepath.Join("testdata/migrations", "t1.sql"))
+		})
+	})
 }
 
 type mockCloudClient struct {

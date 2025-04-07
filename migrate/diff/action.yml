@@ -1,0 +1,49 @@
+name: 'Migrate Diff'
+description: 'Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory.'
+branding:
+  icon: database
+author: 'Ariga'
+inputs:
+  working-directory:
+    description: Atlas working directory, default is project root
+    required: false
+  config:
+    description: |
+      The path to the Atlas configuration file. By default, Atlas will look for a file
+      named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+      Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+    required: false
+  env:
+    description: The environment to use from the Atlas configuration file.  For example, `dev`.
+    required: false
+  vars:
+    description: |
+      A JSON object containing variables to be used in the Atlas configuration file.
+      For example, `{"var1": "value1", "var2": "value2"}`.
+    required: false
+  to:
+    description: |
+      The URL of the desired state.
+    required: false
+  dev-url:
+    description: |
+      The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+      Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+    required: false
+  dir:
+    description: |
+      The URL of the migration directory. For example: `file://migrations`.
+      Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+    required: false
+  remote:
+    description: | 
+      The remote to push changes to. Defaults to `origin`.
+    required: false
+outputs:
+  url:
+    description: |
+      The URL of the CI report in Atlas Cloud, containing an ERD visualization 
+      and analysis of the schema migrations.
+runs:
+  using: node20
+  main: index.js
