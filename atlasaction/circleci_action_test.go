@@ -109,6 +109,16 @@ func TestCircleCI(t *testing.T) {
 			return nil
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
+			"git": func(ts *testscript.TestScript, neg bool, args []string) {
+				err := ts.Exec("git", args...)
+				if neg {
+					if err == nil {
+						ts.Fatalf("expected error, but got none")
+					}
+					return
+				}
+				ts.Check(err)
+			},
 			"output": func(ts *testscript.TestScript, neg bool, args []string) {
 				if len(args) == 0 {
 					_, err := os.Stat(ts.MkAbs(output))
