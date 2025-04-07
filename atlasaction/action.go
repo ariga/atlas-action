@@ -698,6 +698,15 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 		a.Infof("The migration directory is synced with the desired state, no changes to be made")
 		return nil
 	}
+	if v, err := a.exec(ctx, "git", "--version"); err != nil {
+		return fmt.Errorf("failed to get git version: %w", err)
+	} else {
+		a.Infof("migrate diff with %s", v)
+	}
+	// Since running in detached HEAD, we need to switch to the branch.
+	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
+		return fmt.Errorf("failed to checkout to the branch: %w", err)
+	}
 	// If there is a diff, add the files to the migration directory, run `migrate hash` commit and push the changes.
 	u, err := url.Parse(dirURL)
 	if err != nil {
@@ -713,15 +722,6 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 		DirURL: dirURL,
 	}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
-	}
-	if v, err := a.exec(ctx, "git", "--version"); err != nil {
-		return fmt.Errorf("failed to get git version: %w", err)
-	} else {
-		a.Infof("migrate diff with %s", v)
-	}
-	// Since running in detached HEAD, we need to switch to the branch.
-	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
-		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
 	// Add the new migration files to the git index and commit the changes.
 	if _, err = a.exec(ctx, "git", "add", dirPath); err != nil {
