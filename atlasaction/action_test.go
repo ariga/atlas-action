@@ -1101,6 +1101,7 @@ func TestMigrateDiff(t *testing.T) {
 					Files: []atlasexec.File{
 						{Content: "create table t1 ( c int );", Name: "t1.sql"},
 					},
+					Dir: "file://testdata/migrations",
 				}, nil
 			},
 			migrateHash: func(ctx context.Context, p *atlasexec.MigrateHashParams) error {

@@ -679,11 +679,10 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 	}
 	var (
 		remote     = a.GetInputDefault("remote", "origin")
-		dirURL     = a.GetInputDefault("dir", "file://migrations")
 		currBranch = tc.Branch
 	)
 	params := &atlasexec.MigrateDiffParams{
-		DirURL:    dirURL,
+		DirURL:    a.GetInput("dir"),
 		ToURL:     a.GetInput("to"),
 		DevURL:    a.GetInput("dev-url"),
 		ConfigURL: a.GetInput("config"),
@@ -708,7 +707,7 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
 	// If there is a diff, add the files to the migration directory, run `migrate hash` commit and push the changes.
-	u, err := url.Parse(dirURL)
+	u, err := url.Parse(diff.Dir)
 	if err != nil {
 		return fmt.Errorf("failed to parse dir URL: %w", err)
 	}
@@ -719,7 +718,7 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 		}
 	}
 	if err = a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{
-		DirURL: dirURL,
+		DirURL: diff.Dir,
 	}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
 	}
