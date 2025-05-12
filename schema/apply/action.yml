@@ -53,10 +53,10 @@ inputs:
     description: |
       Transaction mode to use. Either "file", "all", or "none". Default is "file".
     required: false
-  approval-policy:
+  lint-review:
     description: |
-      Automatically generate an approval plan before applying changes. Options are "ALWAYS" or "REVIEW".
-      Use "ALWAYS" to generate a plan for every apply, or "REVIEW" to generate a plan only based on lint review.
+      Automatically generate an approval plan before applying changes. Options are "ALWAYS", "ERROR" or "WARNING".
+      Use "ALWAYS" to generate a plan for every apply, or "WARNING" and "ERROR" to generate a plan only based on review policy.
     required: false
   wait-timeout:
     description: Time after which no other retry attempt is made and the action exits.

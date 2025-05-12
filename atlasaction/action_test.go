@@ -313,14 +313,14 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 
 	t.Run("generate an approval plan on every schema changes", func(t *testing.T) {
 		tt := setup(t)
-		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "cannot apply a migration plan in a PENDING state")
 	})
 
 	t.Run("generating an approval plan that have an existing pending plan", func(t *testing.T) {
 		tt := setup(t)
-		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
 		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "cannot apply a migration plan in a PENDING state")
@@ -329,7 +329,7 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 
 	t.Run("generating an approval plan when having > 1 pending plan", func(t *testing.T) {
 		tt := setup(t)
-		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
 		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
 		tt.cloud.AddPlan("pr-0-r1cgcsfo-2", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
@@ -339,7 +339,7 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 
 	t.Run("generating an approval plan that have an existing approved plan", func(t *testing.T) {
 		tt := setup(t)
-		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
 		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "APPROVED", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
 		require.NoError(t, tt.newActs(t).SchemaApply(context.Background()))
@@ -347,14 +347,14 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 
 	t.Run("generating an approval plan based on review policy with lint review = 'ALWAYS'", func(t *testing.T) {
 		tt := setup(t)
-		tt.setInput("approval-policy", "REVIEW")
+		tt.setInput("lint-review", "ERROR")
 		tt.setInput("to", "atlas://example")
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "enabled when review policy is set to WARNING or ERROR")
 	})
 
 	t.Run("generating an approval plan with wait-timeout", func(t *testing.T) {
 		tt := setup(t)
-		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
 		tt.setInput("wait-timeout", "3s")
 		tt.setInput("wait-interval", "1s")
@@ -364,7 +364,7 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 
 	t.Run("generating an approval plan and reaching wait timeout", func(t *testing.T) {
 		tt := setup(t)
-		tt.setInput("approval-policy", "ALWAYS")
+		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
 		tt.setInput("wait-timeout", "1s")
 		require.ErrorContains(
@@ -377,7 +377,7 @@ You can approve the plan by visiting: https://a8m.atlasgo.cloud/schemas/1/plans/
 
 	t.Run("generating an approval plan based on review policy with lint review = 'ERROR'", func(t *testing.T) {
 		tt := setup(t)
-		tt.setInput("approval-policy", "REVIEW")
+		tt.setInput("lint-review", "ERROR")
 		tt.setInput("to", "atlas://example")
 		db, err := sql.Open("sqlite3", tt.db)
 		require.NoError(t, err)
@@ -390,7 +390,6 @@ You can approve the plan by visiting: https://a8m.atlasgo.cloud/schemas/1/plans/
 		require.NoError(t, err)
 		file.WriteString(`
 		lint {
-			review = ERROR
 			destructive {
 				error = true
 			}
