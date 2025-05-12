@@ -1056,7 +1056,7 @@ func (a *Actions) SchemaApply(ctx context.Context) (err error) {
 	var results []*atlasexec.SchemaApply
 	// Determine if the approval process should be used.
 	useApproval :=
-		a.GetInput("approval-policy") != "" &&
+		a.GetInput("lint-review") != "" &&
 			!a.GetBoolInput("auto-approve") &&
 			!a.GetBoolInput("dry-run") &&
 			a.GetInput("plan") == ""
@@ -1181,7 +1181,7 @@ You can approve the plan by visiting: %s`, f.Name, f.Link)
 		return waitAndApplyPlan(plan.File)
 	}
 	// Check existing plans and decide to create a new plan.
-	policy := a.GetInput("approval-policy")
+	review := a.GetInput("lint-review")
 	switch plans, err := a.Atlas.SchemaPlanList(ctx, a.schemaPlanListParams(
 		func(p *atlasexec.SchemaPlanListParams) {
 			p.From = a.GetArrayInput("url")
@@ -1195,17 +1195,36 @@ You can approve the plan by visiting: %s`, f.Name, f.Link)
 	case len(plans) > 1:
 		return a.Atlas.SchemaApplySlice(ctx, a.schemaApplyParams())
 	// There are no pending plans or the policy is set to "ALWAYS". Create a new plan.
-	case len(plans) == 0 && policy == "ALWAYS":
+	case len(plans) == 0 && review == "ALWAYS":
 		return createApprovalPlan()
-	// There are no pending plans and the policy is set to "REVIEW".
-	// In this case, we need to apply the schema first. If there are any errors or warnings
-	// caused by the lint policy, we will create an approval plan.
-	case len(plans) == 0 && policy == "REVIEW":
-		results, err := a.Atlas.SchemaApplySlice(ctx, a.schemaApplyParams())
-		if err != nil && strings.HasPrefix(err.Error(), "Rejected by review policy") {
-			return createApprovalPlan()
+	// There are no pending plans and the review policy is set to "WARNING" or "ERROR".
+	// In this case, we need plan the changes and check for errors.
+	case len(plans) == 0 && (review == "WARNING" || review == "ERROR"):
+		plan, err := a.Atlas.SchemaPlan(ctx, a.schemaPlanParams(
+			func(p *atlasexec.SchemaPlanParams) {
+				p.From = a.GetArrayInput("url")
+				p.To = a.GetArrayInput("to")
+				p.Repo = repo
+				p.DryRun = true
+			},
+		))
+		if err != nil {
+			return nil, fmt.Errorf("failed to plan schema changes: %w", err)
 		}
-		return results, err
+		if plan.Lint == nil {
+			return a.Atlas.SchemaApplySlice(ctx, a.schemaApplyParams())
+		}
+		needApproval := false
+		switch review {
+		case "WARNING":
+			needApproval = plan.Lint.DiagnosticsCount() > 0
+		case "ERROR":
+			needApproval = len(plan.Lint.Errors()) > 0
+		}
+		if !needApproval {
+			return a.Atlas.SchemaApplySlice(ctx, a.schemaApplyParams())
+		}
+		return createApprovalPlan()
 	case len(plans) == 1:
 		return waitAndApplyPlan(&plans[0])
 	default:
