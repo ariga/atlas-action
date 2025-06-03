@@ -1576,7 +1576,6 @@ func (tc *TriggerContext) SCMClient() (SCMClient, error) {
 				tc.Act.Warningf("    contents: read")
 				tc.Act.Warningf("    pull-requests: write")
 				tc.Act.Warningf("  ```")
-				tc.Act.Warningf("")
 				tc.Act.Warningf("  You can also set a personal access token with the required permissions:")
 				tc.Act.Warningf("  ```yaml")
 				tc.Act.Warningf("  env:")
