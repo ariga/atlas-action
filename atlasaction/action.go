@@ -1567,6 +1567,21 @@ func (tc *TriggerContext) SCMClient() (SCMClient, error) {
 		token := tc.Act.Getenv("GITHUB_TOKEN")
 		if token == "" {
 			tc.Act.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
+			if os.Getenv("GITHUB_ACTIONS") != "" {
+				tc.Act.Warningf("On GitHub Actions, you can set the token in the workflow file:")
+				tc.Act.Warningf("  ```yaml")
+				tc.Act.Warningf("  env:")
+				tc.Act.Warningf("    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}")
+				tc.Act.Warningf("  permissions:")
+				tc.Act.Warningf("    contents: read")
+				tc.Act.Warningf("    pull-requests: write")
+				tc.Act.Warningf("  ```")
+				tc.Act.Warningf("  You can also set a personal access token with the required permissions:")
+				tc.Act.Warningf("  ```yaml")
+				tc.Act.Warningf("  env:")
+				tc.Act.Warningf("    GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}")
+				tc.Act.Warningf("  ```")
+			}
 		}
 		return GitHubClient(tc.Repo, tc.SCM.APIURL, token)
 	case atlasexec.SCMTypeGitlab:
