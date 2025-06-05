@@ -389,7 +389,7 @@ func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r 
 	currentMarkers := make(map[string]struct{})
 	for _, step := range r.Steps {
 		for _, diag := range step.Diagnostics {
-			if !slices.Contains(files, diag.Pos.Filename) {
+			if diag.Pos == nil || diag.Pos.Start.Line == 0 || !slices.Contains(files, diag.Pos.Filename) {
 				continue
 			}
 			marker := commentMarker(fmt.Sprintf("schema-lint:%s:%d-%d:%s", diag.Pos.Filename, diag.Pos.Start.Line, diag.Pos.End.Line, diag.Text))
@@ -413,7 +413,7 @@ func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r 
 	// Add or update review comments for diagnostics.
 	for _, step := range r.Steps {
 		for _, diag := range step.Diagnostics {
-			if !slices.Contains(files, diag.Pos.Filename) {
+			if diag.Pos == nil || diag.Pos.Start.Line == 0 || !slices.Contains(files, diag.Pos.Filename) {
 				continue
 			}
 			marker := commentMarker(fmt.Sprintf("schema-lint:%s:%d-%d:%s", diag.Pos.Filename, diag.Pos.Start.Line, diag.Pos.End.Line, diag.Text))
@@ -430,7 +430,7 @@ func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r 
 					Body:      reviewComment,
 					Path:      diag.Pos.Filename,
 					StartLine: diag.Pos.Start.Line,
-					Line:      diag.Pos.End.Line,
+					Line:      max(diag.Pos.Start.Line, diag.Pos.End.Line),
 				}); err != nil {
 					errs = append(errs, fmt.Sprintf("failed to upsert review comment: %v", err))
 				}
