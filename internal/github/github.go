@@ -59,7 +59,7 @@ type (
 			} `mapstructure:"head"`
 		} `mapstructure:"pull_request"`
 		Repository struct {
-			URL string `mapstructure:"html_url"`
+			URL           string `mapstructure:"html_url"`
 			DefaultBranch string `mapstructure:"default_branch"`
 		} `mapstructure:"repository"`
 	}
@@ -257,6 +257,25 @@ func (c *Client) UpdateReviewComment(ctx context.Context, id int, body string) e
 		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
 	return err
+}
+
+// DeleteReviewComment deletes a review comment with the given id.
+func (c *Client) DeleteReviewComment(ctx context.Context, id int) error {
+	url := fmt.Sprintf("%v/repos/%v/pulls/comments/%v", c.baseURL, c.repo, id)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	res, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		b, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	return nil
 }
 
 // ListPullRequestFiles return paths of the files in the trigger event pull request.
