@@ -438,7 +438,7 @@ func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r 
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf(strings.Join(errs, "; "))
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil
 }
