@@ -87,6 +87,8 @@ type (
 		Errorf(string, ...interface{})
 		// Fatalf logs a fatal error message and exits the action.
 		Fatalf(string, ...interface{})
+		// Debugf logs a debug message.
+		Debugf(string, ...any)
 	}
 
 	// AtlasExec is the interface for the atlas exec client.
