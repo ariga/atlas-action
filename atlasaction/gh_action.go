@@ -181,6 +181,12 @@ func (a *ghAction) addChecksSchemaLint(lint *SchemaLintReport) error {
 			logger := a.WithFieldsMap(map[string]string{
 				"title": step.Text,
 			})
+			if diag.Pos != nil {
+				logger = logger.WithFieldsMap(map[string]string{
+					"file": path.Join(a.GetInput("working-directory"), diag.Pos.Filename),
+					"line": strconv.Itoa(max(1, diag.Pos.Start.Line)),
+				})
+			}
 			if step.Text != "" {
 				logger.Warningf("%s", msg)
 			} else {
