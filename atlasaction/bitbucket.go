@@ -80,7 +80,7 @@ func (a *bbPipe) GetTriggerContext(context.Context) (*TriggerContext, error) {
 
 // GetInput implements the Action interface.
 func (a *bbPipe) GetInput(name string) string {
-	return strings.TrimSpace(a.getenv(toInputVarName(name)))
+	return strings.TrimSpace(a.getenv(ToInputVarName(name)))
 }
 
 // SetOutput implements Action.
