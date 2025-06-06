@@ -394,7 +394,10 @@ func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r 
 	currentMarkers := make(map[string]struct{})
 	for _, step := range r.Steps {
 		for _, diag := range step.Diagnostics {
-			if diag.Pos != nil && diag.Pos.Start.Line != 0 && slices.Contains(files, diag.Pos.Filename) {
+			if diag.Pos == nil || diag.Pos.Start.Line == 0 {
+				continue
+			}
+			if diag.Pos.Filename += tc.Act.GetInput("working-directory"); slices.Contains(files, diag.Pos.Filename) {
 				marker := commentMarker(fmt.Sprintf("schema-lint:%s:%d-%d:%s", diag.Pos.Filename, diag.Pos.Start.Line, diag.Pos.End.Line, diag.Text))
 				diagsWithLine = append(diagsWithLine, diagWithMarker{Diag: diag, Marker: marker})
 				currentMarkers[marker] = struct{}{}
