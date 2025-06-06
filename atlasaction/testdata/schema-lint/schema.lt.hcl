@@ -13,3 +13,4 @@ table "t2" {
       type = int
   }
 }
+
