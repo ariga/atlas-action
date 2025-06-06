@@ -427,16 +427,20 @@ func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r 
 		diag := item.Diag
 		marker := item.Marker
 		reviewComment := diag.Text + "\n" + marker
-		if found := slices.IndexFunc(reviewComments, func(c github.PullRequestComment) bool {
+		if !slices.ContainsFunc(reviewComments, func(c github.PullRequestComment) bool {
 			return c.Path == diag.Pos.Filename && strings.Contains(c.Body, marker)
-		}); found == -1 {
+		}) {
 			tc.Act.Debugf("Creating new review comment for file: %s, lines: %d-%d", diag.Pos.Filename, diag.Pos.Start.Line, diag.Pos.End.Line)
+			line, startLine := diag.Pos.Start.Line, 0
+			if diag.Pos.End.Line > diag.Pos.Start.Line {
+				line, startLine = diag.Pos.End.Line, diag.Pos.Start.Line
+			}
 			if err := c.CreateReviewComment(ctx, tc.PullRequest.Number, &github.PullRequestComment{
 				CommitID:  tc.PullRequest.Commit,
 				Body:      reviewComment,
 				Path:      diag.Pos.Filename,
-				StartLine: diag.Pos.Start.Line,
-				Line:      max(diag.Pos.Start.Line, diag.Pos.End.Line),
+				Line:      line,
+				StartLine: startLine,
 			}); err != nil {
 				errs = append(errs, fmt.Sprintf("failed to create review comment: %v", err))
 			}
