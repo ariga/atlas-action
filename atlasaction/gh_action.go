@@ -385,15 +385,20 @@ func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r 
 		return fmt.Errorf("failed to list review comments: %w", err)
 	}
 	var errs []string
-	// Build a set of current markers for diagnostics.
+	// Collect diagnostics that have position line and are in PR files.
+	type diagWithMarker struct {
+		Diag   atlasexec.Diagnostic
+		Marker string
+	}
+	var diagsWithLine []diagWithMarker
 	currentMarkers := make(map[string]struct{})
 	for _, step := range r.Steps {
 		for _, diag := range step.Diagnostics {
-			if diag.Pos == nil || diag.Pos.Start.Line == 0 || !slices.Contains(files, diag.Pos.Filename) {
-				continue
+			if diag.Pos != nil && diag.Pos.Start.Line != 0 && slices.Contains(files, diag.Pos.Filename) {
+				marker := commentMarker(fmt.Sprintf("schema-lint:%s:%d-%d:%s", diag.Pos.Filename, diag.Pos.Start.Line, diag.Pos.End.Line, diag.Text))
+				diagsWithLine = append(diagsWithLine, diagWithMarker{Diag: diag, Marker: marker})
+				currentMarkers[marker] = struct{}{}
 			}
-			marker := commentMarker(fmt.Sprintf("schema-lint:%s:%d-%d:%s", diag.Pos.Filename, diag.Pos.Start.Line, diag.Pos.End.Line, diag.Text))
-			currentMarkers[marker] = struct{}{}
 		}
 	}
 	// Remove outdated review comments.
@@ -410,30 +415,22 @@ func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r 
 			}
 		}
 	}
-	// Add or update review comments for diagnostics.
-	for _, step := range r.Steps {
-		for _, diag := range step.Diagnostics {
-			if diag.Pos == nil || diag.Pos.Start.Line == 0 || !slices.Contains(files, diag.Pos.Filename) {
-				continue
-			}
-			marker := commentMarker(fmt.Sprintf("schema-lint:%s:%d-%d:%s", diag.Pos.Filename, diag.Pos.Start.Line, diag.Pos.End.Line, diag.Text))
-			reviewComment := diag.Text + "\n" + marker
-			if found := slices.IndexFunc(reviewComments, func(c github.PullRequestComment) bool {
-				return c.Path == diag.Pos.Filename && strings.Contains(c.Body, marker)
-			}); found != -1 {
-				if err := c.UpdateReviewComment(ctx, reviewComments[found].ID, reviewComment); err != nil {
-					errs = append(errs, fmt.Sprintf("failed to upsert review comment: %v", err))
-				}
-			} else {
-				if err := c.CreateReviewComment(ctx, tc.PullRequest.Number, &github.PullRequestComment{
-					CommitID:  tc.PullRequest.Commit,
-					Body:      reviewComment,
-					Path:      diag.Pos.Filename,
-					StartLine: diag.Pos.Start.Line,
-					Line:      max(diag.Pos.Start.Line, diag.Pos.End.Line),
-				}); err != nil {
-					errs = append(errs, fmt.Sprintf("failed to upsert review comment: %v", err))
-				}
+	// Add new review comments for diagnostics that have line positions and are not already present.
+	for _, item := range diagsWithLine {
+		diag := item.Diag
+		marker := item.Marker
+		reviewComment := diag.Text + "\n" + marker
+		if found := slices.IndexFunc(reviewComments, func(c github.PullRequestComment) bool {
+			return c.Path == diag.Pos.Filename && strings.Contains(c.Body, marker)
+		}); found == -1 {
+			if err := c.CreateReviewComment(ctx, tc.PullRequest.Number, &github.PullRequestComment{
+				CommitID:  tc.PullRequest.Commit,
+				Body:      reviewComment,
+				Path:      diag.Pos.Filename,
+				StartLine: diag.Pos.Start.Line,
+				Line:      max(diag.Pos.Start.Line, diag.Pos.End.Line),
+			}); err != nil {
+				errs = append(errs, fmt.Sprintf("failed to create review comment: %v", err))
 			}
 		}
 	}

@@ -5,6 +5,7 @@
 package atlasaction_test
 
 import (
+	"ariga.io/atlas/sql/schema"
 	"bytes"
 	"context"
 	"database/sql"
@@ -22,6 +23,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -57,7 +59,8 @@ func TestMigrateApply(t *testing.T) {
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/broken/")
 		err := tt.newActs(t).MigrateApply(context.Background())
-		require.EqualError(t, err, "sql/migrate: executing statement \"CREATE TABLE OrderDetails (\\n    OrderDetailID INTEGER PRIMARY KEY AUTOINCREMENT,\\n    OrderID INTEGER-\\n);\" from version \"20240619073319\": near \"-\": syntax error")
+		require.EqualError(t, err,
+			"sql/migrate: executing statement \"CREATE TABLE OrderDetails (\\n    OrderDetailID INTEGER PRIMARY KEY AUTOINCREMENT,\\n    OrderID INTEGER-\\n);\" from version \"20240619073319\": near \"-\": syntax error")
 
 		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
 		require.NoError(t, err)
@@ -147,7 +150,8 @@ func TestMigrateApply(t *testing.T) {
 		tt.setInput("url", "sqlite://"+tt.db)
 		tt.setInput("dir", "file://testdata/migrations/")
 		err = tt.newActs(t).MigrateApply(context.Background())
-		require.EqualError(t, err, "Error: sql/migrate: connected database is not clean: found multiple tables: 2. baseline version or allow-dirty is required")
+		require.EqualError(t, err,
+			"Error: sql/migrate: connected database is not clean: found multiple tables: 2. baseline version or allow-dirty is required")
 
 		tt.setInput("allow-dirty", "true")
 		err = tt.newActs(t).MigrateApply(context.Background())
@@ -243,7 +247,9 @@ func TestMigrateDown(t *testing.T) {
 			URL:    "URL",
 			Status: "PENDING_USER",
 		}))
-		t.Setenv("TEST_ARGS", fmt.Sprintf(`migrate down --format {{ json . }} --env test --config %s --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION","triggerVersion":"v1.2.3"} --url sqlite://%s --dir file://testdata/down/`, tt.configUrl, tt.db))
+		t.Setenv("TEST_ARGS",
+			fmt.Sprintf(`migrate down --format {{ json . }} --env test --config %s --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION","triggerVersion":"v1.2.3"} --url sqlite://%s --dir file://testdata/down/`,
+				tt.configUrl, tt.db))
 		t.Setenv("TEST_STDOUT", string(st))
 		tt.setInput("env", "test")
 		require.EqualError(t, tt.newActs(t).MigrateDown(context.Background()), "plan approval pending, review here: URL")
@@ -258,7 +264,9 @@ func TestMigrateDown(t *testing.T) {
 			URL:    "URL",
 			Status: "ABORTED",
 		}))
-		t.Setenv("TEST_ARGS", fmt.Sprintf(`migrate down --format {{ json . }} --env test --config %s --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION","triggerVersion":"v1.2.3"} --url sqlite://%s --dir file://testdata/down/`, tt.configUrl, tt.db))
+		t.Setenv("TEST_ARGS",
+			fmt.Sprintf(`migrate down --format {{ json . }} --env test --config %s --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION","triggerVersion":"v1.2.3"} --url sqlite://%s --dir file://testdata/down/`,
+				tt.configUrl, tt.db))
 		t.Setenv("TEST_STDOUT", string(st))
 		t.Setenv("TEST_EXIT_CODE", "1")
 		tt.setInput("env", "test")
@@ -322,18 +330,23 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 		tt := setup(t)
 		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
-		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
+		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=",
+			"IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "cannot apply a migration plan in a PENDING state")
-		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "atlas schema plan approve --url atlas://repo/schema/example/plans/pr-0-r1cgcsfo")
+		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()),
+			"atlas schema plan approve --url atlas://repo/schema/example/plans/pr-0-r1cgcsfo")
 	})
 
 	t.Run("generating an approval plan when having > 1 pending plan", func(t *testing.T) {
 		tt := setup(t)
 		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
-		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
-		tt.cloud.AddPlan("pr-0-r1cgcsfo-2", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
-		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "multiple pre-planned migrations were found in the registry for this schema transition")
+		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=",
+			"IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
+		tt.cloud.AddPlan("pr-0-r1cgcsfo-2", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=",
+			"IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
+		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()),
+			"multiple pre-planned migrations were found in the registry for this schema transition")
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "atlas://repo/schema/example/plans/pr-0-r1cgcsfo")
 	})
 
@@ -341,7 +354,8 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 		tt := setup(t)
 		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
-		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "APPROVED", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
+		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "APPROVED", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=",
+			"IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
 		require.NoError(t, tt.newActs(t).SchemaApply(context.Background()))
 	})
 
@@ -785,10 +799,14 @@ func TestMigratePushWithCloud(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, c.SetEnv(map[string]string{"TEST_BATCH": dir}))
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "1"), 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "args"), []byte(fmt.Sprintf(`migrate push --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --context {"path":"file://testdata/migrations","scmType":"GITHUB"} --config %s test-dir`, tt.configUrl)), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "args"),
+			[]byte(fmt.Sprintf(`migrate push --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --context {"path":"file://testdata/migrations","scmType":"GITHUB"} --config %s test-dir`,
+				tt.configUrl)), 0644))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "stdout"), []byte("LINK1"), 0644))
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "2"), 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "2", "args"), []byte(fmt.Sprintf(`migrate push --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --context {"path":"file://testdata/migrations","scmType":"GITHUB"} --config %s test-dir:valid-tag-123`, tt.configUrl)), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "2", "args"),
+			[]byte(fmt.Sprintf(`migrate push --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --context {"path":"file://testdata/migrations","scmType":"GITHUB"} --config %s test-dir:valid-tag-123`,
+				tt.configUrl)), 0644))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "2", "stdout"), []byte("LINK2"), 0644))
 
 		tt.setInput("dir", "file://testdata/migrations")
@@ -812,7 +830,9 @@ func TestMigratePushWithCloud(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, c.SetEnv(map[string]string{"TEST_BATCH": dir}))
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "1"), 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "args"), []byte(fmt.Sprintf(`migrate push --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --context {"path":"file://testdata/migrations","scmType":"GITHUB"} --config %s test-dir:valid-tag-123`, tt.configUrl)), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "args"),
+			[]byte(fmt.Sprintf(`migrate push --dev-url sqlite://file?mode=memory --dir file://testdata/migrations --context {"path":"file://testdata/migrations","scmType":"GITHUB"} --config %s test-dir:valid-tag-123`,
+				tt.configUrl)), 0644))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "1", "stdout"), []byte("LINK2"), 0644))
 
 		tt.setInput("dir", "file://testdata/migrations")
@@ -1458,15 +1478,17 @@ func TestMigrateLint(t *testing.T) {
 			ad, err := migrate.ArchiveDir(dir)
 			require.NoError(t, err)
 			var resp dirsQueryResponse
-			resp.Data.Dirs = []Dir{{
-				Name:    "test-dir-name",
-				Slug:    "test-dir-slug",
-				Content: base64.StdEncoding.EncodeToString(ad),
-			}, {
-				Name:    "other-dir-name",
-				Slug:    "other-dir-slug",
-				Content: base64.StdEncoding.EncodeToString(ad),
-			}}
+			resp.Data.Dirs = []Dir{
+				{
+					Name:    "test-dir-name",
+					Slug:    "test-dir-slug",
+					Content: base64.StdEncoding.EncodeToString(ad),
+				}, {
+					Name:    "other-dir-name",
+					Slug:    "other-dir-slug",
+					Content: base64.StdEncoding.EncodeToString(ad),
+				},
+			}
 			st2bytes, err := json.Marshal(resp)
 			require.NoError(t, err)
 			_, _ = fmt.Fprint(w, string(st2bytes))
@@ -1591,7 +1613,8 @@ func TestMigrateLint(t *testing.T) {
 			"drop table t1;\n"+
 			"```\n"+
 			"Ensure to run `atlas migrate hash --dir \"file://testdata/migrations_destructive\"` after applying the suggested changes.\n"+
-			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->", comments[0]["body"])
+			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->",
+			comments[0]["body"])
 		require.Equal(t, float64(1), comments[0]["line"])
 		// Run Lint against a directory that has an existing suggestion comment, expecting a PATCH of the comment
 		err = tt.newActs(t).MigrateLint(context.Background())
@@ -1681,15 +1704,17 @@ func TestMigrateLint(t *testing.T) {
 				ad, err := migrate.ArchiveDir(dir)
 				require.NoError(t, err)
 				var resp dirsQueryResponse
-				resp.Data.Dirs = []Dir{{
-					Name:    "test-dir-name",
-					Slug:    "test-dir-slug",
-					Content: base64.StdEncoding.EncodeToString(ad),
-				}, {
-					Name:    "other-dir-name",
-					Slug:    "other-dir-slug",
-					Content: base64.StdEncoding.EncodeToString(ad),
-				}}
+				resp.Data.Dirs = []Dir{
+					{
+						Name:    "test-dir-name",
+						Slug:    "test-dir-slug",
+						Content: base64.StdEncoding.EncodeToString(ad),
+					}, {
+						Name:    "other-dir-name",
+						Slug:    "other-dir-slug",
+						Content: base64.StdEncoding.EncodeToString(ad),
+					},
+				}
 				st2bytes, err := json.Marshal(resp)
 				require.NoError(t, err)
 				_, _ = fmt.Fprint(w, string(st2bytes))
@@ -1780,7 +1805,8 @@ func TestMigrateLint(t *testing.T) {
 			"drop table t1;\n"+
 			"```\n"+
 			"Ensure to run `atlas migrate hash --dir \"file://migrations_destructive\"` after applying the suggested changes.\n"+
-			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->", comments[0]["body"])
+			"<!-- generated by ariga/atlas-action for Add a pre-migration check to ensure table \"t1\" is empty before dropping it -->",
+			comments[0]["body"])
 		require.Equal(t, float64(1), comments[0]["line"])
 		// Run Lint against a directory that has an existing suggestion comment, expecting a PATCH of the comment
 		err = tt.newActs(t).MigrateLint(context.Background())
@@ -1809,15 +1835,17 @@ func TestMigrateLint(t *testing.T) {
 				ad, err := migrate.ArchiveDir(dir)
 				require.NoError(t, err)
 				var resp dirsQueryResponse
-				resp.Data.Dirs = []Dir{{
-					Name:    "test-dir-name",
-					Slug:    "test-dir-slug",
-					Content: base64.StdEncoding.EncodeToString(ad),
-				}, {
-					Name:    "other-dir-name",
-					Slug:    "other-dir-slug",
-					Content: base64.StdEncoding.EncodeToString(ad),
-				}}
+				resp.Data.Dirs = []Dir{
+					{
+						Name:    "test-dir-name",
+						Slug:    "test-dir-slug",
+						Content: base64.StdEncoding.EncodeToString(ad),
+					}, {
+						Name:    "other-dir-name",
+						Slug:    "other-dir-slug",
+						Content: base64.StdEncoding.EncodeToString(ad),
+					},
+				}
 				st2bytes, err := json.Marshal(resp)
 				require.NoError(t, err)
 				_, _ = fmt.Fprint(w, string(st2bytes))
@@ -3037,6 +3065,13 @@ func TestSchemaLint(t *testing.T) {
 	t.Run("lint - PR comment", func(t *testing.T) {
 		tt := newT(t, nil)
 		var comments []map[string]any
+		reviewCommentID := 1
+		reviewComments := map[int]map[string]any{
+			reviewCommentID: {
+				"id":   reviewCommentID,
+				"body": "first comment",
+			},
+		}
 		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			var (
 				path   = request.URL.Path
@@ -3055,6 +3090,35 @@ func TestSchemaLint(t *testing.T) {
 				payload["id"] = 123
 				comments = append(comments, payload)
 				writer.WriteHeader(http.StatusCreated)
+				return
+			case path == "/repos/test-owner/test-repository/pulls/42/files" && method == http.MethodGet:
+				_, err := writer.Write([]byte(`[{"filename": "path/to/file1.go"}, {"filename": "path/to/file2.go"}]`))
+				require.NoError(t, err)
+				return
+			case path == "/repos/test-owner/test-repository/pulls/42/comments" && method == http.MethodGet:
+				var payload []map[string]any
+				for _, v := range reviewComments {
+					payload = append(payload, v)
+				}
+				b, err := json.Marshal(payload)
+				require.NoError(t, err)
+				_, err = writer.Write(b)
+				require.NoError(t, err)
+				return
+			case path == "/repos/test-owner/test-repository/pulls/42/comments" && method == http.MethodPost:
+				var payload map[string]any
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+				reviewCommentID++
+				payload["id"] = reviewCommentID
+				reviewComments[reviewCommentID] = payload
+				writer.WriteHeader(http.StatusCreated)
+				return
+			case strings.HasPrefix(path, "/repos/test-owner/test-repository/pulls/comments/") && method == http.MethodDelete:
+				idStr := strings.TrimPrefix(path, "/repos/test-owner/test-repository/pulls/comments/")
+				if id, err := strconv.Atoi(idStr); err == nil {
+					delete(reviewComments, id)
+				}
+				writer.WriteHeader(http.StatusNoContent)
 				return
 			}
 		}))
@@ -3089,6 +3153,35 @@ func TestSchemaLint(t *testing.T) {
 							{
 								Text: "Table t1 must have a primary key",
 							},
+							{
+								Text: "Table t2 must have a primary key",
+								Pos: &schema.Pos{
+									Filename: "path/to/file1.go",
+								},
+							},
+							{
+								Text: "Table t3 must have a primary key",
+								Pos: &schema.Pos{
+									Filename: "path/to/file1.go",
+									Start:    struct{ Line, Column, Byte int }{Line: 10},
+								},
+							},
+							{
+								Text: "Table t4 must have a primary key",
+								Pos: &schema.Pos{
+									Filename: "path/to/file2.go",
+									Start:    struct{ Line, Column, Byte int }{Line: 10},
+									End:      struct{ Line, Column, Byte int }{Line: 20},
+								},
+							},
+							{
+								Text: "Table t5 must have a primary key",
+								Pos: &schema.Pos{
+									Filename: "path/to/file3.go",
+									Start:    struct{ Line, Column, Byte int }{Line: 10},
+									End:      struct{ Line, Column, Byte int }{Line: 20},
+								},
+							},
 						},
 					},
 				},
@@ -3105,8 +3198,103 @@ func TestSchemaLint(t *testing.T) {
 		require.Len(t, comments, 1)
 		require.Contains(t, comments[0]["body"].(string), "Naming conventions")
 		require.Contains(t, comments[0]["body"].(string), "Rule \"primary-key-required\"")
+		require.Len(t, reviewComments, 3)
+		require.Equal(t, map[string]any{
+			"id":   1,
+			"body": "first comment",
+		}, reviewComments[1])
+		require.Equal(t, map[string]any{
+			"id":         2,
+			"body":       "Table t3 must have a primary key\n<!-- generated by ariga/atlas-action for schema-lint:path/to/file1.go:10-0:Table t3 must have a primary key -->",
+			"path":       "path/to/file1.go",
+			"start_line": float64(10),
+			"line":       float64(10),
+		}, reviewComments[2])
+		require.Equal(t, map[string]any{
+			"id":         3,
+			"body":       "Table t4 must have a primary key\n<!-- generated by ariga/atlas-action for schema-lint:path/to/file2.go:10-20:Table t4 must have a primary key -->",
+			"path":       "path/to/file2.go",
+			"start_line": float64(10),
+			"line":       float64(20),
+		}, reviewComments[3])
+		// Rerun schema lint
+		mockAtlas.schemaLint = func(_ context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {
+			return &atlasexec.SchemaLintReport{
+				Steps: []atlasexec.Report{
+					{
+						Text: "naming conventions",
+						Diagnostics: []atlasexec.Diagnostic{
+							{
+								Text: "Schema name violates the naming convention",
+								Code: "DS102",
+							},
+							{
+								Text: "Table name violates the naming convention",
+								Code: "DS103",
+							},
+						},
+					},
+					{
+						Text: "rule \"primary-key-required\"",
+						Desc: "All tables must have a primary key",
+						Diagnostics: []atlasexec.Diagnostic{
+							{
+								Text: "Table t1 must have a primary key",
+							},
+							{
+								Text: "Table t2 must have a primary key",
+								Pos: &schema.Pos{
+									Filename: "path/to/file1.go",
+								},
+							},
+							{
+								Text: "Table t4 must have a primary key",
+								Pos: &schema.Pos{
+									Filename: "path/to/file2.go",
+									Start:    struct{ Line, Column, Byte int }{Line: 10},
+									End:      struct{ Line, Column, Byte int }{Line: 20},
+								},
+							},
+							{
+								Text: "Table t5 must have a primary key",
+								Pos: &schema.Pos{
+									Filename: "path/to/file2.go",
+									Start:    struct{ Line, Column, Byte int }{Line: 30},
+									End:      struct{ Line, Column, Byte int }{Line: 40},
+								},
+							},
+						},
+					},
+				},
+			}, nil
+		}
+		err = a.SchemaLint(context.Background())
+		require.Nil(t, err)
+		require.Len(t, comments, 1)
+		require.Contains(t, comments[0]["body"].(string), "Naming conventions")
+		require.Contains(t, comments[0]["body"].(string), "Rule \"primary-key-required\"")
+		require.Len(t, reviewComments, 3)
+		require.Equal(t, map[string]any{
+			"id":   1,
+			"body": "first comment",
+		}, reviewComments[1])
+		require.Equal(t, map[string]any{
+			"id":         3,
+			"body":       "Table t4 must have a primary key\n<!-- generated by ariga/atlas-action for schema-lint:path/to/file2.go:10-20:Table t4 must have a primary key -->",
+			"path":       "path/to/file2.go",
+			"start_line": float64(10),
+			"line":       float64(20),
+		}, reviewComments[3])
+		require.Equal(t, map[string]any{
+			"id":         4,
+			"body":       "Table t5 must have a primary key\n<!-- generated by ariga/atlas-action for schema-lint:path/to/file2.go:30-40:Table t5 must have a primary key -->",
+			"path":       "path/to/file2.go",
+			"start_line": float64(30),
+			"line":       float64(40),
+		}, reviewComments[4])
 		// Schema lint has no steps, return Success
 		comments = []map[string]any{}
+		reviewComments = map[int]map[string]any{}
 		mockAtlas.schemaLint = func(_ context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {
 			return &atlasexec.SchemaLintReport{
 				Steps: []atlasexec.Report{},
@@ -3115,5 +3303,6 @@ func TestSchemaLint(t *testing.T) {
 		err = a.SchemaLint(context.Background())
 		require.NoError(t, err)
 		require.Len(t, comments, 0)
+		require.Len(t, reviewComments, 0)
 	})
 }
