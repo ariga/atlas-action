@@ -14,3 +14,9 @@ table "t2" {
   }
 }
 
+table "t3" {
+  schema = schema.public
+  column "c1" {
+      type = int
+  }
+}

@@ -2762,6 +2762,10 @@ func (m *mockAction) Fatalf(msg string, args ...interface{}) {
 	m.fatal = true // Mark fatal called
 }
 
+func (m *mockAction) Debugf(s string, a ...any) {
+	// Debugf is not used in the tests, but we implement it to satisfy the Action interface.
+}
+
 func (m *mockAction) SCM() (atlasaction.SCMClient, error) {
 	return m.scm, nil
 }
