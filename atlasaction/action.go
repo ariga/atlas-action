@@ -1879,4 +1879,8 @@ func (l *coloredLogger) Fatalf(msg string, args ...any) {
 	os.Exit(1)
 }
 
+func (l *coloredLogger) Debugf(msg string, args ...any) {
+	// Debugf is a no-op in the colored logger.
+}
+
 var _ Logger = (*coloredLogger)(nil)
