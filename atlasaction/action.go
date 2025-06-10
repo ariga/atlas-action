@@ -363,6 +363,7 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func (a *Actions) MigrateApply(ctx context.Context) error {
+	a.Infof(`running custom action "ariga/atlas-action/migrate/apply" version %s`, a.Version)
 	params := &atlasexec.MigrateApplyParams{
 		ConfigURL:       a.GetInput("config"),
 		Env:             a.GetInput("env"),
@@ -381,8 +382,8 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 	if mErr := (&atlasexec.MigrateApplyError{}); errors.As(err, &mErr) {
 		// If the error is a MigrateApplyError, we can still get the successful runs.
 		runs = mErr.Result
+		fmt.Println("stderr:", mErr.Stderr)
 	} else if err != nil {
-		a.SetOutput("error", err.Error())
 		return err
 	}
 	if len(runs) == 0 {
@@ -394,6 +395,7 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		}
 		if run.Error != "" {
 			a.SetOutput("error", run.Error)
+			a.Warningf("error applying migration: %s", run.Error)
 			return errors.New(run.Error)
 		}
 		a.Infof(`"atlas migrate apply" completed successfully, applied to version %q`, run.Target)
