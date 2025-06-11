@@ -182,8 +182,13 @@ func (a *ghAction) addChecksSchemaLint(lint *SchemaLintReport) error {
 				"title": step.Text,
 			})
 			if diag.Pos != nil {
+				file := diag.Pos.Filename
+				if !path.IsAbs(file) {
+					// If the file is not absolute, we assume it is relative to the working directory.
+					file = path.Join(a.GetInput("working-directory"), file)
+				}
 				logger = logger.WithFieldsMap(map[string]string{
-					"file": path.Join(a.GetInput("working-directory"), diag.Pos.Filename),
+					"file": file,
 					"line": strconv.Itoa(max(1, diag.Pos.Start.Line)),
 				})
 			}
