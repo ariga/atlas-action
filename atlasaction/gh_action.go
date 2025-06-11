@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -137,9 +137,9 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 // addChecks runs annotations to the trigger event pull request for the given payload.
 func (a *ghAction) addChecks(lint *atlasexec.SummaryReport) error {
 	// Get the directory path from the lint report.
-	dir := path.Join(a.GetInput("working-directory"), lint.Env.Dir)
+	dir := filepath.Join(a.GetInput("working-directory"), lint.Env.Dir)
 	for _, file := range lint.Files {
-		filePath := path.Join(dir, file.Name)
+		filePath := filepath.Join(dir, file.Name)
 		if file.Error != "" && len(file.Reports) == 0 {
 			a.WithFieldsMap(map[string]string{
 				"file": filePath,
@@ -183,9 +183,9 @@ func (a *ghAction) addChecksSchemaLint(lint *SchemaLintReport) error {
 			})
 			if diag.Pos != nil {
 				file := diag.Pos.Filename
-				if !path.IsAbs(file) {
+				if !filepath.IsAbs(file) {
 					// If the file is not absolute, we assume it is relative to the working directory.
-					file = path.Join(a.GetInput("working-directory"), file)
+					file = filepath.Join(a.GetInput("working-directory"), file)
 				}
 				logger = logger.WithFieldsMap(map[string]string{
 					"file": file,
@@ -318,7 +318,7 @@ func addSuggestions(cw string, lint *atlasexec.SummaryReport, fn func(*Suggestio
 		return nil
 	}
 	for _, file := range lint.Files {
-		filePath := path.Join(cw, lint.Env.Dir, file.Name)
+		filePath := filepath.Join(cw, lint.Env.Dir, file.Name)
 		for reportIdx, report := range file.Reports {
 			for _, f := range report.SuggestedFixes {
 				if f.TextEdit == nil {
