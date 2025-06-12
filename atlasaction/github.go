@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -109,8 +110,30 @@ func (a *GitHub) GetTriggerContext(context.Context) (*TriggerContext, error) {
 		return nil, err
 	}
 	tc := &TriggerContext{
-		Act:           a,
-		SCM:           SCM{Type: atlasexec.SCMTypeGithub, APIURL: ctx.APIURL},
+		Act:     a,
+		SCMType: atlasexec.SCMTypeGithub,
+		SCMClient: func() (SCMClient, error) {
+			token := a.Getenv("GITHUB_TOKEN")
+			if token == "" {
+				a.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
+				if os.Getenv("GITHUB_ACTIONS") != "" {
+					a.Warningf("On GitHub Actions, you can set the token in the workflow file:")
+					a.Warningf("  ```yaml")
+					a.Warningf("  env:")
+					a.Warningf("    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}")
+					a.Warningf("  permissions:")
+					a.Warningf("    contents: read")
+					a.Warningf("    pull-requests: write")
+					a.Warningf("  ```")
+					a.Warningf("  You can also set a personal access token with the required permissions:")
+					a.Warningf("  ```yaml")
+					a.Warningf("  env:")
+					a.Warningf("    GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}")
+					a.Warningf("  ```")
+				}
+			}
+			return NewGitHubClient(ctx.Repository, ctx.APIURL, token)
+		},
 		Repo:          ctx.Repository,
 		Branch:        ctx.HeadRef,
 		Commit:        ctx.SHA,

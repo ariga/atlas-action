@@ -131,7 +131,7 @@ type (
 		SchemaPlanApprove(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 		// SchemaApplySlice runs the `schema apply` command.
 		SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error)
-		// Whoami runs the `whoami` command.
+		// WhoAmI runs the `whoami` command.
 		WhoAmI(context.Context, *atlasexec.WhoAmIParams) (*atlasexec.WhoAmI, error)
 	}
 
@@ -145,16 +145,17 @@ type (
 
 	// TriggerContext holds the context of the environment the action is running in.
 	TriggerContext struct {
-		Act           Action       // Act is the action that is running.
-		SCM           SCM          // SCM is the source control management system.
-		Repo          string       // Repo is the repository name. e.g. "ariga/atlas-action".
-		RepoURL       string       // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
-		DefaultBranch string       // DefaultBranch is the default branch of the repository.
-		Branch        string       // Currnet Branch name.
-		Commit        string       // Commit SHA.
-		PullRequest   *PullRequest // PullRequest will be available if the event is "pull_request".
-		Actor         *Actor       // Actor is the user who triggered the action.
-		RerunCmd      string       // RerunCmd is the command to rerun the action.
+		Act           Action                    // Act is the action that is running.
+		SCMType       atlasexec.SCMType         // Type of the SCM, e.g. "GITHUB" / "GITLAB" / "BITBUCKET".
+		SCMClient     func() (SCMClient, error) // SCMClient returns a SCMClient for the current action.
+		Repo          string                    // Repo is the repository name. e.g. "ariga/atlas-action".
+		RepoURL       string                    // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
+		DefaultBranch string                    // DefaultBranch is the default branch of the repository.
+		Branch        string                    // Currnet Branch name.
+		Commit        string                    // Commit SHA.
+		PullRequest   *PullRequest              // PullRequest will be available if the event is "pull_request".
+		Actor         *Actor                    // Actor is the user who triggered the action.
+		RerunCmd      string                    // RerunCmd is the command to rerun the action.
 	}
 
 	// Actor holds the actor information.
@@ -188,12 +189,6 @@ func (p *PullRequest) AtlasDirectives() (ds []string) {
 		}
 	}
 	return ds
-}
-
-// SCM holds the source control management system information.
-type SCM struct {
-	Type   atlasexec.SCMType // Type of the SCM, e.g. "GITHUB" / "GITLAB" / "BITBUCKET".
-	APIURL string            // APIURL is the base URL for the SCM API.
 }
 
 // New creates a new Actions based on the environment.
@@ -1119,7 +1114,7 @@ func (a *Actions) schemaApplyWithApproval(ctx context.Context) ([]*atlasexec.Sch
 			if err != nil {
 				return false, err
 			}
-			// Check the created plan is exists and approved.
+			// Check the created plan exists and is approved.
 			var cloudPlan *atlasexec.SchemaPlanFile
 			for _, plan := range plans {
 				if plan.URL == f.URL {
@@ -1560,55 +1555,6 @@ func (a *Actions) schemaPlanParams(
 	return params
 }
 
-// SCMClient returns a Client to interact with the SCM.
-func (tc *TriggerContext) SCMClient() (SCMClient, error) {
-	switch tc.SCM.Type {
-	case atlasexec.SCMTypeGithub:
-		token := tc.Act.Getenv("GITHUB_TOKEN")
-		if token == "" {
-			tc.Act.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
-			if os.Getenv("GITHUB_ACTIONS") != "" {
-				tc.Act.Warningf("On GitHub Actions, you can set the token in the workflow file:")
-				tc.Act.Warningf("  ```yaml")
-				tc.Act.Warningf("  env:")
-				tc.Act.Warningf("    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}")
-				tc.Act.Warningf("  permissions:")
-				tc.Act.Warningf("    contents: read")
-				tc.Act.Warningf("    pull-requests: write")
-				tc.Act.Warningf("  ```")
-				tc.Act.Warningf("  You can also set a personal access token with the required permissions:")
-				tc.Act.Warningf("  ```yaml")
-				tc.Act.Warningf("  env:")
-				tc.Act.Warningf("    GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}")
-				tc.Act.Warningf("  ```")
-			}
-		}
-		return NewGitHubClient(tc.Repo, tc.SCM.APIURL, token)
-	case atlasexec.SCMTypeGitlab:
-		token := tc.Act.Getenv("GITLAB_TOKEN")
-		if token == "" {
-			tc.Act.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
-		}
-		return NewGitLabClient(
-			tc.Act.Getenv("CI_PROJECT_ID"),
-			tc.SCM.APIURL,
-			token,
-		)
-	case atlasexec.SCMTypeBitbucket:
-		token := tc.Act.Getenv("BITBUCKET_ACCESS_TOKEN")
-		if token == "" {
-			tc.Act.Warningf("BITBUCKET_ACCESS_TOKEN is not set, the action may not have all the permissions")
-		}
-		return NewBitbucketClient(
-			tc.Act.Getenv("BITBUCKET_WORKSPACE"),
-			tc.Act.Getenv("BITBUCKET_REPO_SLUG"),
-			token,
-		)
-	default:
-		return nil, ErrNoSCM // Not implemented yet.
-	}
-}
-
 // GetRunContext returns the run context for the action.
 func (tc *TriggerContext) GetRunContext() *atlasexec.RunContext {
 	rc := &atlasexec.RunContext{
@@ -1616,7 +1562,7 @@ func (tc *TriggerContext) GetRunContext() *atlasexec.RunContext {
 		Repo:    tc.Repo,
 		Branch:  tc.Branch,
 		Commit:  tc.Commit,
-		SCMType: tc.SCM.Type,
+		SCMType: tc.SCMType,
 	}
 	if pr := tc.PullRequest; pr != nil {
 		rc.URL = pr.URL

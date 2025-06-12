@@ -64,7 +64,18 @@ func (a *GitLab) SetOutput(name, value string) {
 func (a *GitLab) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	ctx := &TriggerContext{
 		Act:     a,
-		SCM:     SCM{Type: atlasexec.SCMTypeGitlab, APIURL: a.getenv("CI_API_V4_URL")},
+		SCMType: atlasexec.SCMTypeGitlab,
+		SCMClient: func() (SCMClient, error) {
+			token := a.Getenv("GITLAB_TOKEN")
+			if token == "" {
+				a.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
+			}
+			return NewGitLabClient(
+				a.Getenv("CI_PROJECT_ID"),
+				a.getenv("CI_API_V4_URL"),
+				token,
+			)
+		},
 		Repo:    a.getenv("CI_PROJECT_NAME"),
 		RepoURL: a.getenv("CI_PROJECT_URL"),
 		Branch:  a.getenv("CI_COMMIT_REF_NAME"),

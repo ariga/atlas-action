@@ -2444,9 +2444,9 @@ func TestSchemaPlan(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "token")
 	var (
 		out = &bytes.Buffer{}
+		scm = &mockSCM{baseURL: srv.URL}
 		act = &mockAction{
 			inputs: map[string]string{
-				// "schema-name": "atlas://atlas-action",
 				"from":   "sqlite://file?_fk=1&mode=memory",
 				"config": "file://atlas.hcl",
 				"env":    "test",
@@ -2460,7 +2460,10 @@ func TestSchemaPlan(t *testing.T) {
 				},
 			})),
 			trigger: &atlasaction.TriggerContext{
-				SCM:     atlasaction.SCM{Type: atlasexec.SCMTypeGithub, APIURL: srv.URL},
+				SCMType: atlasexec.SCMTypeGithub,
+				SCMClient: func() (atlasaction.SCMClient, error) {
+					return scm, nil
+				},
 				Repo:    "ariga/atlas-action",
 				RepoURL: "https://github.com/ariga/atlas-action",
 				Branch:  "g/feature-1",
@@ -2471,7 +2474,6 @@ func TestSchemaPlan(t *testing.T) {
 					Commit: "commit-id",
 				},
 			},
-			scm: &mockSCM{baseURL: srv.URL, comments: make(map[string]struct{})},
 		}
 		ctx = context.Background()
 	)
@@ -2607,13 +2609,15 @@ func TestSchemaPlanApprove(t *testing.T) {
 			},
 		})),
 		trigger: &atlasaction.TriggerContext{
-			SCM:     atlasaction.SCM{Type: atlasexec.SCMTypeGithub, APIURL: srv.URL},
+			SCMType: atlasexec.SCMTypeGithub,
+			SCMClient: func() (atlasaction.SCMClient, error) {
+				return &mockSCM{baseURL: srv.URL, comments: make(map[string]struct{})}, nil
+			},
 			Repo:    "ariga/atlas-action",
 			RepoURL: "https://github.com/ariga/atlas-action",
 			Branch:  "g/feature-1",
 			Commit:  "commit-id",
 		},
-		scm: &mockSCM{baseURL: srv.URL, comments: make(map[string]struct{})},
 	}
 	ctx := context.Background()
 	// Multiple plans will fail with an error
@@ -2662,7 +2666,6 @@ time=NOW level=INFO msg="No schema plan found"
 type (
 	mockAction struct {
 		trigger *atlasaction.TriggerContext // trigger context
-		scm     *mockSCM                    // scm client
 		inputs  map[string]string           // input values
 		output  map[string]string           // step's output
 		summary int                         // step summaries
@@ -2716,6 +2719,11 @@ func (m *mockAction) Getenv(e string) string {
 
 // GetTriggerContext implements Action.
 func (m *mockAction) GetTriggerContext(context.Context) (*atlasaction.TriggerContext, error) {
+	if m.trigger != nil && m.trigger.SCMClient == nil {
+		m.trigger.SCMClient = func() (atlasaction.SCMClient, error) {
+			return &mockSCM{}, nil
+		}
+	}
 	return m.trigger, nil
 }
 
@@ -2734,27 +2742,29 @@ func (m *mockAction) SetOutput(name, value string) {
 
 // Infof implements Action.
 func (m *mockAction) Infof(msg string, args ...interface{}) {
-	m.logger.Info(fmt.Sprintf(msg, args...))
+	if m.logger != nil {
+		m.logger.Info(fmt.Sprintf(msg, args...))
+	}
 }
 
 // Warningf implements Action.
 func (m *mockAction) Warningf(msg string, args ...interface{}) {
-	m.logger.Warn(fmt.Sprintf(msg, args...))
+	if m.logger != nil {
+		m.logger.Warn(fmt.Sprintf(msg, args...))
+	}
 }
 
 // Errorf implements Action.
 func (m *mockAction) Errorf(msg string, args ...interface{}) {
-	m.logger.Error(fmt.Sprintf(msg, args...))
+	if m.logger != nil {
+		m.logger.Error(fmt.Sprintf(msg, args...))
+	}
 }
 
 // Fatalf implements Action.
 func (m *mockAction) Fatalf(msg string, args ...interface{}) {
 	m.Errorf(msg, args...)
 	m.fatal = true // Mark fatal called
-}
-
-func (m *mockAction) SCM() (atlasaction.SCMClient, error) {
-	return m.scm, nil
 }
 
 func (m *mockSCM) CommentLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasexec.SummaryReport) error {
@@ -2765,16 +2775,16 @@ func (m *mockSCM) CommentLint(ctx context.Context, tc *atlasaction.TriggerContex
 	return m.comment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
 }
 
+func (m *mockSCM) CommentPlan(ctx context.Context, tc *atlasaction.TriggerContext, p *atlasexec.SchemaPlan) error {
+	return m.comment(ctx, tc.PullRequest, p.File.Name, "")
+}
+
 func (m *mockSCM) CommentSchemaLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasaction.SchemaLintReport) error {
 	comment, err := atlasaction.RenderTemplate("schema-lint.tmpl", r)
 	if err != nil {
 		return err
 	}
 	return m.comment(ctx, tc.PullRequest, "schema-lint", comment)
-}
-
-func (m *mockSCM) CommentPlan(ctx context.Context, tc *atlasaction.TriggerContext, p *atlasexec.SchemaPlan) error {
-	return m.comment(ctx, tc.PullRequest, p.File.Name, "")
 }
 
 func (m *mockSCM) comment(_ context.Context, _ *atlasaction.PullRequest, id string, _ string) error {
@@ -2785,6 +2795,9 @@ func (m *mockSCM) comment(_ context.Context, _ *atlasaction.PullRequest, id stri
 	if _, ok := m.comments[id]; !ok {
 		method = http.MethodPost
 		urlPath = "/repos/ariga/atlas-action/issues/1/comments"
+		if m.comments == nil {
+			m.comments = map[string]struct{}{}
+		}
 		m.comments[id] = struct{}{}
 	}
 	req, err := http.NewRequest(method, m.baseURL+urlPath, nil)
@@ -2975,7 +2988,6 @@ func TestSchemaLint(t *testing.T) {
 				PullRequest: &atlasaction.PullRequest{
 					URL: "http://test",
 				},
-				SCM: atlasaction.SCM{Type: "NONE"},
 			},
 			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		}
@@ -3021,7 +3033,6 @@ func TestSchemaLint(t *testing.T) {
 				PullRequest: &atlasaction.PullRequest{
 					URL: "http://test",
 				},
-				SCM: atlasaction.SCM{Type: "NONE"},
 			},
 			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		}
