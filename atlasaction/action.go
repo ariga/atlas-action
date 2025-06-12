@@ -240,13 +240,13 @@ func WithRuntimeAction() Option {
 		case c.action != nil:
 			// Do nothing. Action is already set.
 		case c.getenv("GITHUB_ACTIONS") == "true":
-			c.action = NewGHAction(c.getenv, c.out)
+			c.action = NewGitHub(c.getenv, c.out)
 		case c.getenv("CIRCLECI") == "true":
-			c.action = NewCircleCIOrb(c.getenv, c.out)
+			c.action = NewCircleCI(c.getenv, c.out)
 		case c.getenv("GITLAB_CI") == "true":
-			c.action = NewGitlabCI(c.getenv, c.out)
+			c.action = NewGitlab(c.getenv, c.out)
 		case c.getenv("BITBUCKET_PIPELINE_UUID") != "":
-			c.action = NewBitBucketPipe(c.getenv, c.out)
+			c.action = NewBitBucket(c.getenv, c.out)
 		}
 	}
 }

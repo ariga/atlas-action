@@ -18,34 +18,34 @@ import (
 	"ariga.io/atlas-go-sdk/atlasexec"
 )
 
-// gitlabCI is an implementation of the Action interface for Gitlab CI.
-type gitlabCI struct {
+// GitLab is an implementation of the Action interface for Gitlab CI.
+type GitLab struct {
 	*coloredLogger
 	getenv func(string) string
 }
 
-// NewGitlabCI returns a new Action for Gitlab CI.
-func NewGitlabCI(getenv func(string) string, w io.Writer) *gitlabCI {
-	return &gitlabCI{getenv: getenv, coloredLogger: &coloredLogger{w}}
+// NewGitlab returns a new Action for Gitlab CI.
+func NewGitlab(getenv func(string) string, w io.Writer) *GitLab {
+	return &GitLab{getenv: getenv, coloredLogger: &coloredLogger{w}}
 }
 
 // GetType implements the Action interface.
-func (*gitlabCI) GetType() atlasexec.TriggerType {
+func (*GitLab) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeGitlab
 }
 
 // Getenv implements Action.
-func (a *gitlabCI) Getenv(key string) string {
+func (a *GitLab) Getenv(key string) string {
 	return a.getenv(key)
 }
 
 // GetInput implements the Action interface.
-func (a *gitlabCI) GetInput(name string) string {
+func (a *GitLab) GetInput(name string) string {
 	return strings.TrimSpace(a.getenv(toInputVarName(name)))
 }
 
 // SetOutput implements the Action interface.
-func (a *gitlabCI) SetOutput(name, value string) {
+func (a *GitLab) SetOutput(name, value string) {
 	dotEnv := ".env"
 	if dir := a.getenv("CI_PROJECT_DIR"); dir != "" {
 		if err := os.MkdirAll(dir, 0700); err != nil {
@@ -61,7 +61,7 @@ func (a *gitlabCI) SetOutput(name, value string) {
 }
 
 // GetTriggerContext implements the Action interface.
-func (a *gitlabCI) GetTriggerContext(context.Context) (*TriggerContext, error) {
+func (a *GitLab) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	ctx := &TriggerContext{
 		Act:     a,
 		SCM:     SCM{Type: atlasexec.SCMTypeGitlab, APIURL: a.getenv("CI_API_V4_URL")},
@@ -142,5 +142,5 @@ func (c *glClient) upsertComment(ctx context.Context, pr *PullRequest, id, comme
 	return c.CreateNote(ctx, pr.Number, comment)
 }
 
-var _ Action = (*gitlabCI)(nil)
+var _ Action = (*GitLab)(nil)
 var _ SCMClient = (*glClient)(nil)

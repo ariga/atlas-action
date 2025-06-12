@@ -19,7 +19,7 @@ import (
 )
 
 type (
-	// ghAPI is an implementation of the SCMClient interface for GitHub Actions.
+	// Client is an implementation of the SCMClient interface for GitHub Actions.
 	Client struct {
 		baseURL string
 		repo    string
@@ -59,7 +59,7 @@ type (
 			} `mapstructure:"head"`
 		} `mapstructure:"pull_request"`
 		Repository struct {
-			URL string `mapstructure:"html_url"`
+			URL           string `mapstructure:"html_url"`
 			DefaultBranch string `mapstructure:"default_branch"`
 		} `mapstructure:"repository"`
 	}

@@ -2249,7 +2249,7 @@ func newT(t *testing.T, w io.Writer) *test {
 	if w == nil {
 		w = &tt.out
 	}
-	tt.act = atlasaction.NewGHAction(func(key string) string { return tt.env[key] }, w)
+	tt.act = atlasaction.NewGitHub(func(key string) string { return tt.env[key] }, w)
 	cli, err := atlasexec.NewClient("", "atlas")
 	require.NoError(t, err)
 	tt.cli = cli

@@ -13,31 +13,31 @@ import (
 	"ariga.io/atlas-go-sdk/atlasexec"
 )
 
-// circleciOrb is an implementation of the Action interface for GitHub Actions.
-type circleCIOrb struct {
+// CircleCI is an implementation of the Action interface for CircleCI.
+type CircleCI struct {
 	*coloredLogger
 	getenv func(string) string
 }
 
-var _ Action = (*circleCIOrb)(nil)
+var _ Action = (*CircleCI)(nil)
 
-// New returns a new Action for GitHub Actions.
-func NewCircleCIOrb(getenv func(string) string, w io.Writer) Action {
-	return &circleCIOrb{getenv: getenv, coloredLogger: &coloredLogger{w}}
+// NewCircleCI returns a new CircleCI.
+func NewCircleCI(getenv func(string) string, w io.Writer) *CircleCI {
+	return &CircleCI{getenv: getenv, coloredLogger: &coloredLogger{w}}
 }
 
 // GetType implements the Action interface.
-func (a *circleCIOrb) GetType() atlasexec.TriggerType {
+func (a *CircleCI) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeCircleCIOrb
 }
 
 // Getenv implements Action.
-func (a *circleCIOrb) Getenv(key string) string {
+func (a *CircleCI) Getenv(key string) string {
 	return a.getenv(key)
 }
 
 // GetInput implements the Action interface.
-func (a *circleCIOrb) GetInput(name string) string {
+func (a *CircleCI) GetInput(name string) string {
 	v := a.getenv(toInputVarName(name))
 	if v == "" {
 		// TODO: Remove this fallback once all the actions are updated.
@@ -47,7 +47,7 @@ func (a *circleCIOrb) GetInput(name string) string {
 }
 
 // SetOutput implements the Action interface.
-func (a *circleCIOrb) SetOutput(name, value string) {
+func (a *CircleCI) SetOutput(name, value string) {
 	if bashEnv := a.getenv("BASH_ENV"); bashEnv != "" {
 		err := fprintln(bashEnv,
 			"export", toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
@@ -59,7 +59,7 @@ func (a *circleCIOrb) SetOutput(name, value string) {
 
 // GetTriggerContext implements the Action interface.
 // https://circleci.com/docs/variables/#built-in-environment-variables
-func (a *circleCIOrb) GetTriggerContext(ctx context.Context) (*TriggerContext, error) {
+func (a *CircleCI) GetTriggerContext(ctx context.Context) (*TriggerContext, error) {
 	tc := &TriggerContext{
 		Act:     a,
 		RepoURL: a.getenv("CIRCLE_REPOSITORY_URL"),
