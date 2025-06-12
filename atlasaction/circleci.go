@@ -100,7 +100,7 @@ func (a *CircleCI) GetTriggerContext(ctx context.Context) (*TriggerContext, erro
 			tc.Branch = tag
 			return tc, nil
 		}
-		c, err := GitHubClient(tc.Repo, tc.SCM.APIURL, ghToken)
+		c, err := NewGitHubClient(tc.Repo, tc.SCM.APIURL, ghToken)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 		}

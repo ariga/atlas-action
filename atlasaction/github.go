@@ -202,11 +202,11 @@ func (a *GitHub) addChecksSchemaLint(lint *SchemaLintReport) error {
 	return nil
 }
 
-type ghClient struct {
+type GitHubClient struct {
 	*github.Client
 }
 
-func GitHubClient(repo, baseURL, token string) (*ghClient, error) {
+func NewGitHubClient(repo, baseURL, token string) (*GitHubClient, error) {
 	c, err := github.NewClient(repo,
 		github.WithBaseURL(baseURL),
 		github.WithToken(&oauth2.Token{AccessToken: token}),
@@ -214,11 +214,11 @@ func GitHubClient(repo, baseURL, token string) (*ghClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ghClient{Client: c}, nil
+	return &GitHubClient{Client: c}, nil
 }
 
 // CommentLint implements SCMClient.
-func (c *ghClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
+func (c *GitHubClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
 	comment, err := RenderTemplate("migrate-lint.tmpl", r)
 	if err != nil {
 		return err
@@ -246,7 +246,7 @@ func (c *ghClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlas
 }
 
 // CommentPlan implements SCMClient.
-func (c *ghClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
+func (c *GitHubClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
 	// Report the schema plan to the user and add a comment to the PR.
 	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
 		"Plan":         p,
@@ -258,7 +258,20 @@ func (c *ghClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlas
 	return c.upsertComment(ctx, tc.PullRequest, p.File.Name, comment)
 }
 
-func (c *ghClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+// CommentSchemaLint implements SCMClient.
+func (c *GitHubClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
+	comment, err := RenderTemplate("schema-lint.tmpl", r)
+	if err != nil {
+		return err
+	}
+	id := "schema-lint"
+	if url := tc.Act.GetInput("url"); url != "" {
+		id = url
+	}
+	return c.upsertComment(ctx, tc.PullRequest, id, comment)
+}
+
+func (c *GitHubClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
 	comments, err := c.IssueComments(ctx, pr.Number)
 	if err != nil {
 		return err
@@ -275,7 +288,7 @@ func (c *ghClient) upsertComment(ctx context.Context, pr *PullRequest, id, comme
 	return err
 }
 
-func (c *ghClient) upsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
+func (c *GitHubClient) upsertSuggestion(ctx context.Context, pr *PullRequest, s *Suggestion) error {
 	// TODO: Listing the comments only once and updating the comment in the same call.
 	comments, err := c.ReviewComments(ctx, pr.Number)
 	if err != nil {
@@ -374,19 +387,6 @@ func addSuggestions(cw string, lint *atlasexec.SummaryReport, fn func(*Suggestio
 	return nil
 }
 
-// CommentSchemaLint implements SCMClient.
-func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
-	comment, err := RenderTemplate("schema-lint.tmpl", r)
-	if err != nil {
-		return err
-	}
-	id := "schema-lint"
-	if url := tc.Act.GetInput("url"); url != "" {
-		id = url
-	}
-	return c.upsertComment(ctx, tc.PullRequest, id, comment)
-}
-
 var _ Action = (*GitHub)(nil)
 var _ Reporter = (*GitHub)(nil)
-var _ SCMClient = (*ghClient)(nil)
+var _ SCMClient = (*GitHubClient)(nil)

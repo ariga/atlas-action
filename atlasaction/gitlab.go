@@ -86,11 +86,11 @@ func (a *GitLab) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	return ctx, nil
 }
 
-type glClient struct {
+type GitLabClient struct {
 	*gitlab.Client
 }
 
-func GitLabClient(project, baseURL, token string) (*glClient, error) {
+func NewGitLabClient(project, baseURL, token string) (*GitLabClient, error) {
 	c, err := gitlab.NewClient(project,
 		gitlab.WithBaseURL(baseURL),
 		gitlab.WithToken(token),
@@ -98,11 +98,11 @@ func GitLabClient(project, baseURL, token string) (*glClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &glClient{Client: c}, nil
+	return &GitLabClient{Client: c}, nil
 }
 
 // CommentLint implements SCMClient.
-func (c *glClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
+func (c *GitLabClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
 	comment, err := RenderTemplate("migrate-lint.tmpl", r)
 	if err != nil {
 		return err
@@ -111,7 +111,7 @@ func (c *glClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlas
 }
 
 // CommentPlan implements SCMClient.
-func (c *glClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
+func (c *GitLabClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
 	// Report the schema plan to the user and add a comment to the PR.
 	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
 		"Plan": p,
@@ -123,11 +123,11 @@ func (c *glClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlas
 }
 
 // CommentSchemaLint implements SCMClient.
-func (c *glClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
+func (c *GitLabClient) CommentSchemaLint(context.Context, *TriggerContext, *SchemaLintReport) error {
 	return nil
 }
 
-func (c *glClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+func (c *GitLabClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
 	comments, err := c.PullRequestNotes(ctx, pr.Number)
 	if err != nil {
 		return err
@@ -143,4 +143,4 @@ func (c *glClient) upsertComment(ctx context.Context, pr *PullRequest, id, comme
 }
 
 var _ Action = (*GitLab)(nil)
-var _ SCMClient = (*glClient)(nil)
+var _ SCMClient = (*GitLabClient)(nil)

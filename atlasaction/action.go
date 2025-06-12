@@ -1583,13 +1583,13 @@ func (tc *TriggerContext) SCMClient() (SCMClient, error) {
 				tc.Act.Warningf("  ```")
 			}
 		}
-		return GitHubClient(tc.Repo, tc.SCM.APIURL, token)
+		return NewGitHubClient(tc.Repo, tc.SCM.APIURL, token)
 	case atlasexec.SCMTypeGitlab:
 		token := tc.Act.Getenv("GITLAB_TOKEN")
 		if token == "" {
 			tc.Act.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
 		}
-		return GitLabClient(
+		return NewGitLabClient(
 			tc.Act.Getenv("CI_PROJECT_ID"),
 			tc.SCM.APIURL,
 			token,
@@ -1599,7 +1599,7 @@ func (tc *TriggerContext) SCMClient() (SCMClient, error) {
 		if token == "" {
 			tc.Act.Warningf("BITBUCKET_ACCESS_TOKEN is not set, the action may not have all the permissions")
 		}
-		return BitbucketClient(
+		return NewBitbucketClient(
 			tc.Act.Getenv("BITBUCKET_WORKSPACE"),
 			tc.Act.Getenv("BITBUCKET_REPO_SLUG"),
 			token,
