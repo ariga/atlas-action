@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"ariga.io/atlas-action/atlasaction"
+	"ariga.io/atlas-go-sdk/atlasexec"
 	"ariga.io/atlas/sql/migrate"
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"
@@ -31,9 +32,10 @@ func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
 	ctx, err := orb.GetTriggerContext(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, &atlasaction.TriggerContext{
-		Act:    orb,
-		Repo:   "atlas-orb",
-		Commit: "1234567890",
+		Act:     orb,
+		Repo:    "atlas-orb",
+		Commit:  "1234567890",
+		SCMType: atlasexec.SCMTypeGithub,
 	}, ctx)
 	t.Setenv("GITHUB_TOKEN", "1234567890")
 	t.Setenv("GITHUB_REPOSITORY", "ariga/atlas-orb")

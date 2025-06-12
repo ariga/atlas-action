@@ -55,9 +55,17 @@ func (a *Bitbucket) GetTriggerContext(context.Context) (*TriggerContext, error) 
 		Commit:  a.getenv("BITBUCKET_COMMIT"),
 		Repo:    a.getenv("BITBUCKET_REPO_FULL_NAME"),
 		RepoURL: a.getenv("BITBUCKET_GIT_HTTP_ORIGIN"),
-		SCM: SCM{
-			Type:   atlasexec.SCMTypeBitbucket,
-			APIURL: "https://api.bitbucket.org/2.0",
+		SCMType: atlasexec.SCMTypeBitbucket,
+		SCMClient: func() (SCMClient, error) {
+			token := a.Getenv("BITBUCKET_ACCESS_TOKEN")
+			if token == "" {
+				a.Warningf("BITBUCKET_ACCESS_TOKEN is not set, the action may not have all the permissions")
+			}
+			return NewBitbucketClient(
+				a.Getenv("BITBUCKET_WORKSPACE"),
+				a.Getenv("BITBUCKET_REPO_SLUG"),
+				token,
+			)
 		},
 	}
 	if pr := a.getenv("BITBUCKET_PR_ID"); pr != "" {
@@ -117,7 +125,7 @@ func (a *Bitbucket) MigrateApply(context.Context, *atlasexec.MigrateApply) {
 }
 
 // SchemaLint implements Reporter.
-func (a *Bitbucket) SchemaLint(ctx context.Context, r *SchemaLintReport) {
+func (a *Bitbucket) SchemaLint(context.Context, *SchemaLintReport) {
 }
 
 // MigrateLint implements Reporter.

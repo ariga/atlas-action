@@ -66,6 +66,7 @@ func (a *CircleCI) GetTriggerContext(ctx context.Context) (*TriggerContext, erro
 		Repo:    a.getenv("CIRCLE_PROJECT_REPONAME"),
 		Branch:  a.getenv("CIRCLE_BRANCH"),
 		Commit:  a.getenv("CIRCLE_SHA1"),
+		SCMType: atlasexec.SCMTypeGithub,
 	}
 	if tc.Repo == "" {
 		return nil, fmt.Errorf("missing CIRCLE_PROJECT_REPONAME environment variable")
@@ -76,10 +77,6 @@ func (a *CircleCI) GetTriggerContext(ctx context.Context) (*TriggerContext, erro
 	// Detect SCM provider based on Token.
 	switch ghToken := a.getenv("GITHUB_TOKEN"); {
 	case ghToken != "":
-		tc.SCM = SCM{
-			Type:   atlasexec.SCMTypeGithub,
-			APIURL: a.getenv("GITHUB_API_URL"),
-		}
 		// Used to change the location that the linting results are posted to.
 		// If GITHUB_REPOSITORY is not set, we default to the CIRCLE_PROJECT_REPONAME repo.
 		if v := a.getenv("GITHUB_REPOSITORY"); v != "" {
@@ -100,10 +97,11 @@ func (a *CircleCI) GetTriggerContext(ctx context.Context) (*TriggerContext, erro
 			tc.Branch = tag
 			return tc, nil
 		}
-		c, err := NewGitHubClient(tc.Repo, tc.SCM.APIURL, ghToken)
+		c, err := NewGitHubClient(tc.Repo, a.getenv("GITHUB_API_URL"), ghToken)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 		}
+		tc.SCMClient = func() (SCMClient, error) { return c, nil }
 		pr, err := c.OpeningPullRequest(ctx, tc.Branch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get open pull requests: %w", err)

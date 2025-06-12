@@ -1,4 +1,5 @@
-<code>atlas migrate lint</code> on <strong>{{ if eq .Env.Dir "." }}working directory{{ else }}{{ .Env.Dir }}{{ end }}</strong><table>
+<code>atlas migrate lint</code> on <strong>{{ if eq .Env.Dir "." }}working directory{{ else }}{{ .Env.Dir }}{{ end }}</strong>
+<table>
   <thead>
     <tr>
       <th>Status</th>
@@ -18,5 +19,6 @@
         {{- end -}}
       </td>
     </tr>
-{{- template "lint-report" . -}}
-  </tbody></table>
+{{- template "lint-report" . }}
+  </tbody>
+</table>
