@@ -24,31 +24,31 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type bbPipe struct {
+type BitBucket struct {
 	*coloredLogger
 	getenv func(string) string
 }
 
-// NewBitBucketPipe returns a new Action for BitBucket.
-func NewBitBucketPipe(getenv func(string) string, w io.Writer) *bbPipe {
+// NewBitBucket returns a new Action for BitBucket.
+func NewBitBucket(getenv func(string) string, w io.Writer) *BitBucket {
 	// Disable color output for testing,
 	// but enable it for non-testing environments.
 	color.NoColor = testing.Testing()
-	return &bbPipe{getenv: getenv, coloredLogger: &coloredLogger{w: w}}
+	return &BitBucket{getenv: getenv, coloredLogger: &coloredLogger{w: w}}
 }
 
 // GetType implements Action.
-func (*bbPipe) GetType() atlasexec.TriggerType {
+func (*BitBucket) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeBitbucket
 }
 
 // Getenv implements Action.
-func (a *bbPipe) Getenv(key string) string {
+func (a *BitBucket) Getenv(key string) string {
 	return a.getenv(key)
 }
 
 // GetTriggerContext implements Action.
-func (a *bbPipe) GetTriggerContext(context.Context) (*TriggerContext, error) {
+func (a *BitBucket) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	tc := &TriggerContext{
 		Act:     a,
 		Branch:  a.getenv("BITBUCKET_BRANCH"),
@@ -79,12 +79,12 @@ func (a *bbPipe) GetTriggerContext(context.Context) (*TriggerContext, error) {
 }
 
 // GetInput implements the Action interface.
-func (a *bbPipe) GetInput(name string) string {
+func (a *BitBucket) GetInput(name string) string {
 	return strings.TrimSpace(a.getenv(toInputVarName(name)))
 }
 
 // SetOutput implements Action.
-func (a *bbPipe) SetOutput(name, value string) {
+func (a *BitBucket) SetOutput(name, value string) {
 	// Because Bitbucket Pipes does not support output variables,
 	// we write the output to a file.
 	// So the next step can read the outputs using the source command.
@@ -113,18 +113,18 @@ func (a *bbPipe) SetOutput(name, value string) {
 }
 
 // MigrateApply implements Reporter.
-func (a *bbPipe) MigrateApply(context.Context, *atlasexec.MigrateApply) {
+func (a *BitBucket) MigrateApply(context.Context, *atlasexec.MigrateApply) {
 }
 
 // SchemaLint implements Reporter.
-func (a *bbPipe) SchemaLint(ctx context.Context, r *SchemaLintReport) {
+func (a *BitBucket) SchemaLint(ctx context.Context, r *SchemaLintReport) {
 }
 
 // MigrateLint implements Reporter.
-func (a *bbPipe) MigrateLint(ctx context.Context, r *atlasexec.SummaryReport) {
+func (a *BitBucket) MigrateLint(ctx context.Context, r *atlasexec.SummaryReport) {
 	c, err := a.reportClient()
 	if err != nil {
-		a.Errorf("failed to create bitbucket client: %v", err)
+		a.Errorf("failed to create BitBucket client: %v", err)
 		return
 	}
 	commitID := a.getenv("BITBUCKET_COMMIT")
@@ -204,11 +204,11 @@ func (a *bbPipe) MigrateLint(ctx context.Context, r *atlasexec.SummaryReport) {
 }
 
 // SchemaApply implements Reporter.
-func (a *bbPipe) SchemaApply(context.Context, *atlasexec.SchemaApply) {
+func (a *BitBucket) SchemaApply(context.Context, *atlasexec.SchemaApply) {
 }
 
 // SchemaPlan implements Reporter.
-func (a *bbPipe) SchemaPlan(ctx context.Context, r *atlasexec.SchemaPlan) {
+func (a *BitBucket) SchemaPlan(ctx context.Context, r *atlasexec.SchemaPlan) {
 	if l := r.Lint; l != nil {
 		a.MigrateLint(ctx, l)
 	}
@@ -216,7 +216,7 @@ func (a *bbPipe) SchemaPlan(ctx context.Context, r *atlasexec.SchemaPlan) {
 
 // reportClient returns a new Bitbucket client,
 // This client only works with the Reports-API.
-func (a *bbPipe) reportClient() (*bitbucket.Client, error) {
+func (a *BitBucket) reportClient() (*bitbucket.Client, error) {
 	return bitbucket.NewClient(
 		a.getenv("BITBUCKET_WORKSPACE"),
 		a.getenv("BITBUCKET_REPO_SLUG"),
@@ -353,6 +353,6 @@ func hash(parts ...string) (string, error) {
 	return base64.URLEncoding.EncodeToString(h.Sum(nil)), nil
 }
 
-var _ Action = (*bbPipe)(nil)
-var _ Reporter = (*bbPipe)(nil)
+var _ Action = (*BitBucket)(nil)
+var _ Reporter = (*BitBucket)(nil)
 var _ SCMClient = (*bbClient)(nil)

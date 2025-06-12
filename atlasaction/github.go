@@ -19,14 +19,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// ghAction is an implementation of the Action interface for GitHub Actions.
-type ghAction struct {
+// GitHub is an implementation of the Action interface for GitHub Actions.
+type GitHub struct {
 	*githubactions.Action
 }
 
-// NewGHAction returns a new Action for GitHub Actions.
-func NewGHAction(getenv func(string) string, w io.Writer) *ghAction {
-	return &ghAction{
+// NewGitHub returns a new Action for GitHub Actions.
+func NewGitHub(getenv func(string) string, w io.Writer) *GitHub {
+	return &GitHub{
 		githubactions.New(
 			githubactions.WithGetenv(getenv),
 			githubactions.WithWriter(w),
@@ -35,7 +35,7 @@ func NewGHAction(getenv func(string) string, w io.Writer) *ghAction {
 }
 
 // MigrateApply implements Reporter.
-func (a *ghAction) MigrateApply(_ context.Context, r *atlasexec.MigrateApply) {
+func (a *GitHub) MigrateApply(_ context.Context, r *atlasexec.MigrateApply) {
 	summary, err := RenderTemplate("migrate-apply.tmpl", r)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
@@ -45,7 +45,7 @@ func (a *ghAction) MigrateApply(_ context.Context, r *atlasexec.MigrateApply) {
 }
 
 // MigrateLint implements Reporter.
-func (a *ghAction) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
+func (a *GitHub) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
 	if err := a.addChecks(r); err != nil {
 		a.Errorf("failed to add checks: %v", err)
 	}
@@ -58,7 +58,7 @@ func (a *ghAction) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
 }
 
 // SchemaApply implements Reporter.
-func (a *ghAction) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
+func (a *GitHub) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
 	summary, err := RenderTemplate("schema-apply.tmpl", r)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
@@ -68,7 +68,7 @@ func (a *ghAction) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
 }
 
 // SchemaPlan implements Reporter.
-func (a *ghAction) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
+func (a *GitHub) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
 	summary, err := RenderTemplate("schema-plan.tmpl", map[string]any{
 		"Plan":         r,
 		"RerunCommand": fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
@@ -81,7 +81,7 @@ func (a *ghAction) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
 }
 
 // SchemaLint implements Reporter.
-func (a *ghAction) SchemaLint(_ context.Context, r *SchemaLintReport) {
+func (a *GitHub) SchemaLint(_ context.Context, r *SchemaLintReport) {
 	if err := a.addChecksSchemaLint(r); err != nil {
 		a.Errorf("failed to add checks: %v", err)
 	}
@@ -94,12 +94,12 @@ func (a *ghAction) SchemaLint(_ context.Context, r *SchemaLintReport) {
 }
 
 // GetType implements the Action interface.
-func (*ghAction) GetType() atlasexec.TriggerType {
+func (*GitHub) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeGithubAction
 }
 
 // GetTriggerContext returns the context of the action.
-func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
+func (a *GitHub) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	ctx, err := a.Action.Context()
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (a *ghAction) GetTriggerContext(context.Context) (*TriggerContext, error) {
 }
 
 // addChecks runs annotations to the trigger event pull request for the given payload.
-func (a *ghAction) addChecks(lint *atlasexec.SummaryReport) error {
+func (a *GitHub) addChecks(lint *atlasexec.SummaryReport) error {
 	// Get the directory path from the lint report.
 	dir := filepath.Join(a.GetInput("working-directory"), lint.Env.Dir)
 	for _, file := range lint.Files {
@@ -171,7 +171,7 @@ func (a *ghAction) addChecks(lint *atlasexec.SummaryReport) error {
 }
 
 // addChecksSchemaLint runs annotations to the trigger event pull request for the given schema lint report.
-func (a *ghAction) addChecksSchemaLint(lint *SchemaLintReport) error {
+func (a *GitHub) addChecksSchemaLint(lint *SchemaLintReport) error {
 	for _, step := range lint.Steps {
 		for _, diag := range step.Diagnostics {
 			msg := diag.Text
@@ -387,6 +387,6 @@ func (c *ghClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r 
 	return c.upsertComment(ctx, tc.PullRequest, id, comment)
 }
 
-var _ Action = (*ghAction)(nil)
-var _ Reporter = (*ghAction)(nil)
+var _ Action = (*GitHub)(nil)
+var _ Reporter = (*GitHub)(nil)
 var _ SCMClient = (*ghClient)(nil)

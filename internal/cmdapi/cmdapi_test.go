@@ -18,7 +18,7 @@ import (
 func TestRunAction_Run(t *testing.T) {
 	client, err := atlasexec.NewClient("", "atlas")
 	require.NoError(t, err)
-	act := atlasaction.NewGHAction(os.Getenv, os.Stdout)
+	act := atlasaction.NewGitHub(os.Getenv, os.Stdout)
 	t.Run("fake", func(t *testing.T) {
 		r := &cmdapi.RunActionCmd{Action: "fake"}
 		c, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(client))

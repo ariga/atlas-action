@@ -21,7 +21,7 @@ import (
 )
 
 func Test_circleCIOrb_GetTriggerContext(t *testing.T) {
-	orb := atlasaction.NewCircleCIOrb(os.Getenv, os.Stdout)
+	orb := atlasaction.NewCircleCI(os.Getenv, os.Stdout)
 	_, err := orb.GetTriggerContext(context.Background())
 	require.EqualError(t, err, "missing CIRCLE_PROJECT_REPONAME environment variable")
 	t.Setenv("CIRCLE_PROJECT_REPONAME", "atlas-orb")
