@@ -24,31 +24,31 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type BitBucket struct {
+type Bitbucket struct {
 	*coloredLogger
 	getenv func(string) string
 }
 
-// NewBitBucket returns a new Action for BitBucket.
-func NewBitBucket(getenv func(string) string, w io.Writer) *BitBucket {
+// NewBitBucket returns a new Action for Bitbucket.
+func NewBitBucket(getenv func(string) string, w io.Writer) *Bitbucket {
 	// Disable color output for testing,
 	// but enable it for non-testing environments.
 	color.NoColor = testing.Testing()
-	return &BitBucket{getenv: getenv, coloredLogger: &coloredLogger{w: w}}
+	return &Bitbucket{getenv: getenv, coloredLogger: &coloredLogger{w: w}}
 }
 
 // GetType implements Action.
-func (*BitBucket) GetType() atlasexec.TriggerType {
+func (*Bitbucket) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeBitbucket
 }
 
 // Getenv implements Action.
-func (a *BitBucket) Getenv(key string) string {
+func (a *Bitbucket) Getenv(key string) string {
 	return a.getenv(key)
 }
 
 // GetTriggerContext implements Action.
-func (a *BitBucket) GetTriggerContext(context.Context) (*TriggerContext, error) {
+func (a *Bitbucket) GetTriggerContext(context.Context) (*TriggerContext, error) {
 	tc := &TriggerContext{
 		Act:     a,
 		Branch:  a.getenv("BITBUCKET_BRANCH"),
@@ -79,12 +79,12 @@ func (a *BitBucket) GetTriggerContext(context.Context) (*TriggerContext, error) 
 }
 
 // GetInput implements the Action interface.
-func (a *BitBucket) GetInput(name string) string {
+func (a *Bitbucket) GetInput(name string) string {
 	return strings.TrimSpace(a.getenv(toInputVarName(name)))
 }
 
 // SetOutput implements Action.
-func (a *BitBucket) SetOutput(name, value string) {
+func (a *Bitbucket) SetOutput(name, value string) {
 	// Because Bitbucket Pipes does not support output variables,
 	// we write the output to a file.
 	// So the next step can read the outputs using the source command.
@@ -113,18 +113,18 @@ func (a *BitBucket) SetOutput(name, value string) {
 }
 
 // MigrateApply implements Reporter.
-func (a *BitBucket) MigrateApply(context.Context, *atlasexec.MigrateApply) {
+func (a *Bitbucket) MigrateApply(context.Context, *atlasexec.MigrateApply) {
 }
 
 // SchemaLint implements Reporter.
-func (a *BitBucket) SchemaLint(ctx context.Context, r *SchemaLintReport) {
+func (a *Bitbucket) SchemaLint(ctx context.Context, r *SchemaLintReport) {
 }
 
 // MigrateLint implements Reporter.
-func (a *BitBucket) MigrateLint(ctx context.Context, r *atlasexec.SummaryReport) {
+func (a *Bitbucket) MigrateLint(ctx context.Context, r *atlasexec.SummaryReport) {
 	c, err := a.reportClient()
 	if err != nil {
-		a.Errorf("failed to create BitBucket client: %v", err)
+		a.Errorf("failed to create Bitbucket client: %v", err)
 		return
 	}
 	commitID := a.getenv("BITBUCKET_COMMIT")
@@ -204,11 +204,11 @@ func (a *BitBucket) MigrateLint(ctx context.Context, r *atlasexec.SummaryReport)
 }
 
 // SchemaApply implements Reporter.
-func (a *BitBucket) SchemaApply(context.Context, *atlasexec.SchemaApply) {
+func (a *Bitbucket) SchemaApply(context.Context, *atlasexec.SchemaApply) {
 }
 
 // SchemaPlan implements Reporter.
-func (a *BitBucket) SchemaPlan(ctx context.Context, r *atlasexec.SchemaPlan) {
+func (a *Bitbucket) SchemaPlan(ctx context.Context, r *atlasexec.SchemaPlan) {
 	if l := r.Lint; l != nil {
 		a.MigrateLint(ctx, l)
 	}
@@ -216,7 +216,7 @@ func (a *BitBucket) SchemaPlan(ctx context.Context, r *atlasexec.SchemaPlan) {
 
 // reportClient returns a new Bitbucket client,
 // This client only works with the Reports-API.
-func (a *BitBucket) reportClient() (*bitbucket.Client, error) {
+func (a *Bitbucket) reportClient() (*bitbucket.Client, error) {
 	return bitbucket.NewClient(
 		a.getenv("BITBUCKET_WORKSPACE"),
 		a.getenv("BITBUCKET_REPO_SLUG"),
@@ -285,12 +285,12 @@ func LintReport(commit string, r *atlasexec.SummaryReport) (*bitbucket.CommitRep
 	return cr, nil
 }
 
-type bbClient struct {
+type BitbucketClient struct {
 	*bitbucket.Client
 }
 
-// BitbucketClient returns a new Bitbucket client that implements SCMClient.
-func BitbucketClient(workspace, repoSlug, token string) (*bbClient, error) {
+// NewBitbucketClient returns a new Bitbucket client that implements SCMClient.
+func NewBitbucketClient(workspace, repoSlug, token string) (*BitbucketClient, error) {
 	c, err := bitbucket.NewClient(
 		workspace, repoSlug,
 		bitbucket.WithToken(&oauth2.Token{AccessToken: token}),
@@ -298,11 +298,11 @@ func BitbucketClient(workspace, repoSlug, token string) (*bbClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &bbClient{Client: c}, nil
+	return &BitbucketClient{Client: c}, nil
 }
 
 // CommentLint implements SCMClient.
-func (c *bbClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
+func (c *BitbucketClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
 	comment, err := RenderTemplate("migrate-lint/md", r)
 	if err != nil {
 		return err
@@ -311,7 +311,7 @@ func (c *bbClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlas
 }
 
 // CommentPlan implements SCMClient.
-func (c *bbClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
+func (c *BitbucketClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
 	comment, err := RenderTemplate("schema-plan/md", p)
 	if err != nil {
 		return err
@@ -320,11 +320,11 @@ func (c *bbClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlas
 }
 
 // CommentSchemaLint implements SCMClient.
-func (c *bbClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
+func (c *BitbucketClient) CommentSchemaLint(context.Context, *TriggerContext, *SchemaLintReport) error {
 	return nil
 }
 
-func (c *bbClient) upsertComment(ctx context.Context, prID int, id, comment string) error {
+func (c *BitbucketClient) upsertComment(ctx context.Context, prID int, id, comment string) error {
 	comments, err := c.PullRequestComments(ctx, prID)
 	if err != nil {
 		return err
@@ -353,6 +353,6 @@ func hash(parts ...string) (string, error) {
 	return base64.URLEncoding.EncodeToString(h.Sum(nil)), nil
 }
 
-var _ Action = (*BitBucket)(nil)
-var _ Reporter = (*BitBucket)(nil)
-var _ SCMClient = (*bbClient)(nil)
+var _ Action = (*Bitbucket)(nil)
+var _ Reporter = (*Bitbucket)(nil)
+var _ SCMClient = (*BitbucketClient)(nil)
