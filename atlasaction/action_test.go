@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -37,6 +38,38 @@ import (
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCopilot(t *testing.T) {
+	fn := func(prompt, id, answer string) atlasaction.AtlasExec {
+		return &mockAtlas{
+			copilot: func(_ context.Context, params *atlasexec.CopilotParams) (atlasexec.Copilot, error) {
+				require.Equal(t, prompt, params.Prompt)
+				require.Equal(t, id, params.Session)
+				if id == "" {
+					id = "id"
+				}
+				return atlasexec.Copilot{{SessionID: id, Type: "message", Content: answer}}, nil
+			},
+		}
+	}
+	t.Run("copilot", func(t *testing.T) {
+		var (
+			p   = "/atlas What is the capital of France?"
+			scm = &mockSCM{}
+		)
+		err := (&atlasaction.Actions{Action: &mockAction{
+			inputs: map[string]string{"prompt": p},
+			trigger: &atlasaction.TriggerContext{
+				SCMClient: func() (atlasaction.SCMClient, error) { return scm, nil },
+				Comment:   &atlasaction.Comment{Body: p},
+			},
+		}, Atlas: fn(p, "", "Paris.")}).Copilot(context.Background())
+		require.NoError(t, err)
+		require.Len(t, scm.comments, 1)
+		m := slices.Collect(maps.Keys(scm.comments))[0]
+		require.Contains(t, m, p)
+	})
+}
 
 func TestMigrateApply(t *testing.T) {
 	t.Run("local dir", func(t *testing.T) {
@@ -587,6 +620,7 @@ func (m *mockAtlasCloud) Start(t *testing.T, token string) *httptest.Server {
 
 type mockAtlas struct {
 	login             func(context.Context, *atlasexec.LoginParams) error
+	copilot           func(context.Context, *atlasexec.CopilotParams) (atlasexec.Copilot, error)
 	migrateDiff       func(context.Context, *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
@@ -611,6 +645,11 @@ func (m *mockAtlas) Version(context.Context) (*atlasexec.Version, error) {
 // Login implements AtlasExec.
 func (m *mockAtlas) Login(ctx context.Context, params *atlasexec.LoginParams) error {
 	return m.login(ctx, params)
+}
+
+// Copilot implements AtlasExec.Copilot.
+func (m *mockAtlas) Copilot(ctx context.Context, p *atlasexec.CopilotParams) (atlasexec.Copilot, error) {
+	return m.copilot(ctx, p)
 }
 
 // MigrateDiff implements AtlasExec.
@@ -2765,6 +2804,18 @@ func (m *mockAction) Errorf(msg string, args ...interface{}) {
 func (m *mockAction) Fatalf(msg string, args ...interface{}) {
 	m.Errorf(msg, args...)
 	m.fatal = true // Mark fatal called
+}
+
+func (m *mockSCM) CommentCopilot(_ context.Context, _ *atlasaction.TriggerContext, c *atlasaction.Copilot) error {
+	if m.comments == nil {
+		m.comments = map[string]struct{}{}
+	}
+	j, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	m.comments[string(j)] = struct{}{}
+	return nil
 }
 
 func (m *mockSCM) CommentLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasexec.SummaryReport) error {
