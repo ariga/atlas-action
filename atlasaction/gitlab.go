@@ -112,6 +112,11 @@ func NewGitLabClient(project, baseURL, token string) (*GitLabClient, error) {
 	return &GitLabClient{Client: c}, nil
 }
 
+// CommentCopilot implements SCMClient.
+func (c *GitLabClient) CommentCopilot(context.Context, *TriggerContext, *Copilot) error {
+	panic("unimplemented: CommentCopilot for GitLabClient")
+}
+
 // CommentLint implements SCMClient.
 func (c *GitLabClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
 	comment, err := RenderTemplate("migrate-lint.tmpl", r)
