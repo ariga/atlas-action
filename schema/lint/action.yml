@@ -25,12 +25,12 @@ inputs:
     description: |
       The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
       Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
-    required: true
+    required: false
   url:
     description: |
       Schema URL(s) to lint. For example: `file://schema.hcl`.
       Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
-    required: true
+    required: false
   schema:
     description: |
       The database schema(s) to include. For example: `public`.
