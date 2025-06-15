@@ -856,7 +856,7 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 			}
 		}
 	}
-	return fmt.Errorf("`atlas schema lint` completed with errors")
+	return fmt.Errorf("`atlas schema lint` completed with issues, check the annotations for details")
 }
 
 // SchemaTest runs the GitHub Action for "ariga/atlas-action/schema/test"
