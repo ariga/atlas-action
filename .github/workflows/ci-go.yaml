@@ -365,7 +365,6 @@ jobs:
           - url: file://ok.lt.hcl
           - url: file://schema.lt.hcl
       fail-fast: false
-    continue-on-error: true
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
@@ -380,6 +379,7 @@ jobs:
         env:
           CGO_ENABLED: 0
       - id: schema_lint_test
+        continue-on-error: true
         uses: ./schema/lint
         with:
           working-directory: atlasaction/testdata/schema-lint
