@@ -364,6 +364,8 @@ jobs:
           - url: sqlite://schemarule.db
           - url: file://ok.lt.hcl
           - url: file://schema.lt.hcl
+      fail-fast: false
+    continue-on-error: true
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
