@@ -3042,7 +3042,7 @@ func TestSchemaLint(t *testing.T) {
 		)
 		require.NoError(t, err)
 		err = a.SchemaLint(context.Background())
-		require.Nil(t, err)
+		require.Error(t, err, "`atlas schema lint` completed with issues, check the annotations for details")
 		require.Equal(t, 1, act.summary)
 	})
 	t.Run("lint - PR comment", func(t *testing.T) {
@@ -3112,7 +3112,7 @@ func TestSchemaLint(t *testing.T) {
 		a := tt.newActs(t)
 		a.Atlas = mockAtlas
 		err := a.SchemaLint(context.Background())
-		require.Nil(t, err)
+		require.Error(t, err, "`atlas schema lint` completed with issues, check the annotations for details")
 		require.Len(t, comments, 1)
 		require.Contains(t, comments[0]["body"].(string), "Naming conventions")
 		require.Contains(t, comments[0]["body"].(string), "Rule \"primary-key-required\"")
