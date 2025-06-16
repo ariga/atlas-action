@@ -47,6 +47,7 @@ type (
 		URL    string
 		Body   string
 		Commit string
+		Ref    string
 	}
 	// TriggerEvent is the structure of the GitHub trigger event.
 	TriggerEvent struct {
@@ -102,7 +103,7 @@ func WithToken(t *oauth2.Token) ClientOption {
 	}
 }
 
-// githubClient returns a new GitHub client for the given repository.
+// NewClient returns a new GitHub client for the given repository.
 // If the GITHUB_TOKEN is set, it will be used for authentication.
 func NewClient(repo string, opts ...ClientOption) (*Client, error) {
 	c := &Client{
@@ -168,7 +169,7 @@ func (c *Client) CreateIssueComment(ctx context.Context, prID int, comment strin
 	return err
 }
 
-// updateIssueComment updates issue comment with the given id.
+// UpdateIssueComment updates issue comment with the given id.
 func (c *Client) UpdateIssueComment(ctx context.Context, id int, comment string) error {
 	content := strings.NewReader(fmt.Sprintf(`{"body":%q}`, comment))
 	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", c.baseURL, c.repo, id)
@@ -191,7 +192,7 @@ func (c *Client) UpdateIssueComment(ctx context.Context, id int, comment string)
 	return err
 }
 
-// listReviewComments for the trigger event pull request.
+// ReviewComments for the trigger event pull request.
 func (c *Client) ReviewComments(ctx context.Context, prID int) ([]PullRequestComment, error) {
 	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", c.baseURL, c.repo, prID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -344,6 +345,87 @@ func (c *Client) OpeningPullRequest(ctx context.Context, branch string) (*PullRe
 			Commit: resp[0].Head.Sha,
 		}, nil
 	}
+}
+
+type pullRequest struct {
+	Number int    `json:"number"`
+	URL    string `json:"html_url"`
+	Body   string `json:"body"`
+	Head   struct {
+		Ref string `json:"ref"`
+		SHA string `json:"sha"`
+	} `json:"head"`
+}
+
+func (p pullRequest) PullRequest() *PullRequest {
+	return &PullRequest{
+		Number: p.Number,
+		URL:    p.URL,
+		Body:   p.Body,
+		Commit: p.Head.SHA,
+		Ref:    p.Head.Ref,
+	}
+}
+
+// PullRequest returns information about a pull request.
+func (c *Client) PullRequest(ctx context.Context, number int) (*PullRequest, error) {
+	url := fmt.Sprintf("%s/repos/%s/pulls/%d", c.baseURL, c.repo, number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling GitHub API: %w", err)
+	}
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	var pr pullRequest
+	if err = json.Unmarshal(b, &pr); err != nil {
+		return nil, fmt.Errorf("unmarshalling response body: %w", err)
+	}
+	return pr.PullRequest(), nil
+}
+
+// CreatePullRequest creates a new pull request.
+func (c *Client) CreatePullRequest(ctx context.Context, head, base, title, body string) (*PullRequest, error) {
+	url := fmt.Sprintf("%s/repos/%s/pulls", c.baseURL, c.repo)
+	j, err := json.Marshal(map[string]string{
+		"head":  head,
+		"base":  base,
+		"title": title,
+		"body":  body,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshalling pull request data: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(j))
+	if err != nil {
+		return nil, err
+	}
+	res, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling GitHub API: %w", err)
+	}
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+	if res.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	var pr pullRequest
+	if err = json.Unmarshal(b, &pr); err != nil {
+		return nil, fmt.Errorf("unmarshalling response body: %w", err)
+	}
+	return pr.PullRequest(), nil
 }
 
 func (c *Client) ownerRepo() (string, string, error) {

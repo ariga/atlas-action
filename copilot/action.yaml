@@ -6,3 +6,7 @@ author: 'Ariga'
 runs:
   using: node20
   main: index.js
+inputs:
+  gen-test:
+    description: Generate atlas tests for the schema changes.
+    required: false
