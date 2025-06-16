@@ -4,6 +4,10 @@ description: Talk to Atlas Copilot.
 branding:
   icon: message-circle
 author: 'Ariga'
+inputs:
+  gen-test:
+    description: Generate atlas tests for the schema changes.
+    default: "false"
 runs:
   using: node20
   main: index.js

@@ -102,6 +102,12 @@ actions:
   - id: copilot
     name: Atlas Copilot
     description: Talk to Atlas Copilot.
+    inputs:
+      gen-test:
+        type: boolean
+        label: Generate tests
+        description: Generate atlas tests for the schema changes.
+        default: "false"
   - id: migrate/apply
     name: Migrate Apply
     description: Applies a migration directory on a target database
