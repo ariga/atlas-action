@@ -397,6 +397,12 @@ func (a *Actions) Copilot(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		if _, err := a.exec(ctx, "git", "config", "--local", "user.email", "atlas-copilot[bot]@users.noreply.github.com"); err != nil {
+			return fmt.Errorf("failed to checkout to the branch: %w", err)
+		}
+		if _, err := a.exec(ctx, "git", "config", "--local", "user.name", "atlas-copilot[bot]"); err != nil {
+			return fmt.Errorf("failed to checkout to the branch: %w", err)
+		}
 		if _, err := a.exec(ctx, "git", "checkout", tc.Branch); err != nil {
 			return fmt.Errorf("failed to checkout to the branch: %w", err)
 		}
