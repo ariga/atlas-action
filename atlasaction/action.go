@@ -71,6 +71,8 @@ type (
 	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
+		// // Commit all files in the given fs.FS to the current branch.
+		// Commit(context.Context, *TriggerContext, fs.FS) error
 		// CommentCopilot comments on the pull request with the copilot response.
 		CommentCopilot(context.Context, *TriggerContext, *Copilot) error
 		// CommentLint comments on the pull request with the lint report.
@@ -380,27 +382,29 @@ func (a *Actions) Copilot(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Atlas Copilot will react to comments that mention it by /atlas.
-	if tc.Comment == nil || !strings.Contains(tc.Comment.Body, "/atlas") {
-		a.Infof("Comment does not contain /atlas command, nothing to do.")
-		return nil
+	if a.GetBoolInput("gen-test") && tc.PullRequest != nil {
+		// Atlas Copilot is configured to generate test cases.
+		params := &atlasexec.CopilotParams{
+			Prompt:  "Generate missing test cases for my schema. ",
+			FSWrite: "**",
+		}
+		cp, err := a.Atlas.Copilot(ctx, params)
+		if err != nil {
+			a.SetOutput("error", err.Error())
+			return err
+		}
+		c, err := tc.SCMClient()
+		if err != nil {
+			return err
+		}
+		return c.CommentCopilot(ctx, tc, &Copilot{
+			Prompt:  params.Prompt,
+			Copilot: cp,
+		})
+	} else {
+		a.Infof("Nothing to do.")
 	}
-	params := &atlasexec.CopilotParams{
-		Prompt: tc.Comment.Body,
-	}
-	cp, err := a.Atlas.Copilot(ctx, params)
-	if err != nil {
-		a.SetOutput("error", err.Error())
-		return err
-	}
-	c, err := tc.SCMClient()
-	if err != nil {
-		return err
-	}
-	return c.CommentCopilot(ctx, tc, &Copilot{
-		Prompt:  params.Prompt,
-		Copilot: cp,
-	})
+	return nil
 }
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
