@@ -112,8 +112,18 @@ func NewGitLabClient(project, baseURL, token string) (*GitLabClient, error) {
 	return &GitLabClient{Client: c}, nil
 }
 
+// CreatePullRequest implements SCMClient.
+func (c *GitLabClient) CreatePullRequest(_ context.Context, _, _, _, _ string) (*PullRequest, error) {
+	panic("unimplemented: CreatePullRequest for GitLabClient")
+}
+
+// CopilotSession implements SCMClient.
+func (c *GitLabClient) CopilotSession(context.Context, *TriggerContext) (string, error) {
+	panic("unimplemented: CopilotSession for GitLabClient")
+}
+
 // CommentCopilot implements SCMClient.
-func (c *GitLabClient) CommentCopilot(context.Context, *TriggerContext, *Copilot) error {
+func (c *GitLabClient) CommentCopilot(context.Context, int, *Copilot) error {
 	panic("unimplemented: CommentCopilot for GitLabClient")
 }
 

@@ -309,8 +309,18 @@ func NewBitbucketClient(workspace, repoSlug, token string) (*BitbucketClient, er
 	return &BitbucketClient{Client: c}, nil
 }
 
+// CreatePullRequest implements SCMClient.
+func (c *BitbucketClient) CreatePullRequest(_ context.Context, _, _, _, _ string) (*PullRequest, error) {
+	panic("unimplemented: CreatePullRequest for BitbucketClient")
+}
+
+// CopilotSession implements SCMClient.
+func (c *BitbucketClient) CopilotSession(context.Context, *TriggerContext) (string, error) {
+	panic("unimplemented: CopilotSession for BitbucketClient")
+}
+
 // CommentCopilot implements SCMClient.
-func (c *BitbucketClient) CommentCopilot(context.Context, *TriggerContext, *Copilot) error {
+func (c *BitbucketClient) CommentCopilot(context.Context, int, *Copilot) error {
 	panic("unimplemented: CommentCopilot for BitbucketClient")
 }
 
