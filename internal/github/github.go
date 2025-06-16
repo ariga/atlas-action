@@ -50,6 +50,18 @@ type (
 	}
 	// TriggerEvent is the structure of the GitHub trigger event.
 	TriggerEvent struct {
+		// Only in case of an 'issue_comment' event.
+		Comment struct {
+			Body string `mapstructure:"body"`
+			URL  string `mapstructure:"html_url"`
+		} `mapstructure:"comment"`
+		Issue struct {
+			Number      int       `mapstructure:"number"`
+			URL         string    `mapstructure:"html_url"`
+			PullRequest *struct{} `mapstructure:"pull_request"` // not-nil if the issue is a pull request
+		} `mapstructure:"issue"`
+
+		// Only in case of a 'pull_request' event.
 		PullRequest struct {
 			Number int    `mapstructure:"number"`
 			Body   string `mapstructure:"body"`
@@ -230,7 +242,7 @@ func (c *Client) CreateReviewComment(ctx context.Context, prID int, s *PullReque
 	return err
 }
 
-// updateReviewComment updates the review comment with the given id.
+// UpdateReviewComment updates the review comment with the given id.
 func (c *Client) UpdateReviewComment(ctx context.Context, id int, body string) error {
 	type pullRequestUpdate struct {
 		Body string `json:"body"`

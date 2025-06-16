@@ -71,6 +71,8 @@ type (
 	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
+		// CommentCopilot comments on the pull request with the copilot response.
+		CommentCopilot(context.Context, *TriggerContext, *Copilot) error
 		// CommentLint comments on the pull request with the lint report.
 		CommentLint(context.Context, *TriggerContext, *atlasexec.SummaryReport) error
 		// CommentPlan comments on the pull request with the schema plan.
@@ -95,6 +97,8 @@ type (
 		Version(ctx context.Context) (*atlasexec.Version, error)
 		// Login runs the `login` command.
 		Login(ctx context.Context, params *atlasexec.LoginParams) error
+		// Copilot runs the 'copilot' command in one-shot mode.
+		Copilot(context.Context, *atlasexec.CopilotParams) (atlasexec.Copilot, error)
 		// MigrateStatus runs the `migrate status` command.
 		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
 		// MigrateHash runs the `migrate hash` command.
@@ -153,9 +157,11 @@ type (
 		DefaultBranch string                    // DefaultBranch is the default branch of the repository.
 		Branch        string                    // Currnet Branch name.
 		Commit        string                    // Commit SHA.
-		PullRequest   *PullRequest              // PullRequest will be available if the event is "pull_request".
 		Actor         *Actor                    // Actor is the user who triggered the action.
 		RerunCmd      string                    // RerunCmd is the command to rerun the action.
+
+		PullRequest *PullRequest // PullRequest will be available if the event is "pull_request".
+		Comment     *Comment     // Comment will be available if the event is "issue_comment".
 	}
 
 	// Actor holds the actor information.
@@ -171,9 +177,20 @@ type (
 		Commit string // Latest commit SHA.
 		Body   string // Body (description) of the pull request.
 	}
+	// Comment holds the comment information.
+	Comment struct {
+		Number int    // Comment Number
+		URL    string // URL of the comment, e.g "https://github.com/ariga/atlas-action/pull/1#issuecomment-1234567890"
+		Body   string // Body (description) of the comment.
+	}
 	SchemaLintReport struct {
 		URL []string `json:"URL,omitempty"` // Redacted schema URLs
 		*atlasexec.SchemaLintReport
+	}
+	// Copilot contains both the prompt and the response from Atlas Copilot.
+	Copilot struct {
+		Prompt  string
+		Copilot atlasexec.Copilot
 	}
 )
 
@@ -277,9 +294,6 @@ func WithCmdExecutor(exec func(ctx context.Context, name string, args ...string)
 	return func(c *config) { c.CmdExecutor = exec }
 }
 
-// ErrNoSCM is returned when no SCM client is found.
-var ErrNoSCM = errors.New("atlasaction: no SCM client found")
-
 type (
 	config struct {
 		getenv      func(string) string
@@ -310,8 +324,10 @@ const (
 	CmdSchemaPlan        = "schema/plan"
 	CmdSchemaPlanApprove = "schema/plan/approve"
 	CmdSchemaApply       = "schema/apply"
-	// Montioring Commands
+	// Monitoring Commands
 	CmdMonitorSchema = "monitor/schema"
+	// Copilot Commands
+	CmdCopilot = "copilot"
 )
 
 // Run runs the action based on the command name.
@@ -351,9 +367,40 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.SchemaApply(ctx)
 	case CmdMonitorSchema:
 		return a.MonitorSchema(ctx)
+	case CmdCopilot:
+		return a.Copilot(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", act)
 	}
+}
+
+// Copilot runs the GitHub Action for "ariga/atlas-action/copilot".
+func (a *Actions) Copilot(ctx context.Context) error {
+	tc, err := a.GetTriggerContext(ctx)
+	if err != nil {
+		return err
+	}
+	// Atlas Copilot will react to comments that mention it by /atlas.
+	if tc.Comment == nil || !strings.Contains(tc.Comment.Body, "/atlas") {
+		a.Infof("Comment does not contain /atlas command, nothing to do.")
+		return nil
+	}
+	params := &atlasexec.CopilotParams{
+		Prompt: tc.Comment.Body,
+	}
+	cp, err := a.Atlas.Copilot(ctx, params)
+	if err != nil {
+		a.SetOutput("error", err.Error())
+		return err
+	}
+	c, err := tc.SCMClient()
+	if err != nil {
+		return err
+	}
+	return c.CommentCopilot(ctx, tc, &Copilot{
+		Prompt:  params.Prompt,
+		Copilot: cp,
+	})
 }
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
@@ -544,14 +591,12 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	}
 	if tc.PullRequest != nil {
 		// In case of a pull request, we need to add comments and suggestion to the PR.
-		switch c, err := tc.SCMClient(); {
-		case errors.Is(err, ErrNoSCM):
-		case err != nil:
+		c, err := tc.SCMClient()
+		if err != nil {
 			return err
-		default:
-			if err = c.CommentLint(ctx, tc, &payload); err != nil {
-				a.Errorf("failed to comment on the pull request: %v", err)
-			}
+		}
+		if err = c.CommentLint(ctx, tc, &payload); err != nil {
+			a.Errorf("failed to comment on the pull request: %v", err)
 		}
 	}
 	if isLintErr {
@@ -845,15 +890,11 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 		r.SchemaLint(ctx, rp)
 	}
 	if tc.PullRequest != nil {
-		switch c, err := tc.SCMClient(); {
-		case errors.Is(err, ErrNoSCM):
-			a.Infof("No SCM client available, skipping PR comment")
-		case err != nil:
+		c, err := tc.SCMClient()
+		if err != nil {
 			a.Errorf("failed to get SCM client: %v", err)
-		default:
-			if err = c.CommentSchemaLint(ctx, tc, rp); err != nil {
-				a.Errorf("failed to comment on the pull request: %v", err)
-			}
+		} else if err = c.CommentSchemaLint(ctx, tc, rp); err != nil {
+			a.Errorf("failed to comment on the pull request: %v", err)
 		}
 	}
 	a.Infof("`atlas schema lint` completed successfully, no issues found")
@@ -971,17 +1012,14 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	if r, ok := a.Action.(Reporter); ok {
 		r.SchemaPlan(ctx, plan)
 	}
-	switch c, err := tc.SCMClient(); {
-	case errors.Is(err, ErrNoSCM):
-	case err != nil:
+	c, err := tc.SCMClient()
+	if err != nil {
 		return err
-	default:
-		err = c.CommentPlan(ctx, tc, plan)
-		if err != nil {
-			// Don't fail the action if the comment fails.
-			// It may be due to the missing permissions.
-			a.Errorf("failed to comment on the pull request: %v", err)
-		}
+	}
+	if err = c.CommentPlan(ctx, tc, plan); err != nil {
+		// Don't fail the action if the comment fails.
+		// It may be due to the missing permissions.
+		a.Errorf("failed to comment on the pull request: %v", err)
 	}
 	if plan.Lint != nil {
 		if errs := plan.Lint.Errors(); len(errs) > 0 {

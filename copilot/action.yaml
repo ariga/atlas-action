@@ -1,0 +1,8 @@
+name: 'Atlas Copilot'
+description: 'Talk to Atlas Copilot.'
+branding:
+  icon: message-circle
+author: 'Ariga'
+runs:
+  using: node20
+  main: index.js

@@ -309,6 +309,11 @@ func NewBitbucketClient(workspace, repoSlug, token string) (*BitbucketClient, er
 	return &BitbucketClient{Client: c}, nil
 }
 
+// CommentCopilot implements SCMClient.
+func (c *BitbucketClient) CommentCopilot(context.Context, *TriggerContext, *Copilot) error {
+	panic("unimplemented: CommentCopilot for BitbucketClient")
+}
+
 // CommentLint implements SCMClient.
 func (c *BitbucketClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
 	comment, err := RenderTemplate("migrate-lint/md", r)
