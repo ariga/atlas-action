@@ -378,6 +378,7 @@ jobs:
         env:
           CGO_ENABLED: 0
       - id: schema_lint_test
+        continue-on-error: true
         uses: ./schema/lint
         with:
           working-directory: atlasaction/testdata/schema-lint
@@ -387,6 +388,18 @@ jobs:
           vars: '{"rulefile":"schema.rule.hcl"}'
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Mark failure as expected
+        if: |
+          steps.schema_lint_test.outcome == 'failure' &&
+          matrix.test.url != 'file://ok.lt.hcl'
+        run: echo "::notice title=Expected Failure::${{ matrix.test.url }} failed as expected"
+      - name: Fail on unexpected failure
+        if: |
+          steps.schema_lint_test.outcome == 'failure' &&
+          matrix.test.url == 'file://ok.lt.hcl'
+        run: |
+          echo "::error title=Unexpected Failure::${{ matrix.test.url }} must pass"
+          exit 1
   schema-apply:
     runs-on: ubuntu-latest
     env:

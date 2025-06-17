@@ -871,7 +871,7 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 	report, err := a.Atlas.SchemaLint(ctx, params)
 	if err != nil {
 		a.SetOutput("error", err.Error())
-		return fmt.Errorf("`atlas schema lint` completed with errors:\n%s", err)
+		return fmt.Errorf("`atlas schema lint` completed failed with errors:\n%s", err)
 	}
 	if len(report.Steps) == 0 {
 		a.Infof("`atlas schema lint` completed successfully, no issues found")
@@ -901,7 +901,18 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 			a.Errorf("failed to comment on the pull request: %v", err)
 		}
 	}
-	a.Infof("`atlas schema lint` completed successfully, no issues found")
+	errorCount, warningCount := 0, 0
+	for _, step := range report.Steps {
+		if step.Error {
+			errorCount++
+		} else {
+			warningCount++
+		}
+	}
+	if errorCount > 0 {
+		return fmt.Errorf("`atlas schema lint` completed successfully with %d errors and %d warnings, check the annotations for details", errorCount, warningCount)
+	}
+	a.Infof("`atlas schema lint` completed successfully with %d warnings, check the annotations for details", warningCount)
 	return nil
 }
 

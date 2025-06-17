@@ -222,10 +222,10 @@ func (a *GitHub) addChecksSchemaLint(lint *SchemaLintReport) error {
 					"line": strconv.Itoa(max(1, diag.Pos.Start.Line)),
 				})
 			}
-			if step.Text != "" {
-				logger.Warningf("%s", msg)
-			} else {
+			if step.Error {
 				logger.Errorf("%s", msg)
+			} else {
+				logger.Warningf("%s", msg)
 			}
 		}
 	}
