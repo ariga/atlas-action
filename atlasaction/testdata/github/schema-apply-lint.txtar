@@ -4,12 +4,16 @@ env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-apply
 env INPUT_ENV=test
 # Run the action
 ! atlas-action --action=schema/apply
+stdout '::warning::Error: quota error'
+stdout '::error::Rejected by review policy: errors or warnings were found'
 
 summary summary.html
 output output.txt
 
 -- schema-apply/1/args --
 schema apply --format {{ json . }} --env test
+-- schema-apply/1/stderr --
+Error: quota error
 -- schema-apply/1/stdout --
 {"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"},"Start":"2024-09-18T11:25:21.64465+07:00","End":"0001-01-01T00:00:00Z","Error":"Rejected by review policy: errors or warnings were found","Plan":{"Env":{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"local.db","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"","Fragment":"","RawFragment":"","Schema":"main"}},"Lint":{"Env":{"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":"file","Path":"","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"mode=memory","Fragment":"","RawFragment":"","Schema":"main"}},"Schema":{},"Steps":[{"Name":"Analyze 20240918042521.sql","Text":"1 reports were found in analysis","Result":{"Name":"20240918042521.sql","Text":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Drop \"t4\" table\nDROP TABLE `t4`;\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Reports":[{"Text":"destructive changes detected","Diagnostics":[{"Pos":101,"Text":"Dropping table \"t4\"","Code":"DS102","SuggestedFixes":[{"Message":"Add a pre-migration check to ensure table \"t4\" is empty before dropping it"}]}]}],"Error":"destructive changes detected"}}],"Files":[{"Name":"20240918042521.sql","Text":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Drop \"t4\" table\nDROP TABLE `t4`;\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Reports":[{"Text":"destructive changes detected","Diagnostics":[{"Pos":101,"Text":"Dropping table \"t4\"","Code":"DS102","SuggestedFixes":[{"Message":"Add a pre-migration check to ensure table \"t4\" is empty before dropping it"}]}]}],"Error":"destructive changes detected"}]},"File":{"Name":"20240918042521","FromHash":"iHZMQ1EoarAXt/KU0KQbBljbbGs8gVqX2ZBXefePSGE=","ToHash":"Rl4lBdMkvFoGQ4xu+3sYCeogTVnamJ7bmDoq9pMXcjw=","Migration":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Drop \"t4\" table\nDROP TABLE `t4`;\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Stmts":[{"Pos":55,"Text":"PRAGMA foreign_keys = off;","Comments":["-- Disable the enforcement of foreign-keys constraints\n"]},{"Pos":101,"Text":"DROP TABLE `t4`;","Comments":["-- Drop \"t4\" table\n"]},{"Pos":177,"Text":"PRAGMA foreign_keys = on;","Comments":["-- Enable back the enforcement of foreign-keys constraints\n"]}]}},"Changes":{}}
 -- output.txt --
