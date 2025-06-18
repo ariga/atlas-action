@@ -137,6 +137,8 @@ type (
 		SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error)
 		// WhoAmI runs the `whoami` command.
 		WhoAmI(context.Context, *atlasexec.WhoAmIParams) (*atlasexec.WhoAmI, error)
+		// SetStderr sets the standard error output for the client.
+		SetStderr(io.Writer)
 	}
 
 	// CloudClient lets an action talk to Atlas Cloud.
@@ -253,6 +255,8 @@ func WithRuntimeAction() Option {
 			// Do nothing. Action is already set.
 		case c.getenv("GITHUB_ACTIONS") == "true":
 			c.action = NewGitHub(c.getenv, c.out)
+			// Forward all output from stderr to the action logger as warnings.
+			c.atlas.SetStderr(logWriter(c.action.Warningf))
 		case c.getenv("CIRCLECI") == "true":
 			c.action = NewCircleCI(c.getenv, c.out)
 		case c.getenv("GITLAB_CI") == "true":
@@ -1862,3 +1866,14 @@ func (l *coloredLogger) Fatalf(msg string, args ...any) {
 }
 
 var _ Logger = (*coloredLogger)(nil)
+
+type logWriter func(string, ...any)
+
+var _ io.Writer = (*logWriter)(nil)
+
+// Write implements the io.Writer interface for logWriter.
+// It writes p to the log using the logWriter function.
+func (s logWriter) Write(p []byte) (int, error) {
+	s("%s", string(p))
+	return len(p), nil
+}

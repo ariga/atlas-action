@@ -637,6 +637,8 @@ type mockAtlas struct {
 
 var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
 
+func (m *mockAtlas) SetStderr(io.Writer) {}
+
 // Version implements AtlasExec.
 func (m *mockAtlas) Version(context.Context) (*atlasexec.Version, error) {
 	return &atlasexec.Version{Version: "v0.29.1", SHA: "bb8bf66", Canary: true}, nil
