@@ -383,7 +383,7 @@ func (c *Client) PullRequest(ctx context.Context, number int) (*PullRequest, err
 	if err != nil {
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}
-	if res.StatusCode != http.StatusCreated {
+	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
 	var pr pullRequest
