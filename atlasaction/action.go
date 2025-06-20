@@ -415,11 +415,9 @@ func (a *Actions) Copilot(ctx context.Context) error {
 		)
 		defer in.Close()
 		go func() {
-			a.Infof("started reading copilot response")
 			for scan.Scan() {
 				a.Infof(scan.Text())
 			}
-			a.Infof("done reading copilot response")
 		}()
 		for st.Next() {
 			m, err = st.Current()
