@@ -374,11 +374,23 @@ func (c *Client) CreatePullRequest(ctx context.Context, head, base, title, body 
 	if res.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
-	var pr PullRequest
+	var pr struct {
+		Number int    `json:"number"`
+		URL    string `json:"html_url"`
+		Body   string `json:"body"`
+		Head   struct {
+			SHA string `json:"sha"`
+		} `json:"head"`
+	}
 	if err = json.Unmarshal(b, &pr); err != nil {
 		return nil, fmt.Errorf("unmarshalling response body: %w", err)
 	}
-	return &pr, nil
+	return &PullRequest{
+		Number: pr.Number,
+		URL:    pr.URL,
+		Body:   pr.Body,
+		Commit: pr.Head.SHA,
+	}, nil
 }
 
 func (c *Client) ownerRepo() (string, string, error) {
