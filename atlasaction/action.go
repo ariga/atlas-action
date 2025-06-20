@@ -77,7 +77,7 @@ type (
 		// CopilotSession returns the Copilot session for the current pull request, if there already is one.
 		CopilotSession(context.Context, *TriggerContext) (string, error)
 		// CommentCopilot comments on the pull request with the copilot response.
-		CommentCopilot(context.Context, int, *Copilot) error
+		CommentCopilot(context.Context, int, Copilot) error
 		// CommentLint comments on the pull request with the lint report.
 		CommentLint(context.Context, *TriggerContext, *atlasexec.SummaryReport) error
 		// CommentPlan comments on the pull request with the schema plan.
@@ -196,7 +196,7 @@ type (
 	}
 	// Copilot contains both the prompt and the response from Atlas Copilot.
 	Copilot struct {
-		Prompt, Response string
+		Session, Prompt, Response string
 	}
 )
 
@@ -397,7 +397,7 @@ func (a *Actions) Copilot(ctx context.Context) error {
 	switch {
 	case a.GetBoolInput("gen-test") && tc.PullRequest != nil:
 		// Atlas Copilot is configured to generate test cases.
-		s, err := a.Atlas.CopilotStream(ctx, &atlasexec.CopilotParams{
+		st, err := a.Atlas.CopilotStream(ctx, &atlasexec.CopilotParams{
 			Session: s,
 			Prompt:  "Generate missing test cases for my schema.",
 			FSWrite: "**",
@@ -421,8 +421,8 @@ func (a *Actions) Copilot(ctx context.Context) error {
 			}
 			a.Infof("done reading copilot response")
 		}()
-		for s.Next() {
-			m, err = s.Current()
+		for st.Next() {
+			m, err = st.Current()
 			if err != nil {
 				return err
 			}
@@ -461,16 +461,20 @@ func (a *Actions) Copilot(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create pull request: %w", err)
 		}
-		if err = c.CommentCopilot(ctx, pr.Number, &Copilot{
+		if err = c.CommentCopilot(ctx, pr.Number, Copilot{
+			Session:  s,
 			Prompt:   "",
 			Response: buf.String(),
 		}); err != nil {
 			return fmt.Errorf("failed to create pull request comment: %w", err)
 		}
-		return c.CommentCopilot(ctx, tc.PullRequest.Number, &Copilot{Response: fmt.Sprintf(
-			"I added the generated test cases to a new branch and created a pull request for you [here](%s). You can review the changes and merge them if you are satisfied.",
-			pr.URL,
-		)})
+		return c.CommentCopilot(ctx, tc.PullRequest.Number, Copilot{
+			Session: s,
+			Response: fmt.Sprintf(
+				"I added the generated test cases to a new branch and created a pull request for you [here](%s). You can review the changes and merge them if you are satisfied.",
+				pr.URL,
+			),
+		})
 	// Atlas Copilot will react to comments that mention it by /atlas.
 	case tc.Comment == nil || !strings.Contains(tc.Comment.Body, "/atlas"):
 		cp, err := a.Atlas.Copilot(ctx, &atlasexec.CopilotParams{
@@ -486,7 +490,8 @@ func (a *Actions) Copilot(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		return c.CommentCopilot(ctx, tc.Comment.Number, &Copilot{
+		return c.CommentCopilot(ctx, tc.Comment.Number, Copilot{
+			Session:  s,
 			Prompt:   tc.Comment.Body,
 			Response: cp.String(),
 		})

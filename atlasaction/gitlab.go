@@ -123,7 +123,7 @@ func (c *GitLabClient) CopilotSession(context.Context, *TriggerContext) (string,
 }
 
 // CommentCopilot implements SCMClient.
-func (c *GitLabClient) CommentCopilot(context.Context, int, *Copilot) error {
+func (c *GitLabClient) CommentCopilot(context.Context, int, Copilot) error {
 	panic("unimplemented: CommentCopilot for GitLabClient")
 }
 

@@ -320,7 +320,7 @@ func (c *BitbucketClient) CopilotSession(context.Context, *TriggerContext) (stri
 }
 
 // CommentCopilot implements SCMClient.
-func (c *BitbucketClient) CommentCopilot(context.Context, int, *Copilot) error {
+func (c *BitbucketClient) CommentCopilot(context.Context, int, Copilot) error {
 	panic("unimplemented: CommentCopilot for BitbucketClient")
 }
 
