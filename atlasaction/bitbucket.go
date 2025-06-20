@@ -309,6 +309,11 @@ func NewBitbucketClient(workspace, repoSlug, token string) (*BitbucketClient, er
 	return &BitbucketClient{Client: c}, nil
 }
 
+// PullRequest implements SCMClient.
+func (c *BitbucketClient) PullRequest(context.Context, int) (*PullRequest, error) {
+	panic("unimplemented: PullRequest for BitbucketClient")
+}
+
 // CreatePullRequest implements SCMClient.
 func (c *BitbucketClient) CreatePullRequest(_ context.Context, _, _, _, _ string) (*PullRequest, error) {
 	panic("unimplemented: CreatePullRequest for BitbucketClient")

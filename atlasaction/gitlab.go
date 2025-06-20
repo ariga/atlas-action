@@ -112,6 +112,11 @@ func NewGitLabClient(project, baseURL, token string) (*GitLabClient, error) {
 	return &GitLabClient{Client: c}, nil
 }
 
+// PullRequest implements SCMClient.
+func (c *GitLabClient) PullRequest(context.Context, int) (*PullRequest, error) {
+	panic("unimplemented: PullRequest for GitLabClient")
+}
+
 // CreatePullRequest implements SCMClient.
 func (c *GitLabClient) CreatePullRequest(_ context.Context, _, _, _, _ string) (*PullRequest, error) {
 	panic("unimplemented: CreatePullRequest for GitLabClient")
