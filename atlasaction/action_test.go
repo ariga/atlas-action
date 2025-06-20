@@ -3053,7 +3053,7 @@ func TestSchemaLint(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, act.summary)
 	})
-	t.Run("lint - with issues", func(t *testing.T) {
+	t.Run("lint - with warning issues", func(t *testing.T) {
 		m := &mockAtlas{}
 		m.schemaLint = func(_ context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {
 			require.Equal(t, "test", p.Env)
@@ -3096,6 +3096,61 @@ func TestSchemaLint(t *testing.T) {
 		require.NoError(t, err)
 		err = a.SchemaLint(context.Background())
 		require.Nil(t, err)
+		require.Equal(t, 1, act.summary)
+	})
+	t.Run("lint - with errors issues", func(t *testing.T) {
+		m := &mockAtlas{}
+		m.schemaLint = func(_ context.Context, p *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error) {
+			require.Equal(t, "test", p.Env)
+			require.Equal(t, "file://testdata/config/atlas.hcl", p.ConfigURL)
+			require.Equal(t, "sqlite://file?mode=memory", p.DevURL)
+			require.Equal(t, []string{"file://schema.hcl"}, p.URL)
+			return &atlasexec.SchemaLintReport{
+				Steps: []atlasexec.Report{
+					{
+						Text: "Warning found",
+						Diagnostics: []atlasexec.Diagnostic{
+							{
+								Text: "Issue detail",
+								Code: "LINT001",
+							},
+						},
+					},
+					{
+						Text:  "Error found",
+						Error: true,
+						Diagnostics: []atlasexec.Diagnostic{
+							{
+								Text: "Issue detail",
+								Code: "LINT001",
+							},
+						},
+					},
+				},
+			}, nil
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"url":     "file://schema.hcl",
+				"dev-url": "sqlite://file?mode=memory",
+				"config":  "file://testdata/config/atlas.hcl",
+				"env":     "test",
+			},
+			output: map[string]string{},
+			trigger: &atlasaction.TriggerContext{
+				PullRequest: &atlasaction.PullRequest{
+					URL: "http://test",
+				},
+			},
+			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		}
+		a, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(m),
+		)
+		require.NoError(t, err)
+		err = a.SchemaLint(context.Background())
+		require.Error(t, err, "`atlas schema lint` completed successfully with 1 errors and 1 warnings, check the annotations for details")
 		require.Equal(t, 1, act.summary)
 	})
 	t.Run("lint - PR comment", func(t *testing.T) {

@@ -11,4 +11,8 @@ lint {
   rule "hcl" "by-var" {
     src = [var.rulefile]
   }
+  rule "hcl" "by-var-with-error" {
+    error = true
+    src   = [var.rulefile]
+  }
 }

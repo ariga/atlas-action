@@ -12,7 +12,7 @@
     <tr>
       <td>
         <div align="center">
-          {{- template "lint-check" "error.svg" -}}
+          {{- template "lint-check" (or (and $step.Error "error.svg") "warning.svg") -}}
         </div>
       </td>
       <td>{{ $step.Text | firstUpper }}</td>

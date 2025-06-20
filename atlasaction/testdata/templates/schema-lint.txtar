@@ -3,7 +3,7 @@ render-schema-lint schema-lint.tmpl data-0.json
 cmp stdout golden-0.html
 
 -- data-0.json --
-{"Steps":[{"Text":"naming violations detected","Diagnostics":[{"Pos":{"Filename":"schema.lt.hcl","Start":{"Line":1,"Column":1,"Byte":0},"End":{"Line":1,"Column":7,"Byte":6}},"Text":"Table \"t1\" violates the naming policy","Code":"NM102"},{"Pos":{"Filename":"schema.lt.hcl","Start":{"Line":5,"Column":1,"Byte":40},"End":{"Line":5,"Column":7,"Byte":46}},"Text":"Table \"t2\" violates the naming policy","Code":"NM102"}]},{"Text":"rule \"primary-key-required\"","Desc":"All tables must have a primary key","Diagnostics":[{"Pos":{"Filename":"schema.lt.hcl","Start":{"Line":3,"Column":1,"Byte":20},"End":{"Line":3,"Column":6,"Byte":25}},"Text":"Table t1 must have a primary key"}]}],"URL":["file://schema.lt.hcl", "file://schema2.lt.hcl"]}
+{"Steps":[{"Text":"naming violations detected","Diagnostics":[{"Pos":{"Filename":"schema.lt.hcl","Start":{"Line":1,"Column":1,"Byte":0},"End":{"Line":1,"Column":7,"Byte":6}},"Text":"Table \"t1\" violates the naming policy","Code":"NM102"},{"Pos":{"Filename":"schema.lt.hcl","Start":{"Line":5,"Column":1,"Byte":40},"End":{"Line":5,"Column":7,"Byte":46}},"Text":"Table \"t2\" violates the naming policy","Code":"NM102"}]},{"Text":"rule \"primary-key-required\"","Desc":"All tables must have a primary key","Error":true,"Diagnostics":[{"Pos":{"Filename":"schema.lt.hcl","Start":{"Line":3,"Column":1,"Byte":20},"End":{"Line":3,"Column":6,"Byte":25}},"Text":"Table t1 must have a primary key"}]}],"URL":["file://schema.lt.hcl", "file://schema2.lt.hcl"]}
 
 -- golden-0.html --
 <code>atlas schema lint</code> on <strong>file://schema.lt.hcl, file://schema2.lt.hcl</strong>
@@ -18,7 +18,7 @@ cmp stdout golden-0.html
   <tbody>
     <tr>
       <td>
-        <div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div>
+        <div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/warning.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/warning.svg?v=1"/></picture></div>
       </td>
       <td>Naming violations detected</td>
       <td>
