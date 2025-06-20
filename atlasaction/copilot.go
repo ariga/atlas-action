@@ -30,7 +30,9 @@ func (a *Actions) Copilot(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.Infof("continue session %s", s)
+	if s != "" {
+		a.Infof("continue session %s", s)
+	}
 	switch {
 	case a.GetBoolInput("gen-test") && tc.PullRequest != nil:
 		// Atlas Copilot is configured to generate test cases.
