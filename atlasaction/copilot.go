@@ -109,7 +109,7 @@ If you have any questions or want me to edit the test, you can comment on this P
 			return err
 		}
 		// We need to know the PR's head branch to commit the changes.
-		pr, err := c.PullRequest(ctx, tc.PullRequest.Number)
+		pr, err := c.PullRequest(ctx, tc.Comment.Number)
 		if err != nil {
 			return err
 		}
