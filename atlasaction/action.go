@@ -5,7 +5,6 @@
 package atlasaction
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
