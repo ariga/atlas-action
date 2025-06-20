@@ -102,7 +102,9 @@ type (
 		Version(ctx context.Context) (*atlasexec.Version, error)
 		// Login runs the `login` command.
 		Login(ctx context.Context, params *atlasexec.LoginParams) error
-		// CopilotStream runs the 'copilot' command in one-shot mode.
+		// Copilot runs the 'copilot' command in one-shot mode.
+		Copilot(context.Context, *atlasexec.CopilotParams) (atlasexec.Copilot, error)
+		// CopilotStream runs the 'copilot' command in one-shot mode, streaming the messages.
 		CopilotStream(context.Context, *atlasexec.CopilotParams) (atlasexec.Stream[*atlasexec.CopilotMessage], error)
 		// MigrateStatus runs the `migrate status` command.
 		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
@@ -421,6 +423,7 @@ func (a *Actions) Copilot(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+			a.Infof("I read %q", m.Content)
 			in.Write([]byte(m.Content))
 		}
 		return nil
