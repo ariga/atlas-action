@@ -115,7 +115,10 @@ If you have any questions or want me to edit the test, you can comment on this P
 		if err != nil {
 			return err
 		}
-		if _, err := a.exec(ctx, "git", "checkout", pr.Ref); err != nil {
+		if _, err := a.exec(ctx, "git", "fetch", "origin"); err != nil {
+			return fmt.Errorf("failed to fetch origin: %w", err)
+		}
+		if _, err := a.exec(ctx, "git", "switch", "-c", "origin/"+pr.Ref); err != nil {
 			return fmt.Errorf("failed to checkout to the branch: %w", err)
 		}
 		if err := a.commitChanges(ctx, tc, "", "user feedback"); err != nil {
