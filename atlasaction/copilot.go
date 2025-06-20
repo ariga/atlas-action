@@ -30,6 +30,7 @@ func (a *Actions) Copilot(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	a.Infof("session %s found", s)
 	switch {
 	case a.GetBoolInput("gen-test") && tc.PullRequest != nil:
 		// Atlas Copilot is configured to generate test cases.
@@ -93,7 +94,7 @@ If you have any questions or want me to edit the test, you can comment on this P
 			),
 		})
 	// Atlas Copilot will react to comments that mention it by /atlas.
-	case tc.Comment == nil || !strings.Contains(tc.Comment.Body, "/atlas"):
+	case tc.Comment != nil && strings.Contains(tc.Comment.Body, "/atlas"):
 		cp, err := a.Atlas.Copilot(ctx, &atlasexec.CopilotParams{
 			Session: s,
 			Prompt:  tc.Comment.Body,
