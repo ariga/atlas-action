@@ -71,6 +71,8 @@ type (
 	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
+		// PullRequest returns information about a pull request.
+		PullRequest(context.Context, int) (*PullRequest, error)
 		// CreatePullRequest creates a pull request with the given title and body into the given base branch.
 		CreatePullRequest(_ context.Context, head, base, title, body string) (*PullRequest, error)
 		// CopilotSession returns the Copilot session for the current pull request, if there already is one.
@@ -161,7 +163,7 @@ type (
 		Repo          string                    // Repo is the repository name. e.g. "ariga/atlas-action".
 		RepoURL       string                    // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
 		DefaultBranch string                    // DefaultBranch is the default branch of the repository.
-		Branch        string                    // Currnet Branch name.
+		Branch        string                    // Current Branch name.
 		Commit        string                    // Commit SHA.
 		Actor         *Actor                    // Actor is the user who triggered the action.
 		RerunCmd      string                    // RerunCmd is the command to rerun the action.
@@ -180,14 +182,15 @@ type (
 	PullRequest struct {
 		Number int    // Pull Request Number
 		URL    string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
-		Commit string // Latest commit SHA.
 		Body   string // Body (description) of the pull request.
+		Commit string // Latest commit SHA.
+		Ref    string
 	}
 	// Comment holds the comment information.
 	Comment struct {
 		Number int    // Pull Request Number
 		URL    string // URL of the comment, e.g "https://github.com/ariga/atlas-action/pull/1#issuecomment-1234567890"
-		Body   string // Body (description) of the comment.
+		Body   string // Body (description) of the comment
 	}
 	SchemaLintReport struct {
 		URL []string `json:"URL,omitempty"` // Redacted schema URLs

@@ -108,14 +108,22 @@ If you have any questions or want me to edit the test, you can comment on this P
 		if err != nil {
 			return err
 		}
-		if err := c.CommentCopilot(ctx, tc.Comment.Number, Copilot{
+		// We need to know the PR's head branch to commit the changes.
+		pr, err := c.PullRequest(ctx, tc.PullRequest.Number)
+		if err != nil {
+			return err
+		}
+		if _, err := a.exec(ctx, "git", "checkout", pr.Ref); err != nil {
+			return fmt.Errorf("failed to checkout to the branch: %w", err)
+		}
+		if err := a.commitChanges(ctx, tc, "", "user feedback"); err != nil {
+			return err
+		}
+		return c.CommentCopilot(ctx, tc.Comment.Number, Copilot{
 			Session:  s,
 			Prompt:   tc.Comment.Body,
 			Response: cp.String(),
-		}); err != nil {
-			return err
-		}
-		return a.commitChanges(ctx, tc, "", "user feedback")
+		})
 	}
 	return nil
 }

@@ -47,6 +47,7 @@ type (
 		URL    string
 		Body   string
 		Commit string
+		Ref    string
 	}
 	// TriggerEvent is the structure of the GitHub trigger event.
 	TriggerEvent struct {
@@ -346,6 +347,52 @@ func (c *Client) OpeningPullRequest(ctx context.Context, branch string) (*PullRe
 	}
 }
 
+type pullRequest struct {
+	Number int    `json:"number"`
+	URL    string `json:"html_url"`
+	Body   string `json:"body"`
+	Head   struct {
+		Ref string `json:"ref"`
+		SHA string `json:"sha"`
+	} `json:"head"`
+}
+
+func (p pullRequest) PullRequest() *PullRequest {
+	return &PullRequest{
+		Number: p.Number,
+		URL:    p.URL,
+		Body:   p.Body,
+		Commit: p.Head.SHA,
+		Ref:    p.Head.Ref,
+	}
+}
+
+// PullRequest returns information about a pull request.
+func (c *Client) PullRequest(ctx context.Context, number int) (*PullRequest, error) {
+	url := fmt.Sprintf("%s/repos/%s/pulls/%d", c.baseURL, c.repo, number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling GitHub API: %w", err)
+	}
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+	if res.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	var pr pullRequest
+	if err = json.Unmarshal(b, &pr); err != nil {
+		return nil, fmt.Errorf("unmarshalling response body: %w", err)
+	}
+	return pr.PullRequest(), nil
+}
+
 // CreatePullRequest creates a new pull request.
 func (c *Client) CreatePullRequest(ctx context.Context, head, base, title, body string) (*PullRequest, error) {
 	url := fmt.Sprintf("%s/repos/%s/pulls", c.baseURL, c.repo)
@@ -374,23 +421,11 @@ func (c *Client) CreatePullRequest(ctx context.Context, head, base, title, body 
 	if res.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
-	var pr struct {
-		Number int    `json:"number"`
-		URL    string `json:"html_url"`
-		Body   string `json:"body"`
-		Head   struct {
-			SHA string `json:"sha"`
-		} `json:"head"`
-	}
+	var pr pullRequest
 	if err = json.Unmarshal(b, &pr); err != nil {
 		return nil, fmt.Errorf("unmarshalling response body: %w", err)
 	}
-	return &PullRequest{
-		Number: pr.Number,
-		URL:    pr.URL,
-		Body:   pr.Body,
-		Commit: pr.Head.SHA,
-	}, nil
+	return pr.PullRequest(), nil
 }
 
 func (c *Client) ownerRepo() (string, string, error) {
