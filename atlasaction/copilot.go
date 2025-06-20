@@ -30,7 +30,7 @@ func (a *Actions) Copilot(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.Infof("session %s found", s)
+	a.Infof("continue session %s", s)
 	switch {
 	case a.GetBoolInput("gen-test") && tc.PullRequest != nil:
 		// Atlas Copilot is configured to generate test cases.
@@ -104,18 +104,18 @@ If you have any questions or want me to edit the test, you can comment on this P
 			a.SetOutput("error", err.Error())
 			return err
 		}
-		if err = a.commitChanges(ctx, tc, "", "user feedback"); err != nil {
-			return err
-		}
 		c, err := tc.SCMClient()
 		if err != nil {
 			return err
 		}
-		return c.CommentCopilot(ctx, tc.Comment.Number, Copilot{
+		if err := c.CommentCopilot(ctx, tc.Comment.Number, Copilot{
 			Session:  s,
 			Prompt:   tc.Comment.Body,
 			Response: cp.String(),
-		})
+		}); err != nil {
+			return err
+		}
+		return a.commitChanges(ctx, tc, "", "user feedback")
 	}
 	return nil
 }
