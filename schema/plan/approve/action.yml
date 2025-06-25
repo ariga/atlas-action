@@ -43,6 +43,20 @@ inputs:
     description: |
       URL(s) of the desired schema state.
     required: false
+  schema:
+    description: |
+      List of database schema(s). For example: `public`.
+    required: false
+  include:
+    description: |
+      list of glob patterns used to select which resources to keep in inspection
+      see: https://atlasgo.io/declarative/inspect#include-schemas-
+    required: false
+  exclude:
+    description: | 
+     list of glob patterns used to filter resources from applying 
+     see: https://atlasgo.io/declarative/inspect#exclude-schemas
+    required: false
 outputs:
   plan:
     description: The plan to be applied or generated. (ig. `atlas://<schema>/plans/<id>`)
