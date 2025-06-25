@@ -36,8 +36,7 @@ inputs:
     required: false
   schema:
     description: |
-      list of glob patterns used to select which resources to keep in inspection
-      see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas'
+      List of database schema(s). For example: `public`.
     required: false
   include:
     description: |

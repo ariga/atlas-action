@@ -485,6 +485,8 @@ Apply a declarative migrations to a database.
 * `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
   Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 * `schema` - The database schema(s). For example: `public`.
+* `include` - list of glob patterns used to select which resources to keep in inspection. see: https://atlasgo.io/declarative/inspect#include-schemas-
+* `exclude` - list of glob patterns used to filter resources from applying. see: https://atlasgo.io/declarative/inspect#exclude-schemas
 * `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
@@ -560,6 +562,8 @@ Plan a declarative migration for a schema transition.
 * `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
   Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 * `schema` - The database schema(s). For example: `public`.
+* `include` - list of glob patterns used to select which resources to keep in inspection. see: https://atlasgo.io/declarative/inspect#include-schemas-
+* `exclude` - list of glob patterns used to filter resources from applying. see: https://atlasgo.io/declarative/inspect#exclude-schemas
 * `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
   Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
@@ -583,6 +587,9 @@ Approve a declarative migration plan.
 * `schema-name` - The name (slug) of the schema repository in [Atlas Registry](https://atlasgo.io/registry).
 * `from` - URL(s) of the current schema state to transition from.
 * `to` - URL(s) of the desired schema state to transition to.
+* `schema` - The database schema(s). For example: `public`.
+* `include` - list of glob patterns used to select which resources to keep in inspection. see: https://atlasgo.io/declarative/inspect#include-schemas-
+* `exclude` - list of glob patterns used to filter resources from applying. see: https://atlasgo.io/declarative/inspect#exclude-schemas
 * `plan` - Optional URL of the plan to be approved. For example, `atlas://<schema>/plans/<id>`. By default, Atlas
   searches in the registry for a plan corresponding to the given schema transition and approves it (typically, this plan
   is created during the PR stage). If multiple plans are found, an error will be thrown.
