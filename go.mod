@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	ariga.io/atlas v0.35.0
-	ariga.io/atlas-go-sdk v0.7.3-0.20250618113748-ae7cd5c57ab0
+	ariga.io/atlas-go-sdk v0.7.3-0.20250625080140-3121b56adcd0
 	github.com/alecthomas/kong v0.8.0
 	github.com/fatih/color v1.17.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
@@ -14,7 +14,7 @@ require (
 	github.com/sethvargo/go-githubactions v1.3.0
 	github.com/stretchr/testify v1.8.4
 	github.com/vektah/gqlparser v1.3.1
-	golang.org/x/oauth2 v0.22.0
+	golang.org/x/oauth2 v0.24.1-0.20250104024449-49a531d12a9a
 )
 
 require (
