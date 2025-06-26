@@ -1,0 +1,270 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+  "id": "9f96e670-85cc-4764-b83f-9824a9747edd",
+  "author": "ariga",
+  "name": "AtlasAction",
+  "friendlyName": "Atlas Action",
+  "description": "Atlas Action for Azure DevOps",
+  "helpMarkDown": "",
+  "category": "Azure Pipelines",
+  "version": {
+    "Major": 0,
+    "Minor": 0,
+    "Patch": 54
+  },
+  "execution": {
+    "Node": {
+      "target": "shim.js",
+      "argumentFormat": ""
+    },
+    "Node10": {
+      "target": "shim.js",
+      "argumentFormat": ""
+    },
+    "Node16": {
+      "target": "shim.js",
+      "argumentFormat": ""
+    },
+    "Node20_1": {
+      "target": "shim.js",
+      "argumentFormat": ""
+    }
+  },
+  "instanceNameFormat": "Atlas Action: $(action)",
+  "groups": [
+    {
+      "name": "MigrateApply",
+      "displayName": "Migrate Apply options",
+      "isExpanded": true,
+      "visibleRule": "action == migrate apply"
+    },
+    {
+      "name": "MigrateAutoRebase",
+      "displayName": "Migrate Auto-Rebase options",
+      "isExpanded": true,
+      "visibleRule": "action == migrate autorebase"
+    },
+    {
+      "name": "MigrateDiff",
+      "displayName": "Migrate Diff options",
+      "isExpanded": true,
+      "visibleRule": "action == migrate diff"
+    },
+    {
+      "name": "MigrateDown",
+      "displayName": "Migrate Down options",
+      "isExpanded": true,
+      "visibleRule": "action == migrate down"
+    },
+    {
+      "name": "MigrateLint",
+      "displayName": "Migrate Lint options",
+      "isExpanded": true,
+      "visibleRule": "action == migrate lint"
+    },
+    {
+      "name": "MigratePush",
+      "displayName": "Migrate Push options",
+      "isExpanded": true,
+      "visibleRule": "action == migrate push"
+    },
+    {
+      "name": "MigrateTest",
+      "displayName": "Migrate Test options",
+      "isExpanded": true,
+      "visibleRule": "action == migrate test"
+    },
+    {
+      "name": "MonitorSchema",
+      "displayName": "Monitor Schema options",
+      "isExpanded": true,
+      "visibleRule": "action == monitor schema"
+    },
+    {
+      "name": "SchemaApply",
+      "displayName": "Schema Apply options",
+      "isExpanded": true,
+      "visibleRule": "action == schema apply"
+    },
+    {
+      "name": "SchemaLint",
+      "displayName": "Schema Lint options",
+      "isExpanded": true,
+      "visibleRule": "action == schema lint"
+    },
+    {
+      "name": "SchemaPlan",
+      "displayName": "Schema Plan options",
+      "isExpanded": true,
+      "visibleRule": "action == schema plan"
+    },
+    {
+      "name": "SchemaPlanApprove",
+      "displayName": "Schema Plan Approve options",
+      "isExpanded": true,
+      "visibleRule": "action == schema plan approve"
+    },
+    {
+      "name": "SchemaPush",
+      "displayName": "Schema Push options",
+      "isExpanded": true,
+      "visibleRule": "action == schema push"
+    },
+    {
+      "name": "SchemaTest",
+      "displayName": "Schema Test options",
+      "isExpanded": true,
+      "visibleRule": "action == schema test"
+    }
+  ],
+  "inputs": [
+    {
+      "type": "pickList",
+      "label": "Action",
+      "helpMarkDown": "Select an action to use at this job.",
+      "required": true,
+      "name": "action",
+      "options": {
+        "migrate apply": "Migrate Apply",
+        "migrate autorebase": "Migrate Auto Rebase",
+        "migrate diff": "Migrate Diff",
+        "migrate down": "Migrate Down",
+        "migrate lint": "Migrate Lint",
+        "migrate push": "Migrate Push",
+        "migrate test": "Migrate Test",
+        "monitor schema": "Monitor Schema",
+        "schema apply": "Schema Apply",
+        "schema lint": "Schema Lint",
+        "schema plan approve": "Schema Plan Approve",
+        "schema plan": "Schema Plan",
+        "schema push": "Schema Push",
+        "schema test": "Schema Test"
+      }
+    },
+    {
+      "type": "string",
+      "label": "Atlas Config",
+      "helpMarkDown": "The URL of the Atlas configuration file. By default, Atlas will look for a file named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`. Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).",
+      "name": "config"
+    },
+    {
+      "type": "string",
+      "label": "Environment",
+      "helpMarkDown": "The environment to use from the Atlas configuration file. For example, `dev`.",
+      "name": "env"
+    },
+    {
+      "type": "string",
+      "label": "Variables",
+      "helpMarkDown": "A JSON object containing variables to be used in the Atlas configuration file. For example, `{\"var1\": \"value1\", \"var2\": \"value2\"}`.",
+      "name": "vars"
+    },
+    {
+      "type": "string",
+      "label": "Dev URL",
+      "helpMarkDown": "The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`. Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).",
+      "name": "dev_url",
+      "aliases": [
+        "devUrl"
+      ]
+    },
+    {
+      "type": "connectedService:github:OAuth,OAuth2,PersonalAccessToken,InstallationToken,Token",
+      "name": "githubConnection",
+      "label": "GitHub connection (OAuth or PAT)",
+      "defaultValue": "",
+      "helpMarkDown": "Specify the name of the GitHub service connection to use to connect to the GitHub repository. The connection must be based on a GitHub user's OAuth or a GitHub personal access token. Learn more about service connections [here](https://aka.ms/AA3am5s)."
+    },
+    {
+      "groupName": "SchemaApply",
+      "type": "multiLine",
+      "label": "URL",
+      "helpMarkDown": "The URL of the target database to apply changes to. For example: `mysql://root:pass@localhost:3306/prod`.",
+      "name": "url"
+    },
+    {
+      "groupName": "SchemaApply",
+      "type": "multiLine",
+      "label": "Schema(s)",
+      "helpMarkDown": "List of database schema(s). For example: `public`.",
+      "name": "schema"
+    },
+    {
+      "groupName": "SchemaApply",
+      "type": "multiLine",
+      "label": "To",
+      "helpMarkDown": "URL(s) of the desired schema state.",
+      "name": "to"
+    },
+    {
+      "groupName": "SchemaApply",
+      "type": "string",
+      "label": "Schema Plan",
+      "helpMarkDown": "The plan to apply. For example, `atlas://<schema>/plans/<id>`.",
+      "name": "plan"
+    },
+    {
+      "groupName": "SchemaApply",
+      "type": "boolean",
+      "label": "Auto approve",
+      "name": "auto_approve",
+      "aliases": [
+        "autoApprove"
+      ]
+    },
+    {
+      "groupName": "SchemaApply",
+      "type": "boolean",
+      "label": "Dry run",
+      "name": "dry_run",
+      "aliases": [
+        "dryRun"
+      ]
+    },
+    {
+      "groupName": "SchemaApply",
+      "type": "pickList",
+      "label": "Transaction Mode",
+      "helpMarkDown": "Transaction mode to use. Either \"file\", \"all\", or \"none\". Default is \"file\".",
+      "name": "tx_mode",
+      "aliases": [
+        "txMode"
+      ],
+      "defaultValue": "file",
+      "options": {
+        "file": "File",
+        "none": "None",
+        "all": "All"
+      }
+    },
+    {
+      "groupName": "SchemaApply",
+      "type": "pickList",
+      "label": "Lint Review",
+      "helpMarkDown": "Automatically generate an approval plan before applying changes. Options are `ALWAYS`, `ERROR` or `WARNING`. Use `ALWAYS` to generate a plan for every apply, or `WARNING` and `ERROR` to generate a plan only based on review policy.",
+      "name": "lint_review",
+      "aliases": [
+        "lintReview"
+      ],
+      "options": {
+        "ALWAYS": "Always",
+        "ERROR": "Error",
+        "WARNING": "Warning"
+      }
+    },
+    {
+      "groupName": "SchemaLint",
+      "type": "multiLine",
+      "label": "URL",
+      "helpMarkDown": "Schema URL(s) to lint. For example: `file://schema.hcl`. Read more about [Atlas URLs](https://atlasgo.io/concepts/url).",
+      "name": "url"
+    },
+    {
+      "groupName": "SchemaLint",
+      "type": "multiLine",
+      "label": "Schema(s)",
+      "helpMarkDown": "List of database schema(s). For example: `public`.",
+      "name": "schema"
+    }
+  ]
+}
