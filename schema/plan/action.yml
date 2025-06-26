@@ -41,6 +41,16 @@ inputs:
     description: |
       List of database schema(s). For example: `public`.
     required: false
+  include:
+    description: |
+      list of glob patterns used to select which resources to keep in inspection
+      see: https://atlasgo.io/declarative/inspect#include-schemas-
+    required: false
+  exclude:
+    description: | 
+     list of glob patterns used to filter resources from applying 
+     see: https://atlasgo.io/declarative/inspect#exclude-schemas
+    required: false
   name:
     description: |
       The name of the plan. By default, Atlas will generate a name based on the schema changes.
