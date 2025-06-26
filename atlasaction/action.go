@@ -263,6 +263,8 @@ func WithRuntimeAction() Option {
 			c.action = NewGitlab(c.getenv, c.out)
 		case c.getenv("BITBUCKET_PIPELINE_UUID") != "":
 			c.action = NewBitBucket(c.getenv, c.out)
+		case c.getenv("TF_BUILD") == "True":
+			c.action = NewAzure(c.getenv, c.out)
 		}
 	}
 }
