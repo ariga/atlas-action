@@ -1,1 +1,1 @@
-require('../../shim/dist')('migrate/test')
+require('../../shim/dist/actions')('migrate/test')

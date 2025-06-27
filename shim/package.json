@@ -7,8 +7,9 @@
     "format": "prettier --write *.js",
     "format-check": "prettier --check *.js",
     "lint": "eslint *.js",
-    "shim": "ncc build index.js -o dist",
-    "all": "npm run format && npm run lint && npm run shim"
+    "all": "npm run format && npm run lint && npm run shim",
+    "shim": "npm run shim:actions",
+    "shim:actions": "ncc build actions.js -o dist/actions"
   },
   "repository": {
     "type": "git",

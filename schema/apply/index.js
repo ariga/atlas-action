@@ -1,1 +1,1 @@
-require('../../shim/dist')('schema/apply')
+require('../../shim/dist/actions')('schema/apply')

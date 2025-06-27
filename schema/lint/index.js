@@ -1,1 +1,1 @@
-require('../../shim/dist')('schema/lint') 
+require('../../shim/dist/actions')('schema/lint')
