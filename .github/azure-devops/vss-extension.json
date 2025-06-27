@@ -1,0 +1,63 @@
+{
+  "manifestVersion": 1,
+  "id": "atlas-action",
+  "name": "Atlas Actions",
+  "version": "0.0.0",
+  "description": "Atlas Action for Azure DevOps Pipeline",
+  "publisher": "ariga",
+  "categories": [
+    "Azure Pipelines"
+  ],
+  "content": {
+    "details": {
+      "path": "README.md"
+    },
+    "license": {
+      "path": "LICENSE"
+    }
+  },
+  "links": {
+    "repository": {
+      "uri": "https://github.com/ariga/atlas-action"
+    },
+    "issues": {
+      "uri": "https://github.com/ariga/atlas/issues"
+    },
+    "support": {
+      "uri": "mailto:hello@ariga.io"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "uri": "https://github.com/ariga/atlas-action"
+  },
+  "icons": {
+    "default": "images/atlas.png"
+  },
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "files": [
+    {
+      "path": "action"
+    },
+    {
+      "path": "images/add-task.png",
+      "addressable": true
+    }
+  ],
+  "contributions": [
+    {
+      "id": "atlas-action",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "action"
+      }
+    }
+  ]
+}

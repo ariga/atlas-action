@@ -60,3 +60,7 @@ release:
 			echo "status=created" >> "$$GITHUB_OUTPUT"; \
 		fi; \
 	fi
+
+.PHONY: azure-devops
+azure-devops:
+	$(MAKE) -C .github/azure-devops VERSION=$(VERSION) vsix
