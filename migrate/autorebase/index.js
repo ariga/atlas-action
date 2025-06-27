@@ -1,1 +1,1 @@
-require('../../shim/dist')('migrate/autorebase')
+require('../../shim/dist/actions')('migrate/autorebase')

@@ -1,1 +1,1 @@
-require('../../shim/dist')('monitor/schema');
+require('../../shim/dist/actions')('monitor/schema');

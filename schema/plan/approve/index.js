@@ -1,1 +1,1 @@
-require('../../../shim/dist')('schema/plan/approve')
+require('../../../shim/dist/actions')('schema/plan/approve')
