@@ -62,15 +62,22 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version-file: go.mod
+      - name: Install tfx-cli
+        run: npm install -g tfx-cli
       - name: Install Atlas
         uses: ariga/setup-atlas@v0
       - name: Build assets
-        run: make atlas-action test s3-upload docker DOCKER_IMAGE=$DOCKER_IMAGE
+        run: make atlas-action test s3-upload docker DOCKER_IMAGE=$DOCKER_IMAGE azure-devops
         env:
           CGO_ENABLED: 0
           AWS_REGION: us-east-1
           DOCKER_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           GH_TOKEN: ${{ github.token }}
+      - name: Upload Azure DevOps Extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: azure-devops-extension
+          path: azure-devops/ariga.atlas-action-*.vsix
   # Run end-to-end test on the published binary.
   e2e-test:
     needs: build

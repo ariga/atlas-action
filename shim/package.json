@@ -8,8 +8,9 @@
     "format-check": "prettier --check *.js",
     "lint": "eslint *.js",
     "all": "npm run format && npm run lint && npm run shim",
-    "shim": "npm run shim:actions",
-    "shim:actions": "ncc build actions.js -o dist/actions"
+    "shim": "npm run shim:actions && npm run shim:azure",
+    "shim:actions": "ncc build actions.js -o dist/actions",
+    "shim:azure": "ncc build azure.js -o dist/azure"
   },
   "repository": {
     "type": "git",
