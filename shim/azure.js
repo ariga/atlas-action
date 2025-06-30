@@ -6,9 +6,9 @@ const path = require("path");
 // due to limitations in Azure DevOps task.json's visibleRule field,
 // which does not handle '/' or quoted strings well.
 //
-// We converting the space-separated action string to the slash-separated
+// We convert the space-separated action string to the slash-separated
 // format expected by the atlas-action binary (e.g., "schema/plan/approve").
-const action = (process.env.INPUT_ACTION || "").replaceAll(" ", "/").toLowerCase();
+const action = (process.env.INPUT_ACTION || "").trim().replaceAll(" ", "/").toLowerCase();
 if (!action) {
   throw new Error("Missing required input: action.");
 }

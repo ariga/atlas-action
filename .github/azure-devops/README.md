@@ -3,7 +3,7 @@
 [![Twitter](https://img.shields.io/twitter/url.svg?label=Follow%20%40ariga%2Fatlas&style=social&url=https%3A%2F%2Ftwitter.com%2Fatlasgo_io)](https://twitter.com/atlasgo_io)
 [![Discord](https://img.shields.io/discord/930720389120794674?label=discord&logo=discord&style=flat-square&logoColor=white)](https://discord.com/invite/zZ6sWVg6NT)
 
-The extension providing `AtlasAction` task to run atlas-action on Azure DevOps.
+This extension provides the `AtlasAction` task to run atlas-action on Azure DevOps.
 
 ## How to use
 
@@ -11,7 +11,7 @@ After installing the extension, you can add one (or more) of the tasks to [your 
 
 ![add-task](images/add-task.png)
 
-Here is example pipeline that push the schema to [Atlas Registry](https://atlasgo.io/cloud/features/registry)
+Here is an example pipeline that pushes the schema to [Atlas Registry](https://atlasgo.io/cloud/features/registry)
 
 ```yaml
 trigger:
@@ -35,9 +35,9 @@ steps:
 
 ## Features
 
-- Support running Atlas-Actions on Azure DevOps (only Linux runner).
-- Report lint result back to Pull Request on GitHub.
-- Currently, only GitHub was supported as SCM.
+- Support for running Atlas-Actions on Azure DevOps (only Linux runner).
+- Reporting lint results back to Pull Request on GitHub.
+- Currently, only GitHub is supported as SCM.
 
 ## Support
 
