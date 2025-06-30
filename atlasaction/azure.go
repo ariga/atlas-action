@@ -52,7 +52,7 @@ func (a *Azure) Getenv(key string) string {
 // GetInput implements the Action interface.
 func (a *Azure) GetInput(name string) string {
 	return strings.TrimSpace(a.getenv(fmt.Sprintf("INPUT_%s",
-		toEnvName(name))))
+		ToEnvName(name))))
 }
 
 // SetOutput implements Action.
