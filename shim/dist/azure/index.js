@@ -66,6 +66,10 @@ module.exports = require("path");
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
+// Copyright 2021-present The Atlas Authors. All rights reserved.
+// This source code is licensed under the Apache 2.0 license found
+// in the LICENSE file in the root directory of this source tree.
+
 const childProcess = __nccwpck_require__(81);
 const fs = __nccwpck_require__(147);
 const path = __nccwpck_require__(17);
@@ -74,9 +78,9 @@ const path = __nccwpck_require__(17);
 // due to limitations in Azure DevOps task.json's visibleRule field,
 // which does not handle '/' or quoted strings well.
 //
-// We converting the space-separated action string to the slash-separated
+// We convert the space-separated action string to the slash-separated
 // format expected by the atlas-action binary (e.g., "schema/plan/approve").
-const action = (process.env.INPUT_ACTION || "").replaceAll(" ", "/").toLowerCase();
+const action = (process.env.INPUT_ACTION || "").trim().replaceAll(" ", "/").toLowerCase();
 if (!action) {
   throw new Error("Missing required input: action.");
 }

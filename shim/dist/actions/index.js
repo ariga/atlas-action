@@ -4,6 +4,10 @@
 /***/ 9358:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
+// Copyright 2021-present The Atlas Authors. All rights reserved.
+// This source code is licensed under the Apache 2.0 license found
+// in the LICENSE file in the root directory of this source tree.
+
 const childProcess = __nccwpck_require__(2081);
 const fs = __nccwpck_require__(7147);
 const path = __nccwpck_require__(1017);
