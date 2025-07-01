@@ -11,7 +11,7 @@ cmp stdout golden-3.md
 -- golden-1.md --
 ### Atlas detected changes to the desired schema
 
-#### Migration Plan ([View on Atlas Cloud](https://ariga-atlas.atlasgo.cloud/schemas/141733923334/plans/210453398560))
+#### Migration Plan | Repository: bitbucket-e2e ([View on Atlas Cloud](https://ariga-atlas.atlasgo.cloud/schemas/141733923334/plans/210453398560))
 
 ```sql
 -- Modify "Image" table
@@ -57,7 +57,7 @@ atlas schema plan push --pending --file pr-1-VwDs28An.plan.hcl
 -- golden-3.md --
 ### Atlas detected changes to the desired schema
 
-#### Migration Plan ([View on Atlas Cloud](https://ariga-atlas.atlasgo.cloud/schemas/141733923334/plans/210453398623))
+#### Migration Plan | Repository: bitbucket-e2e ([View on Atlas Cloud](https://ariga-atlas.atlasgo.cloud/schemas/141733923334/plans/210453398623))
 
 ```sql
 -- Modify "Image" table

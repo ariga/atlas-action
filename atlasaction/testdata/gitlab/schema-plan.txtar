@@ -32,6 +32,7 @@ schema plan --format {{ json . }} --context {"repo":"my-project","branch":"test-
 
 -- schema-plan/2/stdout --
 {
+    "Repo": "app",
     "Lint": {
         "Steps": [
             {
@@ -77,6 +78,7 @@ schema plan --format {{ json . }} --context {"repo":"my-project","branch":"test-
 
 -- schema-plan/3/stdout --
 {
+    "Repo": "app",
     "Lint": {
         "Steps": [
             {
@@ -119,7 +121,7 @@ schema plan --format {{ json . }} --context {"repo":"my-project","branch":"test-
 
 -- comments-expected/1 --
 <h3>Atlas detected changes to the desired schema</h3>
-<h4>Migration Plan (<a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511" target="_blank">View on Atlas Cloud</a>)</h4>
+<h4>Migration Plan | Repository: app (<a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511" target="_blank">View on Atlas Cloud</a>)</h4>
 
 ```sql
 -- Create "1" table
