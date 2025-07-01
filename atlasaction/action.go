@@ -1697,6 +1697,15 @@ var (
 				"appliedStmts": appliedStmts,
 				"filterIssues": filterIssues,
 				"stepIsError":  stepIsError,
+				"repoLink": func(planLink string) string {
+					// Extract repository link from plan link
+					// e.g. "https://ariga-atlas.atlasgo.cloud/schemas/1/plans/2"
+					// becomes "https://ariga-atlas.atlasgo.cloud/schemas/1"
+					if i := strings.LastIndex(planLink, "/plans/"); i != -1 {
+						return planLink[:i]
+					}
+					return planLink
+				},
 				"stmtsDetected": func(plan *atlasexec.SchemaPlanFile) string {
 					switch l := len(plan.Stmts); {
 					case l == 0:
