@@ -77,7 +77,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: azure-devops-extension
-          path: azure-devops/ariga.atlas-action-*.vsix
+          path: .github/azure-devops/ariga.atlas-action-*.vsix
   # Run end-to-end test on the published binary.
   e2e-test:
     needs: build
