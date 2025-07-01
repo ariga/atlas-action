@@ -4,6 +4,7 @@
   "name": "Atlas Actions",
   "version": "0.0.0",
   "description": "Atlas Action for Azure DevOps Pipeline",
+  "public": true,
   "publisher": "ariga",
   "categories": [
     "Azure Pipelines"
