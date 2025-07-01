@@ -1,6 +1,8 @@
 <h3>Atlas detected changes to the desired schema</h3>
-<h4>Migration Plan | Repository: {{ .Plan.Repo }}{{- with .Plan.File.Link }} ({{- . | link "View on Atlas Cloud" -}}){{ end }}</h4>
-{{- with .Plan.File.Migration }}{{ codeblock "sql" . }}{{- end -}}
+{{- with .Plan.File }}
+<h4>Migration Plan for <a href="{{- .Link | repoLink -}}" target="_blank">{{ $.Plan.Repo }}</a> • <a href="{{- .Link -}}" target="_blank">View on Atlas Cloud</a></h4>
+{{- with .Migration }}{{ codeblock "sql" . }}{{- end -}}
+{{- end -}}
 <h4>Atlas lint results</h4>
 {{- template "schema-lint" . -}}
 <hr>
