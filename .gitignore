@@ -54,4 +54,8 @@ lib/**/*
 .idea/
 
 # the binary file for the atlas-action
-atlas-action
+atlas-action*
+
+# the extension file for Azure DevOps marketplace
+ariga.atlas-action-*.vsix
+.github/azure-devops/action/shim.js

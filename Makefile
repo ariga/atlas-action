@@ -1,3 +1,7 @@
+# Copyright 2021-present The Atlas Authors. All rights reserved.
+# This source code is licensed under the Apache 2.0 license found
+# in the LICENSE file in the root directory of this source tree.
+
 BUILD_DATE = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 VERSION    = $(shell cat VERSION.txt)
 COMMIT    ?= $(shell git rev-parse --short HEAD)
@@ -60,3 +64,7 @@ release:
 			echo "status=created" >> "$$GITHUB_OUTPUT"; \
 		fi; \
 	fi
+
+.PHONY: azure-devops
+azure-devops:
+	$(MAKE) -C .github/azure-devops VERSION=$(VERSION) vsix
