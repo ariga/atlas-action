@@ -14,7 +14,7 @@ require (
 	github.com/sethvargo/go-githubactions v1.3.0
 	github.com/stretchr/testify v1.8.4
 	github.com/vektah/gqlparser v1.3.1
-	golang.org/x/oauth2 v0.24.1-0.20250104024449-49a531d12a9a
+	golang.org/x/oauth2 v0.22.0
 )
 
 require (
