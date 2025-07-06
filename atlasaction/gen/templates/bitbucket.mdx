@@ -1,0 +1,257 @@
+---
+title: Automate Database CI/CD with Bitbucket Pipes
+id: bitbucket-pipes
+slug: /integrations/bitbucket-pipes
+tags: [bitbucket, bitbucket pipes, ci/cd]
+description: Learn how to integrate Atlas with Bitbucket Pipelines to automate database migrations, schema validation, and CI/CD workflows. Supports MySQL, Postgres, SQL Server, and more.
+keywords: [bitbucket, bitbucket pipes, ci/cd, database migrations, schema validation, atlas action, continuous integration, continuous deployment]
+---
+
+import Tabs from '@theme/Tabs'
+import TabItem from '@theme/TabItem'
+
+# Bitbucket Pipes
+
+Atlas provides seamless integration with [Bitbucket Pipelines](https://www.atlassian.com/software/bitbucket/features/pipelines), allowing you to manage and apply database migrations directly from your Bitbucket repository.
+By leveraging Bitbucket Pipelines, you can automate the deployment of migration directories to your target databases, ensuring that your database schema is always up-to-date with your application code.
+
+This guide will walk you through the steps to set up and use Atlas-Action with Bitbucket Pipelines, enabling you to deploy migration directories from your git repository effortlessly.
+{{ range .Actions }}
+## `{{ .ID }}`
+
+{{ .Description }}
+
+{{ $tmpl := printf "usage/bitbucket/%s" .ID -}}
+{{- if hasTemplate $tmpl -}}
+### Usage
+
+Add `bitbucket-pipelines.yml` to your repo with the following contents:
+{{ xtemplate $tmpl . -}}
+{{- end -}}
+{{- if .Inputs }}
+### Inputs
+
+* `ATLAS_ACTION` - (Required) Always `{{ .ID }}`.
+* `ATLAS_TOKEN` - (Optional) to authenticate with Atlas Cloud.
+* `BITBUCKET_ACTION_TOKEN` - (Optional) Bitbucket access token to post comment on the PR.
+{{- range $name, $item := .SortedInputs }}
+* `{{ $name | inputvar }}` - {{ if not $item.Required }}(Optional) {{end}}{{ $item.Description | trimnl | nl2sp }}
+{{- end }}
+{{ end -}}
+{{- if .Outputs }}
+### Outputs
+
+The outputs are written into the `.atlas-action/outputs.sh`, we can load it for the next step using the `source` command.
+{{ $action := . -}}
+{{- range $name, $item := .SortedOutputs }}
+* `{{ $name | outputvar $action.ID }}` - {{ $item.Description | trimnl | nl2sp }}
+{{- end -}}
+{{- end }}
+{{ end -}}
+{{- define "usage/bitbucket/migrate/apply" }}
+**Deploy a directory from the git repository**
+```yaml
+image: atlassian/default-image:3
+pipelines:
+  branches:
+    master:
+      - step:
+          name: "{{ .Description }}"
+          script:
+            - name: "{{ .Name }}"
+              pipe: docker://arigaio/atlas-action:master
+              variables:
+                ATLAS_ACTION: "{{ .ID }}" # Required
+                {{ inputvar "url" }}: ${DATABASE_URL}
+                {{ inputvar "dir" }}: "file://migrations"
+            - source .atlas-action/outputs.sh
+```
+
+**Deploy a directory from the cloud**
+```yaml
+image: atlassian/default-image:3
+pipelines:
+  branches:
+    master:
+      - step:
+          name: "{{ .Description }}"
+          script:
+            - name: "{{ .Name }}"
+              pipe: docker://arigaio/atlas-action:master
+              variables:
+                ATLAS_ACTION: "{{ .ID }}" # Required
+                ATLAS_TOKEN: ${ATLAS_TOKEN}
+                {{ inputvar "url" }}: ${DATABASE_URL}
+                {{ inputvar "dir" }}: "atlas://my-project"
+            - source .atlas-action/outputs.sh
+```
+
+{{ end -}}
+
+{{- define "usage/bitbucket/migrate/push" }}
+<Tabs
+defaultValue="mysql"
+values={[
+{{- range $item := dockers }}
+  {label: "{{ $item.Label }}", value: "{{ $item.Driver }}"},
+{{- end }}
+]}>
+
+{{- $action := . -}}
+{{- range $item := dockers }}
+<TabItem value="{{ $item.Driver }}">
+
+```yaml
+image: atlassian/default-image:3
+pipelines:
+  branches:
+    master:
+      - step:
+          name: "{{ $action.Description }}"
+          script:
+            - name: "{{ $action.Name }}"
+              pipe: docker://arigaio/atlas-action:master
+              variables:
+                ATLAS_ACTION: "{{ $action.ID }}" # Required
+                ATLAS_TOKEN: ${ATLAS_TOKEN}
+                BITBUCKET_ACCESS_TOKEN: ${BITBUCKET_ACCESS_TOKEN}
+                {{ inputvar "dir-name" }}: "my-project"
+                {{ inputvar "dev-url" }}: "{{ $item.DevURL }}"
+            - source .atlas-action/outputs.sh
+```
+
+</TabItem>
+{{- end }}
+</Tabs>
+{{ end -}}
+
+{{- define "usage/bitbucket/migrate/lint" }}
+<Tabs
+defaultValue="mysql"
+values={[
+{{- range $item := dockers }}
+  {label: "{{ $item.Label }}", value: "{{ $item.Driver }}"},
+{{- end }}
+]}>
+
+{{- $action := . -}}
+{{- range $item := dockers }}
+<TabItem value="{{ $item.Driver }}">
+
+```yaml
+image: atlassian/default-image:3
+pipelines:
+  branches:
+    master:
+      - step:
+          name: "{{ $action.Description }}"
+          script:
+            - name: "{{ $action.Name }}"
+              pipe: docker://arigaio/atlas-action:master
+              variables:
+                ATLAS_ACTION: "{{ $action.ID }}" # Required
+                ATLAS_TOKEN: ${ATLAS_TOKEN}
+                BITBUCKET_ACCESS_TOKEN: ${BITBUCKET_ACCESS_TOKEN}
+                {{ inputvar "dir-name" }}: "my-project"
+                {{ inputvar "dev-url" }}: "{{ $item.DevURL }}"
+            - source .atlas-action/outputs.sh
+```
+
+</TabItem>
+{{- end }}
+</Tabs>
+{{ end -}}
+
+{{- define "usage/bitbucket/schema/plan" }}
+<Tabs
+defaultValue="mysql"
+values={[
+{{- range $item := dockers }}
+  {label: "{{ $item.Label }}", value: "{{ $item.Driver }}"},
+{{- end }}
+]}>
+
+{{- $action := . -}}
+{{- range $item := dockers }}
+<TabItem value="{{ $item.Driver }}">
+
+```yaml
+image: atlassian/default-image:3
+pipelines:
+  branches:
+    master:
+      - step:
+          name: "{{ $action.Description }}"
+          script:
+            - name: "{{ $action.Name }}"
+              pipe: docker://arigaio/atlas-action:master
+              variables:
+                ATLAS_ACTION: "{{ $action.ID }}" # Required
+                ATLAS_TOKEN: ${ATLAS_TOKEN}
+                BITBUCKET_ACCESS_TOKEN: ${BITBUCKET_ACCESS_TOKEN}
+                {{ inputvar "dev-url" }}: "{{ $item.DevURL }}"
+            - source .atlas-action/outputs.sh
+```
+
+</TabItem>
+{{- end }}
+</Tabs>
+{{ end -}}
+
+{{- define "usage/bitbucket/schema/plan/approve" }}
+```yaml
+image: atlassian/default-image:3
+pipelines:
+  branches:
+    master:
+      - step:
+          name: "{{ .Description }}"
+          script:
+            - name: "{{ .Name }}"
+              pipe: docker://arigaio/atlas-action:master
+              variables:
+                ATLAS_ACTION: "{{ .ID }}" # Required
+                ATLAS_TOKEN: ${ATLAS_TOKEN}
+                {{ inputvar "env" }}: "ci"
+            - source .atlas-action/outputs.sh
+```
+
+{{ end -}}
+{{- define "usage/bitbucket/schema/push" }}
+```yaml
+image: atlassian/default-image:3
+pipelines:
+  branches:
+    master:
+      - step:
+          name: "{{ .Description }}"
+          script:
+            - name: "{{ .Name }}"
+              pipe: docker://arigaio/atlas-action:master
+              variables:
+                ATLAS_ACTION: "{{ .ID }}" # Required
+                ATLAS_TOKEN: ${ATLAS_TOKEN}
+                {{ inputvar "env" }}: "ci"
+                {{ inputvar "latest" }}: "true"
+            - source .atlas-action/outputs.sh
+```
+
+{{ end -}}
+{{- define "usage/bitbucket/schema/apply" }}
+```yaml
+image: atlassian/default-image:3
+pipelines:
+  branches:
+    master:
+      - step:
+          name: "{{ .Description }}"
+          script:
+            - name: "{{ .Name }}"
+              pipe: docker://arigaio/atlas-action:master
+              variables:
+                ATLAS_ACTION: "{{ .ID }}" # Required
+                ATLAS_TOKEN: ${ATLAS_TOKEN} # Needed only for deploying a schema from Atlas Cloud.
+            - source .atlas-action/outputs.sh
+```
+
+{{ end -}}

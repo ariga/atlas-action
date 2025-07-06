@@ -1,0 +1,54 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+  "id": "9f96e670-85cc-4764-b83f-9824a9747edd",
+  "author": "ariga",
+  "name": "AtlasAction",
+  "friendlyName": "Atlas Action",
+  "description": "Atlas Action for Azure DevOps",
+  "helpMarkDown": "",
+  "category": "Azure Pipelines",
+  "version": {
+    "Major": 0,
+    "Minor": 0,
+    "Patch": 54
+  },
+  "execution": {
+    "Node": {
+      "target": "shim.js",
+      "argumentFormat": ""
+    },
+    "Node10": {
+      "target": "shim.js",
+      "argumentFormat": ""
+    },
+    "Node16": {
+      "target": "shim.js",
+      "argumentFormat": ""
+    },
+    "Node20_1": {
+      "target": "shim.js",
+      "argumentFormat": ""
+    }
+  },
+  "instanceNameFormat": "Atlas Action: $(action)",
+  "inputs": [
+    {
+      "type": "pickList",
+      "label": "Action",
+      "helpMarkDown": "Select an action to use at this job.",
+      "required": true,
+      "name": "action",
+      "options": {{ .AsOptions | jsonIndent "      " "  " }}
+    }
+    {{ $lenActions := len .Actions }}
+    {{- range $name, $input := .AllInputs -}}
+    , {
+      "type": "string",
+      "label": "{{ $name }}",
+      "helpMarkDown": {{ $input.Description | json }},
+      "name": "{{ $name | replace "-" "_" }}",
+      "visibleRule": {{ $input.VisibleRule | json }}
+    }
+    {{- end }}
+  ]
+}

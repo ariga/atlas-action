@@ -1,0 +1,499 @@
+# This manifest file defines the actions available in the Atlas Action.
+# Each action has a unique ID, a description, and a set of inputs and outputs.
+# The input name is what the Go code will used to access the input value.
+#
+# yaml-language-server: $schema=./schema.json
+inputs:
+  commonInputs: &commonInputs
+    working-directory:
+      type: string
+      description: Atlas working directory. Default is project root
+    config:
+      type: string
+      description: |
+        The URL of the Atlas configuration file. By default, Atlas will look for a file
+        named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+        Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+    env:
+      type: string
+      description: |
+        The environment to use from the Atlas configuration file. For example, `dev`.
+    vars:
+      type: string
+      description: |
+        A JSON object containing variables to be used in the Atlas configuration file.
+        For example, `{"var1": "value1", "var2": "value2"}`.
+  migrateInputs: &migrateInputs
+    <<: *commonInputs
+    revisions-schema:
+      type: string
+      description: The name of the schema containing the revisions table.
+  schemaInputs: &schemaInputs
+    <<: *commonInputs
+    dev-url:
+      type: string
+      description: |
+        The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+        Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+  schemaPlanInputs: &schemaPlanInputs
+    <<: *schemaInputs
+    from:
+      type: string
+      description: |
+        URL(s) of the current schema state.
+    to:
+      type: string
+      description: |
+        URL(s) of the desired schema state.
+    schema-name:
+      type: string
+      description: The name (slug) of the project in Atlas Cloud.
+    include:
+      type: string
+      description: |
+        List of glob patterns used to select which resources to keep in inspection
+        see: https://atlasgo.io/declarative/inspect#include-schemas-
+    exclude:
+      type: string
+      description: |
+        List of glob patterns used to filter resources from applying
+        see: https://atlasgo.io/declarative/inspect#exclude-schemas
+    schema:
+      type: string
+      description: |
+        List of database schema(s). For example: `public`.
+actions:
+  - id: migrate/apply
+    name: Migrate Apply
+    description: Applies a migration directory on a target database
+    inputs:
+      <<: *migrateInputs
+      dir:
+        type: string
+        description: |
+          The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
+          based directories or `file://migrations` for local ones.
+      url:
+        type: string
+        description: |
+          The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
+      amount:
+        type: number
+        description: The maximum number of migration files to apply. Default is all.
+      tx-mode:
+        type: enum
+        description: |
+          Transaction mode to use. Either "file", "all", or "none". Default is "file".
+        default: file
+        options: [file, all, none]
+      allow-dirty:
+        type: boolean
+        description: Allow working on a non-clean database.
+        default: "false"
+      dry-run:
+        type: boolean
+        description: Print SQL without executing it. Either "true" or "false".
+        default: "false"
+    outputs:
+      applied_count:
+        type: number
+        description: The number of migrations that were applied.
+      current:
+        type: string
+        description: The current version of the database. (before applying migrations)
+      pending_count:
+        type: number
+        description: The number of migrations that will be applied.
+      target:
+        type: string
+        description: The target version of the database.
+  - id: migrate/autorebase
+    name: Migrate Auto Rebase
+    description: Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch.
+    inputs:
+      base-branch:
+        type: string
+        description: |
+          The base branch to rebase the migration directory onto. Default to the default branch of the repository.
+      dir:
+        type: string
+        description: |
+          The URL of the migration directory to rebase on. By default: `file://migrations`.
+      remote:
+        type: string
+        description: |
+          The remote to fetch from. Defaults to `origin`.
+      working-directory:
+        type: string
+        description: Atlas working directory. Default is project root
+  - id: migrate/diff
+    name: Migrate Diff
+    description: Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory.
+    inputs:
+      <<: *commonInputs
+      dev-url:
+        type: string
+        description: |
+          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      dir:
+        type: string
+        description: |
+          The URL of the migration directory. For example: `file://migrations`.
+          Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+      to:
+        type: string
+        description: |
+          The URL of the desired state.
+      remote:
+        type: string
+        description: |
+          The remote to push changes to. Defaults to `origin`.
+    outputs:
+      url:
+        type: string
+        description: |
+          The URL of the CI report in Atlas Cloud, containing an ERD visualization
+          and analysis of the schema migrations.
+  - id: migrate/down
+    name: Migrate Down
+    description: Reverts deployed migration files on a target database
+    inputs:
+      <<: *migrateInputs
+      dev-url:
+        type: string
+        description: |
+          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      url:
+        type: string
+        description: |
+          The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
+      dir:
+        type: string
+        description: |
+          The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
+          based directories or `file://migrations` for local ones.
+      amount:
+        type: number
+        description: The amount of applied migrations to revert. Mutually exclusive with `to-tag` and `to-version`.
+      to-tag:
+        type: string
+        description: The tag to revert to. Mutually exclusive with `amount` and `to-version`.
+      to-version:
+        type: string
+        description: The version to revert to. Mutually exclusive with `amount` and `to-tag`.
+      wait-interval:
+        type: string
+        default: 1s
+        description: Time in seconds between different migrate down attempts.
+      wait-timeout:
+        type: string
+        description: Time after which no other retry attempt is made and the action exits.
+    outputs:
+      current:
+        type: string
+        description: The current version of the database. (before applying migrations)
+      planned_count:
+        type: number
+        description: The number of migrations that will be applied.
+      reverted_count:
+        type: number
+        description: The number of migrations that were reverted.
+      target:
+        type: string
+        description: The target version of the database.
+      url:
+        type: string
+        description: If given, the URL for reviewing the revert plan.
+  - id: migrate/lint
+    description: CI for database schema changes with Atlas
+    name: Migrate Lint
+    inputs:
+      <<: *migrateInputs
+      dev-url:
+        type: string
+        description: |
+          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      dir:
+        type: string
+        description: |
+          The URL of the migration directory to lint. For example: `file://migrations`.
+          Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+      dir-name:
+        type: string
+        required: true
+        description: |
+          The name (slug) of the project in Atlas Cloud.
+      tag:
+        type: string
+        default: latest
+        description: |
+          The tag of migrations to used as base for linting. By default, the `latest` tag is used.
+    outputs:
+      url:
+        description: "The URL of the CI report in Atlas Cloud, containing an ERD visualization \nand analysis of the schema migrations.\n"
+  - id: migrate/push
+    description: Push the current version of your migration directory to Atlas Cloud.
+    name: Migrate Push
+    inputs:
+      <<: *migrateInputs
+      dev-url:
+        type: string
+        description: |
+          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      dir:
+        type: string
+        description: |
+          The URL of the migration directory to push. For example: `file://migrations`.
+          Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+      dir-name:
+        type: string
+        description: The name (slug) of the project in Atlas Cloud.
+      tag:
+        type: string
+        description: |
+          The tag to apply to the pushed migration directory. By default the
+          current git commit hash is used.
+      latest:
+        type: boolean
+        default: "true"
+        description: |
+          If true, push also to the "latest" tag.
+  - id: migrate/test
+    description: CI for database schema changes with Atlas
+    name: Migrate Test
+    inputs:
+      <<: *migrateInputs
+      dev-url:
+        type: string
+        description: |
+          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      dir:
+        type: string
+        description: |
+          The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
+          based directories or `file://migrations` for local ones.
+      paths:
+        type: string
+        description: "List of directories containing test files."
+      run:
+        type: string
+        description: |
+          Filter tests to run by regexp.
+          For example, `^test_.*` will only run tests that start with `test_`.
+          Default is to run all tests.
+  - id: monitor/schema
+    description: Sync the database schema to Atlas Cloud.
+    name: Atlas Schema Monitoring
+    inputs:
+      config:
+        type: string
+        description: |
+          The URL of the Atlas configuration file (mutually exclusive with `url`).
+          For example, `file://config/atlas.hcl`, learn more about
+          [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+      env:
+        type: string
+        description: |
+          The environment to use from the Atlas configuration file.
+          For example, `dev` (mutually exclusive with `url`).
+      cloud-token:
+        type: string
+        required: true
+        description: The token that is used to connect to Atlas Cloud (should be passed as a secret).
+      slug:
+        type: string
+        description: Optional unique identifier for the database server.
+      url:
+        type: string
+        description: URL of the database to sync (mutually exclusive with `config` and `env`).
+      exclude:
+        type: string
+        description: "List of exclude patterns from inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas"
+      schemas:
+        type: string
+        description: "List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas"
+    outputs:
+      url:
+        description: URL of the schema of the database inside Atlas Cloud.
+  - id: schema/apply
+    description: Applies schema changes to a target database
+    name: Schema Apply
+    inputs:
+      <<: *schemaInputs
+      url:
+        type: string
+        description: |
+          The URL of the target database to apply changes to.
+          For example: `mysql://root:pass@localhost:3306/prod`.
+      plan:
+        type: string
+        description: |
+          The plan to apply. For example, `atlas://<schema>/plans/<id>`.
+      to:
+        type: string
+        description: URL(s) of the desired schema state.
+      auto-approve:
+        type: boolean
+        default: "false"
+        description: Automatically approve and apply changes. Either "true" or "false".
+      dry-run:
+        type: boolean
+        default: "false"
+        description: Print SQL without executing it. Either "true" or "false".
+      include:
+        type: string
+        description: |
+          List of glob patterns used to select which resources to keep in inspection
+          see: https://atlasgo.io/declarative/inspect#include-schemas
+      exclude:
+        type: string
+        description: |
+          List of glob patterns used to filter resources from applying
+          see: https://atlasgo.io/declarative/inspect#exclude-schemas
+      schema:
+        type: string
+        description: |
+          List of database schema(s). For example: `public`.
+      lint-review:
+        type: enum
+        options:
+          - ALWAYS
+          - ERROR
+          - WARNING
+        description: |
+          Automatically generate an approval plan before applying changes. Options are "ALWAYS", "ERROR" or "WARNING".
+          Use "ALWAYS" to generate a plan for every apply, or "WARNING" and "ERROR" to generate a plan only based on review policy.
+      tx-mode:
+        type: enum
+        options:
+          - file
+          - all
+          - none
+        description: |
+          Transaction mode to use. Either "file", "all", or "none". Default is "file".
+      wait-interval:
+        type: string
+        description: Time in seconds between different apply attempts.
+        default: 1s
+      wait-timeout:
+        type: string
+        description: Time after which no other retry attempt is made and the action exits.
+    outputs:
+      error:
+        description: The error message if the action fails.
+  - id: schema/lint
+    description: Lint database schema with Atlas
+    name: Schema Lint
+    inputs:
+      <<: *schemaInputs
+      url:
+        type: string
+        description: |
+          Schema URL(s) to lint. For example: `file://schema.hcl`.
+          Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+      schema:
+        type: string
+        description: |
+          The database schema(s) to include. For example: `public`.
+  - id: schema/plan
+    description: Plan a declarative migration to move from the current state to the desired state
+    name: Schema Plan
+    inputs:
+      <<: *schemaPlanInputs
+      name:
+        type: string
+        description: |
+          The name of the plan. By default, Atlas will generate a name based on the schema changes.
+    outputs:
+      link:
+        description: Link to the schema plan on Atlas.
+      plan:
+        description: The plan to be applied or generated. (e.g. `atlas://<schema>/plans/<id>`)
+      status:
+        description: The status of the plan. For example, `PENDING` or `APPROVED`.
+  - id: schema/plan/approve
+    description: Approve a migration plan by its URL
+    name: Schema Plan Approve
+    inputs:
+      <<: *schemaPlanInputs
+      plan:
+        type: string
+        description: |
+          The URL of the plan to be approved. For example, `atlas://<schema>/plans/<id>`.
+          If not provided, Atlas will search the registry for a plan corresponding to the given schema transition and approve it
+          (typically, this plan is created during the PR stage). If multiple plans are found, an error will be thrown.
+    outputs:
+      link:
+        type: string
+        description: Link to the schema plan on Atlas.
+      plan:
+        type: string
+        description: The plan to be applied or generated. (e.g. `atlas://<schema>/plans/<id>`)
+      status:
+        type: string
+        description: The status of the plan. (e.g, `PENDING`, `APPROVED`)
+  - id: schema/push
+    description: Push a schema version with an optional tag to Atlas
+    name: Schema Push
+    inputs:
+      <<: *schemaInputs
+      schema-name:
+        type: string
+        description: |
+          The name (slug) of the schema repository in Atlas Registry.
+          Read more in Atlas website: https://atlasgo.io/registry.
+      url:
+        type: string
+        description: |
+          Desired schema URL(s) to push. For example: `file://schema.lt.hcl`.
+      description:
+        type: string
+        description: The description of the schema.
+      tag:
+        type: string
+        description: |
+          The tag to apply to the pushed schema. By default, the current git commit hash is used.
+      version:
+        type: string
+        description: The version of the schema.
+      latest:
+        type: boolean
+        default: "true"
+        description: If true, push also to the "latest" tag.
+      schema:
+        type: string
+        description: |
+          List of database schema(s). For example: `public`.
+    outputs:
+      link:
+        type: string
+        description: Link to the schema version on Atlas.
+      slug:
+        type: string
+        description: The slug of the pushed schema version.
+      url:
+        type: string
+        description: The URL of the pushed schema version.
+  - id: schema/test
+    description: Run schema tests against the desired schema
+    name: Schema Test
+    inputs:
+      <<: *schemaInputs
+      url:
+        type: string
+        description: The desired schema URL(s) to test
+      paths:
+        type: string
+        description: |
+          List of directories containing test files.
+      run:
+        type: string
+        description: |
+          Filter tests to run by regexp.
+          For example, `^test_.*` will only run tests that start with `test_`.
+          Default is to run all tests.
