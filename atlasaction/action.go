@@ -1451,7 +1451,7 @@ func (a *Actions) GetDurationInput(name string) time.Duration {
 }
 
 // GetAtlasURLInput returns the atlas URL input with the given name.
-// paramsName is the list of input names to be added as query parameters.
+// paramsName is List of input names to be added as query parameters.
 func (a *Actions) GetAtlasURLInput(name string, paramsName ...string) string {
 	v := a.GetInput(name)
 	if v == "" {
@@ -1818,23 +1818,28 @@ func RenderTemplate(name string, data any) (string, error) {
 	return buf.String(), nil
 }
 
-// toEnvName converts the given string to an environment variable name.
-func toEnvName(s string) string {
+// ToEnvName converts the given string to an environment variable name.
+func ToEnvName(s string) string {
 	return strings.ToUpper(strings.NewReplacer(
 		" ", "_", "-", "_", "/", "_",
 	).Replace(s))
 }
 
-// toInputVarName converts the given string to an input variable name.
-func toInputVarName(input string) string {
-	return fmt.Sprintf("ATLAS_INPUT_%s", toEnvName(input))
+// ToInputVarName converts the given string to an input variable name.
+func ToInputVarName(input string) string {
+	return "ATLAS_INPUT_" + ToEnvName(input)
+}
+
+// ToInputVarName converts the given string to an input variable name.
+func ToOutputVarName(action, output string) string {
+	return "ATLAS_OUTPUT_" + ToEnvName(action+"_"+output)
 }
 
 // toOutputVar converts the given values to an output variable.
 // The action and output are used to create the output variable name with the format:
 // ATLAS_OUTPUT_<ACTION>_<OUTPUT>="<value>"
 func toOutputVar(action, output, value string) string {
-	return fmt.Sprintf("ATLAS_OUTPUT_%s=%q", toEnvName(action+"_"+output), value)
+	return fmt.Sprintf("%s=%q", ToOutputVarName(action, output), value)
 }
 
 // fprintln writes the given values to the file using fmt.Fprintln.
