@@ -2,7 +2,7 @@
 name: {{ .Name }}
 description: {{ .Description }}
 branding:
-  icon: database
+  icon: {{if eq .ID "copilot"}}message-circle{{else}}database{{end}}
 author: 'Ariga'
 {{ if .Inputs -}}
 inputs:

@@ -81,6 +81,9 @@ inputs:
       description: |
         List of database schema(s). For example: `public`.
 actions:
+  - id: copilot
+    name: Atlas Copilot
+    description: Talk to Atlas Copilot.
   - id: migrate/apply
     name: Migrate Apply
     description: Applies a migration directory on a target database
