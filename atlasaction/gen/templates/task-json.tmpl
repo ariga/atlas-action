@@ -10,7 +10,7 @@
   "version": {
     "Major": 0,
     "Minor": 0,
-    "Patch": 54
+    "Patch": 0
   },
   "execution": {
     "Node": {
@@ -41,10 +41,18 @@
       "options": {{ .AsOptions | jsonIndent "      " "  " }}
     }
     {{ $lenActions := len .Actions }}
-    {{- range $name, $input := .AllInputs -}}
-    , {
-      "type": "string",
-      "label": "{{ $name }}",
+    {{- range $name, $input := .AzureInputs -}}
+    ,
+    {
+      "type": "{{ $input.AzureInputType }}",
+      {{- if eq $input.Type "enum" }}
+      "options": {
+        {{ range $i, $v := $input.Options -}}
+        {{- if not (eq $i 0) }},{{ end }}{{ $v | printf "%q" }}:{{ $v | printf "%q" -}}
+        {{- end }}
+      },
+      {{- end }}
+      "label": "{{ $input.Label }}",
       "helpMarkDown": {{ $input.Description | json }},
       "name": "{{ $name | replace "-" "_" }}",
       "visibleRule": {{ $input.VisibleRule | json }}

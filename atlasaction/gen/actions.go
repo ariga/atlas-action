@@ -27,11 +27,13 @@ type (
 		Outputs     map[string]ActionOutput `yaml:"outputs,omitempty"`
 	}
 	ActionInput struct {
-		Type        string   `yaml:"type"` // e.g., "string", "boolean", "number", "enum", etc.
-		Required    bool     `yaml:"required,omitempty"`
-		Description string   `yaml:"description,omitempty"`
-		Default     string   `yaml:"default,omitempty"`
-		Options     []string `yaml:"options,omitempty"` // For enum inputs
+		Type        string   `yaml:"type"`                  // e.g., "string", "boolean", "number", "enum", etc.
+		MultiLine   bool     `yaml:"multiLine,omitempty"`   // Indicates if the input accepts multiple lines (e.g., for lists)
+		Default     string   `yaml:"default,omitempty"`     // Default value for the input
+		Options     []string `yaml:"options,omitempty"`     // For enum inputs
+		Required    bool     `yaml:"required,omitempty"`    // Is this input required?
+		Label       string   `yaml:"label,omitempty"`       // Label for the input field
+		Description string   `yaml:"description,omitempty"` // Markdown description of the input
 	}
 	ActionOutput struct {
 		Type        string `yaml:"type,omitempty"` // e.g., "string", "boolean", "number", etc.
@@ -53,40 +55,9 @@ func ParseManifest(r io.Reader) (*Actions, error) {
 func (a Actions) AsOptions() map[string]string {
 	opts := make(map[string]string, len(a.Actions))
 	for _, act := range a.Actions {
-		opts[act.ID] = act.Name
+		opts[strings.ReplaceAll(act.ID, "/", " ")] = act.Name
 	}
 	return opts
-}
-
-type InputGroups struct {
-	ActionInput
-	Groups []string
-}
-
-func (a InputGroups) VisibleRule() string {
-	slices.Sort(a.Groups)
-	rule := make([]string, 0, len(a.Groups))
-	for _, g := range a.Groups {
-		rule = append(rule, "action == "+strings.ReplaceAll(g, "/", " "))
-	}
-	return strings.Join(rule, " || ")
-}
-
-func (a Actions) AllInputs() iter.Seq2[string, InputGroups] {
-	inputs := make(map[string]InputGroups)
-	for _, act := range a.Actions {
-		for k, v := range act.Inputs {
-			i, ok := inputs[k]
-			if !ok {
-				i.ActionInput = v
-			}
-			i.Groups = append(i.Groups, act.ID)
-			inputs[k] = i
-		}
-	}
-	return SortedInputs(inputs, []string{
-		"working-directory", "config", "env", "vars", "dev-url",
-	})
 }
 
 func (a ActionSpec) SortedInputs() iter.Seq2[string, ActionInput] {
@@ -106,12 +77,62 @@ func (a ActionSpec) SortedOutputs() iter.Seq2[string, ActionOutput] {
 	}
 }
 
+// AzureInputs returns a sequence of AzureInputGroups, which groups action inputs by their keys.
+func (a Actions) AzureInputs() iter.Seq2[string, AzureInputGroups] {
+	inputs := make(map[string]AzureInputGroups)
+	for _, act := range a.Actions {
+		for k, v := range act.Inputs {
+			i, ok := inputs[k]
+			if !ok {
+				i.ActionInput = v
+			}
+			i.Groups = append(i.Groups, act.ID)
+			inputs[k] = i
+		}
+	}
+	return SortedInputs(inputs, []string{
+		"working-directory", "config", "env", "vars", "dev-url",
+	})
+}
+
+type AzureInputGroups struct {
+	ActionInput
+	Groups []string
+}
+
+func (a AzureInputGroups) VisibleRule() string {
+	slices.Sort(a.Groups)
+	rule := make([]string, 0, len(a.Groups))
+	for _, g := range a.Groups {
+		rule = append(rule, "action == "+strings.ReplaceAll(g, "/", " "))
+	}
+	return strings.Join(rule, " || ")
+}
+
+// AzureInputType returns the Azure DevOps input type for the action input.
+func (a ActionInput) AzureInputType() string {
+	switch a.Type {
+	case "boolean":
+		return "boolean"
+	case "number":
+		return "int"
+	case "enum":
+		return "pickList"
+	case "string":
+		if a.MultiLine {
+			return "multiLine"
+		}
+		fallthrough
+	default:
+		return "string"
+	}
+}
+
 // GitHubManifests writes the actions to the given path as GitHub Actions manifests.
 // It creates a directory for each action with the action ID as the name and writes
 // the action.yml file inside it. The action.yml file is generated using the
 // "action-yml.tmpl" template.
 func (a Actions) GitHubManifests(path string) error {
-	// Convert the actions to a txtar arc for GitHub Actions.
 	write := func(a ActionSpec) error {
 		dir := filepath.Join(path, a.ID)
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -119,7 +140,7 @@ func (a Actions) GitHubManifests(path string) error {
 		}
 		file, err := os.OpenFile(filepath.Join(dir, "action.yml"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 		if err != nil {
-			return fmt.Errorf("opening directory %s: %w", dir, err)
+			return fmt.Errorf("creating action.yml in %s: %w", dir, err)
 		}
 		defer file.Close()
 		return templates.ExecuteTemplate(file, "action-yml.tmpl", a)
