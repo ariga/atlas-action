@@ -7,7 +7,7 @@ author: 'Ariga'
 inputs:
   exclude:
     description: |
-      List of glob patterns used to filter resources from applying
+      List of glob patterns used to select which resources to filter in inspection
       see: https://atlasgo.io/declarative/inspect#exclude-schemas
 
   from:
@@ -17,7 +17,7 @@ inputs:
   include:
     description: |
       List of glob patterns used to select which resources to keep in inspection
-      see: https://atlasgo.io/declarative/inspect#include-schemas-
+      see: https://atlasgo.io/declarative/inspect#include-schemas
 
   name:
     description: |
@@ -28,7 +28,9 @@ inputs:
       List of database schema(s). For example: `public`.
 
   schema-name:
-    description: The name (slug) of the project in Atlas Cloud.
+    description: |
+      The name (slug) of the schema repository in Atlas Registry.
+      Read more in Atlas website: https://atlasgo.io/registry.
 
   to:
     description: |

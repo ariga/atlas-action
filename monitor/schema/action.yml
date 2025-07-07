@@ -9,7 +9,9 @@ inputs:
     description: The token that is used to connect to Atlas Cloud (should be passed as a secret).
     required: true
   exclude:
-    description: 'List of exclude patterns from inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas'
+    description: |
+      List of glob patterns used to select which resources to filter in inspection
+      see: https://atlasgo.io/declarative/inspect#exclude-schemas
 
   schemas:
     description: 'List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas'
