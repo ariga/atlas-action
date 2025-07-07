@@ -5,18 +5,18 @@
 # yaml-language-server: $schema=./schema.json
 inputs:
   commonInputs: &commonInputs
-    working-directory:
+    working-directory: &workingDirectory
       type: string
       label: Working directory
       description: Atlas working directory. Default is project root
-    config:
+    config: &config
       type: string
       label: Atlas config
       description: |
         The URL of the Atlas configuration file. By default, Atlas will look for a file
         named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
         Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-    env:
+    env: &env
       type: string
       label: Environment
       description: |
@@ -30,13 +30,13 @@ inputs:
         For example, `{"var1": "value1", "var2": "value2"}`.
   migrateInputs: &migrateInputs
     <<: *commonInputs
-    revisions-schema:
+    revisions-schema: &revisionsSchema
       type: string
       label: Revisions schema
       description: The name of the schema containing the revisions table.
   schemaInputs: &schemaInputs
     <<: *commonInputs
-    dev-url:
+    dev-url: &devURL
       type: string
       label: Dev database URL
       description: |
@@ -56,23 +56,25 @@ inputs:
       label: Desired schema URL
       description: |
         URL(s) of the desired schema state.
-    schema-name:
+    schema-name: &schemaName
       type: string
       label: Schema name
-      description: The name (slug) of the project in Atlas Cloud.
-    include:
+      description: |
+        The name (slug) of the schema repository in Atlas Registry.
+        Read more in Atlas website: https://atlasgo.io/registry.
+    include: &inspectInclude
       type: string
       multiLine: true
       label: Include patterns
       description: |
         List of glob patterns used to select which resources to keep in inspection
-        see: https://atlasgo.io/declarative/inspect#include-schemas-
-    exclude:
+        see: https://atlasgo.io/declarative/inspect#include-schemas
+    exclude: &inspectExclude
       type: string
       multiLine: true
       label: Exclude patterns
       description: |
-        List of glob patterns used to filter resources from applying
+        List of glob patterns used to select which resources to filter in inspection
         see: https://atlasgo.io/declarative/inspect#exclude-schemas
     schema:
       type: string
@@ -80,6 +82,22 @@ inputs:
       label: Database schema(s)
       description: |
         List of database schema(s). For example: `public`.
+  testInputs: &testInputs
+    <<: *commonInputs
+    dev-url: *devURL
+    paths:
+      type: string
+      multiLine: true
+      label: Test paths
+      description: |
+        List of directories containing test files.
+    run:
+      type: string
+      label: Test filter
+      description: |
+        Filter tests to run by regexp.
+        For example, `^test_.*` will only run tests that start with `test_`.
+        Default is to run all tests.
 actions:
   - id: copilot
     name: Atlas Copilot
@@ -138,6 +156,7 @@ actions:
     name: Migrate Auto Rebase
     description: Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch.
     inputs:
+      working-directory: *workingDirectory
       base-branch:
         type: string
         label: Base branch
@@ -153,21 +172,12 @@ actions:
         label: Git remote
         description: |
           The remote to fetch from. Defaults to `origin`.
-      working-directory:
-        type: string
-        label: Working directory
-        description: Atlas working directory. Default is project root
   - id: migrate/diff
     name: Migrate Diff
     description: Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory.
     inputs:
       <<: *commonInputs
-      dev-url:
-        type: string
-        label: Dev database URL
-        description: |
-          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
-          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      dev-url: *devURL
       dir:
         type: string
         label: Migration directory
@@ -195,12 +205,7 @@ actions:
     description: Reverts deployed migration files on a target database
     inputs:
       <<: *migrateInputs
-      dev-url:
-        type: string
-        label: Dev database URL
-        description: |
-          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
-          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      dev-url: *devURL
       url:
         type: string
         label: Target database URL
@@ -254,12 +259,7 @@ actions:
     name: Migrate Lint
     inputs:
       <<: *migrateInputs
-      dev-url:
-        type: string
-        label: Dev database URL
-        description: |
-          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
-          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      dev-url: *devURL
       dir:
         type: string
         label: Migration directory
@@ -286,12 +286,7 @@ actions:
     name: Migrate Push
     inputs:
       <<: *migrateInputs
-      dev-url:
-        type: string
-        label: Dev database URL
-        description: |
-          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
-          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      dev-url: *devURL
       dir:
         type: string
         label: Migration directory
@@ -318,45 +313,27 @@ actions:
     description: CI for database schema changes with Atlas
     name: Migrate Test
     inputs:
-      <<: *migrateInputs
-      dev-url:
-        type: string
-        label: Dev database URL
-        description: |
-          The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
-          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      <<: *testInputs
+      revisions-schema: *revisionsSchema
       dir:
         type: string
         label: Migration directory
         description: |
           The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
           based directories or `file://migrations` for local ones.
-      paths:
-        type: string
-        multiLine: true
-        label: Test paths
-        description: "List of directories containing test files."
-      run:
-        type: string
-        label: Test filter
-        description: |
-          Filter tests to run by regexp.
-          For example, `^test_.*` will only run tests that start with `test_`.
-          Default is to run all tests.
   - id: monitor/schema
     description: Sync the database schema to Atlas Cloud.
     name: Atlas Schema Monitoring
     inputs:
+      exclude: *inspectExclude
       config:
-        type: string
-        label: Atlas config
+        <<: *config
         description: |
           The URL of the Atlas configuration file (mutually exclusive with `url`).
           For example, `file://config/atlas.hcl`, learn more about
           [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
       env:
-        type: string
-        label: Environment
+        <<: *env
         description: |
           The environment to use from the Atlas configuration file.
           For example, `dev` (mutually exclusive with `url`).
@@ -373,11 +350,6 @@ actions:
         type: string
         label: Database URL
         description: URL of the database to sync (mutually exclusive with `config` and `env`).
-      exclude:
-        type: string
-        multiLine: true
-        label: Exclude patterns
-        description: "List of exclude patterns from inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas"
       schemas:
         type: string
         multiLine: true
@@ -391,6 +363,8 @@ actions:
     name: Schema Apply
     inputs:
       <<: *schemaInputs
+      include: *inspectInclude
+      exclude: *inspectExclude
       url:
         type: string
         label: Target database URL
@@ -417,20 +391,6 @@ actions:
         default: "false"
         label: Dry run
         description: Print SQL without executing it. Either "true" or "false".
-      include:
-        type: string
-        multiLine: true
-        label: Include patterns
-        description: |
-          List of glob patterns used to select which resources to keep in inspection
-          see: https://atlasgo.io/declarative/inspect#include-schemas
-      exclude:
-        type: string
-        multiLine: true
-        label: Exclude patterns
-        description: |
-          List of glob patterns used to filter resources from applying
-          see: https://atlasgo.io/declarative/inspect#exclude-schemas
       schema:
         type: string
         multiLine: true
@@ -530,12 +490,7 @@ actions:
     name: Schema Push
     inputs:
       <<: *schemaInputs
-      schema-name:
-        type: string
-        label: Schema name
-        description: |
-          The name (slug) of the schema repository in Atlas Registry.
-          Read more in Atlas website: https://atlasgo.io/registry.
+      schema-name: *schemaName
       url:
         type: string
         multiLine: true
@@ -580,22 +535,9 @@ actions:
     description: Run schema tests against the desired schema
     name: Schema Test
     inputs:
-      <<: *schemaInputs
+      <<: *testInputs
       url:
         type: string
         multiLine: true
         label: Schema URL
         description: The desired schema URL(s) to test
-      paths:
-        type: string
-        multiLine: true
-        label: Test paths
-        description: |
-          List of directories containing test files.
-      run:
-        type: string
-        label: Test filter
-        description: |
-          Filter tests to run by regexp.
-          For example, `^test_.*` will only run tests that start with `test_`.
-          Default is to run all tests.

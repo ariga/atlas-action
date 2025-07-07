@@ -13,7 +13,7 @@ inputs:
     default: "false"
   exclude:
     description: |
-      List of glob patterns used to filter resources from applying
+      List of glob patterns used to select which resources to filter in inspection
       see: https://atlasgo.io/declarative/inspect#exclude-schemas
 
   include:

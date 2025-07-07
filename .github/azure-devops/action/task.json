@@ -123,7 +123,7 @@
     {
       "type": "multiLine",
       "label": "Exclude patterns",
-      "helpMarkDown": "List of exclude patterns from inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas",
+      "helpMarkDown": "List of glob patterns used to select which resources to filter in inspection\nsee: https://atlasgo.io/declarative/inspect#exclude-schemas\n",
       "name": "exclude",
       "visibleRule": "action == monitor schema || action == schema apply || action == schema plan || action == schema plan approve"
     },
@@ -168,7 +168,7 @@
     {
       "type": "multiLine",
       "label": "Test paths",
-      "helpMarkDown": "List of directories containing test files.",
+      "helpMarkDown": "List of directories containing test files.\n",
       "name": "paths",
       "visibleRule": "action == migrate test || action == schema test"
     },
@@ -210,7 +210,7 @@
     {
       "type": "string",
       "label": "Schema name",
-      "helpMarkDown": "The name (slug) of the project in Atlas Cloud.",
+      "helpMarkDown": "The name (slug) of the schema repository in Atlas Registry.\nRead more in Atlas website: https://atlasgo.io/registry.\n",
       "name": "schema_name",
       "visibleRule": "action == schema plan || action == schema plan approve || action == schema push"
     },

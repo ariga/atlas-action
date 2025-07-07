@@ -11,7 +11,8 @@ inputs:
       based directories or `file://migrations` for local ones.
 
   paths:
-    description: List of directories containing test files.
+    description: |
+      List of directories containing test files.
 
   revisions-schema:
     description: The name of the schema containing the revisions table.
