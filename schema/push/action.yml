@@ -9,7 +9,8 @@ inputs:
     description: The description of the schema.
 
   latest:
-    description: If true, push also to the "latest" tag.
+    description: |
+      If true, push also to the `latest` tag.
     default: "true"
   schema:
     description: |
