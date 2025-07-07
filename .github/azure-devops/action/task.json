@@ -39,6 +39,7 @@
       "required": true,
       "name": "action",
       "options": {
+        "copilot": "Atlas Copilot",
         "migrate apply": "Migrate Apply",
         "migrate autorebase": "Migrate Auto Rebase",
         "migrate diff": "Migrate Diff",
