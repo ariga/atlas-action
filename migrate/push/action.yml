@@ -15,7 +15,7 @@ inputs:
 
   latest:
     description: |
-      If true, push also to the "latest" tag.
+      If true, push also to the `latest` tag.
     default: "true"
   revisions-schema:
     description: The name of the schema containing the revisions table.

@@ -68,3 +68,8 @@ release:
 .PHONY: azure-devops
 azure-devops:
 	$(MAKE) -C .github/azure-devops VERSION=$(VERSION) vsix
+
+.PHONY: manifest
+manifest:
+	go run ./cmd/gen github-manifest
+	go run ./cmd/gen azure-task -t ./.github/azure-devops/action/task.json

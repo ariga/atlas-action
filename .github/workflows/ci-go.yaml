@@ -25,6 +25,24 @@ jobs:
           echo "$status"
           exit 1
         fi
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v4
+      with:
+        go-version-file: go.mod
+    - name: Run `make manifest`
+      run: |
+        make manifest
+    - name: Verify no git-diff
+      run: |
+        status=$(git status --porcelain)
+        if [ -n "$status" ]; then
+          echo "you need to run 'make manifest' and commit the changes"
+          echo "$status"
+          exit 1
+        fi
   shim-e2e:
     runs-on: ubuntu-latest
     env:
