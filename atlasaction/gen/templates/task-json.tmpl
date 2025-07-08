@@ -39,10 +39,9 @@
       "required": true,
       "name": "action",
       "options": {{ .AsOptions | jsonIndent "      " "  " }}
-    }
-    {{ $lenActions := len .Actions }}
-    {{- range $name, $input := .AzureInputs -}}
-    ,
+    },
+    {{- $lenActions := len .Actions -}}
+    {{- range $name, $input := .AzureInputs }}
     {
       "type": "{{ $input.AzureInputType }}",
       {{- if eq $input.Type "enum" }}
@@ -56,7 +55,15 @@
       "helpMarkDown": {{ $input.Description | json }},
       "name": "{{ $name | replace "-" "_" }}",
       "visibleRule": {{ $input.VisibleRule | json }}
-    }
+    },
     {{- end }}
+    {
+      "name": "githubConnection",
+      "type": "connectedService:github:OAuth,PersonalAccessToken,InstallationToken,Token",
+      "label": "GitHub connection (OAuth or PAT)",
+      "defaultValue": "",
+      "required": true,
+      "helpMarkDown": "Specify the name of the GitHub service connection to use to connect to the GitHub repository. The connection must be based on a GitHub user's OAuth or a GitHub personal access token. Learn more about service connections [here](https://aka.ms/AA3am5s)."
+    }
   ]
 }
