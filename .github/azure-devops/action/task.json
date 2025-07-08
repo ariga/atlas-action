@@ -55,8 +55,7 @@
         "schema push": "Schema Push",
         "schema test": "Schema Test"
       }
-    }
-    ,
+    },
     {
       "type": "boolean",
       "label": "Allow dirty state",
@@ -328,6 +327,13 @@
       "helpMarkDown": "The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.\nRead more about [dev-databases](https://atlasgo.io/concepts/dev-database).\n",
       "name": "dev_url",
       "visibleRule": "action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+    },
+    {
+      "name": "githubConnection",
+      "type": "connectedService:github:OAuth,PersonalAccessToken,InstallationToken,Token",
+      "label": "GitHub connection (OAuth or PAT)",
+      "defaultValue": "",
+      "helpMarkDown": "Specify the name of the GitHub service connection to use to connect to the GitHub repository. The connection must be based on a GitHub user's OAuth or a GitHub personal access token. Learn more about service connections [here](https://aka.ms/AA3am5s)."
     }
   ]
 }
