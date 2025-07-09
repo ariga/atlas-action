@@ -97,6 +97,8 @@ func (a *Azure) GetTriggerContext(context.Context) (_ *TriggerContext, err error
 			if err != nil {
 				return nil, fmt.Errorf("failed to construct pull request URL: %w", err)
 			}
+			tc.Branch = a.getVar("System.PullRequest.SourceBranch")
+			tc.Commit = a.getVar("System.PullRequest.SourceCommitId")
 		}
 		tc.SCMClient = func() (SCMClient, error) {
 			var token string
