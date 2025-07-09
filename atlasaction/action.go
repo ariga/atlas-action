@@ -748,6 +748,9 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 	} else {
 		a.Infof("migrate diff with %s", v)
 	}
+	if _, err := a.exec(ctx, "git", "fetch", remote, currBranch); err != nil {
+		return fmt.Errorf("failed to fetch the branch %s: %w", currBranch, err)
+	}
 	// Since running in detached HEAD, we need to switch to the branch.
 	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
