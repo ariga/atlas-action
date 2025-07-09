@@ -88,6 +88,8 @@ func (a *Azure) GetTriggerContext(context.Context) (_ *TriggerContext, err error
 			return nil, fmt.Errorf("failed to parse System.PullRequest.PullRequestNumber: %w", err)
 		}
 		tc.PullRequest = pr
+		tc.Commit = c
+		tc.Branch = a.getVar("System.PullRequest.SourceBranch")
 	}
 	switch p := a.getVar("Build.Repository.Provider"); p {
 	case "GitHub":
