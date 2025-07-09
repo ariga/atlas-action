@@ -1,9 +1,18 @@
+// Copyright 2021-present The Atlas Authors. All rights reserved.
+// This source code is licensed under the Apache 2.0 license found
+// in the LICENSE file in the root directory of this source tree.
+
+//go:build manifest
+// +build manifest
+
 package main
 
 import (
+	"fmt"
+	"io"
 	"os"
 
-	"ariga.io/atlas-action/atlasaction/gen"
+	"ariga.io/atlas-action/atlasaction"
 	"github.com/spf13/cobra"
 )
 
@@ -30,19 +39,13 @@ func main() {
 func githubManifestCmd() *cobra.Command {
 	var (
 		flags struct {
-			Manifest  string
 			OutputDir string
 		}
 		cmd = &cobra.Command{
 			Use:   "github-manifest",
 			Short: "Generate GitHub Actions manifest files from a manifest",
 			RunE: func(cmd *cobra.Command, args []string) error {
-				f, err := os.Open(flags.Manifest)
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-				actions, err := gen.ParseManifest(f)
+				actions, err := atlasaction.ParseManifest()
 				if err != nil {
 					return err
 				}
@@ -50,7 +53,6 @@ func githubManifestCmd() *cobra.Command {
 			},
 		}
 	)
-	cmd.Flags().StringVarP(&flags.Manifest, "manifest", "m", "atlas-actions.yml", "The manifest file to generate the output from")
 	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
 	return cmd
 }
@@ -58,47 +60,45 @@ func githubManifestCmd() *cobra.Command {
 func azureTaskCmd() *cobra.Command {
 	var (
 		flags struct {
-			Manifest string
 			TaskJSON string
 		}
 		cmd = &cobra.Command{
 			Use:   "azure-task",
 			Short: "Generate Azure DevOps task JSON",
 			RunE: func(cmd *cobra.Command, args []string) error {
-				f, err := os.Open(flags.Manifest)
+				actions, err := atlasaction.ParseManifest()
 				if err != nil {
 					return err
 				}
-				defer f.Close()
-				actions, err := gen.ParseManifest(f)
-				if err != nil {
-					return err
+				var w io.Writer
+				if flags.TaskJSON == "" {
+					w = os.Stdout
+				} else {
+					t, err := os.OpenFile(flags.TaskJSON, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+					if err != nil {
+						return fmt.Errorf("opening file %s: %w", flags.TaskJSON, err)
+					}
+					defer t.Close()
+					w = t
 				}
-				return actions.AzureTaskJSON(flags.TaskJSON)
+				return actions.AzureTaskJSON(w)
 			},
 		}
 	)
-	cmd.Flags().StringVarP(&flags.Manifest, "manifest", "m", "atlas-actions.yml", "The manifest file to generate the output from")
-	cmd.Flags().StringVarP(&flags.TaskJSON, "task-json", "t", "task.json", "The output file for the Azure DevOps task JSON")
+	cmd.Flags().StringVarP(&flags.TaskJSON, "task-json", "t", "", "The output file for the Azure DevOps task JSON")
 	return cmd
 }
 
 func markdownDocCmd() *cobra.Command {
 	var (
 		flags struct {
-			Manifest  string
 			OutputDir string
 		}
 		cmd = &cobra.Command{
 			Use:   "docs",
 			Short: "Generate Azure DevOps task JSON",
 			RunE: func(cmd *cobra.Command, args []string) error {
-				f, err := os.Open(flags.Manifest)
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-				actions, err := gen.ParseManifest(f)
+				actions, err := atlasaction.ParseManifest()
 				if err != nil {
 					return err
 				}
@@ -106,7 +106,6 @@ func markdownDocCmd() *cobra.Command {
 			},
 		}
 	)
-	cmd.Flags().StringVarP(&flags.Manifest, "manifest", "m", "atlas-actions.yml", "The manifest file to generate the output from")
 	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
 	return cmd
 }

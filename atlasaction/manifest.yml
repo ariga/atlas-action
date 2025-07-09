@@ -2,7 +2,7 @@
 # Each action has a unique ID, a description, and a set of inputs and outputs.
 # The input name is what the Go code will used to access the input value.
 #
-# yaml-language-server: $schema=./schema.json
+# yaml-language-server: $schema=../schema.json
 inputs:
   commonInputs: &commonInputs
     working-directory: &workingDirectory

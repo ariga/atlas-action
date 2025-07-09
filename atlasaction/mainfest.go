@@ -1,7 +1,16 @@
-package gen
+// Copyright 2021-present The Atlas Authors. All rights reserved.
+// This source code is licensed under the Apache 2.0 license found
+// in the LICENSE file in the root directory of this source tree.
+
+//go:build manifest
+// +build manifest
+
+package atlasaction
 
 import (
+	"bytes"
 	"cmp"
+	_ "embed"
 	"fmt"
 	"io"
 	"iter"
@@ -14,9 +23,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//go:embed manifest.yml
+var manifest []byte
+
 type (
 	// Actions represents a list of actions.
-	Actions struct {
+	ActionsManifest struct {
 		Actions []ActionSpec
 	}
 	ActionSpec struct {
@@ -43,16 +55,16 @@ type (
 
 // ParseManifest reads the actions from the given reader and returns an Actions struct.
 // It expects the input to be in YAML format.
-func ParseManifest(r io.Reader) (*Actions, error) {
-	var actions Actions
-	err := yaml.NewDecoder(r).Decode(&actions)
+func ParseManifest() (*ActionsManifest, error) {
+	var actions ActionsManifest
+	err := yaml.NewDecoder(bytes.NewReader(manifest)).Decode(&actions)
 	if err != nil {
 		return nil, err
 	}
 	return &actions, nil
 }
 
-func (a Actions) AsOptions() map[string]string {
+func (a ActionsManifest) AsOptions() map[string]string {
 	opts := make(map[string]string, len(a.Actions))
 	for _, act := range a.Actions {
 		opts[strings.ReplaceAll(act.ID, "/", " ")] = act.Name
@@ -78,7 +90,7 @@ func (a ActionSpec) SortedOutputs() iter.Seq2[string, ActionOutput] {
 }
 
 // AzureInputs returns a sequence of AzureInputGroups, which groups action inputs by their keys.
-func (a Actions) AzureInputs() iter.Seq2[string, AzureInputGroups] {
+func (a ActionsManifest) AzureInputs() iter.Seq2[string, AzureInputGroups] {
 	inputs := make(map[string]AzureInputGroups)
 	for _, act := range a.Actions {
 		for k, v := range act.Inputs {
@@ -132,7 +144,7 @@ func (a ActionInput) AzureInputType() string {
 // It creates a directory for each action with the action ID as the name and writes
 // the action.yml file inside it. The action.yml file is generated using the
 // "action-yml.tmpl" template.
-func (a Actions) GitHubManifests(path string) error {
+func (a ActionsManifest) GitHubManifests(path string) error {
 	write := func(a ActionSpec) error {
 		dir := filepath.Join(path, a.ID)
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -159,17 +171,12 @@ func (a Actions) GitHubManifests(path string) error {
 // AzureTaskJSON writes the actions to the given path as an Azure DevOps task JSON file.
 // It creates a file with the given path and writes the action data using the
 // "azure-task-json.tmpl" template.
-func (a Actions) AzureTaskJSON(path string) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("opening file %s: %w", path, err)
-	}
-	defer f.Close()
-	return templates.ExecuteTemplate(f, "task-json.tmpl", a)
+func (a ActionsManifest) AzureTaskJSON(w io.Writer) error {
+	return templates.ExecuteTemplate(w, "task-json.tmpl", a)
 }
 
 // MarkdownDocs writes the actions to the given path as Markdown documentation files.
-func (a Actions) MarkdownDocs(path string) error {
+func (a ActionsManifest) MarkdownDocs(path string) error {
 	write := func(doc string) error {
 		f, err := os.OpenFile(filepath.Join(path, doc), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 		if err != nil {

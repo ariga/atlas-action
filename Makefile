@@ -71,5 +71,5 @@ azure-devops:
 
 .PHONY: manifest
 manifest:
-	go run ./cmd/gen github-manifest
-	go run ./cmd/gen azure-task -t ./.github/azure-devops/action/task.json
+	go run -tags manifest ./cmd/gen github-manifest
+	go run -tags manifest ./cmd/gen azure-task -t ./.github/azure-devops/action/task.json
