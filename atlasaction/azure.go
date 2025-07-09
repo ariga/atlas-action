@@ -128,11 +128,17 @@ func (a *Azure) getGHToken(endpoint string) (string, error) {
 	case az == nil:
 		return "", nil
 	case az.Scheme == "PersonalAccessToken":
-		a.Infof("Using %s scheme for GitHub connection: %s", az.Scheme, az.Parameters)
-		return az.Parameters["accessToken"], nil
+		t, ok := az.Parameters["accessToken"]
+		if !ok {
+			return "", fmt.Errorf("missing accessToken in ENDPOINT_AUTH_%s", endpoint)
+		}
+		return t, nil
 	case az.Scheme == "OAuth", az.Scheme == "Token":
-		a.Infof("Using %s scheme for GitHub connection: %s", az.Scheme, az.Parameters)
-		return az.Parameters["AccessToken"], nil
+		t, ok := az.Parameters["AccessToken"]
+		if !ok {
+			return "", fmt.Errorf("missing AccessToken in ENDPOINT_AUTH_%s", endpoint)
+		}
+		return t, nil
 	case az.Scheme != "":
 		return "", fmt.Errorf("unsupported scheme %q", az.Scheme)
 	default:

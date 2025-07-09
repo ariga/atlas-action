@@ -2,9 +2,10 @@
 // This source code is licensed under the Apache 2.0 license found
 // in the LICENSE file in the root directory of this source tree.
 
-package atlasaction_test
+package atlasaction
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,4 +27,39 @@ func TestAzureDevOpsTask(t *testing.T) {
 			return nil
 		},
 	})
+}
+
+func TestAuthEndpoint(t *testing.T) {
+	m := map[string]string{
+		"ENDPOINT_AUTH_oauth": `{"scheme":"OAuth","parameters":{"AccessToken":"oauth-token"}}`,
+		"ENDPOINT_AUTH_pat":   `{"scheme":"PersonalAccessToken","parameters":{"accessToken":"my-token"}}`,
+		"ENDPOINT_AUTH_token": `{"scheme":"Token","parameters":{"AccessToken":"token"}}`,
+
+		"ENDPOINT_AUTH_invalid-oauth": `{"scheme":"OAuth","parameters":{"foo":"bar"}}`,
+		"ENDPOINT_AUTH_invalid-pat":   `{"scheme":"PersonalAccessToken","parameters":{"foo":"bar"}}`,
+		"ENDPOINT_AUTH_invalid-token": `{"scheme":"Token","parameters":{"foo":"bar"}}`,
+	}
+	a := NewAzure(func(s string) string { return m[s] }, io.Discard)
+
+	tok, err := a.getGHToken("oauth")
+	require.NoError(t, err)
+	require.Equal(t, "oauth-token", tok)
+
+	tok, err = a.getGHToken("pat")
+	require.NoError(t, err)
+	require.Equal(t, "my-token", tok)
+
+	tok, err = a.getGHToken("token")
+	require.NoError(t, err)
+	require.Equal(t, "token", tok)
+
+	_, err = a.getGHToken("unknown")
+	require.ErrorContains(t, err, "ENDPOINT_AUTH_unknown is not set")
+
+	_, err = a.getGHToken("invalid-oauth")
+	require.ErrorContains(t, err, "missing AccessToken in ENDPOINT_AUTH_invalid-oauth")
+	_, err = a.getGHToken("invalid-pat")
+	require.ErrorContains(t, err, "missing accessToken in ENDPOINT_AUTH_invalid-pat")
+	_, err = a.getGHToken("invalid-token")
+	require.ErrorContains(t, err, "missing AccessToken in ENDPOINT_AUTH_invalid-token")
 }
