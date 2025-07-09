@@ -1821,28 +1821,28 @@ func RenderTemplate(name string, data any) (string, error) {
 	return buf.String(), nil
 }
 
-// ToEnvName converts the given string to an environment variable name.
-func ToEnvName(s string) string {
+// toEnvName converts the given string to an environment variable name.
+func toEnvName(s string) string {
 	return strings.ToUpper(strings.NewReplacer(
 		" ", "_", "-", "_", "/", "_",
 	).Replace(s))
 }
 
-// ToInputVarName converts the given string to an input variable name.
-func ToInputVarName(input string) string {
-	return "ATLAS_INPUT_" + ToEnvName(input)
+// toInputVarName converts the given string to an input variable name.
+func toInputVarName(input string) string {
+	return "ATLAS_INPUT_" + toEnvName(input)
 }
 
 // ToInputVarName converts the given string to an input variable name.
-func ToOutputVarName(action, output string) string {
-	return "ATLAS_OUTPUT_" + ToEnvName(action+"_"+output)
+func toOutputVarName(action, output string) string {
+	return "ATLAS_OUTPUT_" + toEnvName(action+"_"+output)
 }
 
 // toOutputVar converts the given values to an output variable.
 // The action and output are used to create the output variable name with the format:
 // ATLAS_OUTPUT_<ACTION>_<OUTPUT>="<value>"
 func toOutputVar(action, output, value string) string {
-	return fmt.Sprintf("%s=%q", ToOutputVarName(action, output), value)
+	return fmt.Sprintf("%s=%q", toOutputVarName(action, output), value)
 }
 
 // fprintln writes the given values to the file using fmt.Fprintln.

@@ -1,4 +1,7 @@
-package gen
+//go:build manifest
+// +build manifest
+
+package atlasaction
 
 import (
 	"bytes"
@@ -8,9 +11,11 @@ import (
 	"strings"
 	"text/template"
 
-	"ariga.io/atlas-action/atlasaction"
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed templates/*
+var templateDir embed.FS
 
 var (
 	// templates holds the Go templates for the code generation.
@@ -52,9 +57,9 @@ var (
 		"replace": func(old, new, s string) string {
 			return strings.ReplaceAll(s, old, new)
 		},
-		"env":       atlasaction.ToEnvName,
-		"inputvar":  atlasaction.ToInputVarName,
-		"outputvar": atlasaction.ToOutputVarName,
+		"env":       toEnvName,
+		"inputvar":  toInputVarName,
+		"outputvar": toOutputVarName,
 		"dockers": func() []DockerURL {
 			return []DockerURL{
 				{Label: "MySQL", Driver: "mysql"},
@@ -67,9 +72,6 @@ var (
 		},
 	}
 )
-
-//go:embed templates/*
-var templateDir embed.FS
 
 func init() {
 	LoadTemplates(templateDir, "templates/*")
