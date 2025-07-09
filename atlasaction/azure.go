@@ -105,6 +105,9 @@ func (a *Azure) GetTriggerContext(context.Context) (_ *TriggerContext, err error
 				if err != nil {
 					return nil, fmt.Errorf("failed to get GitHub token for connection %s: %w", c, err)
 				}
+				if token == "" {
+					a.Warningf("the githubConnection input is set, but no token was found")
+				}
 			} else {
 				a.Warningf("the githubConnection input is not set, the action may not have all the permissions")
 			}
@@ -125,8 +128,10 @@ func (a *Azure) getGHToken(endpoint string) (string, error) {
 	case az == nil:
 		return "", nil
 	case az.Scheme == "PersonalAccessToken":
+		a.Infof("Using %s scheme for GitHub connection: %s", az.Scheme, az.Parameters)
 		return az.Parameters["accessToken"], nil
 	case az.Scheme == "OAuth", az.Scheme == "Token":
+		a.Infof("Using %s scheme for GitHub connection: %s", az.Scheme, az.Parameters)
 		return az.Parameters["AccessToken"], nil
 	case az.Scheme != "":
 		return "", fmt.Errorf("unsupported scheme %q", az.Scheme)
@@ -136,9 +141,9 @@ func (a *Azure) getGHToken(endpoint string) (string, error) {
 }
 
 func (a *Azure) getEndpointAuthorization(id string) (*azureEndpointAuthorization, error) {
-	v := a.getVar("Endpoint.Auth." + id)
+	v := a.getenv("ENDPOINT_AUTH_" + id)
 	if v == "" {
-		return nil, nil
+		return nil, fmt.Errorf("ENDPOINT_AUTH_%s is not set", id)
 	}
 	var auth azureEndpointAuthorization
 	if err := json.Unmarshal([]byte(v), &auth); err != nil {
