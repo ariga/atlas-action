@@ -1180,12 +1180,13 @@ func TestMigrateDiff(t *testing.T) {
 		require.NoError(t, acts.MigrateDiff(context.Background()))
 		require.Contains(t, out.String(), "Run migrate/diff completed successfully")
 		// Check that the correct commands were executed
-		require.Len(t, mockExec.ran, 5)
+		require.Len(t, mockExec.ran, 6)
 		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
-		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[1].args)
-		require.Equal(t, []string{"add", "testdata/migrations"}, mockExec.ran[2].args)
-		require.Equal(t, []string{"commit", "--message", "testdata/migrations: add new migration file"}, mockExec.ran[3].args)
-		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[4].args)
+		require.Equal(t, []string{"fetch", "origin", "my-branch"}, mockExec.ran[1].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"add", "testdata/migrations"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"commit", "--message", "testdata/migrations: add new migration file"}, mockExec.ran[4].args)
+		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[5].args)
 		// Ensure migration file was created
 		require.FileExists(t, filepath.Join("testdata/migrations", "t1.sql"))
 		t.Cleanup(func() {
