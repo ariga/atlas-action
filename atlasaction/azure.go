@@ -88,6 +88,8 @@ func (a *Azure) GetTriggerContext(context.Context) (_ *TriggerContext, err error
 			return nil, fmt.Errorf("failed to parse System.PullRequest.PullRequestNumber: %w", err)
 		}
 		tc.PullRequest = pr
+		tc.Commit = c
+		tc.Branch = a.getVar("System.PullRequest.SourceBranch")
 	}
 	switch p := a.getVar("Build.Repository.Provider"); p {
 	case "GitHub":
@@ -97,8 +99,6 @@ func (a *Azure) GetTriggerContext(context.Context) (_ *TriggerContext, err error
 			if err != nil {
 				return nil, fmt.Errorf("failed to construct pull request URL: %w", err)
 			}
-			tc.Branch = a.getVar("System.PullRequest.SourceBranch")
-			tc.Commit = a.getVar("System.PullRequest.SourceCommitId")
 		}
 		tc.SCMClient = func() (SCMClient, error) {
 			var token string
