@@ -8,15 +8,12 @@ inputs:
   base-branch:
     description: |
       The base branch to rebase the migration directory onto. Default to the default branch of the repository.
-
   dir:
     description: |
       The URL of the migration directory to rebase on. By default: `file://migrations`.
-
   remote:
     description: |
       The remote to fetch from. Defaults to `origin`.
-
   working-directory:
     description: Atlas working directory. Default is project root
 runs:

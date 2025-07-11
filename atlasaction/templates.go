@@ -8,6 +8,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -58,6 +59,7 @@ var (
 			return strings.ReplaceAll(s, old, new)
 		},
 		"env":       toEnvName,
+		"quote":     strconv.Quote,
 		"inputvar":  toInputVarName,
 		"outputvar": toOutputVarName,
 		"dockers": func() []DockerURL {

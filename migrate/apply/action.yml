@@ -10,18 +10,15 @@ inputs:
     default: "false"
   amount:
     description: The maximum number of migration files to apply. Default is all.
-
   dir:
     description: |
       The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
       based directories or `file://migrations` for local ones.
-
   dry-run:
     description: Print SQL without executing it. Either "true" or "false".
     default: "false"
   revisions-schema:
     description: The name of the schema containing the revisions table.
-
   tx-mode:
     description: |
       Transaction mode to use. Either "file", "all", or "none". Default is "file".
@@ -29,20 +26,16 @@ inputs:
   url:
     description: |
       The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
-
   working-directory:
     description: Atlas working directory. Default is project root
-
   config:
     description: |
       The URL of the Atlas configuration file. By default, Atlas will look for a file
       named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
       Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-
   env:
     description: |
       The environment to use from the Atlas configuration file. For example, `dev`.
-
   vars:
     description: |
       A JSON object containing variables to be used in the Atlas configuration file.
@@ -50,13 +43,10 @@ inputs:
 outputs:
   applied_count:
     description: The number of migrations that were applied.
-
   current:
     description: The current version of the database. (before applying migrations)
-
   pending_count:
     description: The number of migrations that will be applied.
-
   target:
     description: The target version of the database.
 runs:

@@ -9,33 +9,26 @@ inputs:
     description: |
       The URL of the migration directory. For example: `file://migrations`.
       Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
-
   remote:
     description: |
       The remote to push changes to. Defaults to `origin`.
-
   to:
     description: |
       The URL of the desired state.
-
   working-directory:
     description: Atlas working directory. Default is project root
-
   config:
     description: |
       The URL of the Atlas configuration file. By default, Atlas will look for a file
       named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
       Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-
   env:
     description: |
       The environment to use from the Atlas configuration file. For example, `dev`.
-
   vars:
     description: |
       A JSON object containing variables to be used in the Atlas configuration file.
       For example, `{"var1": "value1", "var2": "value2"}`.
-
   dev-url:
     description: |
       The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
