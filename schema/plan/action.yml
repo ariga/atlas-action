@@ -9,51 +9,40 @@ inputs:
     description: |
       List of glob patterns used to select which resources to filter in inspection
       see: https://atlasgo.io/declarative/inspect#exclude-schemas
-
   from:
     description: |
       URL(s) of the current schema state.
-
   include:
     description: |
       List of glob patterns used to select which resources to keep in inspection
       see: https://atlasgo.io/declarative/inspect#include-schemas
-
   name:
     description: |
       The name of the plan. By default, Atlas will generate a name based on the schema changes.
-
   schema:
     description: |
       List of database schema(s). For example: `public`.
-
   schema-name:
     description: |
       The name (slug) of the schema repository in Atlas Registry.
       Read more in Atlas website: https://atlasgo.io/registry.
-
   to:
     description: |
       URL(s) of the desired schema state.
-
   working-directory:
     description: Atlas working directory. Default is project root
-
   config:
     description: |
       The URL of the Atlas configuration file. By default, Atlas will look for a file
       named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
       Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-
   env:
     description: |
       The environment to use from the Atlas configuration file. For example, `dev`.
-
   vars:
     description: |
       A JSON object containing variables to be used in the Atlas configuration file.
       For example, `{"var1": "value1", "var2": "value2"}`.
-
   dev-url:
     description: |
       The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
@@ -61,10 +50,8 @@ inputs:
 outputs:
   link:
     description: Link to the schema plan on Atlas.
-
   plan:
     description: The plan to be applied or generated. (e.g. `atlas://<schema>/plans/<id>`)
-
   status:
     description: The status of the plan. For example, `PENDING` or `APPROVED`.
 runs:

@@ -12,22 +12,17 @@ inputs:
     description: |
       List of glob patterns used to select which resources to filter in inspection
       see: https://atlasgo.io/declarative/inspect#exclude-schemas
-
   schemas:
     description: 'List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas'
-
   slug:
     description: Optional unique identifier for the database server.
-
   url:
     description: URL of the database to sync (mutually exclusive with `config` and `env`).
-
   config:
     description: |
       The URL of the Atlas configuration file (mutually exclusive with `url`).
       For example, `file://config/atlas.hcl`, learn more about
       [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
-
   env:
     description: |
       The environment to use from the Atlas configuration file.

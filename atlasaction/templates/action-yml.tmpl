@@ -4,23 +4,22 @@ description: {{ .Description }}
 branding:
   icon: {{if eq .ID "copilot"}}message-circle{{else}}database{{end}}
 author: 'Ariga'
-{{ if .Inputs -}}
+{{- if .Inputs }}
 inputs:
 {{- range $name, $input := .SortedInputs }}
   {{ $name }}:
-    description: {{ $input.Description | yaml 6 -}}
-    {{- if $input.Required }}    required: true
-    {{- end -}}
-    {{- with $input.Default }}{{ printf "    default: %q" . -}}
-    {{- end -}}{{- end -}}
-{{- end -}}
-{{ if .Outputs -}}
+    description: {{ $input.Description | yaml 6 | trimnl }}{{ if $input.Required }}
+    required: true{{ end }}{{ with $input.Default }}
+    default: {{ . | quote }}{{ end }}
+{{- end }}
+{{- end }}
+{{- if .Outputs }}
 outputs:
 {{- range $name, $output := .SortedOutputs }}
   {{ $name }}:
-    description: {{ $output.Description | yaml 6 -}}
-{{ end -}}
-{{- end -}}
+    description: {{ $output.Description | yaml 6 | trimnl }}
+{{- end }}
+{{- end }}
 runs:
   using: node20
   main: index.js
