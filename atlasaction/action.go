@@ -71,8 +71,14 @@ type (
 	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
+		// PullRequest returns information about a pull request.
+		PullRequest(context.Context, int) (*PullRequest, error)
+		// CreatePullRequest creates a pull request with the given title and body into the given base branch.
+		CreatePullRequest(_ context.Context, head, base, title, body string) (*PullRequest, error)
+		// CopilotSession returns the Copilot session for the current pull request, if there already is one.
+		CopilotSession(context.Context, *TriggerContext) (string, error)
 		// CommentCopilot comments on the pull request with the copilot response.
-		CommentCopilot(context.Context, *TriggerContext, *Copilot) error
+		CommentCopilot(_ context.Context, pr int, _ *Copilot) error
 		// CommentLint comments on the pull request with the lint report.
 		CommentLint(context.Context, *TriggerContext, *atlasexec.SummaryReport) error
 		// CommentPlan comments on the pull request with the schema plan.
@@ -97,8 +103,8 @@ type (
 		Version(ctx context.Context) (*atlasexec.Version, error)
 		// Login runs the `login` command.
 		Login(ctx context.Context, params *atlasexec.LoginParams) error
-		// Copilot runs the 'copilot' command in one-shot mode.
-		Copilot(context.Context, *atlasexec.CopilotParams) (atlasexec.Copilot, error)
+		// CopilotStream runs the 'copilot' command in one-shot mode, streaming the messages.
+		CopilotStream(context.Context, *atlasexec.CopilotParams) (atlasexec.Stream[*atlasexec.CopilotMessage], error)
 		// MigrateStatus runs the `migrate status` command.
 		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
 		// MigrateHash runs the `migrate hash` command.
@@ -157,7 +163,7 @@ type (
 		Repo          string                    // Repo is the repository name. e.g. "ariga/atlas-action".
 		RepoURL       string                    // RepoURL is full URL of the repository. e.g. "https://github.com/ariga/atlas-action".
 		DefaultBranch string                    // DefaultBranch is the default branch of the repository.
-		Branch        string                    // Currnet Branch name.
+		Branch        string                    // Current Branch name.
 		Commit        string                    // Commit SHA.
 		Actor         *Actor                    // Actor is the user who triggered the action.
 		RerunCmd      string                    // RerunCmd is the command to rerun the action.
@@ -176,14 +182,15 @@ type (
 	PullRequest struct {
 		Number int    // Pull Request Number
 		URL    string // URL of the pull request. e.g "https://github.com/ariga/atlas-action/pull/1"
-		Commit string // Latest commit SHA.
 		Body   string // Body (description) of the pull request.
+		Commit string // Latest commit SHA.
+		Ref    string
 	}
 	// Comment holds the comment information.
 	Comment struct {
-		Number int    // Comment Number
+		Number int    // Pull Request Number
 		URL    string // URL of the comment, e.g "https://github.com/ariga/atlas-action/pull/1#issuecomment-1234567890"
-		Body   string // Body (description) of the comment.
+		Body   string // Body (description) of the comment
 	}
 	SchemaLintReport struct {
 		URL []string `json:"URL,omitempty"` // Redacted schema URLs
@@ -191,8 +198,7 @@ type (
 	}
 	// Copilot contains both the prompt and the response from Atlas Copilot.
 	Copilot struct {
-		Prompt  string
-		Copilot atlasexec.Copilot
+		Session, Prompt, Response string
 	}
 )
 
@@ -378,35 +384,6 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 	default:
 		return fmt.Errorf("unknown action: %s", act)
 	}
-}
-
-// Copilot runs the GitHub Action for "ariga/atlas-action/copilot".
-func (a *Actions) Copilot(ctx context.Context) error {
-	tc, err := a.GetTriggerContext(ctx)
-	if err != nil {
-		return err
-	}
-	// Atlas Copilot will react to comments that mention it by /atlas.
-	if tc.Comment == nil || !strings.Contains(tc.Comment.Body, "/atlas") {
-		a.Infof("Comment does not contain /atlas command, nothing to do.")
-		return nil
-	}
-	params := &atlasexec.CopilotParams{
-		Prompt: tc.Comment.Body,
-	}
-	cp, err := a.Atlas.Copilot(ctx, params)
-	if err != nil {
-		a.SetOutput("error", err.Error())
-		return err
-	}
-	c, err := tc.SCMClient()
-	if err != nil {
-		return err
-	}
-	return c.CommentCopilot(ctx, tc, &Copilot{
-		Prompt:  params.Prompt,
-		Copilot: cp,
-	})
 }
 
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".

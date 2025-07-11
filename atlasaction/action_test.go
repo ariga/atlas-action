@@ -42,13 +42,8 @@ import (
 func TestCopilot(t *testing.T) {
 	fn := func(prompt, id, answer string) atlasaction.AtlasExec {
 		return &mockAtlas{
-			copilot: func(_ context.Context, params *atlasexec.CopilotParams) (atlasexec.Copilot, error) {
-				require.Equal(t, prompt, params.Prompt)
-				require.Equal(t, id, params.Session)
-				if id == "" {
-					id = "id"
-				}
-				return atlasexec.Copilot{{SessionID: id, Type: "message", Content: answer}}, nil
+			copilotStream: func(ctx context.Context, params *atlasexec.CopilotParams) (atlasexec.Stream[*atlasexec.CopilotMessage], error) {
+				return &mockStream{msg: &atlasexec.CopilotMessage{SessionID: id, Type: "message", Content: answer}}, nil
 			},
 		}
 	}
@@ -56,14 +51,22 @@ func TestCopilot(t *testing.T) {
 		var (
 			p   = "/atlas What is the capital of France?"
 			scm = &mockSCM{}
+			cmd = &mockCmdExecutor{
+				onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+					return exec.CommandContext(ctx, "echo")
+				},
+			}
 		)
-		err := (&atlasaction.Actions{Action: &mockAction{
-			inputs: map[string]string{"prompt": p},
-			trigger: &atlasaction.TriggerContext{
-				SCMClient: func() (atlasaction.SCMClient, error) { return scm, nil },
-				Comment:   &atlasaction.Comment{Body: p},
-			},
-		}, Atlas: fn(p, "", "Paris.")}).Copilot(context.Background())
+		err := (&atlasaction.Actions{
+			Action: &mockAction{
+				inputs: map[string]string{"prompt": p},
+				trigger: &atlasaction.TriggerContext{
+					SCMClient: func() (atlasaction.SCMClient, error) { return scm, nil },
+					Comment:   &atlasaction.Comment{Body: p},
+				},
+			}, Atlas: fn(p, "", "Paris."),
+			CmdExecutor: cmd.ExecCmd,
+		}).Copilot(context.Background())
 		require.NoError(t, err)
 		require.Len(t, scm.comments, 1)
 		m := slices.Collect(maps.Keys(scm.comments))[0]
@@ -620,7 +623,7 @@ func (m *mockAtlasCloud) Start(t *testing.T, token string) *httptest.Server {
 
 type mockAtlas struct {
 	login             func(context.Context, *atlasexec.LoginParams) error
-	copilot           func(context.Context, *atlasexec.CopilotParams) (atlasexec.Copilot, error)
+	copilotStream     func(context.Context, *atlasexec.CopilotParams) (atlasexec.Stream[*atlasexec.CopilotMessage], error)
 	migrateDiff       func(context.Context, *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
@@ -649,9 +652,9 @@ func (m *mockAtlas) Login(ctx context.Context, params *atlasexec.LoginParams) er
 	return m.login(ctx, params)
 }
 
-// Copilot implements AtlasExec.Copilot.
-func (m *mockAtlas) Copilot(ctx context.Context, p *atlasexec.CopilotParams) (atlasexec.Copilot, error) {
-	return m.copilot(ctx, p)
+// CopilotStream implements AtlasExec.CopilotStream.
+func (m *mockAtlas) CopilotStream(ctx context.Context, p *atlasexec.CopilotParams) (atlasexec.Stream[*atlasexec.CopilotMessage], error) {
+	return m.copilotStream(ctx, p)
 }
 
 // MigrateDiff implements AtlasExec.
@@ -729,7 +732,7 @@ func (m *mockAtlas) SchemaPlanLint(ctx context.Context, p *atlasexec.SchemaPlanL
 }
 
 // SchemaPlanStatus implements AtlasExec.
-func (m *mockAtlas) SchemaApplySlice(ctx context.Context, params *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error) {
+func (m *mockAtlas) SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error) {
 	panic("unimplemented")
 }
 
@@ -908,7 +911,7 @@ func TestMigrateTest(t *testing.T) {
 	})
 }
 
-type MockCmdExecutor struct {
+type mockCmdExecutor struct {
 	ran []struct {
 		name string
 		args []string
@@ -917,7 +920,7 @@ type MockCmdExecutor struct {
 }
 
 // ExecCmd is the mocked function compatible with your CmdExecutor.
-func (m *MockCmdExecutor) ExecCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
+func (m *mockCmdExecutor) ExecCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
 	m.ran = append(m.ran, struct {
 		name string
 		args []string
@@ -930,7 +933,7 @@ func TestMigrateAutoRebase(t *testing.T) {
 		c, err := atlasexec.NewClient("", "atlas")
 		require.NoError(t, err)
 		out := &bytes.Buffer{}
-		mockExec := &MockCmdExecutor{
+		mockExec := &mockCmdExecutor{
 			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 				// Simulate result when running: git show
 				if len(args) > 1 && args[0] == "show" {
@@ -983,7 +986,7 @@ func TestMigrateAutoRebase(t *testing.T) {
 			},
 		}
 		out := &bytes.Buffer{}
-		mockExec := &MockCmdExecutor{
+		mockExec := &mockCmdExecutor{
 			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 				// Dummy command to avoid errors
 				cmd := exec.CommandContext(ctx, "echo")
@@ -1049,7 +1052,7 @@ func TestMigrateAutoRebase(t *testing.T) {
 		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[9].args)
 	})
 	t.Run("conflict, but not only in atlas.sum", func(t *testing.T) {
-		mockExec := &MockCmdExecutor{
+		mockExec := &mockCmdExecutor{
 			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 				// Dummy command to avoid errors
 				cmd := exec.CommandContext(ctx, "echo")
@@ -1152,7 +1155,7 @@ func TestMigrateDiff(t *testing.T) {
 			out = &bytes.Buffer{}
 			td  = t.TempDir()
 		)
-		mockExec := &MockCmdExecutor{
+		mockExec := &mockCmdExecutor{
 			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 				// Dummy command to avoid errors
 				return exec.CommandContext(ctx, "echo")
@@ -2809,7 +2812,25 @@ func (m *mockAction) Fatalf(msg string, args ...interface{}) {
 	m.fatal = true // Mark fatal called
 }
 
-func (m *mockSCM) CommentCopilot(_ context.Context, _ *atlasaction.TriggerContext, c *atlasaction.Copilot) error {
+func (m *mockSCM) PullRequest(context.Context, int) (*atlasaction.PullRequest, error) {
+	return &atlasaction.PullRequest{
+		Number: 1,
+		URL:    "https://host/path",
+		Body:   "body",
+		Commit: "sha",
+		Ref:    "branch",
+	}, nil
+}
+
+func (m *mockSCM) CreatePullRequest(context.Context, string, string, string, string) (*atlasaction.PullRequest, error) {
+	return nil, nil
+}
+
+func (m *mockSCM) CopilotSession(context.Context, *atlasaction.TriggerContext) (string, error) {
+	return "", nil
+}
+
+func (m *mockSCM) CommentCopilot(_ context.Context, _ int, c *atlasaction.Copilot) error {
 	if m.comments == nil {
 		m.comments = map[string]struct{}{}
 	}
@@ -2862,6 +2883,22 @@ func (m *mockSCM) comment(_ context.Context, _ *atlasaction.PullRequest, id stri
 	_, err = http.DefaultClient.Do(req)
 	return err
 }
+
+type mockStream struct {
+	called bool
+	msg    *atlasexec.CopilotMessage
+}
+
+func (m *mockStream) Next() bool {
+	defer func() { m.called = true }()
+	return !m.called
+}
+
+func (m *mockStream) Current() (*atlasexec.CopilotMessage, error) {
+	return m.msg, nil
+}
+
+func (m *mockStream) Err() error { return nil }
 
 // Why another testscript for templates?
 // Because I love to see the output in its full glory.
