@@ -7,22 +7,31 @@ VER_MAJOR  = $(shell echo $(VER_NO_V) | cut -d. -f1)
 VER_MINOR  = $(shell echo $(VER_NO_V) | cut -d. -f2)
 VER_PATCH  = $(shell echo $(VER_NO_V) | cut -d. -f3)
 
-prepare-binary:
+prepare:
 	cp ../../atlas-action ./action/atlas-action
-
-prepare-shim:
 	cp ../../shim/dist/azure/index.js ./action/shim.js
+	cp ./images/atlas.png ./action/icon.png
 
 version:
 	jq '.version.Major = $$major | .version.Minor = $$minor | .version.Patch = $$patch' \
 	  --argjson major "$(VER_MAJOR)" --argjson minor "$(VER_MINOR)" --argjson patch "$(VER_PATCH)" \
 	  ./action/task.json > ./action/task.json.tmp
-	jq '.version = $$version' --arg version "$(VER_NO_V)" ./vss-extension.json > ./vss-extension.json.tmp
+	jq '.version = $$version' --arg version "$(VER_NO_V)" \
+	  ./vss-extension.json > ./vss-extension.json.tmp
+	mv ./action/task.json.tmp ./action/task.json
+	mv ./vss-extension.json.tmp ./vss-extension.json
+
+version-dev: version
+	jq '.name = "AtlasActionDev" | .friendlyName = "Atlas Action Dev" | .id = $$id' \
+	  --arg id "43908d25-6448-44e3-accf-49df010ca313" \
+	  ./action/task.json > ./action/task.json.tmp
+	jq '.name = "Atlas Action Dev" | .id = "atlas-action-dev"' \
+	  ./vss-extension.json > ./vss-extension.json.tmp
 	mv ./action/task.json.tmp ./action/task.json
 	mv ./vss-extension.json.tmp ./vss-extension.json
 
 .PHONY: vsix
-vsix: prepare-binary prepare-shim version
+vsix: prepare
 	tfx extension create --manifest-globs vss-extension.json
 
 .PHONY: clean
