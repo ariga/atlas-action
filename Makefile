@@ -67,7 +67,11 @@ release:
 
 .PHONY: azure-devops
 azure-devops:
-	$(MAKE) -C .github/azure-devops VERSION=$(VERSION) vsix
+	$(MAKE) -C .github/azure-devops VERSION=$(VERSION) version vsix
+
+.PHONY: azure-devops-dev
+azure-devops-dev:
+	$(MAKE) -C .github/azure-devops VERSION=$(VERSION) version-dev vsix
 
 .PHONY: manifest
 manifest:
