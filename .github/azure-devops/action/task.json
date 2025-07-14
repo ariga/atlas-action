@@ -134,6 +134,13 @@
       "visibleRule": "action == schema plan || action == schema plan approve"
     },
     {
+      "type": "boolean",
+      "label": "Generate tests",
+      "helpMarkDown": "Generate atlas tests for the schema changes.",
+      "name": "gen_test",
+      "visibleRule": "action == copilot"
+    },
+    {
       "type": "multiLine",
       "label": "Include patterns",
       "helpMarkDown": "List of glob patterns used to select which resources to keep in inspection\nsee: https://atlasgo.io/declarative/inspect#include-schemas\n",
