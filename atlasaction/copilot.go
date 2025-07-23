@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 )
 
 // Copilot runs the GitHub Action for "ariga/atlas-action/copilot".

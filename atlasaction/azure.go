@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"strings"
 
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 	"github.com/fatih/color"
 )
 

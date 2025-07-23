@@ -141,6 +141,20 @@
       "visibleRule": "action == copilot"
     },
     {
+      "type": "string",
+      "label": "Git base",
+      "helpMarkDown": "The base branch to detected changes from.\n",
+      "name": "git_base",
+      "visibleRule": "action == migrate lint"
+    },
+    {
+      "type": "string",
+      "label": "Git directory",
+      "helpMarkDown": "The URL of the git directory to push to. Defaults to the current working directory.\n",
+      "name": "git_dir",
+      "visibleRule": "action == migrate lint"
+    },
+    {
       "type": "multiLine",
       "label": "Include patterns",
       "helpMarkDown": "List of glob patterns used to select which resources to keep in inspection\nsee: https://atlasgo.io/declarative/inspect#include-schemas\n",

@@ -13,6 +13,12 @@ inputs:
     description: |
       The name (slug) of the project in Atlas Cloud.
     required: true
+  git-base:
+    description: |
+      The base branch to detected changes from.
+  git-dir:
+    description: |
+      The URL of the git directory to push to. Defaults to the current working directory.
   revisions-schema:
     description: The name of the schema containing the revisions table.
   tag:

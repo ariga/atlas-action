@@ -3,13 +3,12 @@ module ariga.io/atlas-action
 go 1.24
 
 require (
-	ariga.io/atlas v0.35.0
-	ariga.io/atlas-go-sdk v0.7.3-0.20250626115445-a7101c6b3707
+	ariga.io/atlas v0.36.2-0.20250723101231-c6a9b7e3a684
 	github.com/alecthomas/kong v0.8.0
 	github.com/fatih/color v1.17.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
-	github.com/mattn/go-sqlite3 v1.14.17
-	github.com/mitchellh/mapstructure v1.1.2
+	github.com/mattn/go-sqlite3 v1.14.28
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/rogpeppe/go-internal v1.12.1-0.20240709150035-ccf4b4329d21
 	github.com/sethvargo/go-githubactions v1.3.0
 	github.com/spf13/cobra v1.9.1
@@ -29,10 +28,12 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/hcl/v2 v2.23.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/zclconf/go-cty v1.16.3 // indirect
 	github.com/zclconf/go-cty-yaml v1.1.0 // indirect
@@ -41,4 +42,5 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )

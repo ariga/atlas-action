@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"ariga.io/atlas-action/atlasaction"
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 	"ariga.io/atlas/sql/migrate"
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"

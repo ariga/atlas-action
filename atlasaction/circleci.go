@@ -10,7 +10,7 @@ import (
 	"io"
 	"strings"
 
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 )
 
 // CircleCI is an implementation of the Action interface for CircleCI.
