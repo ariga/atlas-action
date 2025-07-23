@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"ariga.io/atlas-action/internal/github"
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 	"github.com/sethvargo/go-githubactions"
 	"golang.org/x/oauth2"
 )

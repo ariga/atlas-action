@@ -31,7 +31,7 @@ import (
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-action/atlasaction/cloud"
 	"ariga.io/atlas-action/internal/cmdapi"
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 	"ariga.io/atlas/sql/migrate"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rogpeppe/go-internal/diff"

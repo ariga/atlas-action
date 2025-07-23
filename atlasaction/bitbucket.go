@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"ariga.io/atlas-action/internal/bitbucket"
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 	"github.com/fatih/color"
 	"golang.org/x/oauth2"
 )

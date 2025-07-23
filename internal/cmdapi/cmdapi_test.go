@@ -11,7 +11,7 @@ import (
 
 	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-action/internal/cmdapi"
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 	"github.com/stretchr/testify/require"
 )
 

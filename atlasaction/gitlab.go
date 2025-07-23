@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"ariga.io/atlas-action/internal/gitlab"
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 )
 
 // GitLab is an implementation of the Action interface for Gitlab CI.

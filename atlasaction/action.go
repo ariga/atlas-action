@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"ariga.io/atlas-action/atlasaction/cloud"
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"ariga.io/atlas/atlasexec"
 	"ariga.io/atlas/sql/migrate"
 	"ariga.io/atlas/sql/sqlclient"
 	"github.com/fatih/color"
@@ -553,6 +553,8 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Base:      a.GetAtlasURLInput("dir-name", "tag"),
+		GitBase:   a.GetInput("git-base"),
+		GitDir:    a.GetInput("git-dir"),
 		Vars:      a.GetVarsInput("vars"),
 		Web:       true,
 		Writer:    &resp,

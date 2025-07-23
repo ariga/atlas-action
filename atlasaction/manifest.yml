@@ -278,6 +278,16 @@ actions:
         label: Directory name
         description: |
           The name (slug) of the project in Atlas Cloud.
+      git-base:
+        type: string
+        label: Git base
+        description: |
+          The base branch to detected changes from.
+      git-dir:
+        type: string
+        label: Git directory
+        description: |
+          The URL of the git directory to push to. Defaults to the current working directory.
       tag:
         type: string
         default: latest
