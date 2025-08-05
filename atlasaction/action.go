@@ -1287,7 +1287,7 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 		Schema:    a.GetArrayInput("schemas"),
-		Exclude:   a.GetArrayInput("exclude"),
+		Exclude:   append(a.GetArrayInput("exclude"), "*.atlas_schema_revisions"), // exclude the schema revisions table.
 		Format:    `{{ printf "# %s\n# %s\n%s" .RedactedURL .Hash .MarshalHCL }}`,
 	}
 	if (params.ConfigURL != "" || params.Env != "") && params.URL != "" {

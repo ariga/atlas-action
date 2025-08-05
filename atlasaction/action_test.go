@@ -1354,7 +1354,7 @@ func TestMonitorSchema(t *testing.T) {
 					URL:     tt.url,
 					ExtID:   tt.slug,
 					Schemas: tt.schemas,
-					Exclude: tt.exclude,
+					Exclude: append(tt.exclude, "*.atlas_schema_revisions"),
 				},
 				Snapshot:  tt.exSnapshot,
 				HashMatch: tt.exMatch,
