@@ -398,6 +398,7 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		DryRun:          a.GetBoolInput("dry-run"),
 		RevisionsSchema: a.GetInput("revisions-schema"),
 		AllowDirty:      a.GetBoolInput("allow-dirty"),
+		ToVersion:       a.GetInput("to-version"),
 		Amount:          a.GetUin64Input("amount"),
 		TxMode:          a.GetInput("tx-mode"),  // Hidden param.
 		BaselineVersion: a.GetInput("baseline"), // Hidden param.
@@ -413,6 +414,13 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 	if len(runs) == 0 {
 		return nil
 	}
+	type runOutput struct {
+		Current      string `json:"current"`
+		Target       string `json:"target"`
+		AppliedCount int    `json:"applied_count"`
+		PendingCount int    `json:"pending_count"`
+	}
+	var runsOutput []runOutput
 	for _, run := range runs {
 		if r, ok := a.Action.(Reporter); ok {
 			r.MigrateApply(ctx, run)
@@ -422,6 +430,21 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 			return errors.New(run.Error)
 		}
 		a.Infof(`"atlas migrate apply" completed successfully, applied to version %q`, run.Target)
+		a.SetOutput("current", run.Current)
+		a.SetOutput("target", run.Target)
+		a.SetOutput("applied_count", strconv.Itoa(len(run.Applied)))
+		a.SetOutput("pending_count", strconv.Itoa(len(run.Pending)))
+		runsOutput = append(runsOutput, runOutput{
+			Current:      run.Current,
+			Target:       run.Target,
+			AppliedCount: len(run.Applied),
+			PendingCount: len(run.Pending),
+		})
+	}
+	if b, err := json.Marshal(runsOutput); err != nil {
+		a.Warningf("failed to marshal runs output: %v", err)
+	} else {
+		a.SetOutput("runs", string(b))
 	}
 	return nil
 }

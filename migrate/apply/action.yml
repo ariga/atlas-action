@@ -19,6 +19,8 @@ inputs:
     default: "false"
   revisions-schema:
     description: The name of the schema containing the revisions table.
+  to-version:
+    description: The target version to apply migrations to. Mutually exclusive with `amount`.
   tx-mode:
     description: |
       Transaction mode to use. Either "file", "all", or "none". Default is "file".
@@ -47,6 +49,10 @@ outputs:
     description: The current version of the database. (before applying migrations)
   pending_count:
     description: The number of migrations that will be applied.
+  runs:
+    description: |
+      A JSON array of objects containing the current version, target version,
+      applied count, and pending count for each migration run.
   target:
     description: The target version of the database.
 runs:
