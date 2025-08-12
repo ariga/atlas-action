@@ -5,7 +5,7 @@ env INPUT_CONFIG=file://testdata/config/atlas.hcl
 env INPUT_ENV=test
 env INPUT_VARS='{"var1":"value1","var2":"value2"}'
 env INPUT_DIR=file://testdata/migrations
-env INPUT_DEV_URL=sqlite://file?mode=memory
+env INPUT_DEV-URL=sqlite://file?mode=memory
 env INPUT_RUN=example
 
 atlas-action --action=migrate/test
@@ -18,10 +18,10 @@ stdout '::error::`atlas migrate test` completed with errors:%0AFailure'
 ! output
 
 -- migrate-test/1/args --
-migrate test --env test --config file://testdata/config/atlas.hcl --dir file://testdata/migrations --run example --var var1=value1 --var var2=value2
+migrate test --env test --config file://testdata/config/atlas.hcl --dir file://testdata/migrations --dev-url sqlite://file?mode=memory --run example --var var1=value1 --var var2=value2
 -- migrate-test/1/stdout --
 Success
 -- migrate-test/2/args --
-migrate test --env test --config file://testdata/config/atlas.hcl --dir file://testdata/migrations --run example --var var1=value1 --var var2=value2
+migrate test --env test --config file://testdata/config/atlas.hcl --dir file://testdata/migrations --dev-url sqlite://file?mode=memory --run example --var var1=value1 --var var2=value2
 -- migrate-test/2/stderr --
 Failure

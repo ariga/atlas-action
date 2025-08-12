@@ -128,6 +128,10 @@ actions:
         type: number
         label: Num of migrations
         description: The maximum number of migration files to apply. Default is all.
+      to-version:
+        type: string
+        label: To Version
+        description: The target version to apply migrations to. Mutually exclusive with `amount`.
       tx-mode:
         type: enum
         label: Transaction mode
@@ -158,6 +162,11 @@ actions:
       target:
         type: string
         description: The target version of the database.
+      runs:
+        type: string
+        description: |
+          A JSON array of objects containing the current version, target version,
+          applied count, and pending count for each migration run.
   - id: migrate/autorebase
     name: Migrate Auto Rebase
     description: Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch.

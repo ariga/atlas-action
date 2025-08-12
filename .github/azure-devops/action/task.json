@@ -271,10 +271,10 @@
     },
     {
       "type": "string",
-      "label": "Revert to version",
-      "helpMarkDown": "The version to revert to. Mutually exclusive with `amount` and `to-tag`.",
+      "label": "To Version",
+      "helpMarkDown": "The target version to apply migrations to. Mutually exclusive with `amount`.",
       "name": "to_version",
-      "visibleRule": "action == migrate down"
+      "visibleRule": "action == migrate apply || action == migrate down"
     },
     {
       "type": "pickList",

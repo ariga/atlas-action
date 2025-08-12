@@ -4,7 +4,7 @@ env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-test
 env INPUT_CONFIG=file://testdata/config/atlas.hcl
 env INPUT_ENV=test
 env INPUT_VARS='{"var1":"value1","var2":"value2"}'
-env INPUT_DEV_URL=sqlite://file?mode=memory
+env INPUT_DEV-URL=sqlite://file?mode=memory
 env INPUT_RUN=example
 
 atlas-action --action=schema/test
@@ -17,10 +17,10 @@ stdout '::error::`atlas schema test` completed with errors:%0AFailure'
 ! output
 
 -- schema-test/1/args --
-schema test --env test --config file://testdata/config/atlas.hcl --run example --var var1=value1 --var var2=value2
+schema test --env test --config file://testdata/config/atlas.hcl --dev-url sqlite://file?mode=memory --run example --var var1=value1 --var var2=value2
 -- schema-test/1/stdout --
 Success
 -- schema-test/2/args --
-schema test --env test --config file://testdata/config/atlas.hcl --run example --var var1=value1 --var var2=value2
+schema test --env test --config file://testdata/config/atlas.hcl --dev-url sqlite://file?mode=memory --run example --var var1=value1 --var var2=value2
 -- schema-test/2/stderr --
 Failure

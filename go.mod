@@ -3,7 +3,7 @@ module ariga.io/atlas-action
 go 1.24
 
 require (
-	ariga.io/atlas v0.36.2-0.20250723101231-c6a9b7e3a684
+	ariga.io/atlas v0.36.2-0.20250812114402-3e5a531593e8
 	github.com/alecthomas/kong v0.8.0
 	github.com/fatih/color v1.17.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
