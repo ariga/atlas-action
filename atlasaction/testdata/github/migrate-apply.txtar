@@ -3,14 +3,14 @@ env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-apply
 # Setup the action input variables
 env INPUT_DIR=file://migrations
 env INPUT_URL=sqlite://./a.db?cache=shared&_fk=1
-env INPUT_TO_VERSION=20250812113110
+env INPUT_TO-VERSION=20250812113110
 
 atlas-action --action=migrate/apply
 stdout '"atlas migrate apply" completed successfully, applied to version "20250812113110"'
 output output.txt
 
 -- migrate-apply/1/args --
-migrate apply --format {{ json . }} --context {"triggerType":"GITHUB_ACTION","triggerVersion":"testscript"} --url sqlite://./a.db?cache=shared&_fk=1 --dir file://migrations
+migrate apply --format {{ json . }} --context {"triggerType":"GITHUB_ACTION","triggerVersion":"testscript"} --url sqlite://./a.db?cache=shared&_fk=1 --dir file://migrations --to-version 20250812113110
 -- migrate-apply/1/stdout --
 {"Driver":"sqlite3","URL":{"Scheme":"sqlite","Opaque":"","User":null,"Host":".","Path":"/a.db","RawPath":"","OmitHost":false,"ForceQuery":false,"RawQuery":"cache=shared\u0026_fk=1","Fragment":"","RawFragment":"","Schema":"main"},"Dir":"file://migrations","Pending":[{"Name":"20250812113056.sql","Version":"20250812113056"},{"Name":"20250812113110.sql","Version":"20250812113110"}],"Applied":[{"Name":"20250812113056.sql","Version":"20250812113056","Start":"2025-08-12T18:33:33.639168+07:00","End":"2025-08-12T18:33:33.640468+07:00","Applied":["CREATE TABLE t1(a int);"]},{"Name":"20250812113110.sql","Version":"20250812113110","Start":"2025-08-12T18:33:33.640468+07:00","End":"2025-08-12T18:33:33.641098+07:00","Applied":["CREATE TABLE t2(b int);"]}],"Target":"20250812113110","Start":"2025-08-12T18:33:33.635359+07:00","End":"2025-08-12T18:33:33.641098+07:00","Message":"Migrated to version 20250812113110 from  (2 migrations in total)"}
 -- output.txt --
