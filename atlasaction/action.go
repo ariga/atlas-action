@@ -328,6 +328,7 @@ const (
 	CmdMigrateDown       = "migrate/down"
 	CmdMigrateTest       = "migrate/test"
 	CmdMigrateAutoRebase = "migrate/autorebase"
+	CmdMigrateHash       = "migrate/hash"
 	CmdMigrateDiff       = "migrate/diff"
 	// Declarative workflow Commands
 	CmdSchemaPush        = "schema/push"
@@ -363,6 +364,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MigrateTest(ctx)
 	case CmdMigrateAutoRebase:
 		return a.MigrateAutoRebase(ctx)
+	case CmdMigrateHash:
+		return a.MigrateHash(ctx)
 	case CmdMigrateDiff:
 		return a.MigrateDiff(ctx)
 	case CmdSchemaPush:
@@ -716,6 +719,53 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Migrations rebased successfully")
+	return nil
+}
+
+func (a *Actions) MigrateHash(ctx context.Context) error {
+	tc, err := a.GetTriggerContext(ctx)
+	if err != nil {
+		return err
+	}
+	var (
+		remote     = a.GetInputDefault("remote", "origin")
+		baseBranch = a.GetInputDefault("base-branch", tc.DefaultBranch)
+		currBranch = tc.Branch
+	)
+	if v, err := a.exec(ctx, "git", "--version"); err != nil {
+		return fmt.Errorf("failed to get git version: %w", err)
+	} else {
+		a.Infof("migrate hash with %s", v)
+	}
+	if _, err := a.exec(ctx, "git", "fetch", remote, baseBranch); err != nil {
+		return fmt.Errorf("failed to fetch the branch %s: %w", baseBranch, err)
+	}
+	// Since running in detached HEAD, we need to switch to the branch.
+	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
+		return fmt.Errorf("failed to checkout to the branch: %w", err)
+	}
+	if err := a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{
+		DirURL:    a.GetInput("dir"),
+		ConfigURL: a.GetInput("config"),
+		Env:       a.GetInput("env"),
+	}); err != nil {
+		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
+	}
+	// If there is no diff, we can exit early.
+	if _, err := a.exec(ctx, "git", "diff", "--exit-code"); err == nil {
+		a.Infof("No changes to be made, `atlas migrate hash` completed successfully")
+		return nil
+	}
+	if _, err = a.exec(ctx, "git", "add", "."); err != nil {
+		return fmt.Errorf("failed to stage changes: %w", err)
+	}
+	if _, err = a.exec(ctx, "git", "commit", "--message", "run `atlas migrate hash`"); err != nil {
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+	if _, err = a.exec(ctx, "git", "push", remote, currBranch); err != nil {
+		return fmt.Errorf("failed to push changes: %w", err)
+	}
+	a.Infof(`"atlas migrate hash" completed successfully`)
 	return nil
 }
 
