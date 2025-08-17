@@ -16,6 +16,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Revert migrations to a database                                                     |
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | Test migrations on a database                                                       |
 | [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase)  | Fix `atlas.sum` conflicts in migration directory                                    |
+| [ariga/atlas-action/migrate/hash](#arigaatlas-actionmigratehash)              | Fix `atlas.sum` if it is out of sync with the migration directory                   |
 | [ariga/atlas-action/migrate/diff](#arigaatlas-actionmigratediff)              | Run Migrate diff and commit the changes to the migration directory                  |
 | [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Test schema on a database                                                           |
 | [ariga/atlas-action/schema/lint](#arigaatlas-actionschemalint)                | Lint database schema with Atlas                                                     |
@@ -385,6 +386,64 @@ jobs:
     - uses: ariga/atlas-action/migrate/autorebase@v1
       with:
         base-branch: master
+        dir: file://migrations
+```
+
+### `ariga/atlas-action/migrate/hash`
+
+Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.
+
+> **Note**
+> 
+> After the rehash is done and a commit is pushed by the action, no other workflows will be triggered unless the action is running with a personal access token (PAT).
+>```
+>   - uses: actions/checkout@v4
+>     with:
+>       token: ${{ secrets.PAT }}
+>```
+
+#### Inputs
+
+All inputs are optional
+
+* `base-branch` - The branch to pull from. Defaults to repository's default branch.
+* `remote` - The remote to fetch from. Defaults to `origin`.
+* `dir` - The URL of the migration directory to hash. Defaults to `file://migrations`.
+* `config` - The URL of the Atlas configuration file.  By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file.  For example, `dev`.
+
+#### Example usage
+
+Add the next job to your workflow to automatically re-generate the `atlas.sum` file in case it is out of sync with the migration directory:
+
+```yaml
+name: Hash Atlas Migrations
+on:
+  pull_request:
+jobs:
+  migrate-hash:
+    permissions:
+      # Allow pushing changes to repo
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: ariga/setup-atlas@v0
+      with:
+        cloud-token: ${{ secrets.ATLAS_TOKEN }}
+    - uses: actions/checkout@v4
+      with:
+        # Use personal access token to trigger workflows after commits are pushed by the action.
+        token: ${{ secrets.PAT }}
+        fetch-depth: 0
+    # Skip the step below if your CI is already configured with a Git account.
+    - name: config git to commit changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+    - uses: ariga/atlas-action/migrate/hash@v1
+      with:
         dir: file://migrations
 ```
 

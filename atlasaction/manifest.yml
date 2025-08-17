@@ -187,6 +187,38 @@ actions:
         label: Git remote
         description: |
           The remote to fetch from. Defaults to `origin`.
+  - id: migrate/hash
+    name: Migrate Hash
+    description: Automatically generate a hash of the schema migrations directory, and commit it to the migration directory.
+    inputs:
+      working-directory: *workingDirectory
+      base-branch:
+        type: string
+        label: Base branch
+        description: |
+          The base branch to rebase the migration directory onto. Default to the default branch of the repository.
+      remote:
+        type: string
+        label: Git remote
+        description: |
+          The remote to fetch from. Defaults to `origin`.
+      dir:
+        type: string
+        label: Migration directory
+        description: |
+          The URL of the migration directory to hash. By default: `file://migrations`.
+      config: &config
+        type: string
+        label: Atlas config
+        description: |
+          The URL of the Atlas configuration file. By default, Atlas will look for a file
+          named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+          Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+      env: &env
+        type: string
+        label: Environment
+        description: |
+          The environment to use from the Atlas configuration file. For example, `dev`.
   - id: migrate/diff
     name: Migrate Diff
     description: Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory.
