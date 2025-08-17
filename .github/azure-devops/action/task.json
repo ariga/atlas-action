@@ -44,6 +44,7 @@
         "migrate autorebase": "Migrate Auto Rebase",
         "migrate diff": "Migrate Diff",
         "migrate down": "Migrate Down",
+        "migrate hash": "Migrate Hash",
         "migrate lint": "Migrate Lint",
         "migrate push": "Migrate Push",
         "migrate test": "Migrate Test",
@@ -82,7 +83,7 @@
       "label": "Base branch",
       "helpMarkDown": "The base branch to rebase the migration directory onto. Default to the default branch of the repository.\n",
       "name": "base_branch",
-      "visibleRule": "action == migrate autorebase"
+      "visibleRule": "action == migrate autorebase || action == migrate hash"
     },
     {
       "type": "string",
@@ -103,7 +104,7 @@
       "label": "Migration directory",
       "helpMarkDown": "The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud\nbased directories or `file://migrations` for local ones.\n",
       "name": "dir",
-      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate test"
+      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate test"
     },
     {
       "type": "string",
@@ -204,7 +205,7 @@
       "label": "Git remote",
       "helpMarkDown": "The remote to fetch from. Defaults to `origin`.\n",
       "name": "remote",
-      "visibleRule": "action == migrate autorebase || action == migrate diff"
+      "visibleRule": "action == migrate autorebase || action == migrate diff || action == migrate hash"
     },
     {
       "type": "string",
@@ -319,21 +320,21 @@
       "label": "Working directory",
       "helpMarkDown": "Atlas working directory. Default is project root",
       "name": "working_directory",
-      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
     },
     {
       "type": "string",
       "label": "Atlas config",
       "helpMarkDown": "The URL of the Atlas configuration file. By default, Atlas will look for a file\nnamed `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.\nLearn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).\n",
       "name": "config",
-      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
     },
     {
       "type": "string",
       "label": "Environment",
       "helpMarkDown": "The environment to use from the Atlas configuration file. For example, `dev`.\n",
       "name": "env",
-      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
     },
     {
       "type": "multiLine",
