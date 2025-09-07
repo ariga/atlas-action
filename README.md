@@ -5,6 +5,9 @@ This repository contains GitHub Actions for working with [Atlas](https://atlasgo
 To learn more about the recommended way to build workflows, read our guide on 
 [Modern CI/CD for Databases](https://atlasgo.io/guides/modern-database-ci-cd).
 
+> **New to CI/CD or SCM?** Check out our [comprehensive guide](docs/ci-cd-and-scm-providers.md) that explains 
+> the purpose and benefits of CI/CD platforms and Source Code Management providers in the context of database management.
+
 ## Actions
 
 | Action                                                                        | Description                                                                         |
