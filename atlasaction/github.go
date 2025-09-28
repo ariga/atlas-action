@@ -38,7 +38,7 @@ func NewGitHub(getenv func(string) string, w io.Writer) *GitHub {
 
 // MigrateApply implements Reporter.
 func (a *GitHub) MigrateApply(_ context.Context, r *atlasexec.MigrateApply) {
-	summary, err := RenderTemplate("migrate-apply.tmpl", r)
+	summary, err := RenderTemplate("migrate-apply.tmpl", r, nil)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -51,7 +51,7 @@ func (a *GitHub) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
 	if err := a.addChecks(r); err != nil {
 		a.Errorf("failed to add checks: %v", err)
 	}
-	summary, err := RenderTemplate("migrate-lint.tmpl", r)
+	summary, err := RenderTemplate("migrate-lint.tmpl", r, nil)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -61,7 +61,7 @@ func (a *GitHub) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
 
 // SchemaApply implements Reporter.
 func (a *GitHub) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
-	summary, err := RenderTemplate("schema-apply.tmpl", r)
+	summary, err := RenderTemplate("schema-apply.tmpl", r, nil)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -74,7 +74,7 @@ func (a *GitHub) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
 	summary, err := RenderTemplate("schema-plan.tmpl", map[string]any{
 		"Plan":         r,
 		"RerunCommand": fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
-	})
+	}, nil)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -87,7 +87,7 @@ func (a *GitHub) SchemaLint(_ context.Context, r *SchemaLintReport) {
 	if err := a.addChecksSchemaLint(r); err != nil {
 		a.Errorf("failed to add checks: %v", err)
 	}
-	summary, err := RenderTemplate("schema-lint.tmpl", r)
+	summary, err := RenderTemplate("schema-lint.tmpl", r, nil)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -301,7 +301,7 @@ func (c *GitHubClient) CommentCopilot(ctx context.Context, pr int, cp *Copilot) 
 
 // CommentLint implements SCMClient.
 func (c *GitHubClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
-	comment, err := RenderTemplate("migrate-lint.tmpl", r)
+	comment, err := RenderTemplate("migrate-lint.tmpl", r, tc)
 	if err != nil {
 		return err
 	}
@@ -333,7 +333,7 @@ func (c *GitHubClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *a
 	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
 		"Plan":         p,
 		"RerunCommand": tc.RerunCmd,
-	})
+	}, tc)
 	if err != nil {
 		return err
 	}
@@ -342,7 +342,7 @@ func (c *GitHubClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *a
 
 // CommentSchemaLint implements SCMClient.
 func (c *GitHubClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
-	comment, err := RenderTemplate("schema-lint.tmpl", r)
+	comment, err := RenderTemplate("schema-lint.tmpl", r, tc)
 	if err != nil {
 		return err
 	}
@@ -429,7 +429,7 @@ func addSuggestions(cw string, lint *atlasexec.SummaryReport, fn func(*Suggestio
 				s.Comment, err = RenderTemplate("suggestion.tmpl", map[string]any{
 					"Fix": f,
 					"Dir": lint.Env.Dir,
-				})
+				}, nil)
 				if err != nil {
 					return fmt.Errorf("failed to render suggestion: %w", err)
 				}
@@ -455,7 +455,7 @@ func addSuggestions(cw string, lint *atlasexec.SummaryReport, fn func(*Suggestio
 						"File":   file,
 						"Report": reportIdx,
 						"Diag":   diagIdx,
-					})
+					}, nil)
 					if err != nil {
 						return fmt.Errorf("failed to render suggestion: %w", err)
 					}

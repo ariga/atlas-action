@@ -1,0 +1,17 @@
+# Mock the atlas command outputs
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-test
+# Setup the action input variables
+env INPUT_CONFIG=file://testdata/config/atlas.hcl
+env INPUT_ENV=test
+env INPUT_VARS='{"var1":"value1","var2":"value2"}'
+env INPUT_DIR=file://testdata/migrations
+env INPUT_DEV-URL=sqlite://file?mode=memory
+env INPUT_RUN=example
+
+atlas-action --action=migrate/test
+stdout '`atlas migrate test` completed successfully, no issues found'
+
+-- migrate-test/1/args --
+migrate test --env test --config file://testdata/config/atlas.hcl --dir file://testdata/migrations --run example --var var1=value1 --var var2=value2
+-- migrate-test/1/stdout --
+Success

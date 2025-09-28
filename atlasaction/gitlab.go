@@ -134,7 +134,7 @@ func (c *GitLabClient) CommentCopilot(context.Context, int, *Copilot) error {
 
 // CommentLint implements SCMClient.
 func (c *GitLabClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
-	comment, err := RenderTemplate("migrate-lint.tmpl", r)
+	comment, err := RenderTemplate("migrate-lint.tmpl", r, tc)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (c *GitLabClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *a
 	// Report the schema plan to the user and add a comment to the PR.
 	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
 		"Plan": p,
-	})
+	}, tc)
 	if err != nil {
 		return fmt.Errorf("failed to generate schema plan comment: %w", err)
 	}

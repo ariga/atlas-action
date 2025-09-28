@@ -75,6 +75,14 @@ func WithToken(t *oauth2.Token) ClientOption {
 	}
 }
 
+// WithBaseURL returns a ClientOption that sets the base URL for the client.
+func WithBaseURL(baseURL string) ClientOption {
+	return func(c *Client) error {
+		c.baseURL = baseURL
+		return nil
+	}
+}
+
 // NewClient returns a new Azure DevOps client.
 func NewClient(org, project, repo string, opts ...ClientOption) (*Client, error) {
 	c := &Client{
@@ -232,6 +240,31 @@ func (c *Client) UpdateFirstComment(ctx context.Context, prID, threadID int, con
 	}
 	firstCommentID := thread.Comments[0].ID
 	return c.UpdateComment(ctx, prID, threadID, firstCommentID, content)
+}
+
+// ListCommentThreads retrieves all comment threads for a pull request.
+func (c *Client) ListCommentThreads(ctx context.Context, prID int) ([]CommentThread, error) {
+	url := fmt.Sprintf("%s/%s/%s/_apis/git/repositories/%s/pullrequests/%d/threads?api-version=7.1-preview.1",
+		c.baseURL, c.org, c.project, c.repo, prID)
+	res, err := c.json(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("listing comment threads for pull request %d: %w", prID, err)
+	}
+	defer res.Body.Close()
+	buf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response for comment threads list: %w", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %d when listing comment threads. body: %s", res.StatusCode, string(buf))
+	}
+	var response struct {
+		Value []CommentThread `json:"value"`
+	}
+	if err = json.Unmarshal(buf, &response); err != nil {
+		return nil, fmt.Errorf("parsing comment threads list response: %w", err)
+	}
+	return response.Value, nil
 }
 
 // json sends a JSON request to the Azure DevOps API.
