@@ -24,7 +24,6 @@ inputs:
   tx-mode:
     description: |
       Transaction mode to use. Either "file", "all", or "none". Default is "file".
-    default: "file"
   url:
     description: |
       The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
