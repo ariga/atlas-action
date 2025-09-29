@@ -109,7 +109,7 @@ func TestAzureDevOpsClient(t *testing.T) {
 				"pullRequestId": 123,
 				"title":         "Test PR",
 			}
-			json.NewEncoder(w).Encode(response)
+			require.NoError(t, json.NewEncoder(w).Encode(response))
 		case strings.Contains(r.URL.Path, "/threads") && r.Method == "GET":
 			// GET comment threads
 			response := map[string]interface{}{
@@ -125,7 +125,7 @@ func TestAzureDevOpsClient(t *testing.T) {
 					},
 				},
 			}
-			json.NewEncoder(w).Encode(response)
+			require.NoError(t, json.NewEncoder(w).Encode(response))
 		case strings.Contains(r.URL.Path, "/threads") && r.Method == "POST":
 			// POST create comment thread
 			response := map[string]interface{}{
@@ -138,14 +138,14 @@ func TestAzureDevOpsClient(t *testing.T) {
 				},
 			}
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(response)
+			require.NoError(t, json.NewEncoder(w).Encode(response))
 		case strings.Contains(r.URL.Path, "/comments/") && r.Method == "PATCH":
 			// PATCH update comment
 			response := map[string]interface{}{
 				"id":      101,
 				"content": "Updated comment content",
 			}
-			json.NewEncoder(w).Encode(response)
+			require.NoError(t, json.NewEncoder(w).Encode(response))
 		}
 	}))
 	defer server.Close()
