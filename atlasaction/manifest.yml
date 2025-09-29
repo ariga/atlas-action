@@ -137,7 +137,6 @@ actions:
         label: Transaction mode
         description: |
           Transaction mode to use. Either "file", "all", or "none". Default is "file".
-        default: file
         options: [file, all, none]
       allow-dirty:
         type: boolean
