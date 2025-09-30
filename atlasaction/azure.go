@@ -89,20 +89,21 @@ func (a *Azure) GetTriggerContext(context.Context) (_ *TriggerContext, err error
 		Repo:    a.getVar("Build.Repository.Name"),
 		Branch:  a.getVar("Build.SourceBranch"),
 		Commit:  a.getVar("Build.SourceVersion"),
-		Actor:   &Actor{Name: a.getVar("Build.RequestedFor")},
 	}
 	if c := a.getVar("System.PullRequest.SourceCommitId"); c != "" {
-		pr := &PullRequest{Commit: c}
-		pr.Number, err = strconv.Atoi(a.getVar("System.PullRequest.PullRequestId"))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse System.PullRequest.PullRequestId: %w", err)
-		}
-		tc.PullRequest = pr
+		tc.PullRequest = &PullRequest{Commit: c}
 		tc.Commit = c
 		tc.Branch = a.getVar("System.PullRequest.SourceBranch")
 	}
 	switch p := a.getVar("Build.Repository.Provider"); p {
 	case "GitHub":
+		tc.Actor = &Actor{Name: a.getVar("Build.SourceVersionAuthor")}
+		if pr := tc.PullRequest; pr != nil {
+			pr.Number, err = strconv.Atoi(a.getVar("System.PullRequest.PullRequestNumber"))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse System.PullRequest.PullRequestNumber: %w", err)
+			}
+		}
 		tc.SCMType = atlasexec.SCMTypeGithub
 		if pr := tc.PullRequest; pr != nil {
 			pr.URL, err = url.JoinPath(tc.RepoURL, "pull", strconv.Itoa(pr.Number))
@@ -126,6 +127,13 @@ func (a *Azure) GetTriggerContext(context.Context) (_ *TriggerContext, err error
 			return NewGitHubClient(tc.Repo, a.getenv("GITHUB_API_URL"), token)
 		}
 	case "TfsGit":
+		tc.Actor = &Actor{Name: a.getVar("Build.RequestedFor")}
+		if pr := tc.PullRequest; pr != nil {
+			pr.Number, err = strconv.Atoi(a.getVar("System.PullRequest.PullRequestId"))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse System.PullRequest.PullRequestId: %w", err)
+			}
+		}
 		tc.SCMType = atlasexec.SCMTypeAzureDevOps
 		if pr := tc.PullRequest; pr != nil {
 			// Construct Azure DevOps pull request URL
