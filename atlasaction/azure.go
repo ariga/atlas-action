@@ -13,7 +13,6 @@ import (
 	"maps"
 	"net/url"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -68,13 +67,6 @@ func (a *Azure) SetOutput(key, value string) {
 		"isOutput": "true",
 		"isSecret": "false",
 	})
-	if dir := a.getVar("Build.SourcesDirectory"); dir != "" {
-		dotEnv := filepath.Join(dir, ".env")
-		err := fprintln(dotEnv, toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), key, value))
-		if err != nil {
-			a.Errorf("failed to write output to file .env: %v", err)
-		}
-	}
 }
 
 // GetTriggerContext implements Action.
