@@ -331,7 +331,7 @@ func (c *BitbucketClient) CommentCopilot(context.Context, int, *Copilot) error {
 
 // CommentLint implements SCMClient.
 func (c *BitbucketClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
-	comment, err := RenderTemplate("migrate-lint/md", r)
+	comment, err := RenderTemplate("migrate-lint/md", r, tc)
 	if err != nil {
 		return err
 	}
@@ -340,7 +340,7 @@ func (c *BitbucketClient) CommentLint(ctx context.Context, tc *TriggerContext, r
 
 // CommentPlan implements SCMClient.
 func (c *BitbucketClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
-	comment, err := RenderTemplate("schema-plan/md", p)
+	comment, err := RenderTemplate("schema-plan/md", p, tc)
 	if err != nil {
 		return err
 	}

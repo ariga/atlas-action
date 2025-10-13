@@ -1,0 +1,235 @@
+# Test Azure DevOps schema plan functionality with comments
+! atlas-action --action=schema/plan
+stdout 'the action should be run in a pull request context'
+
+env ATLAS_PATH=$MOCK_ATLAS
+env TEST_BATCH=./schema-plan-comment
+
+# Setup Azure DevOps environment variables for pull request context
+env TF_BUILD=True
+env BUILD_REPOSITORY_PROVIDER=TfsGit
+env BUILD_SOURCESDIRECTORY=$WORK
+env SYSTEM_PULLREQUEST_SOURCECOMMITID=abc123def456
+env SYSTEM_PULLREQUEST_PULLREQUESTID=42
+env SYSTEM_PULLREQUEST_SOURCEBRANCH=feature-branch
+env BUILD_REPOSITORY_NAME=test-repo
+env BUILD_REPOSITORY_URI=https://dev.azure.com/testorg/testproject/_git/test-repo
+env SYSTEM_TEAMFOUNDATIONCOLLECTIONURI=https://dev.azure.com/testorg/
+env SYSTEM_TEAMPROJECT=testproject
+env BUILD_SOURCEBRANCHNAME=feature-branch
+env BUILD_SOURCEVERSION=abc123def456
+env BUILD_REQUESTEDFOR=Test User
+env SYSTEM_ACCESSTOKEN=test-token
+
+atlas-action --action=schema/plan
+stdout 'Schema plan does not exist, creating a new one with name "pr-42-3RRRcLHF"'
+
+cmp comments-expected/1 comments/1
+cmp stdout output-expected.txt
+
+-- output-expected.txt --
+Schema plan does not exist, creating a new one with name "pr-42-3RRRcLHF"
+##vso[task.setvariable isOutput=true;isSecret=false;variable=link;]http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511
+##vso[task.setvariable isOutput=true;isSecret=false;variable=plan;]atlas://app/plans/20241010143904
+##vso[task.setvariable isOutput=true;isSecret=false;variable=status;]PENDING
+-- schema-plan-comment/1/args --
+schema plan list --format {{ json . }} --context {"repo":"test-repo","branch":"feature-branch","commit":"abc123def456","url":"https://dev.azure.com/testorg/testproject/_git/test-repo/pullrequest/42","username":"Test","scmType":"AZURE_DEVOPS"} --pending --auto-approve
+
+-- schema-plan-comment/1/stdout --
+[]
+
+-- schema-plan-comment/2/args --
+schema plan --format {{ json . }} --context {"repo":"test-repo","branch":"feature-branch","commit":"abc123def456","url":"https://dev.azure.com/testorg/testproject/_git/test-repo/pullrequest/42","username":"Test","scmType":"AZURE_DEVOPS"} --dry-run
+
+-- schema-plan-comment/2/stdout --
+{
+    "Repo": "app",
+    "Lint": {
+        "Steps": [
+            {
+                "Name": "Analyze 20241010143904.sql",
+                "Text": "0 reports were found in analysis",
+                "Result": {
+                    "Name": "20241010143904.sql",
+                    "Text": "-- Create \"users\" table\nCREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);\n"
+                }
+            }
+        ],
+        "Files": [
+            {
+                "Name": "20241010143904.sql",
+                "Text": "-- Create \"users\" table\nCREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);\n"
+            }
+        ]
+    },
+    "File": {
+        "Name": "20241010143904",
+        "FromHash": "3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=",
+        "FromDesc": "file://schema.lt.hcl",
+        "ToHash": "6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=",
+        "ToDesc": "file://schema1.lt.hcl",
+        "Migration": "-- Create \"users\" table\nCREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);\n",
+        "Stmts": [
+            {
+                "Pos": 25,
+                "Text": "CREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);",
+                "Comments": [
+                    "-- Create \"users\" table\n"
+                ]
+            }
+        ],
+        "URL": "atlas://app/plans/20241010143904",
+        "Link": "http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511",
+        "Status": "PENDING"
+    }
+}
+
+-- schema-plan-comment/3/args --
+schema plan --format {{ json . }} --context {"repo":"test-repo","branch":"feature-branch","commit":"abc123def456","url":"https://dev.azure.com/testorg/testproject/_git/test-repo/pullrequest/42","username":"Test","scmType":"AZURE_DEVOPS"} --name pr-42-3RRRcLHF --pending --auto-approve
+
+-- schema-plan-comment/3/stdout --
+{
+    "Repo": "app",
+    "Lint": {
+        "Steps": [
+            {
+                "Name": "Analyze 20241010143904.sql",
+                "Text": "0 reports were found in analysis",
+                "Result": {
+                    "Name": "20241010143904.sql",
+                    "Text": "-- Create \"users\" table\nCREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);\n"
+                }
+            }
+        ],
+        "Files": [
+            {
+                "Name": "20241010143904.sql",
+                "Text": "-- Create \"users\" table\nCREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);\n"
+            }
+        ]
+    },
+    "File": {
+        "Name": "20241010143904",
+        "FromHash": "3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=",
+        "FromDesc": "file://schema.lt.hcl",
+        "ToHash": "6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=",
+        "ToDesc": "file://schema1.lt.hcl",
+        "Migration": "-- Create \"users\" table\nCREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);\n",
+        "Stmts": [
+            {
+                "Pos": 25,
+                "Text": "CREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);",
+                "Comments": [
+                    "-- Create \"users\" table\n"
+                ]
+            }
+        ],
+        "URL": "atlas://app/plans/20241010143904",
+        "Link": "http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511",
+        "Status": "PENDING"
+    }
+}
+
+-- schema-plan-comment/atlas.hcl --
+env "test" {
+  url = "sqlserver://localhost:1433?database=test"
+}
+
+-- schema-plan-comment/schema.lt.hcl --
+table "users" {
+  schema = schema.dbo
+  column "id" {
+    null = false
+    type = int
+    identity {
+      seed      = 1
+      increment = 1
+    }
+  }
+  column "name" {
+    null = false
+    type = nvarchar(255)
+  }
+  primary_key {
+    columns = [column.id]
+  }
+}
+
+schema "dbo" {
+  name = "dbo"
+}
+
+-- schema-plan-comment/schema1.lt.hcl --
+table "users" {
+  schema = schema.dbo
+  column "id" {
+    null = false
+    type = int
+    identity {
+      seed      = 1
+      increment = 1
+    }
+  }
+  column "name" {
+    null = false
+    type = nvarchar(255)
+  }
+  column "email" {
+    null = true
+    type = nvarchar(255)
+  }
+  primary_key {
+    columns = [column.id]
+  }
+}
+
+schema "dbo" {
+  name = "dbo"
+}
+
+-- comments-expected/1 --
+<h3>Atlas detected changes to the desired schema</h3>
+<h4>Migration Plan for <a href="http://test.atlasgo.cloud/schemas/141733920769" target="_blank">app</a> • <a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511" target="_blank">View on Atlas Cloud</a></h4>
+
+```sql
+-- Create "users" table
+CREATE TABLE [users] (
+ [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,
+ [name] nvarchar(255) NOT NULL
+);
+```
+
+<h4>Atlas lint results</h4><table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody><tr>
+      <td><div align="center"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></div></td>
+      <td>Detect schema changes</td><td>1 new statement detected</td>
+    </tr><tr>
+      <td><div align="center"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></div></td>
+      <td>No issues found</td>
+      <td></td>
+    </tr></tbody></table><hr>
+<details>
+<summary>📝 Steps to edit this migration plan</summary>
+
+1\. Run the following command to pull the generated plan to your local workstation:
+```bash
+atlas schema plan pull --url "atlas://app/plans/20241010143904" > 20241010143904.plan.hcl
+```
+
+2\. Open `20241010143904` in your editor and modify it as needed. Note that the result of the plan should align
+the database with the desired state. Otherwise, Atlas will report a schema drift.
+
+3\. Push the updated plan to the registry using the following command:
+```bash
+atlas schema plan push --pending --file 20241010143904.plan.hcl
+```
+
+</details>
+<!-- generated by ariga/atlas-action for 20241010143904 -->

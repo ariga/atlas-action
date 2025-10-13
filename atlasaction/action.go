@@ -1744,8 +1744,12 @@ func stepIsError(s *atlasexec.StepReport) bool {
 
 var (
 	//go:embed comments
-	comments     embed.FS
-	CommentsTmpl = template.Must(
+	comments embed.FS
+)
+
+// RenderTemplate renders the given template with the data.
+func RenderTemplate(name string, data any, tc *TriggerContext) (string, error) {
+	tmpl := template.Must(
 		template.New("comments").
 			Funcs(template.FuncMap{
 				"execTime":     execTime,
@@ -1853,6 +1857,11 @@ var (
 					default:
 						return "", fmt.Errorf("invalid number of arguments %d", len(args))
 					}
+					// Some SCMs, like Azure DevOps, don't support <picture> tags and don't allow clicking to view the full size.
+					// We can simply use the <img> tag instead.
+					if tc != nil && tc.SCMType == atlasexec.SCMTypeAzureDevOps {
+						return fmt.Sprintf(`<img %s/>`, attrs), nil
+					}
 					// Wrap the image in a picture element to avoid
 					// clicking on the image to view the full size.
 					return fmt.Sprintf(`<picture><source media="(prefers-color-scheme: light)" srcset=%q><img %s/></picture>`, src, attrs), nil
@@ -1862,12 +1871,8 @@ var (
 			}).
 			ParseFS(comments, "comments/*"),
 	)
-)
-
-// RenderTemplate renders the given template with the data.
-func RenderTemplate(name string, data any) (string, error) {
 	var buf bytes.Buffer
-	if err := CommentsTmpl.ExecuteTemplate(&buf, name, data); err != nil {
+	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

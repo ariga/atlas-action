@@ -1,0 +1,53 @@
+# Test Azure DevOps schema push functionality
+env ATLAS_PATH=$MOCK_ATLAS
+env TEST_BATCH=./schema-push-comment
+
+# Setup Azure DevOps environment variables
+env TF_BUILD=True
+env BUILD_REPOSITORY_PROVIDER=TfsGit
+env BUILD_SOURCESDIRECTORY=$WORK
+
+# Setup action input variables
+env INPUT_ENV=test
+env INPUT_LATEST=true
+
+# Run the action
+atlas-action --action=schema/push
+
+-- schema-push-comment/1/args --
+schema push --format {{ json . }} --env test --context {"scmType":"AZURE_DEVOPS"} --tag latest
+
+-- schema-push-comment/1/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}
+
+-- schema-push-comment/2/args --
+schema push --format {{ json . }} --env test --context {"scmType":"AZURE_DEVOPS"}
+
+-- schema-push-comment/2/stdout --
+{
+    "link": "https://test.atlas.ariga/schemas/12345",
+    "url": "atlas://schema/12345",
+    "slug": "test-repo"
+}
+
+-- schema-push-comment/atlas.hcl --
+env "test" {
+  url = "sqlite://test.db"
+}
+
+-- schema-push-comment/schema.sql --
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL
+);
+
+-- schema-push-comment/expected.json --
+{
+  "URL": "https://test.atlas.ariga/schemas/12345",
+  "Slug": "test-repo", 
+  "Link": "https://test.atlas.ariga/schemas/12345"
+}

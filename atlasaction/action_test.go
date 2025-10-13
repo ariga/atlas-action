@@ -2843,7 +2843,7 @@ func (m *mockSCM) CommentCopilot(_ context.Context, _ int, c *atlasaction.Copilo
 }
 
 func (m *mockSCM) CommentLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasexec.SummaryReport) error {
-	comment, err := atlasaction.RenderTemplate("migrate-lint.tmpl", r)
+	comment, err := atlasaction.RenderTemplate("migrate-lint.tmpl", r, tc)
 	if err != nil {
 		return err
 	}
@@ -2855,7 +2855,7 @@ func (m *mockSCM) CommentPlan(ctx context.Context, tc *atlasaction.TriggerContex
 }
 
 func (m *mockSCM) CommentSchemaLint(ctx context.Context, tc *atlasaction.TriggerContext, r *atlasaction.SchemaLintReport) error {
-	comment, err := atlasaction.RenderTemplate("schema-lint.tmpl", r)
+	comment, err := atlasaction.RenderTemplate("schema-lint.tmpl", r, tc)
 	if err != nil {
 		return err
 	}
@@ -2935,11 +2935,14 @@ func renderTemplate[T any](ts *testscript.TestScript, neg bool, args []string) {
 	}
 	ts.Check(json.Unmarshal([]byte(ts.ReadFile(args[1])), &data))
 	b := &bytes.Buffer{}
-	ts.Check(atlasaction.CommentsTmpl.ExecuteTemplate(b, args[0], data))
+	r, err := atlasaction.RenderTemplate(args[0], data, nil)
+	ts.Check(err)
+	_, err = b.WriteString(r)
+	ts.Check(err)
 	if l := b.Len(); l > 0 && b.Bytes()[l-1] != '\n' {
 		ts.Check(b.WriteByte('\n')) // Add a newline the make the `cmp` command work.
 	}
-	_, err := io.Copy(ts.Stdout(), b)
+	_, err = io.Copy(ts.Stdout(), b)
 	ts.Check(err)
 }
 

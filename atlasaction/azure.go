@@ -17,8 +17,10 @@ import (
 	"strconv"
 	"strings"
 
+	"ariga.io/atlas-action/internal/azuredevops"
 	"ariga.io/atlas/atlasexec"
 	"github.com/fatih/color"
+	"golang.org/x/oauth2"
 )
 
 type (
@@ -79,20 +81,21 @@ func (a *Azure) GetTriggerContext(context.Context) (_ *TriggerContext, err error
 		Repo:    a.getVar("Build.Repository.Name"),
 		Branch:  a.getVar("Build.SourceBranch"),
 		Commit:  a.getVar("Build.SourceVersion"),
-		Actor:   &Actor{Name: a.getVar("Build.SourceVersionAuthor")},
 	}
 	if c := a.getVar("System.PullRequest.SourceCommitId"); c != "" {
-		pr := &PullRequest{Commit: c}
-		pr.Number, err = strconv.Atoi(a.getVar("System.PullRequest.PullRequestNumber"))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse System.PullRequest.PullRequestNumber: %w", err)
-		}
-		tc.PullRequest = pr
+		tc.PullRequest = &PullRequest{Commit: c}
 		tc.Commit = c
 		tc.Branch = a.getVar("System.PullRequest.SourceBranch")
 	}
 	switch p := a.getVar("Build.Repository.Provider"); p {
 	case "GitHub":
+		tc.Actor = &Actor{Name: a.getVar("Build.SourceVersionAuthor")}
+		if pr := tc.PullRequest; pr != nil {
+			pr.Number, err = strconv.Atoi(a.getVar("System.PullRequest.PullRequestNumber"))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse System.PullRequest.PullRequestNumber: %w", err)
+			}
+		}
 		tc.SCMType = atlasexec.SCMTypeGithub
 		if pr := tc.PullRequest; pr != nil {
 			pr.URL, err = url.JoinPath(tc.RepoURL, "pull", strconv.Itoa(pr.Number))
@@ -115,7 +118,46 @@ func (a *Azure) GetTriggerContext(context.Context) (_ *TriggerContext, err error
 			}
 			return NewGitHubClient(tc.Repo, a.getenv("GITHUB_API_URL"), token)
 		}
-	case "Bitbucket", "TfsGit", "TfsVersionControl", "Git", "Svn":
+	case "TfsGit":
+		tc.Actor = &Actor{Name: a.getVar("Build.RequestedFor")}
+		if pr := tc.PullRequest; pr != nil {
+			pr.Number, err = strconv.Atoi(a.getVar("System.PullRequest.PullRequestId"))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse System.PullRequest.PullRequestId: %w", err)
+			}
+		}
+		tc.SCMType = atlasexec.SCMTypeAzureDevOps
+		if pr := tc.PullRequest; pr != nil {
+			// Construct Azure DevOps pull request URL
+			// Format: https://dev.azure.com/{organization}/{project}/_git/{repo}/pullrequest/{prId}
+			org := a.getVar("System.TeamFoundationCollectionUri")
+			project := a.getVar("System.TeamProject")
+			repo := a.getVar("Build.Repository.Name")
+			if org != "" && project != "" && repo != "" {
+				baseURL := strings.TrimSuffix(org, "/")
+				pr.URL = fmt.Sprintf("%s/%s/_git/%s/pullrequest/%d", baseURL, project, repo, pr.Number)
+			}
+		}
+		tc.SCMClient = func() (SCMClient, error) {
+			// Use System.AccessToken for Azure DevOps PR-triggered actions
+			// In YAML pipelines, System.AccessToken must be explicitly mapped as an environment variable
+			token := a.getenv("SYSTEM_ACCESSTOKEN")
+			if token == "" {
+				a.Warningf("System.AccessToken is not available. " +
+					"In YAML pipelines, you must explicitly map System.AccessToken by adding 'env: SYSTEM_ACCESSTOKEN: $(System.AccessToken)' to your task. ")
+			}
+			org := a.getVar("System.TeamFoundationCollectionUri") // format: https://dev.azure.com/testorg/
+			project := a.getVar("System.TeamProject")
+			repo := a.getVar("Build.Repository.Name")
+			if org != "" {
+				parts := strings.Split(strings.TrimSuffix(org, "/"), "/")
+				if len(parts) > 0 {
+					org = parts[len(parts)-1]
+				}
+			}
+			return NewAzureDevOpsClient(org, project, repo, token)
+		}
+	case "Bitbucket", "TfsVersionControl", "Git", "Svn":
 		a.Warningf("Unsupported repository provider: %q", p)
 	default:
 		return nil, fmt.Errorf("unknown BUILD_REPOSITORY_PROVIDER %q", p)
@@ -212,3 +254,116 @@ func (a *Azure) command(name, message string, props map[string]string) {
 	}
 	fmt.Fprintf(a.w, "]%s\n", escapeData(message))
 }
+
+type AzureDevOpsClient struct {
+	*azuredevops.Client
+}
+
+func NewAzureDevOpsClient(org, project, repo, token string) (*AzureDevOpsClient, error) {
+	var opts []azuredevops.ClientOption
+	if token != "" {
+		opts = append(opts, azuredevops.WithToken(&oauth2.Token{AccessToken: token}))
+	}
+	// Use custom base URL for testing if provided
+	if baseURL := os.Getenv("AZURE_DEVOPS_API_URL"); baseURL != "" {
+		opts = append(opts, azuredevops.WithBaseURL(baseURL))
+	}
+	c, err := azuredevops.NewClient(org, project, repo, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &AzureDevOpsClient{Client: c}, nil
+}
+
+// PullRequest implements SCMClient.
+func (c *AzureDevOpsClient) PullRequest(ctx context.Context, number int) (*PullRequest, error) {
+	pr, err := c.Client.PullRequest(ctx, number)
+	if err != nil {
+		return nil, err
+	}
+	return &PullRequest{
+		Number: pr.ID,
+	}, nil
+}
+
+// CreatePullRequest implements SCMClient.
+func (c *AzureDevOpsClient) CreatePullRequest(_ context.Context, _, _, _, _ string) (*PullRequest, error) {
+	panic("unimplemented: CreatePullRequest for AzureDevOpsClient")
+}
+
+// CopilotSession implements SCMClient.
+func (c *AzureDevOpsClient) CopilotSession(context.Context, *TriggerContext) (string, error) {
+	panic("unimplemented: CopilotSession for AzureDevOpsClient")
+}
+
+// CommentCopilot implements SCMClient.
+func (c *AzureDevOpsClient) CommentCopilot(context.Context, int, *Copilot) error {
+	panic("unimplemented: CommentCopilot for AzureDevOpsClient")
+}
+
+// CommentLint implements SCMClient.
+func (c *AzureDevOpsClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
+	comment, err := RenderTemplate("migrate-lint.tmpl", r, tc)
+	if err != nil {
+		return err
+	}
+	return c.upsertComment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
+}
+
+// CommentPlan implements SCMClient.
+func (c *AzureDevOpsClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
+	// Report the schema plan to the user and add a comment to the PR.
+	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
+		"Plan": p,
+	}, tc)
+	if err != nil {
+		return fmt.Errorf("failed to generate schema plan comment: %w", err)
+	}
+	return c.upsertComment(ctx, tc.PullRequest, p.File.Name, comment)
+}
+
+// CommentSchemaLint implements SCMClient.
+func (c *AzureDevOpsClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
+	comment, err := RenderTemplate("schema-lint.tmpl", r, tc)
+	if err != nil {
+		return err
+	}
+	id := "schema-lint"
+	if url := tc.Act.GetInput("url"); url != "" {
+		id = url
+	}
+	return c.upsertComment(ctx, tc.PullRequest, id, comment)
+}
+
+func (c *AzureDevOpsClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	if pr == nil {
+		return fmt.Errorf("pull request is required for commenting")
+	}
+
+	marker := commentMarker(id)
+	comment += "\n" + marker
+
+	// List existing comment threads to find if we already have a comment with this marker
+	threads, err := c.ListCommentThreads(ctx, pr.Number)
+	if err != nil {
+		return fmt.Errorf("failed to list comment threads: %w", err)
+	}
+
+	// Look for an existing thread with our marker
+	for _, thread := range threads {
+		if len(thread.Comments) > 0 {
+			// Check if the first comment contains our marker
+			if strings.Contains(thread.Comments[0].Content, marker) {
+				// Update the first comment in this thread
+				_, err = c.UpdateFirstComment(ctx, pr.Number, thread.ID, comment)
+				return err
+			}
+		}
+	}
+
+	// No existing thread found, create a new one
+	_, err = c.AddComment(ctx, pr.Number, comment)
+	return err
+}
+
+var _ SCMClient = (*AzureDevOpsClient)(nil)
