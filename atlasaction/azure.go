@@ -339,16 +339,13 @@ func (c *AzureDevOpsClient) upsertComment(ctx context.Context, pr *PullRequest, 
 	if pr == nil {
 		return fmt.Errorf("pull request is required for commenting")
 	}
-
-	marker := commentMarker(id)
-	comment += "\n" + marker
-
 	// List existing comment threads to find if we already have a comment with this marker
 	threads, err := c.ListCommentThreads(ctx, pr.Number)
 	if err != nil {
 		return fmt.Errorf("failed to list comment threads: %w", err)
 	}
-
+	marker := commentMarker(id)
+	comment += "\n" + marker
 	// Look for an existing thread with our marker
 	for _, thread := range threads {
 		if len(thread.Comments) > 0 {
@@ -360,7 +357,6 @@ func (c *AzureDevOpsClient) upsertComment(ctx context.Context, pr *PullRequest, 
 			}
 		}
 	}
-
 	// No existing thread found, create a new one
 	_, err = c.AddComment(ctx, pr.Number, comment)
 	return err

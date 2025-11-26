@@ -207,6 +207,9 @@ type (
 //
 //	/atlas:nolint destructive
 func (p *PullRequest) AtlasDirectives() (ds []string) {
+	if p == nil {
+		return nil
+	}
 	const prefix = "/atlas:"
 	for _, l := range strings.Split(p.Body, "\n") {
 		if l = strings.TrimSpace(l); strings.HasPrefix(l, prefix) && !strings.HasSuffix(l, prefix) {
@@ -995,11 +998,8 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 // SchemaPlan runs the GitHub Action for "ariga/atlas-action/schema/plan"
 func (a *Actions) SchemaPlan(ctx context.Context) error {
 	tc, err := a.GetTriggerContext(ctx)
-	switch {
-	case err != nil:
+	if err != nil {
 		return fmt.Errorf("unable to get the trigger context: %w", err)
-	case tc.PullRequest == nil:
-		return fmt.Errorf("the action should be run in a pull request context")
 	}
 	var plan *atlasexec.SchemaPlan
 	params := &atlasexec.SchemaPlanListParams{
@@ -1071,10 +1071,15 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		case err != nil:
 			return fmt.Errorf("failed to save schema plan: %w", err)
 		case dryRun:
+			// RFC4648 base64url encoding without padding.
+			h := strings.NewReplacer("+", "-", "/", "_", "=", "").
+				Replace(plan.File.FromHash)
+			if tc.PullRequest == nil {
+				name = fmt.Sprintf("ref-%.8s-%.8s", tc.Commit, h)
+			} else {
+				name = fmt.Sprintf("pr-%d-%.8s", tc.PullRequest.Number, h)
+			}
 			// Save the plan with the generated name.
-			name = fmt.Sprintf("pr-%d-%.8s", tc.PullRequest.Number,
-				// RFC4648 base64url encoding without padding.
-				strings.NewReplacer("+", "-", "/", "_", "=", "").Replace(plan.File.FromHash))
 			goto runPlan
 		}
 	default:
@@ -1094,10 +1099,12 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err = c.CommentPlan(ctx, tc, plan); err != nil {
-		// Don't fail the action if the comment fails.
-		// It may be due to the missing permissions.
-		a.Errorf("failed to comment on the pull request: %v", err)
+	if tc.PullRequest != nil {
+		if err = c.CommentPlan(ctx, tc, plan); err != nil {
+			// Don't fail the action if the comment fails.
+			// It may be due to the missing permissions.
+			a.Errorf("failed to comment on the pull request: %v", err)
+		}
 	}
 	if plan.Lint != nil {
 		if errs := plan.Lint.Errors(); len(errs) > 0 {

@@ -335,7 +335,7 @@ func (c *BitbucketClient) CommentLint(ctx context.Context, tc *TriggerContext, r
 	if err != nil {
 		return err
 	}
-	return c.upsertComment(ctx, tc.PullRequest.Number, tc.Act.GetInput("dir-name"), comment)
+	return c.upsertComment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
 }
 
 // CommentPlan implements SCMClient.
@@ -344,7 +344,7 @@ func (c *BitbucketClient) CommentPlan(ctx context.Context, tc *TriggerContext, p
 	if err != nil {
 		return err
 	}
-	return c.upsertComment(ctx, tc.PullRequest.Number, p.File.Name, comment)
+	return c.upsertComment(ctx, tc.PullRequest, p.File.Name, comment)
 }
 
 // CommentSchemaLint implements SCMClient.
@@ -352,8 +352,11 @@ func (c *BitbucketClient) CommentSchemaLint(context.Context, *TriggerContext, *S
 	return nil
 }
 
-func (c *BitbucketClient) upsertComment(ctx context.Context, prID int, id, comment string) error {
-	comments, err := c.PullRequestComments(ctx, prID)
+func (c *BitbucketClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	if pr == nil {
+		return fmt.Errorf("pull request is required for commenting")
+	}
+	comments, err := c.PullRequestComments(ctx, pr.Number)
 	if err != nil {
 		return err
 	}
@@ -362,9 +365,9 @@ func (c *BitbucketClient) upsertComment(ctx context.Context, prID int, id, comme
 	if found := slices.IndexFunc(comments, func(c bitbucket.PullRequestComment) bool {
 		return strings.Contains(c.Content.Raw, marker)
 	}); found != -1 {
-		_, err = c.PullRequestUpdateComment(ctx, prID, comments[found].ID, comment)
+		_, err = c.PullRequestUpdateComment(ctx, pr.Number, comments[found].ID, comment)
 	} else {
-		_, err = c.PullRequestCreateComment(ctx, prID, comment)
+		_, err = c.PullRequestCreateComment(ctx, pr.Number, comment)
 	}
 	return err
 }

@@ -159,6 +159,9 @@ func (c *GitLabClient) CommentSchemaLint(context.Context, *TriggerContext, *Sche
 }
 
 func (c *GitLabClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	if pr == nil {
+		return fmt.Errorf("pull request is required for commenting")
+	}
 	comments, err := c.PullRequestNotes(ctx, pr.Number)
 	if err != nil {
 		return err
