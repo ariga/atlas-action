@@ -354,6 +354,9 @@ func (c *GitHubClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext
 }
 
 func (c *GitHubClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	if pr == nil {
+		return fmt.Errorf("pull request is required for commenting")
+	}
 	comments, err := c.IssueComments(ctx, pr.Number)
 	if err != nil {
 		return err
