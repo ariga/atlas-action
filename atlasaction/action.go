@@ -1422,7 +1422,10 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to inspect the schema stats: %w", err)
 		}
-		input.Stats = []byte(stats)
+		input.Stats = &cloud.PushSnapshotStatsInput{
+			Stats: []byte(stats),
+			Time:  time.Now(),
+		}
 	}
 	u, err := cc.PushSnapshot(ctx, input)
 	if err != nil {

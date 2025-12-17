@@ -701,6 +701,11 @@ func (m *mockAtlas) SchemaInspect(ctx context.Context, p *atlasexec.SchemaInspec
 	return m.schemaInspect(ctx, p)
 }
 
+// SchemaStatsInspect implements AtlasExec.
+func (m *mockAtlas) SchemaStatsInspect(ctx context.Context, p *atlasexec.SchemaStatsInspectParams) (string, error) {
+	panic("unimplemented")
+}
+
 // SchemaPush implements AtlasExec.
 func (m *mockAtlas) SchemaPush(ctx context.Context, p *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error) {
 	return m.schemaPush(ctx, p)
