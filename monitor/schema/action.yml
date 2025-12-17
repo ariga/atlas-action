@@ -3,7 +3,7 @@ name: Atlas Schema Monitoring
 description: Sync the database schema to Atlas Cloud.
 branding:
   icon: database
-author: "Ariga"
+author: 'Ariga'
 inputs:
   cloud-token:
     description: The token that is used to connect to Atlas Cloud (should be passed as a secret).
@@ -11,13 +11,9 @@ inputs:
   exclude:
     description: |
       List of glob patterns used to select which resources to filter in inspection
-      see: https://atlasgo.io/inspect#exclude
-  include:
-    description: |
-      List of glob patterns used to select which resources to keep in inspection
-      see: https://atlasgo.io/inspect#include
+      see: https://atlasgo.io/declarative/inspect#exclude-schemas
   schemas:
-    description: "List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas"
+    description: 'List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas'
   slug:
     description: Optional unique identifier for the database server.
   url:
@@ -31,9 +27,6 @@ inputs:
     description: |
       The environment to use from the Atlas configuration file.
       For example, `dev` (mutually exclusive with `url`).
-  collect-stats:
-    description: Collect statistics about the schema. Either "true" or "false".
-    default: "false"
 outputs:
   url:
     description: URL of the schema of the database inside Atlas Cloud.
