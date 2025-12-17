@@ -67,7 +67,6 @@ type (
 	PushSnapshotStatsInput struct {
 		Stats []byte    `json:"stats"` // JSON-encoded statistics about the snapshot.
 		Time  time.Time `json:"time"`  // Time of the snapshot.
-
 	}
 	PushSnapshotInput struct {
 		ScopeIdent

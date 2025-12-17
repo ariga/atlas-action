@@ -547,11 +547,23 @@ jobs:
               name VARCHAR(255) NOT NULL,
               email VARCHAR(255) NOT NULL
           );
+          EOF
 
+          # Insert random number of rows (between 2-10)
+          NUM_ROWS=$((RANDOM % 9 + 2))
+          echo "Inserting $NUM_ROWS random users..."
+          NAMES=("Alice Johnson" "Bob Smith" "Carol White" "David Brown" "Eve Davis" "Frank Miller" "Grace Wilson" "Henry Lee" "Ivy Chen" "Jack Taylor")
+          for i in $(seq 1 $NUM_ROWS); do
+            NAME="${NAMES[$((i-1))]}"
+            EMAIL=$(echo "$NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '.' | sed 's/$/@example.com/')
+            mysql -h 127.0.0.1 -u root --password=pass dev -e "INSERT INTO users (name, email) VALUES ('$NAME', '$EMAIL');"
+          done
+
+          mysql -h 127.0.0.1 -u root --password=pass dev <<EOF
           CREATE VIEW user_emails AS
           SELECT id, email FROM users;
           EOF
-          echo "Table and view created!"
+          echo "Table and view created with $NUM_ROWS users!"
       - uses: ariga/setup-atlas@v0
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
