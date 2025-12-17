@@ -53,7 +53,7 @@ func newClient(endpoint, token, version, cliVersion string) *Client {
 }
 
 // New creates a new Client for the Atlas Cloud API.
-func New (token, version, cliVersion string) *Client {
+func New(token, version, cliVersion string) *Client {
 	return newClient("", token, version, cliVersion)
 }
 
@@ -68,6 +68,7 @@ type (
 		ScopeIdent
 		Snapshot  *SnapshotInput `json:"snapshot,omitempty"` // The snapshot taken, required if hashMatch is false.
 		HashMatch bool           `json:"hashMatch"`          // If hash of snapshot matches hash of last snapshot.
+		Stats     []byte         `json:"stats"`              // JSON-encoded statistics about the snapshot.
 	}
 	SnapshotInput struct {
 		Hash string `json:"hash"` // Atlas schema hash for the given HCL.

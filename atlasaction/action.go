@@ -125,6 +125,8 @@ type (
 		MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error)
 		// SchemaInspect runs the `schema inspect` command.
 		SchemaInspect(ctx context.Context, params *atlasexec.SchemaInspectParams) (string, error)
+		// SchemaStatsInspect runs the `schema stats inspect` command.
+		SchemaStatsInspect(ctx context.Context, params *atlasexec.SchemaStatsInspectParams) (string, error)
 		// SchemaPush runs the `schema push` command.
 		SchemaPush(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 		// SchemaTest runs the `schema test` command.
@@ -1368,6 +1370,7 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		Env:       a.GetInput("env"),
 		Schema:    a.GetArrayInput("schemas"),
 		Exclude:   a.GetArrayInput("exclude"),
+		Include:   a.GetArrayInput("include"),
 		Format:    `{{ printf "# %s\n# %s\n%s" .RedactedURL .Hash .MarshalHCL }}`,
 	}
 	if (params.ConfigURL != "" || params.Env != "") && params.URL != "" {
@@ -1405,6 +1408,21 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	}
 	if !input.HashMatch {
 		input.Snapshot = &cloud.SnapshotInput{Hash: hash, HCL: hcl}
+	}
+	if a.GetBoolInput("collect-stats") {
+		statsParams := &atlasexec.SchemaStatsInspectParams{
+			URL:       a.GetInput("url"),
+			ConfigURL: a.GetInput("config"),
+			Env:       a.GetInput("env"),
+			Schema:    a.GetArrayInput("schemas"),
+			Exclude:   a.GetArrayInput("exclude"),
+			Include:   a.GetArrayInput("include"),
+		}
+		stats, err := a.Atlas.SchemaStatsInspect(ctx, statsParams)
+		if err != nil {
+			return fmt.Errorf("failed to inspect the schema stats: %w", err)
+		}
+		input.Stats = []byte(stats)
 	}
 	u, err := cc.PushSnapshot(ctx, input)
 	if err != nil {
