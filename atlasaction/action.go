@@ -1422,12 +1422,8 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to inspect the schema stats: %w", err)
 		}
-		statsBytes, err := json.Marshal(stats)
-		if err != nil {
-			return fmt.Errorf("failed to marshal the schema stats: %w", err)
-		}
 		input.Stats = &cloud.PushSnapshotStatsInput{
-			Stats: statsBytes,
+			Stats: stats,
 			Time:  time.Now(),
 		}
 	}

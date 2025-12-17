@@ -65,7 +65,7 @@ type (
 		Exclude []string `json:"exclude,omitempty"` // List of exclude patterns to apply on the inspection.
 	}
 	PushSnapshotStatsInput struct {
-		Stats []byte    `json:"stats"` // JSON-encoded statistics about the snapshot.
+		Stats string    `json:"stats"` // JSON-encoded statistics about the snapshot.
 		Time  time.Time `json:"time"`  // Time of the snapshot.
 	}
 	PushSnapshotInput struct {
