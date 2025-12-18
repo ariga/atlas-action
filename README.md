@@ -684,6 +684,7 @@ Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in 
 * `slug` - (optional) Unique identifier for the database server.
 * `schemas` - (optional) List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas.
 * `exclude` - (optional) List of exclude patterns from inspection. see: https://atlasgo.io/declarative/inspect#exclude-schemas.
+* `collect-stats` - (optional) Whether to collect schema statistics. Defaults to `true`. see: https://atlasgo.io/monitoring#schema-statistics.
 
 #### Outputs
 
