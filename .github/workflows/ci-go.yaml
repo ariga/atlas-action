@@ -6,43 +6,43 @@ jobs:
   shim:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-node@v3
-      with:
-        node-version: 20.x
-        cache: 'npm'
-        cache-dependency-path: shim/package-lock.json
-    - name: Install
-      working-directory: shim
-      run: |
-        npm i
-        npm run all
-    - name: verify no git diff
-      run: |
-        status=$(git status --porcelain)
-        if [ -n "$status" ]; then
-          echo "you need to run 'npm run all' and commit the changes"
-          echo "$status"
-          exit 1
-        fi
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+          cache: "npm"
+          cache-dependency-path: shim/package-lock.json
+      - name: Install
+        working-directory: shim
+        run: |
+          npm i
+          npm run all
+      - name: verify no git diff
+        run: |
+          status=$(git status --porcelain)
+          if [ -n "$status" ]; then
+            echo "you need to run 'npm run all' and commit the changes"
+            echo "$status"
+            exit 1
+          fi
   manifest:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-go@v4
-      with:
-        go-version-file: go.mod
-    - name: Run `make manifest`
-      run: |
-        make manifest
-    - name: Verify no git-diff
-      run: |
-        status=$(git status --porcelain)
-        if [ -n "$status" ]; then
-          echo "you need to run 'make manifest' and commit the changes"
-          echo "$status"
-          exit 1
-        fi
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - name: Run `make manifest`
+        run: |
+          make manifest
+      - name: Verify no git-diff
+        run: |
+          status=$(git status --porcelain)
+          if [ -n "$status" ]; then
+            echo "you need to run 'make manifest' and commit the changes"
+            echo "$status"
+            exit 1
+          fi
   shim-e2e:
     runs-on: ubuntu-latest
     env:
@@ -237,8 +237,8 @@ jobs:
           dir: file://atlasaction/testdata/down
           dev-url: sqlite://dev?mode=memory
         env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
+          TEST_ARGS: 'migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION","triggerVersion":"v0.0.0"} --dir file://atlasaction/testdata/down'
+          TEST_STDOUT: '{"URL":"PENDING_URL","Status":"PENDING_USER"}'
           TEST_EXIT_CODE: 1
       - name: check-exit-code
         if: steps.pending-approval.outcome == 'success'
@@ -254,8 +254,8 @@ jobs:
           dev-url: sqlite://dev?mode=memory
           wait-timeout: 5s
         env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"URL\":\"PENDING_URL\",\"Status\":\"PENDING_USER\"}"
+          TEST_ARGS: 'migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION","triggerVersion":"v0.0.0"} --dir file://atlasaction/testdata/down'
+          TEST_STDOUT: '{"URL":"PENDING_URL","Status":"PENDING_USER"}'
           TEST_EXIT_CODE: 1
       - name: check-exit-code-wait
         if: steps.pending-approval-wait.outcome == 'success'
@@ -270,8 +270,8 @@ jobs:
           dir: file://atlasaction/testdata/down
           dev-url: sqlite://dev?mode=memory
         env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"URL\":\"ABORTED_URL\",\"Status\":\"ABORTED\"}"
+          TEST_ARGS: 'migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION","triggerVersion":"v0.0.0"} --dir file://atlasaction/testdata/down'
+          TEST_STDOUT: '{"URL":"ABORTED_URL","Status":"ABORTED"}'
           TEST_EXIT_CODE: 1
       - name: check-exit-code
         if: steps.aborted.outcome == 'success'
@@ -285,16 +285,16 @@ jobs:
           dir: file://atlasaction/testdata/down
           dev-url: sqlite://dev?mode=memory
         env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPROVED\"}"
+          TEST_ARGS: 'migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION","triggerVersion":"v0.0.0"} --dir file://atlasaction/testdata/down'
+          TEST_STDOUT: '{"Planned":[{}],"Reverted":[{}],"Status":"APPROVED"}'
       - id: applied
         uses: ./migrate/down
         with:
           dir: file://atlasaction/testdata/down
           dev-url: sqlite://dev?mode=memory
         env:
-          TEST_ARGS: "migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {\"triggerType\":\"GITHUB_ACTION\",\"triggerVersion\":\"v0.0.0\"} --dir file://atlasaction/testdata/down"
-          TEST_STDOUT: "{\"Planned\":[{}],\"Reverted\":[{}],\"Status\":\"APPLIED\"}"
+          TEST_ARGS: 'migrate down --format {{ json . }} --dev-url sqlite://dev?mode=memory --context {"triggerType":"GITHUB_ACTION","triggerVersion":"v0.0.0"} --dir file://atlasaction/testdata/down'
+          TEST_STDOUT: '{"Planned":[{}],"Reverted":[{}],"Status":"APPLIED"}'
       - name: verify output
         run: |
           [[ "${{ steps.pending-approval.outputs.url }}" = PENDING_URL ]]
@@ -427,7 +427,7 @@ jobs:
       matrix:
         test:
           - directory: lint-review
-            error: 'errors or warnings were found'
+            error: "errors or warnings were found"
           - directory: on-the-fly
             auto-approve: "true"
           - directory: remote-repo
@@ -441,24 +441,24 @@ jobs:
           - directory: legacy
             auto-approve: "true"
             version: "v0.29.0"
-            error: 'multiple pre-planned migrations were found'
+            error: "multiple pre-planned migrations were found"
           - directory: approval/no-changes
             lint-review: "ALWAYS"
           - directory: approval/approved
             lint-review: "ALWAYS"
           - directory: approval/pending
             lint-review: "ALWAYS"
-            error: 'cannot apply a migration plan in a PENDING state'
+            error: "cannot apply a migration plan in a PENDING state"
           - directory: approval/pending
             lint-review: "ALWAYS"
-            error: 'was not approved within the specified waiting period'
+            error: "was not approved within the specified waiting period"
             wait-timeout: 5s
           - directory: approval/lint-review
             lint-review: "ERROR"
-            error: 'cannot apply a migration plan in a PENDING state'
+            error: "cannot apply a migration plan in a PENDING state"
           - directory: approval/lint-review
             lint-review: "ERROR"
-            error: 'was not approved within the specified waiting period'
+            error: "was not approved within the specified waiting period"
             wait-timeout: 5s
     steps:
       - uses: ariga/setup-atlas@v0
@@ -547,11 +547,23 @@ jobs:
               name VARCHAR(255) NOT NULL,
               email VARCHAR(255) NOT NULL
           );
+          EOF
 
+          # Insert random number of rows (between 2-10)
+          NUM_ROWS=$((RANDOM % 9 + 2))
+          echo "Inserting $NUM_ROWS random users..."
+          NAMES=("Alice Johnson" "Bob Smith" "Carol White" "David Brown" "Eve Davis" "Frank Miller" "Grace Wilson" "Henry Lee" "Ivy Chen" "Jack Taylor")
+          for i in $(seq 1 $NUM_ROWS); do
+            NAME="${NAMES[$((i-1))]}"
+            EMAIL=$(echo "$NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '.' | sed 's/$/@example.com/')
+            mysql -h 127.0.0.1 -u root --password=pass dev -e "INSERT INTO users (name, email) VALUES ('$NAME', '$EMAIL');"
+          done
+
+          mysql -h 127.0.0.1 -u root --password=pass dev <<EOF
           CREATE VIEW user_emails AS
           SELECT id, email FROM users;
           EOF
-          echo "Table and view created!"
+          echo "Table and view created with $NUM_ROWS users!"
       - uses: ariga/setup-atlas@v0
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
@@ -564,11 +576,12 @@ jobs:
         uses: ./monitor/schema
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-          url: 'mysql://root:pass@localhost:3306/dev'
-          slug: 'github-action'
+          url: "mysql://root:pass@localhost:3306/dev"
+          slug: "github-action"
+          collect-stats: "true"
       - name: sanity using config
         uses: ./monitor/schema
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-          config: 'file://monitor/schema/atlas.hcl'
-          env: 'dev'
+          config: "file://monitor/schema/atlas.hcl"
+          env: "dev"

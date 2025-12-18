@@ -53,7 +53,7 @@ func newClient(endpoint, token, version, cliVersion string) *Client {
 }
 
 // New creates a new Client for the Atlas Cloud API.
-func New (token, version, cliVersion string) *Client {
+func New(token, version, cliVersion string) *Client {
 	return newClient("", token, version, cliVersion)
 }
 
@@ -64,10 +64,16 @@ type (
 		Schemas []string `json:"schemas,omitempty"` // List of schemas to inspect, empty to inspect everything.
 		Exclude []string `json:"exclude,omitempty"` // List of exclude patterns to apply on the inspection.
 	}
+	PushSnapshotStatsInput struct {
+		Stats string    `json:"stats"` // JSON-encoded statistics about the snapshot.
+		Time  time.Time `json:"time"`  // Time of the snapshot.
+	}
 	PushSnapshotInput struct {
 		ScopeIdent
-		Snapshot  *SnapshotInput `json:"snapshot,omitempty"` // The snapshot taken, required if hashMatch is false.
-		HashMatch bool           `json:"hashMatch"`          // If hash of snapshot matches hash of last snapshot.
+
+		Snapshot  *SnapshotInput          `json:"snapshot,omitempty"` // The snapshot taken, required if hashMatch is false.
+		HashMatch bool                    `json:"hashMatch"`          // If hash of snapshot matches hash of last snapshot.
+		Stats     *PushSnapshotStatsInput `json:"stats,omitempty"`    // Statistics about the snapshot.
 	}
 	SnapshotInput struct {
 		Hash string `json:"hash"` // Atlas schema hash for the given HCL.
