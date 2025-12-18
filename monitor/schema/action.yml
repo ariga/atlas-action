@@ -8,6 +8,9 @@ inputs:
   cloud-token:
     description: The token that is used to connect to Atlas Cloud (should be passed as a secret).
     required: true
+  collect-stats:
+    description: Whether to collect and send anonymized usage statistics to Atlas.
+    default: "true"
   exclude:
     description: |
       List of glob patterns used to select which resources to filter in inspection

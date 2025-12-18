@@ -93,6 +93,13 @@
       "visibleRule": "action == monitor schema"
     },
     {
+      "type": "boolean",
+      "label": "Collect statistics",
+      "helpMarkDown": "Whether to collect and send anonymized usage statistics to Atlas.",
+      "name": "collect_stats",
+      "visibleRule": "action == monitor schema"
+    },
+    {
       "type": "string",
       "label": "Description",
       "helpMarkDown": "The description of the schema.",
