@@ -382,6 +382,7 @@ actions:
     name: Atlas Schema Monitoring
     inputs:
       exclude: *inspectExclude
+      include: *inspectInclude
       config:
         <<: *config
         description: |
@@ -411,6 +412,11 @@ actions:
         multiLine: true
         label: Include schemas
         description: "List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas"
+      collect-stats:
+        type: boolean
+        default: "true"
+        label: Collect statistics
+        description: Whether to collect and send anonymized usage statistics to Atlas.
     outputs:
       url:
         description: URL of the schema of the database inside Atlas Cloud.

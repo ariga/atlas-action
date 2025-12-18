@@ -93,6 +93,13 @@
       "visibleRule": "action == monitor schema"
     },
     {
+      "type": "boolean",
+      "label": "Collect statistics",
+      "helpMarkDown": "Whether to collect and send anonymized usage statistics to Atlas.",
+      "name": "collect_stats",
+      "visibleRule": "action == monitor schema"
+    },
+    {
       "type": "string",
       "label": "Description",
       "helpMarkDown": "The description of the schema.",
@@ -160,7 +167,7 @@
       "label": "Include patterns",
       "helpMarkDown": "List of glob patterns used to select which resources to keep in inspection\nsee: https://atlasgo.io/declarative/inspect#include-schemas\n",
       "name": "include",
-      "visibleRule": "action == schema apply || action == schema plan || action == schema plan approve"
+      "visibleRule": "action == monitor schema || action == schema apply || action == schema plan || action == schema plan approve"
     },
     {
       "type": "boolean",
