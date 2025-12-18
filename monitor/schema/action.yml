@@ -15,6 +15,10 @@ inputs:
     description: |
       List of glob patterns used to select which resources to filter in inspection
       see: https://atlasgo.io/declarative/inspect#exclude-schemas
+  include:
+    description: |
+      List of glob patterns used to select which resources to keep in inspection
+      see: https://atlasgo.io/declarative/inspect#include-schemas
   schemas:
     description: 'List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas'
   slug:

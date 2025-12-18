@@ -382,6 +382,7 @@ actions:
     name: Atlas Schema Monitoring
     inputs:
       exclude: *inspectExclude
+      include: *inspectInclude
       config:
         <<: *config
         description: |
