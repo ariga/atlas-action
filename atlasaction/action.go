@@ -397,7 +397,7 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 // MigrateApply runs the GitHub Action for "ariga/atlas-action/migrate/apply".
 func (a *Actions) MigrateApply(ctx context.Context) error {
 	params := &atlasexec.MigrateApplyParams{
-		ConfigURL:       a.GetInput("config"),
+		ConfigURL:       a.GetConfigURL(),
 		Env:             a.GetInput("env"),
 		Vars:            a.GetVarsInput("vars"),
 		Context:         a.DeployRunContext(),
@@ -467,7 +467,7 @@ const (
 // MigrateDown runs the GitHub Action for "ariga/atlas-action/migrate/down".
 func (a *Actions) MigrateDown(ctx context.Context) (err error) {
 	params := &atlasexec.MigrateDownParams{
-		ConfigURL:       a.GetInput("config"),
+		ConfigURL:       a.GetConfigURL(),
 		Env:             a.GetInput("env"),
 		Vars:            a.GetVarsInput("vars"),
 		Context:         a.DeployRunContext(),
@@ -532,12 +532,12 @@ func (a *Actions) MigratePush(ctx context.Context) error {
 	rc := tc.GetRunContext()
 	rc.Path = a.GetInput("dir")
 	params := &atlasexec.MigratePushParams{
+		ConfigURL: a.GetConfigURL(),
 		Context:   rc,
-		Name:      a.GetInput("dir-name"),
-		DirURL:    a.GetInput("dir"),
 		DevURL:    a.GetInput("dev-url"),
-		ConfigURL: a.GetInput("config"),
+		DirURL:    a.GetInput("dir"),
 		Env:       a.GetInput("env"),
+		Name:      a.GetInput("dir-name"),
 		Vars:      a.GetVarsInput("vars"),
 	}
 	if a.GetBoolInput("latest") {
@@ -578,12 +578,12 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	rc := tc.GetRunContext()
 	rc.Path = a.GetInput("dir")
 	switch err := a.Atlas.MigrateLintError(ctx, &atlasexec.MigrateLintParams{
+		Base:      a.GetAtlasURLInput("dir-name", "tag"),
+		ConfigURL: a.GetConfigURL(),
 		Context:   rc,
 		DevURL:    a.GetInput("dev-url"),
 		DirURL:    a.GetInput("dir"),
-		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
-		Base:      a.GetAtlasURLInput("dir-name", "tag"),
 		GitBase:   a.GetInput("git-base"),
 		GitDir:    a.GetInput("git-dir"),
 		Vars:      a.GetVarsInput("vars"),
@@ -625,10 +625,10 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 // MigrateTest runs the GitHub Action for "ariga/atlas-action/migrate/test"
 func (a *Actions) MigrateTest(ctx context.Context) error {
 	result, err := a.Atlas.MigrateTest(ctx, &atlasexec.MigrateTestParams{
+		ConfigURL:       a.GetConfigURL(),
 		DirURL:          a.GetInput("dir"),
 		DevURL:          a.GetInput("dev-url"),
 		Run:             a.GetInput("run"),
-		ConfigURL:       a.GetInput("config"),
 		Env:             a.GetInput("env"),
 		Vars:            a.GetVarsInput("vars"),
 		RevisionsSchema: a.GetInput("revisions-schema"),
@@ -750,8 +750,8 @@ func (a *Actions) MigrateHash(ctx context.Context) error {
 		return fmt.Errorf("failed to checkout to the branch: %w", err)
 	}
 	if err := a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{
+		ConfigURL: a.GetConfigURL(),
 		DirURL:    a.GetInput("dir"),
-		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
 	}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
@@ -785,11 +785,11 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 		currBranch = tc.Branch
 	)
 	params := &atlasexec.MigrateDiffParams{
-		DirURL:    a.GetInput("dir"),
-		ToURL:     a.GetInput("to"),
+		ConfigURL: a.GetConfigURL(),
 		DevURL:    a.GetInput("dev-url"),
-		ConfigURL: a.GetInput("config"),
+		DirURL:    a.GetInput("dir"),
 		Env:       a.GetInput("env"),
+		ToURL:     a.GetInput("to"),
 		Vars:      a.GetVarsInput("vars"),
 	}
 	diff, err := a.Atlas.MigrateDiff(ctx, params)
@@ -881,16 +881,16 @@ func (a *Actions) SchemaPush(ctx context.Context) error {
 		return err
 	}
 	params := &atlasexec.SchemaPushParams{
+		ConfigURL:   a.GetConfigURL(),
 		Context:     tc.GetRunContext(),
-		Name:        a.GetInput("schema-name"),
 		Description: a.GetInput("description"),
-		Version:     a.GetInput("version"),
-		URL:         a.GetArrayInput("url"),
-		Schema:      a.GetArrayInput("schema"),
 		DevURL:      a.GetInput("dev-url"),
-		ConfigURL:   a.GetInput("config"),
 		Env:         a.GetInput("env"),
+		Name:        a.GetInput("schema-name"),
+		Schema:      a.GetArrayInput("schema"),
+		URL:         a.GetArrayInput("url"),
 		Vars:        a.GetVarsInput("vars"),
+		Version:     a.GetInput("version"),
 	}
 	if a.GetBoolInput("latest") {
 		// Push the "latest" tag.
@@ -923,12 +923,12 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 		return fmt.Errorf("unable to get the trigger context: %w", err)
 	}
 	params := &atlasexec.SchemaLintParams{
-		ConfigURL: a.GetInput("config"),
-		Vars:      a.GetVarsInput("vars"),
-		Env:       a.GetInput("env"),
-		URL:       a.GetArrayInput("url"),
-		Schema:    a.GetArrayInput("schema"),
+		ConfigURL: a.GetConfigURL(),
 		DevURL:    a.GetInput("dev-url"),
+		Env:       a.GetInput("env"),
+		Schema:    a.GetArrayInput("schema"),
+		URL:       a.GetArrayInput("url"),
+		Vars:      a.GetVarsInput("vars"),
 	}
 	report, err := a.Atlas.SchemaLint(ctx, params)
 	if err != nil {
@@ -981,13 +981,13 @@ func (a *Actions) SchemaLint(ctx context.Context) error {
 // SchemaTest runs the GitHub Action for "ariga/atlas-action/schema/test"
 func (a *Actions) SchemaTest(ctx context.Context) error {
 	result, err := a.Atlas.SchemaTest(ctx, &atlasexec.SchemaTestParams{
-		URL:       a.GetInput("url"),
+		ConfigURL: a.GetConfigURL(),
 		DevURL:    a.GetInput("dev-url"),
-		Run:       a.GetInput("run"),
-		ConfigURL: a.GetInput("config"),
 		Env:       a.GetInput("env"),
-		Vars:      a.GetVarsInput("vars"),
 		Paths:     a.GetArrayInput("paths"),
+		Run:       a.GetInput("run"),
+		URL:       a.GetInput("url"),
+		Vars:      a.GetVarsInput("vars"),
 	})
 	if err != nil {
 		return fmt.Errorf("`atlas schema test` completed with errors:\n%s", err)
@@ -1005,18 +1005,18 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 	}
 	var plan *atlasexec.SchemaPlan
 	params := &atlasexec.SchemaPlanListParams{
+		ConfigURL: a.GetConfigURL(),
 		Context:   tc.GetRunContext(),
-		ConfigURL: a.GetInput("config"),
-		Env:       a.GetInput("env"),
-		Vars:      a.GetVarsInput("vars"),
-		Repo:      a.GetAtlasURLInput("schema-name"),
 		DevURL:    a.GetInput("dev-url"),
-		Schema:    a.GetArrayInput("schema"),
+		Env:       a.GetInput("env"),
+		Exclude:   a.GetArrayInput("exclude"),
 		From:      a.GetArrayInput("from"),
 		Include:   a.GetArrayInput("include"),
-		Exclude:   a.GetArrayInput("exclude"),
-		To:        a.GetArrayInput("to"),
 		Pending:   true,
+		Repo:      a.GetAtlasURLInput("schema-name"),
+		Schema:    a.GetArrayInput("schema"),
+		To:        a.GetArrayInput("to"),
+		Vars:      a.GetVarsInput("vars"),
 	}
 	switch planFiles, err := a.Atlas.SchemaPlanList(ctx, params); {
 	case err != nil:
@@ -1126,7 +1126,7 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 		return fmt.Errorf("the action should be run in a branch context")
 	}
 	params := &atlasexec.SchemaPlanApproveParams{
-		ConfigURL: a.GetInput("config"),
+		ConfigURL: a.GetConfigURL(),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
 		URL:       a.GetInput("plan"),
@@ -1365,12 +1365,12 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 		return fmt.Errorf("failed to login to Atlas Cloud: %w", err)
 	}
 	params := &atlasexec.SchemaInspectParams{
-		URL:       a.GetInput("url"),
-		ConfigURL: a.GetInput("config"),
+		ConfigURL: a.GetConfigURL(),
 		Env:       a.GetInput("env"),
-		Schema:    a.GetArrayInput("schemas"),
 		Exclude:   a.GetArrayInput("exclude"),
 		Include:   a.GetArrayInput("include"),
+		Schema:    a.GetArrayInput("schemas"),
+		URL:       a.GetInput("url"),
 		Format:    `{{ printf "# %s\n# %s\n%s" .RedactedURL .Hash .MarshalHCL }}`,
 	}
 	if (params.ConfigURL != "" || params.Env != "") && params.URL != "" {
@@ -1411,12 +1411,12 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	}
 	if a.GetBoolInput("collect-stats") {
 		statsParams := &atlasexec.SchemaStatsInspectParams{
-			URL:       a.GetInput("url"),
-			ConfigURL: a.GetInput("config"),
+			ConfigURL: a.GetConfigURL(),
 			Env:       a.GetInput("env"),
-			Schema:    a.GetArrayInput("schemas"),
 			Exclude:   a.GetArrayInput("exclude"),
 			Include:   a.GetArrayInput("include"),
+			Schema:    a.GetArrayInput("schemas"),
+			URL:       a.GetInput("url"),
 		}
 		stats, err := a.Atlas.SchemaStatsInspect(ctx, statsParams)
 		if err != nil {
@@ -1489,6 +1489,12 @@ func OldAgentHash(src string) string {
 // WorkingDir returns the working directory for the action.
 func (a *Actions) WorkingDir() string {
 	return a.GetInput("working-directory")
+}
+
+// GetConfigURL returns the config URL input.
+// It joins multiple config URLs with a comma.
+func (a *Actions) GetConfigURL() string {
+	return strings.Join(a.GetArrayInput("config"), ",")
 }
 
 // GetBoolInput returns the boolean input with the given name.
@@ -1642,7 +1648,7 @@ func (a *Actions) RequiredInputs(input ...string) error {
 // schemaApplyParams returns the parameters for the schema apply action based on the inputs.
 func (a *Actions) schemaApplyParams(withParams ...func(*atlasexec.SchemaApplyParams)) *atlasexec.SchemaApplyParams {
 	params := &atlasexec.SchemaApplyParams{
-		ConfigURL:   a.GetInput("config"),
+		ConfigURL:   a.GetConfigURL(),
 		Env:         a.GetInput("env"),
 		Vars:        a.GetVarsInput("vars"),
 		DevURL:      a.GetInput("dev-url"),
@@ -1667,7 +1673,7 @@ func (a *Actions) schemaPlanListParams(
 	withParams ...func(*atlasexec.SchemaPlanListParams),
 ) *atlasexec.SchemaPlanListParams {
 	params := &atlasexec.SchemaPlanListParams{
-		ConfigURL: a.GetInput("config"),
+		ConfigURL: a.GetConfigURL(),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
 		Repo:      a.GetInput("repo"),
@@ -1687,7 +1693,7 @@ func (a *Actions) schemaPlanParams(
 	withParams ...func(*atlasexec.SchemaPlanParams),
 ) *atlasexec.SchemaPlanParams {
 	params := &atlasexec.SchemaPlanParams{
-		ConfigURL: a.GetInput("config"),
+		ConfigURL: a.GetConfigURL(),
 		Env:       a.GetInput("env"),
 		Vars:      a.GetVarsInput("vars"),
 		Schema:    a.GetArrayInput("schema"),
