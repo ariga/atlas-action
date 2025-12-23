@@ -423,10 +423,11 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		return nil
 	}
 	type runOutput struct {
-		Current      string `json:"current"`
-		Target       string `json:"target"`
-		AppliedCount int    `json:"applied_count"`
-		PendingCount int    `json:"pending_count"`
+		Current      string   `json:"current"`
+		Target       string   `json:"target"`
+		AppliedCount int      `json:"applied_count"`
+		PendingCount int      `json:"pending_count"`
+		PendingFiles []string `json:"pending_files,omitempty"`
 	}
 	var runsOutput []runOutput
 	for _, run := range runs {
@@ -442,11 +443,16 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		a.SetOutput("target", run.Target)
 		a.SetOutput("applied_count", strconv.Itoa(len(run.Applied)))
 		a.SetOutput("pending_count", strconv.Itoa(len(run.Pending)))
+		pendingFiles := make([]string, len(run.Pending))
+		for i, p := range run.Pending {
+			pendingFiles[i] = p.Name
+		}
 		runsOutput = append(runsOutput, runOutput{
 			Current:      run.Current,
 			Target:       run.Target,
 			AppliedCount: len(run.Applied),
 			PendingCount: len(run.Pending),
+			PendingFiles: pendingFiles,
 		})
 	}
 	if b, err := json.Marshal(runsOutput); err != nil {
