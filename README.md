@@ -186,6 +186,7 @@ Setup the Atlas CLI and optionally login to Atlas Cloud.
    a cloud token see the [docs](https://atlasgo.io/cloud/bots).
 * `version` - (Optional) The version of the Atlas CLI to install. Defaults to the latest
    version.
+* `flavor` - (Optional) The driver flavor to install. Some drivers require customer binaries like ("snowflake", "spanner").
 
 ### `ariga/atlas-action/migrate/push` 
 
