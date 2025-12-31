@@ -61,3 +61,4 @@ ariga.atlas-action-*.vsix
 .github/azure-devops/action/shim.js
 
 !atlas-actions.yml
+gitlab/*

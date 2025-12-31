@@ -44,7 +44,7 @@
     {{- range $name, $input := .AzureInputs }}
     {
       "type": "{{ $input.AzureInputType }}",
-      {{- if eq $input.Type "enum" }}
+      {{- if $input.Options }}
       "options": {
         {{ range $i, $v := $input.Options -}}
         {{- if not (eq $i 0) }},{{ end }}{{ $v | printf "%q" }}:{{ $v | printf "%q" -}}

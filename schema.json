@@ -62,7 +62,6 @@
     "type": {
       "type": "string",
       "enum": [
-        "enum",
         "boolean",
         "string",
         "number"
@@ -87,7 +86,11 @@
         },
         "default": {
           "description": "Default value of the input",
-          "type": "string"
+          "type": [
+            "string",
+            "boolean",
+            "number"
+          ]
         },
         "options": {
           "type": "array",
@@ -111,21 +114,41 @@
       "allOf": [
         {
           "if": {
-            "properties": { "type": { "const": "enum" } }
+            "properties": { "type": { "const": "string" } }
           },
           "then": {
-            "required": ["options"],
             "properties": {
               "options": {
                 "type": "array",
                 "minItems": 1,
                 "items": { "type": "string" }
-              }
+              },
+              "default": { "type": "string" }
             }
           },
           "else": {
             "not": {
               "required": ["options"]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "boolean" } }
+          },
+          "then": {
+            "properties": {
+              "default": { "type": "boolean" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "number" } }
+          },
+          "then": {
+            "properties": {
+              "default": { "type": "number" }
             }
           }
         }

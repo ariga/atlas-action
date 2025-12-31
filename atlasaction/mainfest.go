@@ -128,11 +128,12 @@ func (a ActionInput) AzureInputType() string {
 		return "boolean"
 	case "number":
 		return "int"
-	case "enum":
-		return "pickList"
 	case "string":
 		if a.MultiLine {
 			return "multiLine"
+		}
+		if len(a.Options) > 0 {
+			return "pickList"
 		}
 		fallthrough
 	default:
@@ -156,6 +157,30 @@ func (a ActionsManifest) GitHubManifests(path string) error {
 		}
 		defer file.Close()
 		return templates.ExecuteTemplate(file, "action-yml.tmpl", a)
+	}
+	for _, act := range a.Actions {
+		if act.ID == "" {
+			continue
+		}
+		if err := write(act); err != nil {
+			return fmt.Errorf("writing action %s: %w", act.ID, err)
+		}
+	}
+	return nil
+}
+
+func (a ActionsManifest) GitLabTemplates(path string) error {
+	write := func(a ActionSpec) error {
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return fmt.Errorf("creating directory %s: %w", path, err)
+		}
+		temp := filepath.Join(path, strings.ReplaceAll(a.ID, "/", "-"))
+		file, err := os.OpenFile(fmt.Sprintf("%s.yml", temp), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			return fmt.Errorf("creating %s: %w", temp, err)
+		}
+		defer file.Close()
+		return templates.ExecuteTemplate(file, "gitlab-yml.tmpl", a)
 	}
 	for _, act := range a.Actions {
 		if act.ID == "" {
