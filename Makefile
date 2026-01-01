@@ -76,4 +76,5 @@ azure-devops-dev:
 .PHONY: manifest
 manifest:
 	go run -tags manifest ./cmd/gen github-manifest
+	go run -tags manifest ./cmd/gen gitlab-template -o gitlab
 	go run -tags manifest ./cmd/gen azure-task -t ./.github/azure-devops/action/task.json

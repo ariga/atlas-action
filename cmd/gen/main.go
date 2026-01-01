@@ -27,6 +27,7 @@ func main() {
 	root.SetOut(os.Stdout)
 	root.AddCommand(
 		githubManifestCmd(),
+		gitlabTemplateCmd(),
 		azureTaskCmd(),
 		markdownDocCmd(),
 	)
@@ -50,6 +51,27 @@ func githubManifestCmd() *cobra.Command {
 					return err
 				}
 				return actions.GitHubManifests(flags.OutputDir)
+			},
+		}
+	)
+	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
+	return cmd
+}
+
+func gitlabTemplateCmd() *cobra.Command {
+	var (
+		flags struct {
+			OutputDir string
+		}
+		cmd = &cobra.Command{
+			Use:   "gitlab-template",
+			Short: "Generate GitLab template files from a manifest",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				actions, err := atlasaction.ParseManifest()
+				if err != nil {
+					return err
+				}
+				return actions.GitLabTemplates(flags.OutputDir)
 			},
 		}
 	)

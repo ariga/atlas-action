@@ -107,7 +107,7 @@ actions:
         type: boolean
         label: Generate tests
         description: Generate atlas tests for the schema changes.
-        default: "false"
+        default: false
   - id: migrate/apply
     name: Migrate Apply
     description: Applies a migration directory on a target database
@@ -133,7 +133,7 @@ actions:
         label: To Version
         description: The target version to apply migrations to. Mutually exclusive with `amount`.
       tx-mode:
-        type: enum
+        type: string
         label: Transaction mode
         description: |
           Transaction mode to use. Either "file", "all", or "none". Default is "file".
@@ -142,12 +142,12 @@ actions:
         type: boolean
         label: Allow dirty state
         description: Allow working on a non-clean database.
-        default: "false"
+        default: false
       dry-run:
         type: boolean
         label: Dry run
         description: Print SQL without executing it. Either "true" or "false".
-        default: "false"
+        default: false
     outputs:
       applied_count:
         type: number
@@ -361,7 +361,7 @@ actions:
           current git commit hash is used.
       latest:
         type: boolean
-        default: "true"
+        default: true
         label: Push the `latest` tag
         description: |
           If true, push also to the `latest` tag.
@@ -414,7 +414,7 @@ actions:
         description: "List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas"
       collect-stats:
         type: boolean
-        default: "true"
+        default: true
         label: Collect statistics
         description: Whether to collect and send anonymized usage statistics to Atlas.
     outputs:
@@ -445,12 +445,12 @@ actions:
         description: URL(s) of the desired schema state.
       auto-approve:
         type: boolean
-        default: "false"
+        default: false
         label: Auto approve
         description: Automatically approve and apply changes. Either "true" or "false".
       dry-run:
         type: boolean
-        default: "false"
+        default: false
         label: Dry run
         description: Print SQL without executing it. Either "true" or "false".
       schema:
@@ -460,7 +460,7 @@ actions:
         description: |
           List of database schema(s). For example: `public`.
       lint-review:
-        type: enum
+        type: string
         options:
           - ALWAYS
           - ERROR
@@ -470,7 +470,7 @@ actions:
           Automatically generate an approval plan before applying changes. Options are "ALWAYS", "ERROR" or "WARNING".
           Use "ALWAYS" to generate a plan for every apply, or "WARNING" and "ERROR" to generate a plan only based on review policy.
       tx-mode:
-        type: enum
+        type: string
         options:
           - file
           - all
@@ -574,7 +574,7 @@ actions:
         description: The version of the schema.
       latest:
         type: boolean
-        default: "true"
+        default: true
         label: Push the `latest` tag
         description: |
           If true, push also to the `latest` tag.
