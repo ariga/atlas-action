@@ -1,0 +1,594 @@
+{{- $oc := "{{" -}}
+{{- $cc := "}}" -}}
+# GitHub Actions for Atlas
+
+This repository contains GitHub Actions for working with [Atlas](https://atlasgo.io).
+
+To learn more about the recommended way to build workflows, read our guide on 
+[Modern CI/CD for Databases](https://atlasgo.io/guides/modern-database-ci-cd).
+
+## Actions
+
+| Action                                                                        | Description                                                                         |
+|-------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| [ariga/setup-atlas](#arigasetup-atlas)                                        | Setup the Atlas CLI and optionally login to Atlas Cloud                             |
+{{- range .Actions }}
+| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+
+## Examples
+
+The Atlas GitHub Actions can be composed into workflows to create CI/CD pipelines for your database schema.
+Workflows will normally begin with the `setup-atlas` action, which will install the Atlas CLI and optionally
+login to Atlas Cloud. Followed by whatever actions you need to run, such as `migrate lint` or `migrate apply`.
+
+### Pre-requisites
+
+The following examples require you to have an Atlas Cloud account and push an initial version of your
+migration directory.
+
+To create an account, first download the Atlas CLI (on Linux/macOS):
+
+```bash
+curl -sSL https://atlasgo.io/install | sh
+```
+For more installation options, see the [documentation](https://atlasgo.io/getting-started#installation).
+
+Then, create an account by running the following command and following the instructions:
+
+```bash
+atlas login
+```
+
+After logging in, push your migration directory to Atlas Cloud:
+
+```bash
+atlas migrate push --dev-url docker://mysql/8/dev --dir-name my-project
+```
+
+For a more detailed guide, see the [documentation](https://atlasgo.io/versioned/intro#pushing-migrations-to-atlas).
+
+Finally, you will need an API token to use the Atlas GitHub Actions. To create a token, see 
+the [docs](https://atlasgo.io/cloud/bots).
+
+### Continuous Integration and Delivery
+
+This example workflow shows how to configure a CI/CD pipeline for your database schema. The workflow will
+verify the safety of your schema changes when in a pull request and push migrations to Atlas Cloud when
+merged into the main branch.
+
+#### Quick Setup: Using the `gh` CLI
+
+If you have the [gh](https://cli.github.com/) CLI installed, you can use the following command to
+setup a workflow for your repository:
+
+```bash
+gh extension install ariga/gh-atlas
+gh auth refresh -s write:packages,workflow
+gh atlas init-action
+```
+
+This will create a pull request with a workflow that will run `migrate lint` on pull requests and
+`migrate push` on the main branch. You can customize the workflow by editing the generated
+`.github/workflows/atlas-ci.yaml` file.
+
+#### Manual Setup: Create a workflow
+
+Create a new file named `.github/workflows/atlas.yaml` with the following contents:
+
+```yaml
+name: Atlas CI/CD
+on:
+  push:
+    branches:
+      - master # Use your main branch here.
+  pull_request:
+    paths:
+      - 'migrations/*' # Use the path to your migration directory here.
+# Permissions to write comments on the pull request.
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  atlas:
+    services:
+      # Spin up a mysql:8 container to be used as the dev-database for analysis.
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_DATABASE: dev
+          MYSQL_ROOT_PASSWORD: pass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -ppass"
+          --health-interval 10s
+          --health-start-period 10s
+          --health-timeout 5s
+          --health-retries 10
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{$oc}} github.token {{$cc}}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{$oc}} secrets.ATLAS_TOKEN {{$cc}}
+      - uses: ariga/atlas-action/migrate/lint@v1
+        with:
+          dir: 'file://migrations'
+          dir-name: 'my-project' # The name of the project in Atlas Cloud
+          dev-url: "mysql://root:pass@localhost:3306/dev"
+      - uses: ariga/atlas-action/migrate/push@v1
+        if: github.ref == 'refs/heads/master'
+        with:
+          dir: 'file://migrations'
+          dir-name: 'my-project' 
+          dev-url: 'mysql://root:pass@localhost:3306/dev' # Use the service name "mysql" as the hostname
+```
+
+This example uses a MySQL database, but you can use any database supported by Atlas.  
+For more examples, see the [documentation](https://atlasgo.io/integrations/github-actions).
+
+### Continuous Deployment
+
+This example workflow shows how to configure a continuous deployment pipeline for your database schema. The workflow will
+apply migrations on the target database whenever a new commit is pushed to the main branch.
+
+```yaml
+name: Atlas Continuous Deployment
+on:
+  push:
+    branches:
+      - master
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{$oc}} secrets.ATLAS_TOKEN {{$cc}}
+      - uses: ariga/atlas-action/migrate/apply@v1
+        with:
+          url: 'mysql://user:${{$oc}} secrets.DB_PASSWORD {{$cc}}@db.hostname.io:3306/db'
+          dir: 'atlas://my-project' # A directory stored in Atlas Cloud, use ?tag=<tag> to specify a tag
+```
+
+This example workflow shows how to configure a deployment pipeline for your database schema. 
+This workflow will pull the most recent version of your migration directory from Atlas Cloud
+and apply it to the target database.
+
+For more examples, see the [documentation](https://atlasgo.io/integrations/github-actions).
+
+## API 
+
+### `ariga/setup-atlas`
+
+Setup the Atlas CLI and optionally login to Atlas Cloud.
+
+#### Inputs
+* `cloud-token` - (Optional) The Atlas Cloud token to use for authentication. To create
+   a cloud token see the [docs](https://atlasgo.io/cloud/bots).
+* `version` - (Optional) The version of the Atlas CLI to install. Defaults to the latest
+   version.
+* `flavor` - (Optional) The driver flavor to install. Some drivers require custom binaries like ("snowflake", "spanner").
+{{ with action . "migrate/push" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Push the current version of your migration directory to Atlas Cloud.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+{{- if .Outputs }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+{{- end }}
+{{- end }}
+{{- with action . "migrate/lint" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Lint migration changes with Atlas
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+{{- if .Outputs }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+{{- end }}
+{{- end }}
+{{- with action . "migrate/apply" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Apply migrations to a database.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+{{- if .Outputs }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+{{- end }}
+{{- end }}
+{{- with action . "migrate/down" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Revert migrations to a database.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+{{- if .Outputs }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+{{- end }}
+{{- end }}
+{{- with action . "migrate/test" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Run schema migration tests. Read more in [Atlas website](https://atlasgo.io/testing/migrate).
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+{{- end }}
+{{- with action . "migrate/autorebase" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch. 
+
+> **Note**
+> 
+> Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
+> 
+> After the rebase is done and a commit is pushed by the action, no other workflows will be triggered unless the action is running with a personal access token (PAT).
+>```
+>   - uses: actions/checkout@v4
+>     with:
+>       token: ${{$oc}} secrets.PAT {{$cc}}
+>```
+
+
+#### Inputs
+
+All inputs are optional
+
+{{ template "readme/inputs" . }}
+#### Example usage
+
+Add the next job to your workflow to automatically rebase migrations on top of the migration directory in case of conflicts:
+
+```yaml
+name: Rebase Atlas Migrations
+on:
+  # Run on push event and not pull request because github action does not run when there is a conflict in the PR.
+  push:
+    branches-ignore:
+      - master
+jobs:
+  migrate-auto-rebase:
+    permissions:
+      # Allow pushing changes to repo
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: ariga/setup-atlas@v0
+      with:
+        cloud-token: ${{$oc}} secrets.ATLAS_TOKEN {{$cc}}
+    - uses: actions/checkout@v4
+      with:
+        # Use personal access token to trigger workflows after commits are pushed by the action.
+        token: ${{$oc}} secrets.PAT {{$cc}}
+        # Need to fetch the branch history for rebase.
+        fetch-depth: 0
+    # Skip the step below if your CI is already configured with a Git account.
+    - name: config git to commit changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+    - uses: ariga/atlas-action/migrate/autorebase@v1
+      with:
+        base-branch: master
+        dir: file://migrations
+```
+{{- end }}
+{{- with action . "migrate/hash" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.
+
+> **Note**
+> 
+> After the rehash is done and a commit is pushed by the action, no other workflows will be triggered unless the action is running with a personal access token (PAT).
+>```
+>   - uses: actions/checkout@v4
+>     with:
+>       token: ${{$oc}} secrets.PAT {{$cc}}
+>```
+
+#### Inputs
+
+All inputs are optional
+
+{{ template "readme/inputs" . }}
+#### Example usage
+
+Add the next job to your workflow to automatically re-generate the `atlas.sum` file in case it is out of sync with the migration directory:
+
+```yaml
+name: Hash Atlas Migrations
+on:
+  pull_request:
+jobs:
+  migrate-hash:
+    permissions:
+      # Allow pushing changes to repo
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: ariga/setup-atlas@v0
+      with:
+        cloud-token: ${{$oc}} secrets.ATLAS_TOKEN {{$cc}}
+    - uses: actions/checkout@v4
+      with:
+        # Use personal access token to trigger workflows after commits are pushed by the action.
+        token: ${{$oc}} secrets.PAT {{$cc}}
+        fetch-depth: 0
+    # Skip the step below if your CI is already configured with a Git account.
+    - name: config git to commit changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+    - uses: ariga/atlas-action/migrate/hash@v1
+      with:
+        dir: file://migrations
+```
+{{- end }}
+{{- with action . "migrate/diff" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory.
+> **Note**
+>
+> After committing the changes to the migration directory, no other workflows will be triggered unless the action is run with a personal access token (PAT).
+>```
+>   - uses: actions/checkout@v4
+>     with:
+>       token: ${{$oc}} secrets.PAT {{$cc}}
+>```
+
+#### Inputs
+
+`dir`, `to`  and `dev-url` are required, but they can be specified in the Atlas configuration file via `config` and `env`.
+
+{{ template "readme/inputs" . }}
+#### Example usage
+
+```yaml
+jobs:
+  migrate-diff:
+    permissions:
+      # Allow pushing changes to repo and comments on the pull request
+      contents: write
+      pull-requests: write
+    env:
+      GITHUB_TOKEN: ${{$oc}} github.token {{$cc}}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: ariga/setup-atlas@v0
+      with:
+        cloud-token: ${{$oc}} secrets.ATLAS_TOKEN {{$cc}}
+    - uses: actions/checkout@v4
+      with:
+        # Use personal access token to trigger workflows after commits are pushed by the action.
+        token: ${{$oc}} secrets.PAT {{$cc}}
+        fetch-depth: 0
+    # Skip the step below if your CI is already configured with a Git account.
+    - name: config git to commit changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+    - uses: ariga/atlas-action/migrate/diff@v1
+      with:
+        dev-url: "mysql://root:pass@localhost:3306/dev"
+        dir: file://migrations
+        to:  file://schema.sql # The desired schema state to transition to.
+```
+{{ end }}
+{{- with action . "schema/test" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Run schema tests on the desired schema. Read more in [Atlas website](https://atlasgo.io/testing/schema).
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+{{- end }}
+{{- with action . "schema/apply" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Apply a declarative migrations to a database.
+
+#### Inputs
+
+{{ template "readme/inputs" . }}
+{{- if .Outputs }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+{{- end }}
+{{- end }}
+{{- with action . "schema/lint" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Lint database schema with Atlas.
+
+#### Inputs
+
+{{ template "readme/inputs" . }}
+{{- end }}
+{{- with action . "schema/push" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Push a schema to [Atlas Registry](https://atlasgo.io/registry) with an optional tag.
+
+#### Inputs
+
+{{ template "readme/inputs" . }}
+
+{{ if .Outputs }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+{{ end }}
+{{- end }}
+{{- with action . "schema/plan" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Plan a declarative migration for a schema transition.
+
+#### Inputs
+
+{{ template "readme/inputs" . }}
+
+{{ if .Outputs }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+{{ end }}
+{{- end }}
+{{- with action . "schema/plan/approve" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Approve a declarative migration plan.
+
+#### Inputs
+
+{{ template "readme/inputs" . }}
+
+{{ if .Outputs }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+{{ end }}
+{{- end }}
+{{- with action . "monitor/schema" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Monitor changes of the database schema and track them in Atlas Cloud.
+Can be used periodically to [monitor](https://atlasgo.io/monitoring) changes in the database schema.
+
+#### Inputs
+
+{{ template "readme/inputs" . }}
+
+{{ if .Outputs }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+{{ end -}}
+#### Example usage
+
+The following action will monitor changes to the `auth` and `app` schemas inside the `mysql://root:pass@localhost:3306` database and track them in Atlas Cloud.
+In case the database URL is subject to change, the `slug` parameter can use to identify the same database across runs.
+
+```yaml
+        uses: ariga/atlas-action/monitor/schema@v1
+        with:
+          cloud-token: ${{$oc}} secrets.ATLAS_CLOUD_TOKEN {{$cc}}
+          url: 'mysql://root:pass@localhost:3306'
+          schemas: |-
+            auth
+            app
+```
+{{ end }}
+### `ariga/atlas-action/setup`
+
+This action builds the binary of atlas-action on your pipeline, instead of downloading it from the internet. So you can pin it and other actions to specified commit.
+
+#### Inputs
+
+* `token` - (Optional) The GitHub Token for GitHub Enterprise usage only.
+
+#### Example usage
+
+The following example demonstrates how to pin the `ariga/atlas-action/setup` action to a specific commit for better security and reproducibility:
+
+```yaml
+name: Setup Atlas CLI
+on:
+  push:
+    branches:
+      - main
+jobs:
+  migrate-apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      # This action builds the binary locally
+      - uses: ariga/atlas-action/setup@<commit-sha>
+      # Pin other actions without `atlas-action/setup` won't work
+      - uses: ariga/atlas-action/migrate/apply@<commit-sha>
+        with:
+          url: 'mysql://user:${{$oc}} secrets.DB_PASSWORD {{$cc}}@db.hostname.io:3306/db'
+          dir: 'atlas://my-project' # A directory stored in Atlas Cloud, use ?tag=<tag> to specify a tag
+```
+
+Replace `<commit-sha>` with the specific commit hash you want to pin the action to. Pinning to a commit ensures that the action's behavior does not change unexpectedly due to updates in the repository.
+
+### Why Pin Actions to a Commit?
+
+Pinning actions to a specific commit provides the following benefits:
+- **Security**: Prevents the action from being modified by unauthorized changes in the repository.
+- **Reproducibility**: Ensures that workflows behave consistently across runs, even if the action is updated in the future.
+
+For more details, see the [GitHub Actions security best practices](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions).
+
+### Development
+
+To release the new version of atlas-action, bump the version in `VERSION.txt` and open the Pull Request to the master branch.
+
+### Legal
+
+The source code for this GitHub Action is released under the Apache 2.0
+License, see [LICENSE](LICENSE).
+
+This action downloads a binary version of [Atlas](https://atlasgo.io) which
+is distributed under the [Ariga EULA](https://ariga.io/legal/atlas/eula).
+
+{{- define "readme/inputs" -}}
+{{- range $name, $item := .SortedInputs }}
+{{- $desc := $item.Description | trimnl -}}
+* `{{ $name }}` - {{ if $item.Required }}(Required) {{ end }}{{ $desc | replace "\n" "\n  " }}
+{{ end }}
+{{- end -}}
+
+{{- define "readme/outputs" -}}
+{{- range $name, $item := .SortedOutputs }}
+{{- $desc := $item.Description | trimnl -}}
+* `{{ $name }}` - {{ $desc | replace "\n" "\n  " }}
+{{ end }}
+{{- end -}}

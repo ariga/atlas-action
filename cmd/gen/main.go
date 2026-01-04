@@ -115,6 +115,7 @@ func markdownDocCmd() *cobra.Command {
 	var (
 		flags struct {
 			OutputDir string
+			Readme    string
 		}
 		cmd = &cobra.Command{
 			Use:   "docs",
@@ -124,10 +125,19 @@ func markdownDocCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return actions.MarkdownDocs(flags.OutputDir)
+				if err := actions.MarkdownDocs(flags.OutputDir); err != nil {
+					return err
+				}
+				if flags.Readme != "" {
+					if err := actions.MarkdownREADME(flags.Readme); err != nil {
+						return err
+					}
+				}
+				return nil
 			},
 		}
 	)
 	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
+	cmd.Flags().StringVar(&flags.Readme, "readme", "", "The output file for the generated README")
 	return cmd
 }

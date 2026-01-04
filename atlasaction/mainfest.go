@@ -221,6 +221,16 @@ func (a ActionsManifest) MarkdownDocs(path string) error {
 	return nil
 }
 
+// MarkdownREADME writes the README documentation using the readme template.
+func (a ActionsManifest) MarkdownREADME(path string) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("opening file %s: %w", path, err)
+	}
+	defer file.Close()
+	return templates.ExecuteTemplate(file, "readme-md.tmpl", a)
+}
+
 func SortedInputs[Map ~map[K]V, K cmp.Ordered, V any](m Map, orders []K) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		keys := slices.SortedFunc(maps.Keys(m), ComparePriority(orders))

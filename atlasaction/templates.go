@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"strconv"
 	"strings"
@@ -24,6 +25,14 @@ var (
 	// Funcs are the predefined template
 	// functions used by the codegen.
 	Funcs = template.FuncMap{
+		"action": func(m ActionsManifest, id string) (*ActionSpec, error) {
+			for i := range m.Actions {
+				if m.Actions[i].ID == id {
+					return &m.Actions[i], nil
+				}
+			}
+			return nil, fmt.Errorf("unknown action %q", id)
+		},
 		"xtemplate":   xtemplate,
 		"hasTemplate": hasTemplate,
 		"trimnl": func(s string) string {
