@@ -72,9 +72,13 @@ func (a *GitLab) GetTriggerContext(context.Context) (*TriggerContext, error) {
 		Act:     a,
 		SCMType: atlasexec.SCMTypeGitlab,
 		SCMClient: func() (SCMClient, error) {
-			token := a.Getenv("GITLAB_TOKEN")
+			envName := a.Getenv("ATLAS_GITLAB_TOKEN_ENV")
+			if envName == "" {
+				envName = "GITLAB_TOKEN"
+			}
+			token := a.Getenv(envName)
 			if token == "" {
-				a.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
+				a.Warningf("%s is not set, the action may not have all the permissions", envName)
 			}
 			return NewGitLabClient(
 				a.Getenv("CI_PROJECT_ID"),
