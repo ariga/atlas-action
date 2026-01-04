@@ -41,7 +41,13 @@ func (a *GitLab) Getenv(key string) string {
 
 // GetInput implements the Action interface.
 func (a *GitLab) GetInput(name string) string {
-	return strings.TrimSpace(a.getenv(toInputVarName(name)))
+	v := strings.TrimSpace(a.getenv(toInputVarName(name)))
+	s, err := strconv.Unquote(v)
+	if err != nil {
+		a.Errorf("Fail to unquote the string %s, fallback to its raw value: %w", v, err)
+		return v
+	}
+	return s
 }
 
 // SetOutput implements the Action interface.
