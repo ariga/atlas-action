@@ -138,6 +138,6 @@ func markdownDocCmd() *cobra.Command {
 		}
 	)
 	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
-	cmd.Flags().StringVar(&flags.Readme, "readme", "README.md", "The output file for the generated README")
+	cmd.Flags().StringVar(&flags.Readme, "readme", "", "The output file for the generated README")
 	return cmd
 }
