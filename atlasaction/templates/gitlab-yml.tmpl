@@ -10,14 +10,12 @@ spec:
     atlas-version:
       description: Install a specific Atlas version.
       default: latest
+    gitlab-token:
+      description: A Gitlab access token for posting merge request comments.
+      default: ""
 {{- if ne .ID "monitor/schema" }}
     atlas-cloud-token:
       description: A token for Atlas Cloud.
-      default: ""
-{{- end }}
-{{- if or (eq .ID "migrate/diff") (eq .ID "migrate/lint") }}
-    gitlab-token:
-      description: A Gitlab access token for posting merge request comments.
       default: ""
 {{- end }}
 {{- range $name, $input := .SortedInputs }}
@@ -29,6 +27,9 @@ spec:
       {{- end }}{{ end }}
     {{- with .Options }}
       options:
+        {{- if and (eq $input.Default "") (not $input.Required) }}
+        - ""
+        {{- end }}
         {{- range $v := . }}
         - {{ $v }}
         {{- end }}
@@ -61,17 +62,10 @@ $[[ inputs.job_name ]]:
       git config --global user.name "GitLab CI"
       git remote set-url $[[ inputs.remote ]] "https://oauth2:$[[ inputs.gitlab-token ]]@$CI_SERVER_HOST/$CI_PROJECT_PATH.git"
 {{- end }}
-{{- if eq .ID "schema/apply" }}
-  needs:
-    - job: atlas-schema-plan-approve
-      artifacts: true
-{{- end }}
   script:
     - ./atlas-action --action={{ .ID }}
   variables:
-{{- if eq .ID "migrate/lint" }}
     GITLAB_TOKEN: $[[ inputs.gitlab-token ]]
-{{- end }}
 {{- range $name, $input := .SortedInputs }}
     {{ $name | inputvar }}: $[[ inputs.{{ $name }} ]]
 {{- end }}
