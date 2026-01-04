@@ -188,6 +188,7 @@ Setup the Atlas CLI and optionally login to Atlas Cloud.
 * `version` - (Optional) The version of the Atlas CLI to install. Defaults to the latest
    version.
 * `flavor` - (Optional) The driver flavor to install. Some drivers require custom binaries like ("snowflake", "spanner").
+
 ### `ariga/atlas-action/migrate/push`
 
 Push the current version of your migration directory to Atlas Cloud.
