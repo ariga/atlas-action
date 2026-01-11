@@ -53,7 +53,9 @@ $[[ inputs.job_name ]]:
 {{- if ne .ID "monitor/schema" }}
       atlas login --token $[[ inputs.atlas-cloud-token ]]
 {{- end }}
-      curl -o atlas-action https://release.ariga.io/atlas-action/atlas-action-v1
+      BINARY_NAME="atlas-action-${CI_RUNNER_EXECUTABLE_ARCH//\//-}-v1"
+      DOWNLOAD_URL="https://release.ariga.io/atlas-action/${BINARY_NAME}"
+      curl -fL -o atlas-action "$DOWNLOAD_URL" || { echo "Failed to download atlas-action from $DOWNLOAD_URL"; exit 1; }
       chmod +x ./atlas-action
 {{- if eq .ID "migrate/diff" }}
       # Set up git
