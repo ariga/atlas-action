@@ -44,6 +44,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.0.2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to Docker Hub (${{ env.REGISTRY }})
@@ -67,7 +71,7 @@ jobs:
       - name: Install Atlas
         uses: ariga/setup-atlas@v0
       - name: Build assets
-        run: make atlas-action test s3-upload docker DOCKER_IMAGE=$DOCKER_IMAGE azure-devops
+        run: make DOCKER_IMAGE=$DOCKER_IMAGE atlas-action test s3-upload docker azure-devops
         env:
           CGO_ENABLED: 0
           AWS_REGION: us-east-1
