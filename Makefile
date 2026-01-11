@@ -10,14 +10,17 @@ LDFLAGS    = "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}"
 
 BINARY_NAME  = atlas-action
 DOCKER_IMAGE = arigaio/atlas-action
+ATLAS_BIN_LINUX_AMD64 = $(BINARY_NAME)-linux-amd64
+ATLAS_BIN_LINUX_ARM64 = $(BINARY_NAME)-linux-arm64
+DOCKER_PLATFORMS ?= linux/amd64,linux/arm64
 
 .PHONY: install
 install:
 	go install -ldflags $(LDFLAGS) ./cmd/atlas-action
 
 .PHONY: atlas-action
-atlas-action:
-	go build -o atlas-action -ldflags $(LDFLAGS) ./cmd/atlas-action
+atlas-action: $(ATLAS_BIN_LINUX_AMD64)
+	cp $(ATLAS_BIN_LINUX_AMD64) $(BINARY_NAME)
 
 .PHONY: test
 test:
@@ -25,17 +28,25 @@ test:
 	echo "$$OUTPUT" | grep -iq "$(VERSION)" && echo "Version=$$OUTPUT" || (echo "unexpected output: $$OUTPUT, expected to include: $(VERSION)"; exit 1)
 
 .PHONY: s3-upload
-s3-upload:
-	aws s3 cp ./atlas-action s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(VERSION); \
-	aws s3 cp ./atlas-action s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(MAJOR_VER);
+s3-upload: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
+	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(VERSION); \
+	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(MAJOR_VER); \
+	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION); \
+	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(MAJOR_VER); \
+	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(VERSION); \
+	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER);
 
 .PHONY: docker-build
-docker-build:
-	docker build \
+docker-build: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
+	docker buildx build \
+		--platform $(DOCKER_PLATFORMS) \
 		--label org.opencontainers.image.revision=$(COMMIT) \
 		--label org.opencontainers.image.created=$(BUILD_DATE) \
 		-t $(DOCKER_IMAGE):$(VERSION) \
 		-t $(DOCKER_IMAGE):$(MAJOR_VER) .
+
+$(BINARY_NAME)-linux-%:
+	GOOS=linux GOARCH=$* go build -o $@ -ldflags $(LDFLAGS) ./cmd/atlas-action
 
 .PHONY: docker-push
 docker-push:

@@ -8,7 +8,8 @@ ARG ALPINE_VERSION="3.21"
 FROM alpine:${ALPINE_VERSION}
 COPY LICENSE README.md /
 COPY --chmod=001 ./scripts/setup-atlas.sh /usr/local/bin/setup-atlas
-COPY --chmod=001 ./atlas-action /usr/local/bin/
+ARG TARGETARCH=amd64
+COPY --chmod=001 ./atlas-action-linux-${TARGETARCH} /usr/local/bin/atlas-action
 RUN apk add --update --no-cache curl
 RUN setup-atlas && rm -rf /root/.atlas /tmp/*
 WORKDIR /root
