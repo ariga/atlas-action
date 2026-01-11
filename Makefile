@@ -43,18 +43,18 @@ docker-build: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
 		--label org.opencontainers.image.revision=$(COMMIT) \
 		--label org.opencontainers.image.created=$(BUILD_DATE) \
 		-t $(DOCKER_IMAGE):$(VERSION) \
-		-t $(DOCKER_IMAGE):$(MAJOR_VER) \
-		--push .
+		-t $(DOCKER_IMAGE):$(MAJOR_VER) .
 
 $(BINARY_NAME)-linux-%:
 	GOOS=linux GOARCH=$* go build -o $@ -ldflags $(LDFLAGS) ./cmd/atlas-action
 
 .PHONY: docker-push
 docker-push:
-	@echo "docker-build already pushed $(DOCKER_IMAGE):$(VERSION) and $(DOCKER_IMAGE):$(MAJOR_VER)"
+	docker push $(DOCKER_IMAGE):$(VERSION)
+	docker push $(DOCKER_IMAGE):$(MAJOR_VER)
 
 .PHONY: docker
-docker: docker-build
+docker: docker-build docker-push
 
 .PHONY: release
 release:
