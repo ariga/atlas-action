@@ -35,7 +35,7 @@ login to Atlas Cloud. Followed by whatever actions you need to run, such as `mig
 
 ### Pre-requisites
 
-The following examples require you to have an Atlas Cloud account and a push an initial version of your
+The following examples require you to have an Atlas Cloud account and push an initial version of your
 migration directory.
 
 To create an account, first download the Atlas CLI (on Linux/macOS):
@@ -640,7 +640,8 @@ Plan a declarative migration for a schema transition.
 
 * `exclude` - List of glob patterns used to select which resources to filter in inspection
   see: https://atlasgo.io/declarative/inspect#exclude-schemas
-* `from` - URL(s) of the current schema state.
+* `from` - URL(s) of the current schema state. If not provided, Atlas uses the [`url`](https://atlasgo.io/hcl/config#env.url) from the config file.
+  If that is also not set, Atlas defaults to the **last known state in the Atlas Registry** (use [`schema.repo`](https://atlasgo.io/hcl/config#env.schema.repo) from the config file).
 * `include` - List of glob patterns used to select which resources to keep in inspection
   see: https://atlasgo.io/declarative/inspect#include-schemas
 * `name` - The name of the plan. By default, Atlas will generate a name based on the schema changes.
@@ -675,7 +676,8 @@ Approve a declarative migration plan.
 
 * `exclude` - List of glob patterns used to select which resources to filter in inspection
   see: https://atlasgo.io/declarative/inspect#exclude-schemas
-* `from` - URL(s) of the current schema state.
+* `from` - URL(s) of the current schema state. If not provided, Atlas uses the [`url`](https://atlasgo.io/hcl/config#env.url) from the config file.
+  If that is also not set, Atlas defaults to the **last known state in the Atlas Registry** (use [`schema.repo`](https://atlasgo.io/hcl/config#env.schema.repo) from the config file).
 * `include` - List of glob patterns used to select which resources to keep in inspection
   see: https://atlasgo.io/declarative/inspect#include-schemas
 * `plan` - The URL of the plan to be approved. For example, `atlas://<schema>/plans/<id>`.
