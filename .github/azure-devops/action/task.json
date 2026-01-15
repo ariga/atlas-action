@@ -137,7 +137,7 @@
     {
       "type": "multiLine",
       "label": "Current schema URL",
-      "helpMarkDown": "URL(s) of the current schema state.\n",
+      "helpMarkDown": "URL(s) of the current schema state. If not provided, Atlas uses the [`url`](https://atlasgo.io/hcl/config#env.url) from the config file.\nIf that is also not set, Atlas defaults to the **last known state in the Atlas Registry** (use [`schema.repo`](https://atlasgo.io/hcl/config#env.schema.repo) from the config file).\n",
       "name": "from",
       "visibleRule": "action == schema plan || action == schema plan approve"
     },

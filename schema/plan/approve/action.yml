@@ -11,7 +11,8 @@ inputs:
       see: https://atlasgo.io/declarative/inspect#exclude-schemas
   from:
     description: |
-      URL(s) of the current schema state.
+      URL(s) of the current schema state. If not provided, Atlas uses the [`url`](https://atlasgo.io/hcl/config#env.url) from the config file.
+      If that is also not set, Atlas defaults to the **last known state in the Atlas Registry** (use [`schema.repo`](https://atlasgo.io/hcl/config#env.schema.repo) from the config file).
   include:
     description: |
       List of glob patterns used to select which resources to keep in inspection
