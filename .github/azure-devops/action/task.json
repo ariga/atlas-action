@@ -290,7 +290,7 @@
         "file":"file","all":"all","none":"none"
       },
       "label": "Transaction mode",
-      "helpMarkDown": "Transaction mode to use. Either \"file\", \"all\", or \"none\". Default is \"file\".\n",
+      "helpMarkDown": "Transaction mode to use. Either \"file\", \"all\", or \"none\".\n",
       "name": "tx_mode",
       "visibleRule": "action == migrate apply || action == schema apply"
     },

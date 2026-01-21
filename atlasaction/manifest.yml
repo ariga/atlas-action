@@ -136,9 +136,8 @@ actions:
       tx-mode:
         type: string
         label: Transaction mode
-        default: "file"
         description: |
-          Transaction mode to use. Either "file", "all", or "none". Default is "file".
+          Transaction mode to use. Either "file", "all", or "none".
         options: [file, all, none]
       allow-dirty:
         type: boolean
@@ -478,9 +477,8 @@ actions:
           - all
           - none
         label: Transaction mode
-        default: "file"
         description: |
-          Transaction mode to use. Either "file", "all", or "none". Default is "file".
+          Transaction mode to use. Either "file", "all", or "none".
       wait-interval:
         type: string
         default: 1s

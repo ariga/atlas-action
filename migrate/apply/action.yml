@@ -23,8 +23,7 @@ inputs:
     description: The target version to apply migrations to. Mutually exclusive with `amount`.
   tx-mode:
     description: |
-      Transaction mode to use. Either "file", "all", or "none". Default is "file".
-    default: "file"
+      Transaction mode to use. Either "file", "all", or "none".
   url:
     description: |
       The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
