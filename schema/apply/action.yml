@@ -33,8 +33,7 @@ inputs:
     description: URL(s) of the desired schema state.
   tx-mode:
     description: |
-      Transaction mode to use. Either "file", "all", or "none". Default is "file".
-    default: "file"
+      Transaction mode to use. Either "file", "all", or "none".
   url:
     description: |
       The URL of the target database to apply changes to.

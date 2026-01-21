@@ -259,7 +259,7 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `dry-run` - Print SQL without executing it. Either "true" or "false".
 * `revisions-schema` - The name of the schema containing the revisions table.
 * `to-version` - The target version to apply migrations to. Mutually exclusive with `amount`.
-* `tx-mode` - Transaction mode to use. Either "file", "all", or "none". Default is "file".
+* `tx-mode` - Transaction mode to use. Either "file", "all", or "none".
 * `url` - The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
 * `working-directory` - Atlas working directory. Default is project root
 * `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
@@ -561,7 +561,7 @@ Apply a declarative migrations to a database.
 * `plan` - The plan to apply. For example, `atlas://<schema>/plans/<id>`.
 * `schema` - List of database schema(s). For example: `public`.
 * `to` - URL(s) of the desired schema state.
-* `tx-mode` - Transaction mode to use. Either "file", "all", or "none". Default is "file".
+* `tx-mode` - Transaction mode to use. Either "file", "all", or "none".
 * `url` - The URL of the target database to apply changes to.
   For example: `mysql://root:pass@localhost:3306/prod`.
 * `wait-interval` - Time in seconds between different apply attempts.
