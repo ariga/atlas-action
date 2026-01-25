@@ -7,6 +7,7 @@ require (
 	github.com/alecthomas/kong v0.8.0
 	github.com/fatih/color v1.17.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
+	github.com/magiconair/properties v1.8.10
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/rogpeppe/go-internal v1.12.1-0.20240709150035-ccf4b4329d21
@@ -32,19 +33,14 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
-	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.66.1 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/zclconf/go-cty v1.16.3 // indirect
 	github.com/zclconf/go-cty-yaml v1.1.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/mod v0.26.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/tools v0.35.0 // indirect
-	google.golang.org/protobuf v1.36.8 // indirect
 )
