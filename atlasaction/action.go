@@ -213,7 +213,7 @@ func (p *PullRequest) AtlasDirectives() (ds []string) {
 		return nil
 	}
 	const prefix = "/atlas:"
-	for _, l := range strings.Split(p.Body, "\n") {
+	for l := range strings.SplitSeq(p.Body, "\n") {
 		if l = strings.TrimSpace(l); strings.HasPrefix(l, prefix) && !strings.HasSuffix(l, prefix) {
 			ds = append(ds, l[1:])
 		}
@@ -276,6 +276,8 @@ func WithRuntimeAction() Option {
 			c.action = NewBitBucket(c.getenv, c.out)
 		case c.getenv("TF_BUILD") == "True":
 			c.action = NewAzure(c.getenv, c.out)
+		case c.getenv("TEAMCITY_VERSION") != "":
+			c.action = NewTeamCity(c.getenv, c.out)
 		}
 	}
 }
