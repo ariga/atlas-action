@@ -139,6 +139,13 @@ actions:
         description: |
           Transaction mode to use. Either "file", "all", or "none".
         options: [file, all, none]
+      exec-order:
+        type: enum
+        label: Execution order
+        description: |
+          How Atlas computes and executes pending migration files to the database.
+          Either "linear", "linear-skip", or "non-linear".
+        options: [linear, linear-skip, non-linear]
       allow-dirty:
         type: boolean
         label: Allow dirty state

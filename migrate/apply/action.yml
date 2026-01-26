@@ -17,6 +17,10 @@ inputs:
   dry-run:
     description: Print SQL without executing it. Either "true" or "false".
     default: "false"
+  exec-order:
+    description: |
+      How Atlas computes and executes pending migration files to the database.
+      Either "linear", "linear-skip", or "non-linear".
   revisions-schema:
     description: The name of the schema containing the revisions table.
   to-version:
