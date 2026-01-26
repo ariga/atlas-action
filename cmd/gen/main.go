@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"ariga.io/atlas-action/atlasaction"
 	"github.com/spf13/cobra"
@@ -28,6 +29,7 @@ func main() {
 	root.AddCommand(
 		githubManifestCmd(),
 		gitlabTemplateCmd(),
+		teamcityTemplateCmd(),
 		azureTaskCmd(),
 		markdownDocCmd(),
 	)
@@ -76,6 +78,33 @@ func gitlabTemplateCmd() *cobra.Command {
 		}
 	)
 	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
+	return cmd
+}
+
+func teamcityTemplateCmd() *cobra.Command {
+	var (
+		flags struct {
+			OutputDir string
+			Version   string
+		}
+		cmd = &cobra.Command{
+			Use:   "teamcity-template",
+			Short: "Generate TeamCity recipe files from a manifest",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				actions, err := atlasaction.ParseManifest()
+				if err != nil {
+					return err
+				}
+				ver := strings.TrimPrefix(flags.Version, "v")
+				for actionIdx := range actions.Actions {
+					actions.Actions[actionIdx].Version = ver
+				}
+				return actions.TeamCityTemplates(flags.OutputDir)
+			},
+		}
+	)
+	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
+	cmd.Flags().StringVarP(&flags.Version, "version", "v", "v1.0.0", "The version of the TeamCity recipes")
 	return cmd
 }
 
