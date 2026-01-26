@@ -1,0 +1,25 @@
+name: Bats Tests
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/ci-bats.yaml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/ci-bats.yaml'
+jobs:
+  bats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ariga/setup-atlas@v0
+      - name: Setup Bats and bats libs
+        id: setup-bats
+        uses: bats-core/bats-action@4.0.0
+      - name: Run bats tests
+        shell: bash
+        env:
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
+          TERM: xterm
+        run: bats scripts/*.bats
