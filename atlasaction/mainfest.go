@@ -37,6 +37,7 @@ type (
 		Description string                  `yaml:"description"`
 		Inputs      map[string]ActionInput  `yaml:"inputs,omitempty"`
 		Outputs     map[string]ActionOutput `yaml:"outputs,omitempty"`
+		Version     string                  `yaml:"-"` // Injected at runtime, not from YAML
 	}
 	ActionInput struct {
 		Type        string   `yaml:"type"`                  // e.g., "string", "boolean", "number", "enum", etc.
@@ -181,6 +182,31 @@ func (a ActionsManifest) GitLabTemplates(path string) error {
 		}
 		defer file.Close()
 		return templates.ExecuteTemplate(file, "gitlab-yml.tmpl", a)
+	}
+	for _, act := range a.Actions {
+		if act.ID == "" {
+			continue
+		}
+		if err := write(act); err != nil {
+			return fmt.Errorf("writing action %s: %w", act.ID, err)
+		}
+	}
+	return nil
+}
+
+// TeamCityTemplates writes the actions to the given path as TeamCity build configuration templates.
+func (a ActionsManifest) TeamCityTemplates(path string) error {
+	write := func(a ActionSpec) error {
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return fmt.Errorf("creating directory %s: %w", path, err)
+		}
+		name := "atlas-" + strings.ReplaceAll(a.ID, "/", "-")
+		file, err := os.OpenFile(filepath.Join(path, fmt.Sprintf("%s.yml", name)), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			return fmt.Errorf("creating %s: %w", name, err)
+		}
+		defer file.Close()
+		return templates.ExecuteTemplate(file, "teamcity-yml.tmpl", a)
 	}
 	for _, act := range a.Actions {
 		if act.ID == "" {
