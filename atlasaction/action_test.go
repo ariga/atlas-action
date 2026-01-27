@@ -627,6 +627,7 @@ type mockAtlas struct {
 	migrateDiff       func(context.Context, *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
+	migrateSet        func(context.Context, *atlasexec.MigrateSetParams) error
 	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
 	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
@@ -670,6 +671,11 @@ func (m *mockAtlas) MigrateStatus(context.Context, *atlasexec.MigrateStatusParam
 // MigrateHash implements AtlasExec.
 func (m *mockAtlas) MigrateHash(ctx context.Context, params *atlasexec.MigrateHashParams) error {
 	return m.migrateHash(ctx, params)
+}
+
+// MigrateSet implements AtlasExec.
+func (m *mockAtlas) MigrateSet(ctx context.Context, params *atlasexec.MigrateSetParams) error {
+	return m.migrateSet(ctx, params)
 }
 
 // MigrateInspect implements AtlasExec.

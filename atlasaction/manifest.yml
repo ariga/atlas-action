@@ -194,6 +194,13 @@ actions:
         label: Git remote
         description: |
           The remote to fetch from. Defaults to `origin`.
+    outputs:
+      rebased:
+        type: string
+        description: Whether migration files were rebased. Either "true" or "false".
+      latest_version:
+        type: string
+        description: The latest migration version in the directory after rebase.
   - id: migrate/hash
     name: Migrate Hash
     description: Automatically generate a hash of the schema migrations directory, and commit it to the migration directory.
@@ -226,6 +233,29 @@ actions:
         label: Environment
         description: |
           The environment to use from the Atlas configuration file. For example, `dev`.
+  - id: migrate/set
+    name: Migrate Set
+    description: Edits the revision table to consider all migrations up to and including the given version to be applied.
+    inputs:
+      <<: *migrateInputs
+      dir:
+        type: string
+        label: Migration directory
+        description: |
+          The URL of the migration directory. For example: `file://migrations`.
+          Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+      url:
+        type: string
+        label: Target database URL
+        description: |
+          The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
+      version:
+        type: string
+        required: true
+        label: Version
+        description: |
+          The version to set the revision table to. All migrations up to and including this version
+          will be marked as applied.
   - id: migrate/diff
     name: Migrate Diff
     description: Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory.
