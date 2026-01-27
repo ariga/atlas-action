@@ -18,6 +18,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown) | Reverts deployed migration files on a target database |
 | [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint) | CI for database schema changes with Atlas |
 | [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush) | Push the current version of your migration directory to Atlas Cloud. |
+| [ariga/atlas-action/migrate/set](#arigaatlas-actionmigrateset) | Edits the revision table to consider all migrations up to and including the given version to be applied. |
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest) | CI for database schema changes with Atlas |
 | [ariga/atlas-action/monitor/schema](#arigaatlas-actionmonitorschema) | Sync the database schema to Atlas Cloud. |
 | [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply) | Applies schema changes to a target database |
@@ -337,6 +338,39 @@ All inputs are optional as they may be specified in the Atlas configuration file
   For example, `{"var1": "value1", "var2": "value2"}`.
 * `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
   Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+
+### `ariga/atlas-action/migrate/set`
+
+Edits the revision table to consider all migrations up to and including the given version to be applied.
+This command is usually used after manually making changes to the managed database.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `dir` - The URL of the migration directory. For example: `file://migrations`.
+  Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+* `revisions-schema` - The name of the schema containing the revisions table.
+* `url` - The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
+* `version` - (Required) The version to set the revision table to. All migrations up to and including this version
+  will be marked as applied.
+* `working-directory` - Atlas working directory. Default is project root
+* `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
+* `vars` - A JSON object containing variables to be used in the Atlas configuration file.
+  For example, `{"var1": "value1", "var2": "value2"}`.
+
+#### Example usage
+
+```yaml
+- uses: ariga/atlas-action/migrate/set@v1
+  with:
+    url: 'mysql://root:pass@localhost:3306/dev'
+    dir: 'file://migrations'
+    version: '20230922132634'
+```
 
 ### `ariga/atlas-action/migrate/autorebase`
 
