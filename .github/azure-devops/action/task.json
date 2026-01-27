@@ -47,6 +47,7 @@
         "migrate hash": "Migrate Hash",
         "migrate lint": "Migrate Lint",
         "migrate push": "Migrate Push",
+        "migrate set": "Migrate Set",
         "migrate test": "Migrate Test",
         "monitor schema": "Atlas Schema Monitoring",
         "schema apply": "Schema Apply",
@@ -111,7 +112,7 @@
       "label": "Migration directory",
       "helpMarkDown": "The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud\nbased directories or `file://migrations` for local ones.\n",
       "name": "dir",
-      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate test"
+      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test"
     },
     {
       "type": "string",
@@ -229,7 +230,7 @@
       "label": "Revisions schema",
       "helpMarkDown": "The name of the schema containing the revisions table.",
       "name": "revisions_schema",
-      "visibleRule": "action == migrate apply || action == migrate down || action == migrate lint || action == migrate push || action == migrate test"
+      "visibleRule": "action == migrate apply || action == migrate down || action == migrate lint || action == migrate push || action == migrate set || action == migrate test"
     },
     {
       "type": "string",
@@ -309,14 +310,14 @@
       "label": "Target database URL",
       "helpMarkDown": "The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.\n",
       "name": "url",
-      "visibleRule": "action == migrate apply || action == migrate down || action == monitor schema || action == schema apply || action == schema lint || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate down || action == migrate set || action == monitor schema || action == schema apply || action == schema lint || action == schema push || action == schema test"
     },
     {
       "type": "string",
       "label": "Version",
-      "helpMarkDown": "The version of the schema.",
+      "helpMarkDown": "The version to set the revision table to. All migrations up to and including this version\nwill be marked as applied.\n",
       "name": "version",
-      "visibleRule": "action == schema push"
+      "visibleRule": "action == migrate set || action == schema push"
     },
     {
       "type": "string",
@@ -337,28 +338,28 @@
       "label": "Working directory",
       "helpMarkDown": "Atlas working directory. Default is project root",
       "name": "working_directory",
-      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
     },
     {
       "type": "string",
       "label": "Atlas config",
       "helpMarkDown": "The URL of the Atlas configuration file. By default, Atlas will look for a file\nnamed `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.\nLearn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).\n",
       "name": "config",
-      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
     },
     {
       "type": "string",
       "label": "Environment",
       "helpMarkDown": "The environment to use from the Atlas configuration file. For example, `dev`.\n",
       "name": "env",
-      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
     },
     {
       "type": "multiLine",
       "label": "Variables",
       "helpMarkDown": "A JSON object containing variables to be used in the Atlas configuration file.\nFor example, `{\"var1\": \"value1\", \"var2\": \"value2\"}`.\n",
       "name": "vars",
-      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
     },
     {
       "type": "string",

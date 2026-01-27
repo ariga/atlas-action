@@ -109,6 +109,8 @@ type (
 		MigrateStatus(context.Context, *atlasexec.MigrateStatusParams) (*atlasexec.MigrateStatus, error)
 		// MigrateHash runs the `migrate hash` command.
 		MigrateHash(context.Context, *atlasexec.MigrateHashParams) error
+		// MigrateSet runs the `migrate set` command.
+		MigrateSet(context.Context, *atlasexec.MigrateSetParams) error
 		// MigrateDiff runs the `migrate diff --dry-run` command.
 		MigrateDiff(ctx context.Context, params *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
 		// MigrateRebase runs the `migrate rebase` command.
@@ -334,6 +336,7 @@ const (
 	CmdMigrateTest       = "migrate/test"
 	CmdMigrateAutoRebase = "migrate/autorebase"
 	CmdMigrateHash       = "migrate/hash"
+	CmdMigrateSet        = "migrate/set"
 	CmdMigrateDiff       = "migrate/diff"
 	// Declarative workflow Commands
 	CmdSchemaPush        = "schema/push"
@@ -371,6 +374,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MigrateAutoRebase(ctx)
 	case CmdMigrateHash:
 		return a.MigrateHash(ctx)
+	case CmdMigrateSet:
+		return a.MigrateSet(ctx)
 	case CmdMigrateDiff:
 		return a.MigrateDiff(ctx)
 	case CmdSchemaPush:
@@ -778,6 +783,25 @@ func (a *Actions) MigrateHash(ctx context.Context) error {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof(`"atlas migrate hash" completed successfully`)
+	return nil
+}
+
+// MigrateSet runs the GitHub Action for "ariga/atlas-action/migrate/set".
+func (a *Actions) MigrateSet(ctx context.Context) error {
+	params := &atlasexec.MigrateSetParams{
+		ConfigURL:       a.GetConfigURL(),
+		Env:             a.GetInput("env"),
+		Vars:            a.GetVarsInput("vars"),
+		URL:             a.GetInput("url"),
+		DirURL:          a.GetInput("dir"),
+		RevisionsSchema: a.GetInput("revisions-schema"),
+		Version:         a.GetInput("version"),
+	}
+	if err := a.Atlas.MigrateSet(ctx, params); err != nil {
+		a.SetOutput("error", err.Error())
+		return err
+	}
+	a.Infof(`"atlas migrate set" completed successfully, set version to %q`, params.Version)
 	return nil
 }
 
