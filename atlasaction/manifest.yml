@@ -194,6 +194,13 @@ actions:
         label: Git remote
         description: |
           The remote to fetch from. Defaults to `origin`.
+    outputs:
+      rebased:
+        type: string
+        description: Whether migration files were rebased. Either "true" or "false".
+      latest_version:
+        type: string
+        description: The latest migration version in the directory after rebase.
   - id: migrate/hash
     name: Migrate Hash
     description: Automatically generate a hash of the schema migrations directory, and commit it to the migration directory.

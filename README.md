@@ -258,6 +258,8 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `dir` - The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
   based directories or `file://migrations` for local ones.
 * `dry-run` - Print SQL without executing it. Either "true" or "false".
+* `exec-order` - How Atlas computes and executes pending migration files to the database.
+  Either "linear", "linear-skip", or "non-linear". Learn more about [execution order](https://atlasgo.io/versioned/apply#execution-order).
 * `revisions-schema` - The name of the schema containing the revisions table.
 * `to-version` - The target version to apply migrations to. Mutually exclusive with `amount`.
 * `tx-mode` - Transaction mode to use. Either "file", "all", or "none".
@@ -397,6 +399,11 @@ All inputs are optional
 * `remote` - The remote to fetch from. Defaults to `origin`.
 * `working-directory` - Atlas working directory. Default is project root
 
+#### Outputs
+
+* `rebased` - Whether migration files were rebased. Either "true" or "false".
+* `latest_version` - The latest migration version in the directory after rebase.
+
 #### Example usage
 
 Add the next job to your workflow to automatically rebase migrations on top of the migration directory in case of conflicts:
@@ -434,6 +441,69 @@ jobs:
         base-branch: master
         dir: file://migrations
 ```
+
+#### Resolving Out-of-Order Migration Conflicts
+
+When working with multiple branches and applying hotfixes directly to production, out-of-order migration 
+conflicts may occur. The following workflow demonstrates how to automatically rebase migrations and sync 
+your development database after a hotfix. Learn more in the [Atlas FAQ](https://atlasgo.io/faq/out-of-order-migrations).
+
+```yaml
+name: Rebase and Sync Migrations
+on:
+  push:
+    branches-ignore:
+      - master
+jobs:
+  rebase-and-sync:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+      # Step 1: Rebase migrations to resolve atlas.sum conflicts
+      - name: Rebase migrations
+        id: rebase
+        uses: ariga/atlas-action/migrate/autorebase@v1
+        with:
+          base-branch: master
+          dir: file://migrations
+      # Step 2: Apply any out-of-order migrations (e.g., hotfixes from master)
+      - name: Apply migrations with non-linear execution
+        if: steps.rebase.outputs.rebased == 'true'
+        uses: ariga/atlas-action/migrate/apply@v1
+        with:
+          url: ${{ secrets.DATABASE_URL }}
+          dir: 'file://migrations'
+          exec-order: non-linear
+      # Step 3: Mark all migrations as applied (sync revision table with rebased files)
+      - name: Set migration version
+        if: steps.rebase.outputs.rebased == 'true'
+        uses: ariga/atlas-action/migrate/set@v1
+        with:
+          url: ${{ secrets.DATABASE_URL }}
+          dir: 'file://migrations'
+          version: ${{ steps.rebase.outputs.latest_version }}
+```
+
+This workflow:
+1. **Rebases migrations** - Resolves `atlas.sum` conflicts by renaming out-of-order files with new timestamps.
+   Sets `rebased` output to "true" if files were rebased, and `latest_version` to the latest migration version.
+2. **Applies with non-linear execution** - Only runs if files were rebased. The `exec-order: non-linear` flag 
+   allows Atlas to apply migrations even when they weren't created in order.
+3. **Sets the migration version** - Only runs if files were rebased. Updates the revision table to mark all 
+   migrations up to the latest version as applied, using the `latest_version` output from the rebase step.
+
 ### `ariga/atlas-action/migrate/hash`
 
 Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.

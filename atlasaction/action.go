@@ -695,12 +695,14 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	files := newFiles(baseHash, currHash)
 	if len(files) == 0 {
 		a.Infof("No new migration files to rebase")
+		a.SetOutput("rebased", "false")
 		return nil
 	}
 	// Try to merge the base branch into the current branch.
 	if _, err := a.exec(ctx, "git", "merge", "--no-ff",
 		fmt.Sprintf("%s/%s", remote, baseBranch)); err == nil {
 		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
+		a.SetOutput("rebased", "false")
 		return nil
 	}
 	// If merge failed due to conflict, check that the conflict is only in atlas.sum file.
@@ -736,7 +738,44 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Migrations rebased successfully")
+	a.SetOutput("rebased", "true")
+	// Get the latest migration version from the directory
+	if latest, err := a.latestMigrationVersion(dirPath); err != nil {
+		a.Warningf("failed to get latest migration version: %v", err)
+	} else {
+		a.SetOutput("latest_version", latest)
+	}
 	return nil
+}
+
+// latestMigrationVersion returns the latest migration version from the directory.
+// Migration files are expected to be named like: 20230922132634_description.sql or 20001.sql
+func (a *Actions) latestMigrationVersion(dirPath string) (string, error) {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read directory: %w", err)
+	}
+	var latest string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".sql") {
+			continue
+		}
+		// Remove .sql extension first
+		name = strings.TrimSuffix(name, ".sql")
+		// Extract version (everything before the first underscore, or the whole name if no underscore)
+		version := strings.SplitN(name, "_", 2)[0]
+		if version > latest {
+			latest = version
+		}
+	}
+	if latest == "" {
+		return "", fmt.Errorf("no migration files found")
+	}
+	return latest, nil
 }
 
 func (a *Actions) MigrateHash(ctx context.Context) error {
