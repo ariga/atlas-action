@@ -1,0 +1,76 @@
+# GitHub event context
+env GITHUB_EVENT_NAME=push
+env GITHUB_EVENT_PATH=$WORK/event.json
+env GITHUB_REPOSITORY=acme/repo
+env GITHUB_REF=refs/heads/conflict
+env GITHUB_REF_NAME=conflict
+env GITHUB_SHA=1234567890
+env GITHUB_ACTOR=octocat
+env HOME=$WORK
+
+# Action inputs
+env INPUT_BASE-BRANCH=main
+env INPUT_REMOTE=origin
+env INPUT_DIR=file://migrations
+env INPUT_RESOLVE-TARGET-URL=sqlite://./dev.db?_fk=1
+
+# Ensure atlas migrate new writes content
+env EDITOR=$WORK/editor.sh
+exec chmod +x $WORK/editor.sh
+
+# Setup git repository and remote
+exec git init --quiet
+exec git config --local user.email test@example.com
+exec git config --local user.name "Test Script"
+
+exec git init --quiet $WORK/remote
+exec git remote add origin file://$WORK/remote
+exec git checkout --quiet -b main
+
+# Base branch migrations
+exec atlas migrate new v1 --edit
+exec git add .
+exec git commit --quiet --message 'v1'
+exec sleep 1s # timestamped versions require a delay to ensure different timestamps
+exec atlas migrate new v2 --edit
+exec git add .
+exec git commit --quiet --message 'v2'
+exec git push --quiet -u origin main
+
+# Create conflict branch from first commit
+exec git reset --quiet --hard HEAD~1
+exec git checkout --quiet -b conflict
+exec git push --quiet -u origin conflict
+
+exec sleep 1s # timestamped versions require a delay to ensure different timestamps
+# Add new migration on conflict branch
+exec atlas migrate new v3 --edit
+exec git add .
+exec git commit --quiet --message 'v3'
+exec git push --quiet
+
+# Run the action with resolve target URL
+atlas-action --action=migrate/autorebase
+stdout 'Applying out-of-order migrations with non-linear execution order'
+stdout 'Migrations rebased successfully'
+
+# Ensure no pending migrations after migrate set
+exec atlas migrate status --format '{{ json . }}' --dir file://migrations --url sqlite://./dev.db?_fk=1
+stdout '"Status":"OK"'
+
+-- event.json --
+{
+  "repository": {
+    "default_branch": "main",
+    "html_url": "https://github.com/acme/repo"
+  }
+}
+-- editor.sh --
+#!/bin/sh
+case "$1" in
+  *v1*.sql) echo "CREATE TABLE t1 (col int);" >> "$1" ;;
+  *v2*.sql) echo "CREATE TABLE t2 (col int);" >> "$1" ;;
+  *v3*.sql) echo "CREATE TABLE t3 (col int);" >> "$1" ;;
+esac
+-- .gitignore --
+remote

@@ -189,6 +189,13 @@ actions:
         label: Migration directory
         description: |
           The URL of the migration directory to rebase on. By default: `file://migrations`.
+      resolve-target-url:
+        type: string
+        label: Resolve target URL
+        description: |
+          Optional database URL to resolve out-of-order migrations. When set, the action will run
+          `atlas migrate apply` with `--exec-order non-linear` before rebasing and
+          `atlas migrate set` after rebasing to mark the rebased migrations as applied.
       remote:
         type: string
         label: Git remote

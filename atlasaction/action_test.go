@@ -627,6 +627,7 @@ type mockAtlas struct {
 	migrateDiff       func(context.Context, *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
+	migrateApplySlice func(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error)
 	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
 	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
@@ -678,7 +679,10 @@ func (m *mockAtlas) MigrateRebase(ctx context.Context, params *atlasexec.Migrate
 }
 
 // MigrateApplySlice implements AtlasExec.
-func (m *mockAtlas) MigrateApplySlice(context.Context, *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error) {
+func (m *mockAtlas) MigrateApplySlice(ctx context.Context, params *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error) {
+	if m.migrateApplySlice != nil {
+		return m.migrateApplySlice(ctx, params)
+	}
 	panic("unimplemented")
 }
 
@@ -1055,6 +1059,110 @@ func TestMigrateAutoRebase(t *testing.T) {
 		require.Equal(t, []string{"add", "testdata/need_rebase"}, mockExec.ran[7].args)
 		require.Equal(t, []string{"commit", "--message", "testdata/need_rebase: rebase migration files"}, mockExec.ran[8].args)
 		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[9].args)
+	})
+	t.Run("conflict in atlas.sum with resolve target", func(t *testing.T) {
+		var (
+			rebasedFiles []string
+			applyParams  *atlasexec.MigrateApplyParams
+		)
+		baseFiles := []migrate.File{
+			migrate.NewLocalFile("20230922132634_init.sql", []byte("CREATE TABLE t (id int);")),
+		}
+		baseHash, err := migrate.NewHashFile(baseFiles)
+		require.NoError(t, err)
+		baseText, err := baseHash.MarshalText()
+		require.NoError(t, err)
+		currFiles := append([]migrate.File{}, baseFiles...)
+		currFiles = append(currFiles, migrate.NewLocalFile("20230922132635_rebase.sql", []byte("ALTER TABLE t ADD COLUMN name text;")))
+		currHash, err := migrate.NewHashFile(currFiles)
+		require.NoError(t, err)
+		currText, err := currHash.MarshalText()
+		require.NoError(t, err)
+		cli := &mockAtlas{
+			migrateHash: func(ctx context.Context, p *atlasexec.MigrateHashParams) error {
+				return nil
+			},
+			migrateRebase: func(ctx context.Context, params *atlasexec.MigrateRebaseParams) error {
+				rebasedFiles = params.Files
+				return nil
+			},
+			migrateApplySlice: func(ctx context.Context, params *atlasexec.MigrateApplyParams) ([]*atlasexec.MigrateApply, error) {
+				applyParams = params
+				return []*atlasexec.MigrateApply{{}}, nil
+			},
+		}
+		absDir, err := filepath.Abs("testdata/migrations")
+		require.NoError(t, err)
+		dirURL := "file://" + absDir
+		sumPath := filepath.Join(absDir, "atlas.sum")
+		out := &bytes.Buffer{}
+		mockExec := &mockCmdExecutor{
+			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+				// Dummy command to avoid errors
+				cmd := exec.CommandContext(ctx, "echo")
+				switch {
+				// Simulate a conflict when running `git merge --no-ff origin/rebase-branch`
+				case len(args) > 2 && args[0] == "merge" && args[2] == "origin/rebase-branch":
+					cmd.Err = &exec.ExitError{Stderr: []byte("conflict")}
+				// Simulate result when running: git show
+				case len(args) > 1 && args[0] == "show":
+					var res string
+					switch {
+					case strings.Contains(args[1], "origin/rebase-branch:"):
+						res = string(baseText)
+					case strings.Contains(args[1], "origin/my-branch:"):
+						res = string(currText)
+					}
+					// print the result to the stdout
+					cmd = exec.CommandContext(ctx, "printf", "%s", res)
+				// Simulate result when running: git diff --name-only
+				case len(args) > 1 && args[0] == "diff" && args[1] == "--name-only":
+					cmd = exec.CommandContext(ctx, "echo", sumPath)
+				}
+				return cmd
+			},
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"dir":                dirURL,
+				"base-branch":        "rebase-branch",
+				"resolve-target-url": "sqlite://file?mode=memory",
+			},
+			trigger: &atlasaction.TriggerContext{
+				Branch: "my-branch",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+		acts, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(cli),
+			atlasaction.WithCmdExecutor(mockExec.ExecCmd),
+		)
+		require.NoError(t, err)
+
+		require.NoError(t, acts.MigrateAutoRebase(context.Background()))
+		require.NotNil(t, applyParams)
+		require.Equal(t, dirURL, applyParams.DirURL)
+		require.Equal(t, "sqlite://file?mode=memory", applyParams.URL)
+		require.Equal(t, atlasexec.ExecOrderNonLinear, applyParams.ExecOrder)
+		require.Contains(t, out.String(), "Migrations rebased successfully")
+		require.Len(t, rebasedFiles, 1)
+		require.Equal(t, "20230922132635_rebase.sql", rebasedFiles[0])
+
+		dir, err := migrate.NewLocalDir(absDir)
+		require.NoError(t, err)
+		files, err := dir.Files()
+		require.NoError(t, err)
+		latest := files[len(files)-1].Version()
+		expected := []string{"migrate", "set", latest, "--url", "sqlite://file?mode=memory", "--dir", dirURL}
+		found := false
+		for _, ran := range mockExec.ran {
+			if ran.name == "atlas" && slices.Equal(ran.args, expected) {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "expected atlas migrate set command not found")
 	})
 	t.Run("conflict, but not only in atlas.sum", func(t *testing.T) {
 		mockExec := &mockCmdExecutor{

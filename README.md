@@ -257,6 +257,8 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `dir` - The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
   based directories or `file://migrations` for local ones.
 * `dry-run` - Print SQL without executing it. Either "true" or "false".
+* `exec-order` - How Atlas computes and executes pending migration files to the database.
+  Either "linear", "linear-skip", or "non-linear".
 * `revisions-schema` - The name of the schema containing the revisions table.
 * `to-version` - The target version to apply migrations to. Mutually exclusive with `amount`.
 * `tx-mode` - Transaction mode to use. Either "file", "all", or "none".
@@ -346,6 +348,10 @@ Automatically resolves `atlas.sum` conflicts and rebases the migration directory
 > 
 > Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
 > 
+> If `resolve-target-url` is set, the action will apply out-of-order migrations with
+> `--exec-order non-linear` before rebasing and run `atlas migrate set` after rebasing.
+> See https://atlasgo.io/faq/out-of-order-migrations for more details.
+>
 > After the rebase is done and a commit is pushed by the action, no other workflows will be triggered unless the action is running with a personal access token (PAT).
 >```
 >   - uses: actions/checkout@v4
@@ -361,6 +367,9 @@ All inputs are optional
 * `base-branch` - The base branch to rebase the migration directory onto. Default to the default branch of the repository.
 * `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
 * `remote` - The remote to fetch from. Defaults to `origin`.
+* `resolve-target-url` - Optional database URL to resolve out-of-order migrations. When set, the action will run
+  `atlas migrate apply` with `--exec-order non-linear` before rebasing and
+  `atlas migrate set` after rebasing to mark the rebased migrations as applied.
 * `working-directory` - Atlas working directory. Default is project root
 
 #### Example usage

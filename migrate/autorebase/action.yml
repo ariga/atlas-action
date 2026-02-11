@@ -14,6 +14,11 @@ inputs:
   remote:
     description: |
       The remote to fetch from. Defaults to `origin`.
+  resolve-target-url:
+    description: |
+      Optional database URL to resolve out-of-order migrations. When set, the action will run
+      `atlas migrate apply` with `--exec-order non-linear` before rebasing and
+      `atlas migrate set` after rebasing to mark the rebased migrations as applied.
   working-directory:
     description: Atlas working directory. Default is project root
 runs:

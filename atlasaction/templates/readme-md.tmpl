@@ -261,6 +261,10 @@ Automatically resolves `atlas.sum` conflicts and rebases the migration directory
 > 
 > Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
 > 
+> If `resolve-target-url` is set, the action will apply out-of-order migrations with
+> `--exec-order non-linear` before rebasing and run `atlas migrate set` after rebasing.
+> See https://atlasgo.io/faq/out-of-order-migrations for more details.
+>
 > After the rebase is done and a commit is pushed by the action, no other workflows will be triggered unless the action is running with a personal access token (PAT).
 >```
 >   - uses: actions/checkout@v4

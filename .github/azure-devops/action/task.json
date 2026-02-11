@@ -226,6 +226,13 @@
     },
     {
       "type": "string",
+      "label": "Resolve target URL",
+      "helpMarkDown": "Optional database URL to resolve out-of-order migrations. When set, the action will run\n`atlas migrate apply` with `--exec-order non-linear` before rebasing and\n`atlas migrate set` after rebasing to mark the rebased migrations as applied.\n",
+      "name": "resolve_target_url",
+      "visibleRule": "action == migrate autorebase"
+    },
+    {
+      "type": "string",
       "label": "Revisions schema",
       "helpMarkDown": "The name of the schema containing the revisions table.",
       "name": "revisions_schema",

@@ -408,8 +408,8 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		AllowDirty:      a.GetBoolInput("allow-dirty"),
 		ToVersion:       a.GetInput("to-version"),
 		Amount:          a.GetUin64Input("amount"),
-		TxMode:          a.GetInput("tx-mode"),       // Hidden param.
-		BaselineVersion: a.GetInput("baseline"),      // Hidden param.
+		TxMode:          a.GetInput("tx-mode"),  // Hidden param.
+		BaselineVersion: a.GetInput("baseline"), // Hidden param.
 		ExecOrder:       atlasexec.MigrateExecOrder(a.GetInput("exec-order")),
 	}
 	runs, err := a.Atlas.MigrateApplySlice(ctx, params)
@@ -659,6 +659,7 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		remote     = a.GetInputDefault("remote", "origin")
 		baseBranch = a.GetInputDefault("base-branch", tc.DefaultBranch)
 		currBranch = tc.Branch
+		resolveURL = strings.TrimSpace(a.GetInput("resolve-target-url"))
 	)
 	if v, err := a.exec(ctx, "git", "--version"); err != nil {
 		return fmt.Errorf("failed to get git version: %w", err)
@@ -714,11 +715,21 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	}); err != nil {
 		return fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
 	}
+	if resolveURL != "" {
+		if err = a.applyOutOfOrderMigrations(ctx, dirURL, resolveURL); err != nil {
+			return err
+		}
+	}
 	if err = a.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{
 		DirURL: dirURL,
 		Files:  files,
 	}); err != nil {
 		return fmt.Errorf("failed to rebase migrations: %w", err)
+	}
+	if resolveURL != "" {
+		if err = a.markRebasedMigrations(ctx, dirURL, dirPath, resolveURL); err != nil {
+			return err
+		}
 	}
 	if _, err = a.exec(ctx, "git", "add", dirPath); err != nil {
 		return fmt.Errorf("failed to stage changes: %w", err)
@@ -731,6 +742,46 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Migrations rebased successfully")
+	return nil
+}
+
+func (a *Actions) applyOutOfOrderMigrations(ctx context.Context, dirURL, targetURL string) error {
+	a.Infof("Applying out-of-order migrations with non-linear execution order")
+	runs, err := a.Atlas.MigrateApplySlice(ctx, &atlasexec.MigrateApplyParams{
+		DirURL:    dirURL,
+		URL:       targetURL,
+		ExecOrder: atlasexec.ExecOrderNonLinear,
+	})
+	if mErr := (&atlasexec.MigrateApplyError{}); errors.As(err, &mErr) {
+		runs = mErr.Result
+	} else if err != nil {
+		return fmt.Errorf("failed to apply out-of-order migrations: %w", err)
+	}
+	for _, run := range runs {
+		if run.Error != "" {
+			return fmt.Errorf("failed to apply out-of-order migrations: %s", run.Error)
+		}
+	}
+	return nil
+}
+
+func (a *Actions) markRebasedMigrations(ctx context.Context, dirURL, dirPath, targetURL string) error {
+	localPath := filepath.Join(a.WorkingDir(), dirPath)
+	dir, err := migrate.NewLocalDir(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to open migration directory %q: %w", localPath, err)
+	}
+	files, err := dir.Files()
+	if err != nil {
+		return fmt.Errorf("failed to list migration files: %w", err)
+	}
+	if len(files) == 0 {
+		return errors.New("no migration files found to mark as applied")
+	}
+	latest := files[len(files)-1].Version()
+	if _, err = a.exec(ctx, "atlas", "migrate", "set", latest, "--url", targetURL, "--dir", dirURL); err != nil {
+		return fmt.Errorf("failed to run `atlas migrate set`: %w", err)
+	}
 	return nil
 }
 
