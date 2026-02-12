@@ -67,6 +67,10 @@ var (
 		"replace": func(old, new, s string) string {
 			return strings.ReplaceAll(s, old, new)
 		},
+		"contains": strings.Contains,
+		"majorver": func(v string) string {
+			return strings.SplitN(v, ".", 2)[0]
+		},
 		"env":       toEnvName,
 		"quote":     strconv.Quote,
 		"inputvar":  toInputVarName,
