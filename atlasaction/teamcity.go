@@ -94,7 +94,7 @@ func (t *TeamCity) GetTriggerContext(context.Context) (*TriggerContext, error) {
 			if tc.PullRequest != nil {
 				tc.PullRequest.URL = fmt.Sprintf("%s/pull/%d", strings.TrimSuffix(tc.RepoURL, ".git"), tc.PullRequest.Number)
 			}
-		case host == "gitlab.com" || strings.HasSuffix(host, ".gitlab.com") || strings.Contains(host, "gitlab"):
+		case host == "gitlab.com" || strings.HasSuffix(host, ".gitlab.com"):
 			tc.SCMType = atlasexec.SCMTypeGitlab
 			tc.SCMClient = func() (SCMClient, error) {
 				token := t.getenv("GITLAB_TOKEN")
@@ -164,6 +164,11 @@ func (t *TeamCity) buildProperties() (*properties.Properties, error) {
 
 // message sends a TeamCity service message.
 func (t *TeamCity) message(typ string, attrs ...string) {
+	// Validate attributes before writing any output
+	if len(attrs) > 1 && len(attrs)%2 != 0 {
+		t.Fatalf("message() called with odd number of attributes (%d): %v", len(attrs), attrs)
+		return
+	}
 	fmt.Fprint(t.w, "##teamcity[")
 	fmt.Fprint(t.w, typ)
 	switch l := len(attrs); {
@@ -172,12 +177,6 @@ func (t *TeamCity) message(typ string, attrs ...string) {
 		fmt.Fprint(t.w, t.escapeString(attrs[0]))
 		fmt.Fprint(t.w, "'")
 	case l > 1:
-		if l%2 != 0 {
-			// If odd number of attributes, log a failure message
-			fmt.Fprint(t.w, "]\n")
-			t.Fatalf("message() called with odd number of attributes (%d): %v", l, attrs)
-			return
-		}
 		for i := 0; i < len(attrs); i += 2 {
 			fmt.Fprint(t.w, " ")
 			fmt.Fprint(t.w, t.escapeString(attrs[i]))

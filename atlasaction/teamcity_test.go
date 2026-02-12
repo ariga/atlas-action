@@ -115,8 +115,8 @@ func TestTeamCity_SCMDetection(t *testing.T) {
 			expectedSCM: atlasexec.SCMTypeGitlab,
 		},
 		{
-			name:        "GitLab self-hosted with gitlab in hostname",
-			repoURL:     "https://gitlab.example.com/ariga/atlas-action.git",
+			name:        "GitLab self-hosted with .gitlab.com",
+			repoURL:     "https://eu.gitlab.com/ariga/atlas-action.git",
 			expectedSCM: atlasexec.SCMTypeGitlab,
 		},
 		{
@@ -145,7 +145,7 @@ func TestTeamCity_SCMDetection(t *testing.T) {
 build.vcs.number=abc123
 teamcity.build.branch=main
 vcsroot.url=` + tt.repoURL
-			err := os.WriteFile(propsFile, []byte(content), 0644)
+			err := os.WriteFile(propsFile, []byte(content), 0600)
 			require.NoError(t, err)
 
 			getenv := func(key string) string {
