@@ -106,7 +106,7 @@ func (t *TeamCity) GetTriggerContext(context.Context) (*TriggerContext, error) {
 			if tc.PullRequest != nil {
 				tc.PullRequest.URL = fmt.Sprintf("%s/-/merge_requests/%d", strings.TrimSuffix(tc.RepoURL, ".git"), tc.PullRequest.Number)
 			}
-		case host == "bitbucket.org" || strings.HasSuffix(host, ".bitbucket.org"):
+		case host == "bitbucket.org":
 			tc.SCMType = atlasexec.SCMTypeBitbucket
 			tc.SCMClient = func() (SCMClient, error) {
 				token := t.getenv("BITBUCKET_ACCESS_TOKEN")
