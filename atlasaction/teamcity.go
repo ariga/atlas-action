@@ -164,10 +164,12 @@ func (t *TeamCity) buildProperties() (*properties.Properties, error) {
 
 // message sends a TeamCity service message.
 func (t *TeamCity) message(typ string, attrs ...string) {
-	// Validate attributes before writing any output
+	// Validate attributes before writing any output.
+	// Single attribute (len == 1) is valid for single-value messages.
+	// Multiple attributes must be even (key-value pairs).
 	if len(attrs) > 1 && len(attrs)%2 != 0 {
 		t.Fatalf("message() called with odd number of attributes (%d): %v", len(attrs), attrs)
-		return
+		return // Fatalf does not terminate execution, so return is necessary
 	}
 	fmt.Fprint(t.w, "##teamcity[")
 	fmt.Fprint(t.w, typ)
