@@ -177,7 +177,7 @@ func (t *TeamCity) message(typ string, attrs ...string) {
 		fmt.Fprint(t.w, t.escapeString(attrs[0]))
 		fmt.Fprint(t.w, "'")
 	case l > 1:
-		for i := 0; i < len(attrs); i += 2 {
+		for i := 0; i+1 < len(attrs); i += 2 {
 			fmt.Fprint(t.w, " ")
 			fmt.Fprint(t.w, t.escapeString(attrs[i]))
 			fmt.Fprint(t.w, "='")

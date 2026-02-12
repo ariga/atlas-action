@@ -79,18 +79,37 @@ func TestTeamCity_escapeString(t *testing.T) {
 	}
 }
 
-func TestTeamCity_messageOddAttributes(t *testing.T) {
+func TestTeamCity_messageAttributes(t *testing.T) {
 	var buf bytes.Buffer
 	tc := atlasaction.NewTeamCity(os.Getenv, &buf)
 
-	// This should trigger the odd attribute count error
-	// We need to call SetOutput with an internal call that would pass odd attrs
-	// Since we can't directly call message(), let's verify the behavior
-	// by checking that even-number attributes work correctly
-	buf.Reset()
-	tc.SetOutput("test", "value")
-	output := buf.String()
-	require.Contains(t, output, "##teamcity[setParameter name='test' value='value']")
+	// Test even-number attributes work correctly
+	t.Run("even attributes", func(t *testing.T) {
+		buf.Reset()
+		tc.SetOutput("test", "value")
+		output := buf.String()
+		require.Contains(t, output, "##teamcity[setParameter name='test' value='value']")
+	})
+
+	// Test single attribute (special case for single value)
+	t.Run("single message", func(t *testing.T) {
+		buf.Reset()
+		tc.Infof("hello")
+		output := buf.String()
+		require.Contains(t, output, "##teamcity[message text='hello' status='NORMAL']")
+	})
+
+	// Test multiple attributes
+	t.Run("multiple attributes", func(t *testing.T) {
+		buf.Reset()
+		tc.Warningf("warning message")
+		output := buf.String()
+		require.Contains(t, output, "##teamcity[message text='warning message' status='WARNING']")
+	})
+
+	// Note: The odd attribute validation in message() cannot be easily tested
+	// from outside the package since message() is not exported. The validation
+	// is primarily a safety check against programming errors within the package.
 }
 
 func TestTeamCity_SCMDetection(t *testing.T) {
