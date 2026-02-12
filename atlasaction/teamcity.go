@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strings"
 	"unicode/utf16"
 
@@ -46,6 +47,7 @@ func (t *TeamCity) Errorf(msg string, a ...any) {
 // Fatalf implements [Action].
 func (t *TeamCity) Fatalf(msg string, a ...any) {
 	t.message("message", "text", fmt.Sprintf(msg, a...), "status", "FAILURE")
+	os.Exit(1) // terminate execution
 }
 
 // GetType implements [Action].
@@ -171,7 +173,7 @@ func (t *TeamCity) message(typ string, attrs ...string) {
 	// Multiple attributes must be even (key-value pairs).
 	if len(attrs) > 1 && len(attrs)%2 != 0 {
 		t.Fatalf("message() called with odd number of attributes (%d): %v", len(attrs), attrs)
-		return // Fatalf does not terminate execution, so return is necessary
+		return
 	}
 	fmt.Fprint(t.w, "##teamcity[")
 	fmt.Fprint(t.w, typ)

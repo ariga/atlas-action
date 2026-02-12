@@ -481,3 +481,61 @@ EOF
   [[ "$output" == *"migrate/lint"* ]]
   [[ "$output" != *"Downloading"* ]]
 }
+
+@test "propagates exit code from atlas-action binary" {
+  export ATLAS_ACTION_LOCAL="1"
+
+  # Create a mock binary that exits with code 42
+  mkdir -p "$TEST_TMPDIR/bin"
+  cat > "$TEST_TMPDIR/bin/atlas-action" << 'EOF'
+#!/bin/sh
+echo "mock-atlas-action exiting with code 42"
+exit 42
+EOF
+  chmod +x "$TEST_TMPDIR/bin/atlas-action"
+  export PATH="$TEST_TMPDIR/bin:$PATH"
+
+  run -42 "$SHIM_SCRIPT" "migrate/lint"
+  [[ "$output" == *"mock-atlas-action exiting with code 42"* ]]
+}
+
+@test "propagates success exit code from atlas-action binary" {
+  export ATLAS_ACTION_LOCAL="1"
+  create_mock_binary
+
+  run "$SHIM_SCRIPT" "migrate/lint"
+  [ "$status" -eq 0 ]
+}
+
+# =============================================================================
+# Pipeline Execution Tests (simulates TeamCity curl | sh -s --)
+# =============================================================================
+
+@test "works when piped through sh (like curl | sh)" {
+  export ATLAS_ACTION_LOCAL="1"
+  create_mock_binary
+
+  run sh -c "cat '$SHIM_SCRIPT' | sh -s -- migrate/lint"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Running in local mode"* ]]
+  [[ "$output" == *"mock-atlas-action"* ]]
+}
+
+@test "propagates exit code from atlas-action when piped" {
+  export ATLAS_ACTION_LOCAL="1"
+
+  # Create a mock binary that exits with code 5
+  mkdir -p "$TEST_TMPDIR/bin"
+  cat > "$TEST_TMPDIR/bin/atlas-action" << 'EOF'
+#!/bin/sh
+echo "failing with exit code 5"
+exit 5
+EOF
+  chmod +x "$TEST_TMPDIR/bin/atlas-action"
+  export PATH="$TEST_TMPDIR/bin:$PATH"
+
+  run sh -c "cat '$SHIM_SCRIPT' | sh -s -- migrate/lint"
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"failing with exit code 5"* ]]
+}
+
