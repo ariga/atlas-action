@@ -8,7 +8,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
+	"unicode/utf16"
 
 	"ariga.io/atlas/atlasexec"
 	"github.com/magiconair/properties"
@@ -76,46 +78,52 @@ func (t *TeamCity) GetTriggerContext(context.Context) (*TriggerContext, error) {
 			Commit: tc.Commit,
 		}
 	}
-	switch {
-	case strings.Contains(tc.RepoURL, "github.com"):
-		tc.SCMType = atlasexec.SCMTypeGithub
-		tc.SCMClient = func() (SCMClient, error) {
-			token := t.getenv("GITHUB_TOKEN")
-			if token == "" {
-				t.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
+	// Detect SCM provider by parsing the URL and checking the hostname
+	switch u, err := url.Parse(tc.RepoURL); {
+	case err != nil:
+		return nil, fmt.Errorf("parsing repo URL %q: %w", tc.RepoURL, err)
+	case u.Host != "":
+		switch h := strings.ToLower(u.Hostname()); {
+		case h == "github.com" || strings.HasSuffix(h, ".github.com"):
+			tc.SCMType = atlasexec.SCMTypeGithub
+			tc.SCMClient = func() (SCMClient, error) {
+				token := t.getenv("GITHUB_TOKEN")
+				if token == "" {
+					t.Warningf("GITHUB_TOKEN is not set, the action may not have all the permissions")
+				}
+				return NewGitHubClient(tc.Repo, t.getenv("GITHUB_API_URL"), token)
 			}
-			return NewGitHubClient(tc.Repo, t.getenv("GITHUB_API_URL"), token)
-		}
-		if tc.PullRequest != nil {
-			tc.PullRequest.URL = fmt.Sprintf("%s/pull/%d", strings.TrimSuffix(tc.RepoURL, ".git"), tc.PullRequest.Number)
-		}
-	case strings.Contains(tc.RepoURL, "gitlab.com") || strings.Contains(tc.RepoURL, "gitlab"):
-		tc.SCMType = atlasexec.SCMTypeGitlab
-		tc.SCMClient = func() (SCMClient, error) {
-			token := t.getenv("GITLAB_TOKEN")
-			if token == "" {
-				t.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
+			if tc.PullRequest != nil {
+				tc.PullRequest.URL = fmt.Sprintf("%s/pull/%d", strings.TrimSuffix(tc.RepoURL, ".git"), tc.PullRequest.Number)
 			}
-			return NewGitLabClient(tc.Repo, t.getenv("CI_API_V4_URL"), token)
-		}
-		if tc.PullRequest != nil {
-			tc.PullRequest.URL = fmt.Sprintf("%s/-/merge_requests/%d", strings.TrimSuffix(tc.RepoURL, ".git"), tc.PullRequest.Number)
-		}
-	case strings.Contains(tc.RepoURL, "bitbucket.org"):
-		tc.SCMType = atlasexec.SCMTypeBitbucket
-		tc.SCMClient = func() (SCMClient, error) {
-			token := t.getenv("BITBUCKET_ACCESS_TOKEN")
-			if token == "" {
-				t.Warningf("BITBUCKET_ACCESS_TOKEN is not set, the action may not have all the permissions")
+		case h == "gitlab.com" || strings.HasSuffix(h, ".gitlab.com"):
+			tc.SCMType = atlasexec.SCMTypeGitlab
+			tc.SCMClient = func() (SCMClient, error) {
+				token := t.getenv("GITLAB_TOKEN")
+				if token == "" {
+					t.Warningf("GITLAB_TOKEN is not set, the action may not have all the permissions")
+				}
+				return NewGitLabClient(tc.Repo, t.getenv("CI_API_V4_URL"), token)
 			}
-			return NewBitbucketClient(
-				t.getenv("BITBUCKET_WORKSPACE"),
-				t.getenv("BITBUCKET_REPO_SLUG"),
-				token,
-			)
-		}
-		if tc.PullRequest != nil {
-			tc.PullRequest.URL = fmt.Sprintf("%s/pull-requests/%d", strings.TrimSuffix(tc.RepoURL, ".git"), tc.PullRequest.Number)
+			if tc.PullRequest != nil {
+				tc.PullRequest.URL = fmt.Sprintf("%s/-/merge_requests/%d", strings.TrimSuffix(tc.RepoURL, ".git"), tc.PullRequest.Number)
+			}
+		case h == "bitbucket.org":
+			tc.SCMType = atlasexec.SCMTypeBitbucket
+			tc.SCMClient = func() (SCMClient, error) {
+				token := t.getenv("BITBUCKET_ACCESS_TOKEN")
+				if token == "" {
+					t.Warningf("BITBUCKET_ACCESS_TOKEN is not set, the action may not have all the permissions")
+				}
+				return NewBitbucketClient(
+					t.getenv("BITBUCKET_WORKSPACE"),
+					t.getenv("BITBUCKET_REPO_SLUG"),
+					token,
+				)
+			}
+			if tc.PullRequest != nil {
+				tc.PullRequest.URL = fmt.Sprintf("%s/pull-requests/%d", strings.TrimSuffix(tc.RepoURL, ".git"), tc.PullRequest.Number)
+			}
 		}
 	}
 	return tc, nil
@@ -158,6 +166,13 @@ func (t *TeamCity) buildProperties() (*properties.Properties, error) {
 
 // message sends a TeamCity service message.
 func (t *TeamCity) message(typ string, attrs ...string) {
+	// Validate attributes before writing any output.
+	// Single attribute (len == 1) is valid for single-value messages.
+	// Multiple attributes must be even (key-value pairs).
+	if len(attrs) > 1 && len(attrs)%2 != 0 {
+		t.Fatalf("message() called with odd number of attributes (%d): %v", len(attrs), attrs)
+		return // Fatalf does not terminate execution, so return is necessary
+	}
 	fmt.Fprint(t.w, "##teamcity[")
 	fmt.Fprint(t.w, typ)
 	switch l := len(attrs); {
@@ -197,8 +212,16 @@ func (t *TeamCity) escapeString(val string) string {
 			b = append(b, '|', byte(r))
 		case r <= 127: // unicode.MaxASCII
 			b = append(b, byte(r))
-		default:
+		case r <= 0xFFFF:
+			// Characters in the Basic Multilingual Plane (BMP)
 			b = fmt.Appendf(b, "|0x%04X", r)
+		default:
+			// Non-BMP characters (> 0xFFFF) need to be encoded as UTF-16 surrogate pairs
+			// TeamCity expects two |0xXXXX sequences for these characters
+			pair := utf16.Encode([]rune{r})
+			for _, code := range pair {
+				b = fmt.Appendf(b, "|0x%04X", code)
+			}
 		}
 	}
 	return string(b)
