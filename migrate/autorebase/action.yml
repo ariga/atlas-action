@@ -17,5 +17,16 @@ inputs:
   working-directory:
     description: Atlas working directory. Default is project root
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - id: action
+      run: |
+        ls -la scripts/shim.sh
+        scripts/shim.sh migrate/autorebase
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_BASE-BRANCH: ${{ inputs.base-branch }}
+        INPUT_DIR: ${{ inputs.dir }}
+        INPUT_REMOTE: ${{ inputs.remote }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}

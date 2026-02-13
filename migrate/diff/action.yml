@@ -38,6 +38,22 @@ outputs:
     description: |
       The URL of the CI report in Atlas Cloud, containing an ERD visualization
       and analysis of the schema migrations.
+    value: ${{ steps.action.outputs.url }}
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - id: action
+      run: |
+        ls -la scripts/shim.sh
+        scripts/shim.sh migrate/diff
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_DIR: ${{ inputs.dir }}
+        INPUT_REMOTE: ${{ inputs.remote }}
+        INPUT_TO: ${{ inputs.to }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENV: ${{ inputs.env }}
+        INPUT_VARS: ${{ inputs.vars }}
+        INPUT_DEV-URL: ${{ inputs.dev-url }}

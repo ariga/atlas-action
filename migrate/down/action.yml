@@ -46,14 +46,39 @@ inputs:
 outputs:
   current:
     description: The current version of the database. (before applying migrations)
+    value: ${{ steps.action.outputs.current }}
   planned_count:
     description: The number of migrations that will be applied.
+    value: ${{ steps.action.outputs.planned_count }}
   reverted_count:
     description: The number of migrations that were reverted.
+    value: ${{ steps.action.outputs.reverted_count }}
   target:
     description: The target version of the database.
+    value: ${{ steps.action.outputs.target }}
   url:
     description: If given, the URL for reviewing the revert plan.
+    value: ${{ steps.action.outputs.url }}
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - id: action
+      run: |
+        ls -la scripts/shim.sh
+        scripts/shim.sh migrate/down
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_AMOUNT: ${{ inputs.amount }}
+        INPUT_DIR: ${{ inputs.dir }}
+        INPUT_REVISIONS-SCHEMA: ${{ inputs.revisions-schema }}
+        INPUT_TO-TAG: ${{ inputs.to-tag }}
+        INPUT_TO-VERSION: ${{ inputs.to-version }}
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_WAIT-INTERVAL: ${{ inputs.wait-interval }}
+        INPUT_WAIT-TIMEOUT: ${{ inputs.wait-timeout }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENV: ${{ inputs.env }}
+        INPUT_VARS: ${{ inputs.vars }}
+        INPUT_DEV-URL: ${{ inputs.dev-url }}

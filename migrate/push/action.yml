@@ -40,5 +40,22 @@ inputs:
       The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
       Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - id: action
+      run: |
+        ls -la scripts/shim.sh
+        scripts/shim.sh migrate/push
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_DIR: ${{ inputs.dir }}
+        INPUT_DIR-NAME: ${{ inputs.dir-name }}
+        INPUT_LATEST: ${{ inputs.latest }}
+        INPUT_REVISIONS-SCHEMA: ${{ inputs.revisions-schema }}
+        INPUT_TAG: ${{ inputs.tag }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENV: ${{ inputs.env }}
+        INPUT_VARS: ${{ inputs.vars }}
+        INPUT_DEV-URL: ${{ inputs.dev-url }}

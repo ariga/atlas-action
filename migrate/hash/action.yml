@@ -25,5 +25,18 @@ inputs:
     description: |
       The environment to use from the Atlas configuration file. For example, `dev`.
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - id: action
+      run: |
+        ls -la scripts/shim.sh
+        scripts/shim.sh migrate/hash
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_BASE-BRANCH: ${{ inputs.base-branch }}
+        INPUT_DIR: ${{ inputs.dir }}
+        INPUT_REMOTE: ${{ inputs.remote }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENV: ${{ inputs.env }}

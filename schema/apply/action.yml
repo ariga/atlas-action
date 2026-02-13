@@ -64,6 +64,31 @@ inputs:
 outputs:
   error:
     description: The error message if the action fails.
+    value: ${{ steps.action.outputs.error }}
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - id: action
+      run: |
+        ls -la scripts/shim.sh
+        scripts/shim.sh schema/apply
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_AUTO-APPROVE: ${{ inputs.auto-approve }}
+        INPUT_DRY-RUN: ${{ inputs.dry-run }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+        INPUT_INCLUDE: ${{ inputs.include }}
+        INPUT_LINT-REVIEW: ${{ inputs.lint-review }}
+        INPUT_PLAN: ${{ inputs.plan }}
+        INPUT_SCHEMA: ${{ inputs.schema }}
+        INPUT_TO: ${{ inputs.to }}
+        INPUT_TX-MODE: ${{ inputs.tx-mode }}
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_WAIT-INTERVAL: ${{ inputs.wait-interval }}
+        INPUT_WAIT-TIMEOUT: ${{ inputs.wait-timeout }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENV: ${{ inputs.env }}
+        INPUT_VARS: ${{ inputs.vars }}
+        INPUT_DEV-URL: ${{ inputs.dev-url }}
