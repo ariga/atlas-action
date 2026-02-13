@@ -314,19 +314,30 @@ EOF
 @test "download mode attempts to create cache directory" {
   command -v curl >/dev/null || skip "curl not installed"
   export ATLAS_ACTION_VERSION="v1.0.0"
-  # Don't set ATLAS_ACTION_LOCAL, so it will try to download
-  # This will fail with 404 (22) since v1.0.0 doesn't exist
+  export GITHUB_ACTIONS="true"
+  export RUNNER_TOOL_CACHE="$TEST_TMPDIR/cache"
+
+  platform="linux-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+  cache_dir="$TEST_TMPDIR/cache/atlas-action/v1.0.0/$platform"
+
+  # Verify cache directory doesn't exist yet
+  [ ! -d "$cache_dir" ]
+
+  # Run the script (will fail to download v1.0.0 since it doesn't exist)
   run ! "$SHIM_SCRIPT" "test"
-  [[ "$output" == *"Downloading"* ]]
+
+  # Verify cache directory was created
+  [ -d "$cache_dir" ]
 }
 
 @test "download URL includes version and platform" {
   command -v curl >/dev/null || skip "curl not installed"
   export ATLAS_ACTION_VERSION="v1.2.3"
-  # This will fail with 404 (22) since v1.2.3 doesn't exist
+
+  # Run the script and check the logged URL contains version and platform
   run ! "$SHIM_SCRIPT" "test"
-  [[ "$output" == *"atlas-action-linux-"* ]]
-  [[ "$output" == *"v1.2.3"* ]]
+  [[ "$output" == *"Downloading: https://release.ariga.io/atlas-action/atlas-action-linux-"* ]]
+  [[ "$output" == *"-v1.2.3"* ]]
 }
 
 # =============================================================================
@@ -538,4 +549,3 @@ EOF
   [ "$status" -eq 5 ]
   [[ "$output" == *"failing with exit code 5"* ]]
 }
-
