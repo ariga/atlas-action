@@ -45,12 +45,12 @@ steps:
     script: |
       #!/bin/bash
       set -eo pipefail
-      curl -sSf https://raw.githubusercontent.com/ariga/atlas-action/v{{ .Version }}/scripts/setup-atlas.sh \
+      curl -sSf https://release.ariga.io/atlas-action/scripts-v{{ .Version }}/setup-atlas.sh \
         | CI=true sh
   - name: Run {{ .Name }}
     script: |
       #!/bin/bash
       set -eo pipefail
       export ATLAS_ACTION_VERSION={{ .Version | majorver | printf "v%s" }}
-      curl -sSf https://raw.githubusercontent.com/ariga/atlas-action/v{{ .Version }}/scripts/shim.sh \
+      curl -sSf https://release.ariga.io/atlas-action/scripts-v{{ .Version }}/shim.sh \
         | CI=true sh -s -- {{ .ID }}

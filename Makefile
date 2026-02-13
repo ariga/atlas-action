@@ -29,6 +29,8 @@ test:
 
 .PHONY: s3-upload
 s3-upload: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
+	aws s3 cp ./scripts/shim.sh s3://release.ariga.io/atlas-action/scripts-$(VERSION)/shim.sh; \
+	aws s3 cp ./scripts/setup-atlas.sh s3://release.ariga.io/atlas-action/scripts-$(VERSION)/setup-atlas.sh; \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(VERSION); \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(MAJOR_VER); \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION); \
