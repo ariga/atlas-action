@@ -41,10 +41,7 @@ runs:
   using: composite
   steps:
     - id: action
-      run: |
-        pwd
-        ls -la scripts/shim.sh
-        scripts/shim.sh migrate/test
+      run: ${{ github.action_path }}/scripts/shim.sh migrate/test
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:

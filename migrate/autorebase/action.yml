@@ -20,10 +20,7 @@ runs:
   using: composite
   steps:
     - id: action
-      run: |
-        pwd
-        ls -la scripts/shim.sh
-        scripts/shim.sh migrate/autorebase
+      run: ${{ github.action_path }}/scripts/shim.sh migrate/autorebase
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:

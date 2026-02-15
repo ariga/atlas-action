@@ -69,10 +69,7 @@ runs:
   using: composite
   steps:
     - id: action
-      run: |
-        pwd
-        ls -la scripts/shim.sh
-        scripts/shim.sh schema/apply
+      run: ${{ github.action_path }}/scripts/shim.sh schema/apply
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
