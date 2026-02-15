@@ -37,6 +37,22 @@ inputs:
 outputs:
   url:
     description: URL of the schema of the database inside Atlas Cloud.
+    value: ${{ steps.action.outputs.url }}
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - run: printenv
+      shell: bash
+    - id: action
+      run: ${{ github.action_path }}/../../scripts/shim.sh monitor/schema
+      shell: bash
+      env:
+        INPUT_CLOUD-TOKEN: ${{ inputs.cloud-token }}
+        INPUT_COLLECT-STATS: ${{ inputs.collect-stats }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+        INPUT_INCLUDE: ${{ inputs.include }}
+        INPUT_SCHEMAS: ${{ inputs.schemas }}
+        INPUT_SLUG: ${{ inputs.slug }}
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENV: ${{ inputs.env }}

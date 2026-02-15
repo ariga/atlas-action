@@ -410,8 +410,8 @@ func (a *Actions) MigrateApply(ctx context.Context) error {
 		AllowDirty:      a.GetBoolInput("allow-dirty"),
 		ToVersion:       a.GetInput("to-version"),
 		Amount:          a.GetUin64Input("amount"),
-		TxMode:          a.GetInput("tx-mode"),       // Hidden param.
-		BaselineVersion: a.GetInput("baseline"),      // Hidden param.
+		TxMode:          a.GetInput("tx-mode"),  // Hidden param.
+		BaselineVersion: a.GetInput("baseline"), // Hidden param.
 		ExecOrder:       atlasexec.MigrateExecOrder(a.GetInput("exec-order")),
 	}
 	runs, err := a.Atlas.MigrateApplySlice(ctx, params)
@@ -1924,7 +1924,7 @@ func RenderTemplate(name string, data any, tc *TriggerContext) (string, error) {
 // toEnvName converts the given string to an environment variable name.
 func toEnvName(s string) string {
 	return strings.ToUpper(strings.NewReplacer(
-		" ", "_", "-", "_", "/", "_",
+		" ", "_", "/", "_",
 	).Replace(s))
 }
 

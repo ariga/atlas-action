@@ -9,5 +9,12 @@ inputs:
     description: Generate atlas tests for the schema changes.
     default: "false"
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - run: printenv
+      shell: bash
+    - id: action
+      run: ${{ github.action_path }}/../scripts/shim.sh copilot
+      shell: bash
+      env:
+        INPUT_GEN-TEST: ${{ inputs.gen-test }}
