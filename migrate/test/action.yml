@@ -42,6 +42,7 @@ runs:
   steps:
     - id: action
       run: |
+        pwd
         ls -la scripts/shim.sh
         scripts/shim.sh migrate/test
       shell: bash

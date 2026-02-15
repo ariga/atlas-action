@@ -65,6 +65,7 @@ runs:
   steps:
     - id: action
       run: |
+        pwd
         ls -la scripts/shim.sh
         scripts/shim.sh schema/plan/approve
       shell: bash

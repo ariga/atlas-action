@@ -26,6 +26,7 @@ runs:
   steps:
     - id: action
       run: |
+        pwd
         ls -la scripts/shim.sh
         scripts/shim.sh {{ .ID }}
       shell: bash
