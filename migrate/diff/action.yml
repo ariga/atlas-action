@@ -45,7 +45,6 @@ runs:
     - id: action
       run: ${{ github.action_path }}/../../scripts/shim.sh migrate/diff
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       env:
         INPUT_DIR: ${{ inputs.dir }}
         INPUT_REMOTE: ${{ inputs.remote }}

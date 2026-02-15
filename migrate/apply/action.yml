@@ -69,7 +69,6 @@ runs:
     - id: action
       run: ${{ github.action_path }}/../../scripts/shim.sh migrate/apply
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       env:
         INPUT_ALLOW-DIRTY: ${{ inputs.allow-dirty }}
         INPUT_AMOUNT: ${{ inputs.amount }}

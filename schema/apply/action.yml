@@ -71,7 +71,6 @@ runs:
     - id: action
       run: ${{ github.action_path }}/../../scripts/shim.sh schema/apply
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       env:
         INPUT_AUTO-APPROVE: ${{ inputs.auto-approve }}
         INPUT_DRY-RUN: ${{ inputs.dry-run }}

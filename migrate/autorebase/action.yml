@@ -22,7 +22,6 @@ runs:
     - id: action
       run: ${{ github.action_path }}/../../scripts/shim.sh migrate/autorebase
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       env:
         INPUT_BASE-BRANCH: ${{ inputs.base-branch }}
         INPUT_DIR: ${{ inputs.dir }}

@@ -44,7 +44,6 @@ runs:
     - id: action
       run: ${{ github.action_path }}/../../scripts/shim.sh monitor/schema
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       env:
         INPUT_CLOUD-TOKEN: ${{ inputs.cloud-token }}
         INPUT_COLLECT-STATS: ${{ inputs.collect-stats }}

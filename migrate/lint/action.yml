@@ -53,7 +53,6 @@ runs:
     - id: action
       run: ${{ github.action_path }}/../../scripts/shim.sh migrate/lint
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       env:
         INPUT_DIR: ${{ inputs.dir }}
         INPUT_DIR-NAME: ${{ inputs.dir-name }}

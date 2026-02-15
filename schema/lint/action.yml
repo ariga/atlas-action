@@ -36,7 +36,6 @@ runs:
     - id: action
       run: ${{ github.action_path }}/../../scripts/shim.sh schema/lint
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       env:
         INPUT_SCHEMA: ${{ inputs.schema }}
         INPUT_URL: ${{ inputs.url }}

@@ -39,7 +39,6 @@ runs:
     - id: action
       run: ${{ github.action_path }}/../../scripts/shim.sh schema/test
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       env:
         INPUT_PATHS: ${{ inputs.paths }}
         INPUT_RUN: ${{ inputs.run }}
