@@ -64,7 +64,7 @@ runs:
   using: composite
   steps:
     - id: action
-      run: ${{ github.action_path }}/scripts/shim.sh schema/plan/approve
+      run: ${{ github.action_path }}/../../../scripts/shim.sh schema/plan/approve
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:

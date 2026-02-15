@@ -28,7 +28,7 @@ runs:
   using: composite
   steps:
     - id: action
-      run: ${{ github.action_path }}/scripts/shim.sh migrate/hash
+      run: ${{ github.action_path }}/../../scripts/shim.sh migrate/hash
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:

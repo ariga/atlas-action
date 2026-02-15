@@ -43,7 +43,7 @@ runs:
   using: composite
   steps:
     - id: action
-      run: ${{ github.action_path }}/scripts/shim.sh migrate/push
+      run: ${{ github.action_path }}/../../scripts/shim.sh migrate/push
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:

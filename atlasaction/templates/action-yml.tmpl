@@ -25,7 +25,7 @@ runs:
   using: composite
   steps:
     - id: action
-      run: {{ .ID | printf "${{ github.action_path }}/scripts/shim.sh %s" }}
+      run: {{ printf "${{ github.action_path }}/%s %s" .Shim .ID }}
       shell: bash
       working-directory: {{ printf "${{ inputs.working-directory }}" }}
 {{- if .Inputs }}

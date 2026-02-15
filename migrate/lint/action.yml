@@ -51,7 +51,7 @@ runs:
   using: composite
   steps:
     - id: action
-      run: ${{ github.action_path }}/scripts/shim.sh migrate/lint
+      run: ${{ github.action_path }}/../../scripts/shim.sh migrate/lint
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
