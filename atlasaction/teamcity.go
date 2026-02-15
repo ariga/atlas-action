@@ -11,43 +11,222 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"unicode/utf16"
 
+	"ariga.io/atlas-action/internal/teamcity"
 	"ariga.io/atlas/atlasexec"
 	"github.com/magiconair/properties"
 )
 
-type (
-	TeamCity struct {
-		w      io.Writer
-		getenv func(string) string
-	}
-)
+type TeamCity struct {
+	*teamcity.ServiceMessage
+	getenv func(string) string
+}
 
 // NewTeamCity creates a new TeamCity action.
 func NewTeamCity(getenv func(string) string, w io.Writer) *TeamCity {
-	return &TeamCity{getenv: getenv, w: w}
+	return &TeamCity{teamcity.NewServiceMessage(w), getenv}
 }
 
 // Infof implements [Action].
 func (t *TeamCity) Infof(msg string, a ...any) {
-	t.message("message", "text", fmt.Sprintf(msg, a...), "status", "NORMAL")
+	t.Message("NORMAL", fmt.Sprintf(msg, a...))
 }
 
 // Warningf implements [Action].
 func (t *TeamCity) Warningf(msg string, a ...any) {
-	t.message("message", "text", fmt.Sprintf(msg, a...), "status", "WARNING")
+	t.Message("WARNING", fmt.Sprintf(msg, a...))
 }
 
 // Errorf implements [Action].
 func (t *TeamCity) Errorf(msg string, a ...any) {
-	t.message("message", "text", fmt.Sprintf(msg, a...), "status", "ERROR")
+	t.Message("ERROR", fmt.Sprintf(msg, a...))
 }
 
 // Fatalf implements [Action].
 func (t *TeamCity) Fatalf(msg string, a ...any) {
-	t.message("message", "text", fmt.Sprintf(msg, a...), "status", "FAILURE")
+	t.Message("FAILURE", fmt.Sprintf(msg, a...))
 	os.Exit(1) // terminate execution
+}
+
+// MigrateApply implements Reporter.
+func (t *TeamCity) MigrateApply(_ context.Context, r *atlasexec.MigrateApply) {
+	if r == nil {
+		return
+	}
+	const blockName = "atlas migrate apply"
+	flowID := teamcity.WithFlowID("migrate-apply")
+	t.BlockOpened(blockName, flowID)
+	defer t.BlockClosed(blockName, flowID)
+	t.Message("NORMAL", fmt.Sprintf("Migration Directory: %s", r.Dir), flowID)
+	if r.Current != "" {
+		t.Message("NORMAL", fmt.Sprintf("From Version: %s", r.Current), flowID)
+	}
+	t.Message("NORMAL", fmt.Sprintf("To Version: %s", r.Target), flowID)
+	t.Message("NORMAL", fmt.Sprintf("Applied: %d migration file(s)", len(r.Applied)), flowID)
+	for _, f := range r.Applied {
+		if f.Error != nil {
+			t.Message("ERROR", fmt.Sprintf("Migration %s failed: %s", f.Name, f.Error.Text), flowID)
+		} else {
+			t.Message("NORMAL", fmt.Sprintf("Migration %s applied successfully (%d statements)", f.Name, len(f.Applied)), flowID)
+		}
+	}
+	if r.Error != "" {
+		t.Message("ERROR", fmt.Sprintf("Migration failed: %s", r.Error), flowID)
+	}
+}
+
+// MigrateLint implements Reporter.
+func (t *TeamCity) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
+	if r == nil {
+		return
+	}
+	t.lintReport("atlas migrate lint", r)
+}
+
+// SchemaLint implements Reporter.
+func (t *TeamCity) SchemaLint(_ context.Context, r *SchemaLintReport) {
+	if r == nil || r.SchemaLintReport == nil {
+		return
+	}
+	flowID := teamcity.WithFlowID("schema-lint")
+	blockOpts := []teamcity.Option{flowID}
+	if desc := strings.TrimSpace(strings.Join(r.URL, ", ")); desc != "" {
+		blockOpts = append(blockOpts, teamcity.WithDescription(desc))
+	}
+	const blockName = "atlas schema lint"
+	t.BlockOpened(blockName, blockOpts...)
+	defer t.BlockClosed(blockName, flowID)
+	if len(r.Steps) == 0 {
+		t.Message("NORMAL", "atlas schema lint completed with no findings", flowID)
+		return
+	}
+	const inspectionTypeID = "atlas-schema-lint"
+	t.InspectionType(inspectionTypeID, "Atlas Schema Lint", "atlas", "Schema lint checks", flowID)
+	for _, step := range r.Steps {
+		severity := "WARNING"
+		if step.Error {
+			severity = "ERROR"
+			t.Message("ERROR", fmt.Sprintf("%s %s", step.Text, step.Desc), flowID)
+		} else {
+			t.Message("WARNING", fmt.Sprintf("%s %s", step.Text, step.Desc), flowID)
+		}
+		if len(step.Diagnostics) == 0 {
+			continue
+		}
+		for _, diag := range step.Diagnostics {
+			// Only report diagnostics with position as TeamCity requires file
+			// for inspections.
+			// The message of the step will contain the summary of the issue.
+			if p := diag.Pos; p != nil {
+				msg := fmt.Sprintf(`<a href="https://atlasgo.io/lint/analyzers#%s">%s</a>`,
+					diag.Code, diag.Text)
+				opts := []teamcity.Option{
+					teamcity.WithSeverity(severity),
+					teamcity.WithMessage(msg),
+					flowID,
+				}
+				if l := p.Start.Line; l > 0 {
+					opts = append(opts, teamcity.WithLine(l))
+				}
+				t.Inspection(inspectionTypeID, p.Filename, opts...)
+			}
+		}
+	}
+}
+
+// SchemaPlan implements Reporter.
+func (t *TeamCity) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
+	if r == nil {
+		return
+	}
+	const blockName = "atlas schema plan"
+	flowID := teamcity.WithFlowID("schema-plan")
+	t.BlockOpened(blockName, flowID)
+	defer t.BlockClosed(blockName, flowID)
+
+	if r.Error != "" {
+		t.Message("ERROR", fmt.Sprintf("Schema plan failed: %s", r.Error), flowID)
+		return
+	}
+	if r.File != nil {
+		t.Message("NORMAL", fmt.Sprintf("Plan: %s", r.File.Name), flowID)
+		if r.File.URL != "" {
+			t.Message("NORMAL", fmt.Sprintf("URL: %s", r.File.URL), flowID)
+		}
+		if r.File.Link != "" {
+			t.Message("NORMAL", fmt.Sprintf("Link: %s", r.File.Link), flowID)
+		}
+	}
+	// Report lint findings if present
+	if r.Lint != nil && len(r.Lint.Files) > 0 {
+		t.lintReport("Lint report", r.Lint)
+	}
+}
+
+// SchemaApply implements Reporter.
+func (t *TeamCity) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
+	if r == nil {
+		return
+	}
+	const blockName = "atlas schema apply"
+	flowID := teamcity.WithFlowID("schema-apply")
+	t.BlockOpened(blockName, flowID)
+	defer t.BlockClosed(blockName, flowID)
+	if r.Error != "" {
+		t.Message("ERROR", r.Error, flowID)
+		return
+	}
+	if a := r.Applied; a != nil {
+		t.Message("NORMAL", fmt.Sprintf("Applied %d statement(s)", len(a.Applied)), flowID)
+		if a.Error != nil {
+			t.Message("ERROR", fmt.Sprintf("Error in statement: %s", a.Error.Text), flowID)
+		}
+	}
+	// Report plan lint findings if present
+	if p := r.Plan; p != nil && p.Lint != nil {
+		t.lintReport("Lint report", p.Lint)
+	}
+}
+
+func (t *TeamCity) lintReport(name string, r *atlasexec.SummaryReport) {
+	const typeID = "atlas-lint-report"
+	flowID := teamcity.WithFlowID("lint-report")
+	t.BlockOpened(name, flowID)
+	defer t.BlockClosed(name, flowID)
+	if len(r.Files) == 0 {
+		t.Message("NORMAL", "Lint report completed with no findings", flowID)
+		return
+	}
+	t.InspectionType(typeID, "Atlas Lint Report", "atlas",
+		"Migration lint report", flowID)
+	for _, f := range r.Files {
+		if f.Error != "" {
+			t.Message("ERROR", fmt.Sprintf("File %s: %s", f.Name, f.Error), flowID)
+		}
+		for _, report := range f.Reports {
+			for _, diag := range report.Diagnostics {
+				severity := "WARNING"
+				if f.Error != "" {
+					severity = "ERROR"
+				}
+				msg := diag.Text
+				if diag.Code != "" {
+					msg = fmt.Sprintf(`<a href="https://atlasgo.io/lint/analyzers#%s">%s</a>`, diag.Code, diag.Text)
+				}
+				opts := []teamcity.Option{
+					teamcity.WithSeverity(severity),
+					teamcity.WithMessage(msg),
+					flowID,
+				}
+				// Calculate line number from position
+				if diag.Pos > 0 {
+					lines := strings.Split(f.Text[:diag.Pos], "\n")
+					opts = append(opts, teamcity.WithLine(max(1, len(lines))))
+				}
+				t.Inspection(typeID, f.Name, opts...)
+			}
+		}
+	}
 }
 
 // GetType implements [Action].
@@ -152,10 +331,10 @@ func (t *TeamCity) GetInput(name string) string {
 
 // SetOutput implements [Action].
 func (t *TeamCity) SetOutput(name string, value string) {
-	t.message("setParameter", "name", name, "value", value)
+	t.SetParameter(name, value)
 	// Also set as environment variable, to allow usage in subsequent build steps.
-	env := toOutputVarName(t.getenv("ATLAS_ACTION_COMMAND"), name)
-	t.message("setParameter", "name", fmt.Sprintf("env.%s", env), "value", value)
+	t.SetParameter(fmt.Sprintf("env.%s", toOutputVarName(
+		t.getenv("ATLAS_ACTION_COMMAND"), name)), value)
 }
 
 func (t *TeamCity) buildProperties() (*properties.Properties, error) {
@@ -166,67 +345,7 @@ func (t *TeamCity) buildProperties() (*properties.Properties, error) {
 	return properties.LoadFile(path, properties.UTF8)
 }
 
-// message sends a TeamCity service message.
-func (t *TeamCity) message(typ string, attrs ...string) {
-	// Validate attributes before writing any output.
-	// Single attribute (len == 1) is valid for single-value messages.
-	// Multiple attributes must be even (key-value pairs).
-	if len(attrs) > 1 && len(attrs)%2 != 0 {
-		t.Fatalf("message() called with odd number of attributes (%d): %v", len(attrs), attrs)
-		return
-	}
-	fmt.Fprint(t.w, "##teamcity[")
-	fmt.Fprint(t.w, typ)
-	switch l := len(attrs); {
-	case l == 1:
-		fmt.Fprint(t.w, " '")
-		fmt.Fprint(t.w, t.escapeString(attrs[0]))
-		fmt.Fprint(t.w, "'")
-	case l > 1:
-		for i := 0; i+1 < len(attrs); i += 2 {
-			fmt.Fprint(t.w, " ")
-			fmt.Fprint(t.w, t.escapeString(attrs[i]))
-			fmt.Fprint(t.w, "='")
-			fmt.Fprint(t.w, t.escapeString(attrs[i+1]))
-			fmt.Fprint(t.w, "'")
-		}
-	}
-	fmt.Fprint(t.w, "]\n")
-}
-
-// escapeString escapes a string according to TeamCity service message rules.
-// https://www.jetbrains.com/help/teamcity/service-messages.html#Escaped+Values
-func (t *TeamCity) escapeString(val string) string {
-	b := make([]byte, 0, len(val))
-	for _, r := range val {
-		switch {
-		case r == '\n':
-			b = append(b, '|', 'n')
-		case r == '\r':
-			b = append(b, '|', 'r')
-		case r == '\u0085':
-			b = append(b, '|', 'x')
-		case r == '\u2028':
-			b = append(b, '|', 'l')
-		case r == '\u2029':
-			b = append(b, '|', 'p')
-		case r == '|', r == '[', r == ']', r == '\'':
-			b = append(b, '|', byte(r))
-		case r <= 127: // unicode.MaxASCII
-			b = append(b, byte(r))
-		case r <= 0xFFFF:
-			// Characters in the Basic Multilingual Plane (BMP)
-			b = fmt.Appendf(b, "|0x%04X", r)
-		default:
-			// Non-BMP characters (> 0xFFFF) need to be encoded as UTF-16 surrogate pairs
-			// TeamCity expects two |0xXXXX sequences for these characters
-			pair := utf16.Encode([]rune{r})
-			for _, code := range pair {
-				b = fmt.Appendf(b, "|0x%04X", code)
-			}
-		}
-	}
-	return string(b)
-}
-
-var _ Action = (*TeamCity)(nil)
+var (
+	_ Action   = (*TeamCity)(nil)
+	_ Reporter = (*TeamCity)(nil)
+)

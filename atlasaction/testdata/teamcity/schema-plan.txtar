@@ -1,0 +1,38 @@
+# Test schema/plan action for TeamCity
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-plan
+
+! atlas-action --action=schema/plan
+cmp stdout out
+
+-- schema-plan/1/args --
+schema plan list --format {{ json . }} --context {"repo":"test-project","branch":"main","commit":"abc123","url":"https://github.com/ariga/atlas-action.git","scmType":"GITHUB"} --pending --auto-approve
+-- schema-plan/1/stdout --
+[]
+-- schema-plan/2/args --
+schema plan --format {{ json . }} --context {"repo":"test-project","branch":"main","commit":"abc123","url":"https://github.com/ariga/atlas-action.git","scmType":"GITHUB"} --dry-run
+-- schema-plan/2/stdout --
+{"Repo":"app","Lint":{"Files":[{"Name":"20241010143904.sql","Text":"CREATE TABLE t1 (c int);","Reports":[{"Text":"destructive changes","Diagnostics":[{"Pos":0,"Text":"Dropping table t2","Code":"DS102"}]}],"Error":"destructive changes detected"}]},"File":{"Name":"20241010143904","URL":"atlas://app/plans/20241010143904","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511","Status":"PENDING"}}
+-- schema-plan/3/args --
+schema plan --format {{ json . }} --context {"repo":"test-project","branch":"main","commit":"abc123","url":"https://github.com/ariga/atlas-action.git","scmType":"GITHUB"} --name ref-abc123- --pending --auto-approve
+-- schema-plan/3/stdout --
+{"Repo":"app","Lint":{"Files":[{"Name":"20241010143904.sql","Text":"CREATE TABLE t1 (c int);","Reports":[{"Text":"destructive changes","Diagnostics":[{"Pos":0,"Text":"Dropping table t2","Code":"DS102"}]}],"Error":"destructive changes detected"}]},"File":{"Name":"20241010143904","URL":"atlas://app/plans/20241010143904","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511","Status":"PENDING"}}
+-- out --
+##teamcity[message status='NORMAL' text='Schema plan does not exist, creating a new one with name "ref-abc123-"']
+##teamcity[setParameter name='link' value='http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_SCHEMA_PLAN_LINK' value='http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511']
+##teamcity[setParameter name='plan' value='atlas://app/plans/20241010143904']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_SCHEMA_PLAN_PLAN' value='atlas://app/plans/20241010143904']
+##teamcity[setParameter name='status' value='PENDING']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_SCHEMA_PLAN_STATUS' value='PENDING']
+##teamcity[blockOpened flowId='schema-plan' name='atlas schema plan']
+##teamcity[message flowId='schema-plan' status='NORMAL' text='Plan: 20241010143904']
+##teamcity[message flowId='schema-plan' status='NORMAL' text='URL: atlas://app/plans/20241010143904']
+##teamcity[message flowId='schema-plan' status='NORMAL' text='Link: http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511']
+##teamcity[blockOpened flowId='lint-report' name='Lint report']
+##teamcity[inspectionType category='atlas' description='Migration lint report' flowId='lint-report' id='atlas-lint-report' name='Atlas Lint Report']
+##teamcity[message flowId='lint-report' status='ERROR' text='File 20241010143904.sql: destructive changes detected']
+##teamcity[inspection SEVERITY='ERROR' file='20241010143904.sql' flowId='lint-report' message='<a href="https://atlasgo.io/lint/analyzers#DS102">Dropping table t2</a>' typeId='atlas-lint-report']
+##teamcity[blockClosed flowId='lint-report' name='Lint report']
+##teamcity[blockClosed flowId='schema-plan' name='atlas schema plan']
+##teamcity[message status='WARNING' text='GITHUB_TOKEN is not set, the action may not have all the permissions']
+##teamcity[message status='FAILURE' text='`atlas schema plan` completed with lint errors:|ndestructive changes detected']

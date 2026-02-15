@@ -1,0 +1,32 @@
+# Test migrate/apply action for TeamCity
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-apply
+# Setup the action input variables
+env ATLAS_INPUT_DIR=file://migrations
+env ATLAS_INPUT_URL=sqlite://./a.db?cache=shared&_fk=1
+
+atlas-action --action=migrate/apply
+cmp stdout out
+
+-- migrate-apply/1/args --
+migrate apply --format {{ json . }} --context {"triggerType":"TEAMCITY","triggerVersion":"testscript"} --url sqlite://./a.db?cache=shared&_fk=1 --dir file://migrations
+-- migrate-apply/1/stdout --
+{"Driver":"sqlite3","Dir":"file://migrations","Pending":[{"Name":"20250812113056.sql","Version":"20250812113056"},{"Name":"20250812113110.sql","Version":"20250812113110"}],"Applied":[{"Name":"20250812113056.sql","Version":"20250812113056","Start":"2025-08-12T18:33:33.639168+07:00","End":"2025-08-12T18:33:33.640468+07:00","Applied":["CREATE TABLE t1(a int);"]},{"Name":"20250812113110.sql","Version":"20250812113110","Start":"2025-08-12T18:33:33.640468+07:00","End":"2025-08-12T18:33:33.641098+07:00","Applied":["CREATE TABLE t2(b int);"]}],"Target":"20250812113110","Current":"","Start":"2025-08-12T18:33:33.635359+07:00","End":"2025-08-12T18:33:33.641098+07:00"}
+-- out --
+##teamcity[blockOpened flowId='migrate-apply' name='atlas migrate apply']
+##teamcity[message flowId='migrate-apply' status='NORMAL' text='Migration Directory: file://migrations']
+##teamcity[message flowId='migrate-apply' status='NORMAL' text='To Version: 20250812113110']
+##teamcity[message flowId='migrate-apply' status='NORMAL' text='Applied: 2 migration file(s)']
+##teamcity[message flowId='migrate-apply' status='NORMAL' text='Migration 20250812113056.sql applied successfully (1 statements)']
+##teamcity[message flowId='migrate-apply' status='NORMAL' text='Migration 20250812113110.sql applied successfully (1 statements)']
+##teamcity[blockClosed flowId='migrate-apply' name='atlas migrate apply']
+##teamcity[message status='NORMAL' text='"atlas migrate apply" completed successfully, applied to version "20250812113110"']
+##teamcity[setParameter name='current' value='']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_APPLY_CURRENT' value='']
+##teamcity[setParameter name='target' value='20250812113110']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_APPLY_TARGET' value='20250812113110']
+##teamcity[setParameter name='applied_count' value='2']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_APPLY_APPLIED_COUNT' value='2']
+##teamcity[setParameter name='pending_count' value='2']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_APPLY_PENDING_COUNT' value='2']
+##teamcity[setParameter name='runs' value='|[{"current":"","target":"20250812113110","applied_count":2,"pending_count":2,"pending_files":|["20250812113056.sql","20250812113110.sql"|]}|]']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_APPLY_RUNS' value='|[{"current":"","target":"20250812113110","applied_count":2,"pending_count":2,"pending_files":|["20250812113056.sql","20250812113110.sql"|]}|]']
