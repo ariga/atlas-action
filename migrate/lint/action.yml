@@ -50,6 +50,8 @@ outputs:
 runs:
   using: composite
   steps:
+    - run: printenv
+      shell: bash
     - id: action
       run: ${{ github.action_path }}/../../scripts/shim.sh migrate/lint
       shell: bash

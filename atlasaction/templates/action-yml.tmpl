@@ -24,6 +24,8 @@ outputs:
 runs:
   using: composite
   steps:
+    - run: printenv
+      shell: bash
     - id: action
       run: {{ printf "${{ github.action_path }}/%s %s" .Shim .ID }}
       shell: bash
