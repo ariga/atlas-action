@@ -1,0 +1,20 @@
+# Test migrate/lint action for TeamCity
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-lint
+# Setup the action input variables
+env ATLAS_INPUT_DIR=file://migrations
+env ATLAS_INPUT_DEV_URL=sqlite://file?mode=memory
+env ATLAS_INPUT_DIR_NAME=test-dir
+
+atlas-action --action=migrate/lint
+cmp stdout out
+
+-- migrate-lint/1/args --
+migrate lint -w --context {"repo":"test-project","path":"file://migrations","branch":"main","commit":"abc123","url":"https://github.com/ariga/atlas-action.git","scmType":"GITHUB"} --dev-url sqlite://file?mode=memory --dir file://migrations --base atlas://test-dir --format {{ json . }}
+-- migrate-lint/1/stdout --
+{"Files":[{"Name":"20250812113056.sql","Text":"CREATE TABLE t1(a int);","Reports":[{"Text":"naming","Diagnostics":[{"Pos":13,"Text":"Table name should use snake_case","Code":"NM101"}]}]}]}
+-- out --
+##teamcity[blockOpened flowId='lint-report' name='atlas migrate lint']
+##teamcity[inspectionType category='atlas' description='Migration lint report' flowId='lint-report' id='atlas-lint-report' name='Atlas Lint Report']
+##teamcity[inspection SEVERITY='WARNING' file='20250812113056.sql' flowId='lint-report' line='1' message='<a href="https://atlasgo.io/lint/analyzers#NM101">Table name should use snake_case</a>' typeId='atlas-lint-report']
+##teamcity[blockClosed flowId='lint-report' name='atlas migrate lint']
+##teamcity[message status='NORMAL' text='`atlas migrate lint` completed successfully, no issues found']
