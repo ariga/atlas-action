@@ -18,11 +18,11 @@ schema plan --format {{ json . }} --context {"repo":"test-project","branch":"mai
 {"Repo":"app","Lint":{"Files":[{"Name":"20241010143904.sql","Text":"CREATE TABLE t1 (c int);","Reports":[{"Text":"destructive changes","Diagnostics":[{"Pos":0,"Text":"Dropping table t2","Code":"DS102"}]}],"Error":"destructive changes detected"}]},"File":{"Name":"20241010143904","URL":"atlas://app/plans/20241010143904","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511","Status":"PENDING"}}
 -- out --
 ##teamcity[message status='NORMAL' text='Schema plan does not exist, creating a new one with name "ref-abc123-"']
-##teamcity[setParameter name='link' value='http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511']
+##teamcity[setParameter name='atlas-action.schema-plan.outputs.link' value='http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511']
 ##teamcity[setParameter name='env.ATLAS_OUTPUT_SCHEMA_PLAN_LINK' value='http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511']
-##teamcity[setParameter name='plan' value='atlas://app/plans/20241010143904']
+##teamcity[setParameter name='atlas-action.schema-plan.outputs.plan' value='atlas://app/plans/20241010143904']
 ##teamcity[setParameter name='env.ATLAS_OUTPUT_SCHEMA_PLAN_PLAN' value='atlas://app/plans/20241010143904']
-##teamcity[setParameter name='status' value='PENDING']
+##teamcity[setParameter name='atlas-action.schema-plan.outputs.status' value='PENDING']
 ##teamcity[setParameter name='env.ATLAS_OUTPUT_SCHEMA_PLAN_STATUS' value='PENDING']
 ##teamcity[blockOpened flowId='schema-plan' name='atlas schema plan']
 ##teamcity[message flowId='schema-plan' status='NORMAL' text='Plan: 20241010143904']

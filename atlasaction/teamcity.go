@@ -331,10 +331,10 @@ func (t *TeamCity) GetInput(name string) string {
 
 // SetOutput implements [Action].
 func (t *TeamCity) SetOutput(name string, value string) {
-	t.SetParameter(name, value)
-	// Also set as environment variable, to allow usage in subsequent build steps.
-	t.SetParameter(fmt.Sprintf("env.%s", toOutputVarName(
-		t.getenv("ATLAS_ACTION_COMMAND"), name)), value)
+	act := t.getenv("ATLAS_ACTION_COMMAND")
+	t.SetParameter(fmt.Sprintf("atlas-action.%s.outputs.%s",
+		strings.ReplaceAll(act, "/", "-"), name), value)
+	t.SetParameter(fmt.Sprintf("env.%s", toOutputVarName(act, name)), value)
 }
 
 func (t *TeamCity) buildProperties() (*properties.Properties, error) {
