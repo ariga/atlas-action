@@ -25,8 +25,8 @@ if [[ "$TEST_BATCH" != "" ]]; then
   fi
 fi
 
-if [[ "$TEST_ARGS" != "$@" ]]; then
-  >&2 echo "Receive unexpected args: $@"
+if [[ "$TEST_ARGS" != "$*" ]]; then
+  >&2 echo "Receive unexpected args: $*"
   exit 1
 fi
 
