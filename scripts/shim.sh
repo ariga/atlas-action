@@ -119,11 +119,16 @@ run() {
     if bin_version=$("$dest" --version 2>/dev/null); then
       log_notice "Using cached binary: $bin_version"
     else
-      url="https://release.ariga.io"
-      url="${url}/atlas-action/atlas-action-${platform}-${version}"
+      primary_url="https://atlasbinaries.com/atlas-action/atlas-action-${platform}-${version}"
+      fallback_url="https://release.ariga.io/atlas-action/atlas-action-${platform}-${version}"
       mkdir -p "$tool_path"
-      log_notice "Downloading: $url"
-      curl -sSfL "$url" -o "$dest"
+      log_notice "Downloading: $primary_url"
+      if ! curl -sSfL "$primary_url" -o "$dest"; then
+        log_notice "Primary server failed, falling back to release.ariga.io"
+        rm -f "$dest"
+        log_notice "Downloading: $fallback_url"
+        curl -sSfL "$fallback_url" -o "$dest"
+      fi
       chmod 700 "$dest"
     fi
     add_to_path "$tool_path"
