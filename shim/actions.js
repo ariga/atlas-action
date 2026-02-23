@@ -27,15 +27,22 @@ module.exports = async function run(action) {
     let toolPath = toolCache.find(toolName, cacheVersion);
     // Tool Path is the directory where the binary is located. If it is not found, download it.
     if (!toolPath || !fs.existsSync(path.join(toolPath, binaryName))) {
-      const url = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
+      const primaryUrl = `https://atlasbinaries.com/atlas-action/atlas-action-${version}`;
+      const fallbackUrl = `https://release.ariga.io/atlas-action/atlas-action-${version}`;
       const dest = path.join(process.cwd(), "atlas-action");
       // The action can be run in the same job multiple times.
-      // And the cache in only updated after the job is done.
+      // And the cache is only updated after the job is done.
       if (fs.existsSync(dest)) {
         core.debug(`Using downloaded binary: ${dest}`);
       } else {
-        core.info(`Downloading atlas-action binary: ${url} to ${dest}`);
-        await toolCache.downloadTool(url, dest);
+        core.info(`Downloading atlas-action binary: ${primaryUrl} to ${dest}`);
+        try {
+          await toolCache.downloadTool(primaryUrl, dest);
+        } catch (err) {
+          core.warning(`Primary server failed (${err.message}), falling back to release.ariga.io`);
+          core.info(`Downloading atlas-action binary: ${fallbackUrl} to ${dest}`);
+          await toolCache.downloadTool(fallbackUrl, dest);
+        }
         fs.chmodSync(dest, "700");
       }
       toolPath = await toolCache.cacheFile(dest, binaryName, toolName, cacheVersion);

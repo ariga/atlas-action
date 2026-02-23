@@ -335,8 +335,9 @@ EOF
   export ATLAS_ACTION_VERSION="v1.2.3"
 
   # Run the script and check the logged URL contains version and platform
+  # (tries atlasbinaries.com first, then fallback to release.ariga.io)
   run ! "$SHIM_SCRIPT" "test"
-  [[ "$output" == *"Downloading: https://release.ariga.io/atlas-action/atlas-action-linux-"* ]]
+  [[ "$output" == *"Downloading: https://atlasbinaries.com/atlas-action/atlas-action-linux-"* ]] || [[ "$output" == *"Downloading: https://release.ariga.io/atlas-action/atlas-action-linux-"* ]]
   [[ "$output" == *"-v1.2.3"* ]]
 }
 

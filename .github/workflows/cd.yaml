@@ -70,6 +70,11 @@ jobs:
         run: npm install -g tfx-cli
       - name: Install Atlas
         uses: ariga/setup-atlas@v0
+      - name: Install rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rclone
+          rclone version
       - name: Build assets
         run: make DOCKER_IMAGE=$DOCKER_IMAGE atlas-action test s3-upload docker azure-devops
         env:
@@ -77,6 +82,12 @@ jobs:
           AWS_REGION: us-east-1
           DOCKER_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           GH_TOKEN: ${{ github.token }}
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          RCLONE_S3_NO_CHECK_BUCKET: true
       - name: Upload Azure DevOps Extension
         uses: actions/upload-artifact@v4
         with:

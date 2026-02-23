@@ -36,7 +36,15 @@ s3-upload: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
 	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION); \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(MAJOR_VER); \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(VERSION); \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER);
+	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER); \
+	rclone copyto ./scripts/shim.sh r2:atlas-binaries/atlas-action/scripts-$(VERSION)/shim.sh; \
+	rclone copyto ./scripts/setup-atlas.sh r2:atlas-binaries/atlas-action/scripts-$(VERSION)/setup-atlas.sh; \
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(BINARY_NAME)-$(VERSION); \
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(BINARY_NAME)-$(MAJOR_VER); \
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION); \
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(MAJOR_VER); \
+	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(VERSION); \
+	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER);
 
 .PHONY: docker
 docker: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
