@@ -12,12 +12,18 @@ migrate apply --format {{ json . }} --context {"triggerType":"TEAMCITY","trigger
 -- migrate-apply/1/stdout --
 {"Driver":"sqlite3","Dir":"file://migrations","Pending":[{"Name":"20250812113056.sql","Version":"20250812113056"},{"Name":"20250812113110.sql","Version":"20250812113110"}],"Applied":[{"Name":"20250812113056.sql","Version":"20250812113056","Start":"2025-08-12T18:33:33.639168+07:00","End":"2025-08-12T18:33:33.640468+07:00","Applied":["CREATE TABLE t1(a int);"]},{"Name":"20250812113110.sql","Version":"20250812113110","Start":"2025-08-12T18:33:33.640468+07:00","End":"2025-08-12T18:33:33.641098+07:00","Applied":["CREATE TABLE t2(b int);"]}],"Target":"20250812113110","Current":"","Start":"2025-08-12T18:33:33.635359+07:00","End":"2025-08-12T18:33:33.641098+07:00"}
 -- out --
-##teamcity[blockOpened flowId='migrate-apply' name='atlas migrate apply']
+##teamcity[buildStatisticValue key='atlas.migrate.apply.files' value='2']
+##teamcity[buildStatisticValue key='atlas.migrate.apply.statements' value='2']
+##teamcity[buildStatisticValue key='atlas.migrate.apply.duration.ms' value='5']
+##teamcity[addBuildTag 'migration-applied']
+##teamcity[buildStatus text='{build.status.text}, migrated to 20250812113110 (2 file(s), 2 statement(s))']
+##teamcity[blockOpened description='-> 20250812113110' flowId='migrate-apply' name='atlas migrate apply']
 ##teamcity[message flowId='migrate-apply' status='NORMAL' text='Migration Directory: file://migrations']
 ##teamcity[message flowId='migrate-apply' status='NORMAL' text='To Version: 20250812113110']
-##teamcity[message flowId='migrate-apply' status='NORMAL' text='Applied: 2 migration file(s)']
-##teamcity[message flowId='migrate-apply' status='NORMAL' text='Migration 20250812113056.sql applied successfully (1 statements)']
-##teamcity[message flowId='migrate-apply' status='NORMAL' text='Migration 20250812113110.sql applied successfully (1 statements)']
+##teamcity[message flowId='migrate-apply' status='NORMAL' text='Duration: 5ms']
+##teamcity[message flowId='migrate-apply' status='NORMAL' text='Applied: 2 migration file(s), 2 statement(s)']
+##teamcity[message flowId='migrate-apply' status='NORMAL' text='Migration 20250812113056.sql applied successfully (1 statements in 1ms)']
+##teamcity[message flowId='migrate-apply' status='NORMAL' text='Migration 20250812113110.sql applied successfully (1 statements in 0ms)']
 ##teamcity[blockClosed flowId='migrate-apply' name='atlas migrate apply']
 ##teamcity[message status='NORMAL' text='"atlas migrate apply" completed successfully, applied to version "20250812113110"']
 ##teamcity[setParameter name='atlas-action.migrate-apply.outputs.current' value='']
