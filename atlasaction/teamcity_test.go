@@ -123,7 +123,13 @@ func TestTeamCity_SchemaLint(t *testing.T) {
 		},
 	}
 	tc.SchemaLint(context.Background(), report)
-	require.Equal(t, `##teamcity[blockOpened description='file://schema.hcl' flowId='schema-lint' name='atlas schema lint']
+	require.Equal(t, `##teamcity[buildStatisticValue key='atlas.schema.lint.steps' value='2']
+##teamcity[buildStatisticValue key='atlas.schema.lint.diagnostics' value='2']
+##teamcity[buildStatisticValue key='atlas.schema.lint.errors' value='1']
+##teamcity[addBuildTag 'schema-lint-failed']
+##teamcity[buildStatus text='{build.status.text}, schema lint failed: destructive change']
+##teamcity[buildProblem description='Schema lint found 1 error(s)' identity='atlas-schema-lint']
+##teamcity[blockOpened description='file://schema.hcl' flowId='schema-lint' name='atlas schema lint']
 ##teamcity[inspectionType category='atlas' description='Schema lint checks' flowId='schema-lint' id='atlas-schema-lint' name='Atlas Schema Lint']
 ##teamcity[message flowId='schema-lint' status='ERROR' text='destructive change Dropping column users.email']
 ##teamcity[inspection SEVERITY='ERROR' file='schema.hcl' flowId='schema-lint' line='12' message='<a href="https://atlasgo.io/lint/analyzers#DS103">Non-virtual column was dropped</a>' typeId='atlas-schema-lint']

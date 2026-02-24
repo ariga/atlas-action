@@ -123,6 +123,12 @@ func (t *ServiceMessage) Message(status, text string, opts ...Option) {
 	})
 }
 
+// WithDescriptionF returns an Option to set the description attribute of the message,
+// formatting the description using fmt.Sprintf with the provided format string and arguments.
+func WithDescriptionF(format string, a ...any) Option {
+	return WithDescription(fmt.Sprintf(format, a...))
+}
+
 // WithDescription returns an Option to set the description attribute of the message,
 // which specifies the description of the block to be opened.
 func WithDescription(description string) Option {

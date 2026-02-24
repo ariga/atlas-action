@@ -13,6 +13,11 @@ schema lint --format {{ json . }} --dev-url sqlite://file?mode=memory --url file
 -- schema-lint/1/stdout --
 {"Steps":[{"Text":"naming","Diagnostics":[{"Pos":{"Filename":"schema.hcl","Start":{"Line":5}},"Text":"Table name should use snake_case","Code":"NM101"}]}]}
 -- out --
+##teamcity[buildStatisticValue key='atlas.schema.lint.steps' value='1']
+##teamcity[buildStatisticValue key='atlas.schema.lint.diagnostics' value='1']
+##teamcity[buildStatisticValue key='atlas.schema.lint.errors' value='0']
+##teamcity[addBuildTag 'schema-lint-issues']
+##teamcity[buildStatus text='{build.status.text}, schema lint found 1 issue(s) in 1 step(s)']
 ##teamcity[blockOpened description='file://schema.hcl' flowId='schema-lint' name='atlas schema lint']
 ##teamcity[inspectionType category='atlas' description='Schema lint checks' flowId='schema-lint' id='atlas-schema-lint' name='Atlas Schema Lint']
 ##teamcity[message flowId='schema-lint' status='WARNING' text='naming ']

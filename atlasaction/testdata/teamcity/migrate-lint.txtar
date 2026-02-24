@@ -13,8 +13,14 @@ migrate lint -w --context {"repo":"test-project","path":"file://migrations","bra
 -- migrate-lint/1/stdout --
 {"Files":[{"Name":"20250812113056.sql","Text":"CREATE TABLE t1(a int);","Reports":[{"Text":"naming","Diagnostics":[{"Pos":13,"Text":"Table name should use snake_case","Code":"NM101"}]}]}]}
 -- out --
-##teamcity[blockOpened flowId='lint-report' name='atlas migrate lint']
+##teamcity[buildStatisticValue key='atlas.migrate.lint.files' value='1']
+##teamcity[buildStatisticValue key='atlas.migrate.lint.diagnostics' value='1']
+##teamcity[buildStatisticValue key='atlas.migrate.lint.errors' value='0']
+##teamcity[blockOpened description='1 file(s), 1 issue(s)' flowId='lint-report' name='Lint report']
 ##teamcity[inspectionType category='atlas' description='Migration lint report' flowId='lint-report' id='atlas-lint-report' name='Atlas Lint Report']
-##teamcity[inspection SEVERITY='WARNING' file='20250812113056.sql' flowId='lint-report' line='1' message='<a href="https://atlasgo.io/lint/analyzers#NM101">Table name should use snake_case</a>' typeId='atlas-lint-report']
-##teamcity[blockClosed flowId='lint-report' name='atlas migrate lint']
+##teamcity[message flowId='lint-report' status='WARNING' text='File 20250812113056.sql: 1 issue(s)']
+##teamcity[inspection SEVERITY='WARNING' file='20250812113056.sql' flowId='lint-report' line='1' message='<a href="https://atlasgo.io/lint/analyzers#NM101">NM101</a> Table name should use snake_case' typeId='atlas-lint-report']
+##teamcity[addBuildTag 'lint-issues']
+##teamcity[buildStatus text='{build.status.text}, lint found 1 issue(s) in 1 file(s)']
+##teamcity[blockClosed flowId='lint-report' name='Lint report']
 ##teamcity[message status='NORMAL' text='`atlas migrate lint` completed successfully, no issues found']

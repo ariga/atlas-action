@@ -11,7 +11,14 @@ schema apply --format {{ json . }} --env test
 -- schema-apply/1/stdout --
 {"Driver":"sqlite3","Start":"2024-09-18T11:25:21.64465+07:00","End":"2024-09-18T11:25:22.64465+07:00","Applied":{"Applied":["CREATE TABLE t1 (c int);","CREATE TABLE t2 (c int);"]},"Changes":{"Applied":["CREATE TABLE t1 (c int);","CREATE TABLE t2 (c int);"]}}
 -- out --
-##teamcity[blockOpened flowId='schema-apply' name='atlas schema apply']
+##teamcity[buildStatisticValue key='atlas.schema.apply.duration.ms' value='1000']
+##teamcity[buildStatisticValue key='atlas.schema.apply.statements' value='2']
+##teamcity[addBuildTag 'schema-applied']
+##teamcity[buildStatus text='{build.status.text}, schema applied 2 statement(s)']
+##teamcity[blockOpened description='2 statement(s)' flowId='schema-apply' name='atlas schema apply']
+##teamcity[message flowId='schema-apply' status='NORMAL' text='Duration: 1000ms']
 ##teamcity[message flowId='schema-apply' status='NORMAL' text='Applied 2 statement(s)']
+##teamcity[message flowId='schema-apply' status='NORMAL' text='  |[1|] CREATE TABLE t1 (c int);']
+##teamcity[message flowId='schema-apply' status='NORMAL' text='  |[2|] CREATE TABLE t2 (c int);']
 ##teamcity[blockClosed flowId='schema-apply' name='atlas schema apply']
 ##teamcity[message status='NORMAL' text='"atlas schema apply" completed successfully on the target <nil>']
