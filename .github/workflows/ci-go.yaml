@@ -235,25 +235,28 @@ jobs:
         with:
           url: "sqlite://atlasaction/testdata/inspect-test.db"
       - name: Verify schema output is non-empty
-        shell: bash
-        run: |
-          if [ -z "${{ steps.inspect.outputs.schema }}" ]; then
-            echo "Expected schema output, but got empty"
-            exit 1
-          fi
+        env:
+          SCHEMA: ${{ steps.inspect.outputs.schema }}
+        run: test -n "$SCHEMA"
       - id: inspect_sql
         uses: ./schema/inspect
         with:
           url: "sqlite://atlasaction/testdata/inspect-test.db"
           format: "sql"
       - name: Verify SQL format output
-        shell: bash
+        env:
+          SCHEMA: ${{ steps.inspect_sql.outputs.schema }}
         run: |
-          echo "${{ steps.inspect_sql.outputs.schema }}"
-          if ! echo "${{ steps.inspect_sql.outputs.schema }}" | grep -qi "CREATE TABLE"; then
-            echo "Expected SQL output containing CREATE TABLE"
-            exit 1
-          fi
+          printf '%s\n' "$SCHEMA" > got.sql
+          cat > expected.sql <<'EOF'
+          -- Create "users" table
+          CREATE TABLE `users` (
+            `id` integer NULL,
+            `name` text NOT NULL,
+            PRIMARY KEY (`id`)
+          );
+          EOF
+          diff expected.sql got.sql
   migrate-down:
     runs-on: ubuntu-latest
     env:

@@ -590,7 +590,7 @@ Inspect a database schema.
 * `url` - The URL of the database to inspect. For example: `mysql://root:pass@localhost:3306/db`.
 * `exclude` - List of glob patterns used to select which resources to filter in inspection
   see: https://atlasgo.io/declarative/inspect#exclude-schemas
-* `format` - Go template to use to format the output. For example, `{{ sql . }}` outputs the schema as SQL.
+* `format` - Go template to use to format the output. For example, `sql`.
 * `include` - List of glob patterns used to select which resources to keep in inspection
   see: https://atlasgo.io/declarative/inspect#include-schemas
 * `schema` - List of database schema(s) to inspect. For example: `public`.
