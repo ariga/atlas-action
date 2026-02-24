@@ -21,6 +21,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest) | CI for database schema changes with Atlas |
 | [ariga/atlas-action/monitor/schema](#arigaatlas-actionmonitorschema) | Sync the database schema to Atlas Cloud. |
 | [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply) | Applies schema changes to a target database |
+| [ariga/atlas-action/schema/inspect](#arigaatlas-actionschemainspect) | Inspect a database schema |
 | [ariga/atlas-action/schema/lint](#arigaatlas-actionschemalint) | Lint database schema with Atlas |
 | [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan) | Plan a declarative migration to move from the current state to the desired state |
 | [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a migration plan by its URL |
@@ -579,6 +580,33 @@ Apply a declarative migrations to a database.
 #### Outputs
 
 * `error` - The error message if the action fails.
+
+### `ariga/atlas-action/schema/inspect`
+
+Inspect a database schema.
+
+#### Inputs
+
+* `url` - The URL of the database to inspect. For example: `mysql://root:pass@localhost:3306/db`.
+* `exclude` - List of glob patterns used to select which resources to filter in inspection
+  see: https://atlasgo.io/declarative/inspect#exclude-schemas
+* `format` - Go template to use to format the output. For example, `{{ sql . }}` outputs the schema as SQL.
+* `include` - List of glob patterns used to select which resources to keep in inspection
+  see: https://atlasgo.io/declarative/inspect#include-schemas
+* `schema` - List of database schema(s) to inspect. For example: `public`.
+* `working-directory` - Atlas working directory. Default is project root
+* `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
+* `vars` - A JSON object containing variables to be used in the Atlas configuration file.
+  For example, `{"var1": "value1", "var2": "value2"}`.
+* `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+
+#### Outputs
+
+* `schema` - The inspected schema of the database.
 
 ### `ariga/atlas-action/schema/lint`
 

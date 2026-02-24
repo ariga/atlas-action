@@ -1389,6 +1389,90 @@ func TestSchemaTest(t *testing.T) {
 	})
 }
 
+func TestSchemaInspect(t *testing.T) {
+	t.Run("all inputs", func(t *testing.T) {
+		c, err := atlasexec.NewClient("", "./mock-atlas.sh")
+		require.NoError(t, err)
+		require.NoError(t, c.SetEnv(map[string]string{
+			"TEST_ARGS":   "schema inspect --env test --config file://testdata/config/atlas.hcl --url sqlite://file?mode=memory --dev-url sqlite://dev?mode=memory --format {{ sql . }} --schema public,private --exclude internal --include users --var var1=value1 --var var2=value2",
+			"TEST_STDOUT": `CREATE TABLE users (id int NOT NULL);`,
+		}))
+		tt := newT(t, nil)
+		tt.cli = c
+		tt.setInput("url", "sqlite://file?mode=memory")
+		tt.setInput("dev-url", "sqlite://dev?mode=memory")
+		tt.setInput("format", "{{ sql . }}")
+		tt.setInput("config", "file://testdata/config/atlas.hcl")
+		tt.setInput("env", "test")
+		tt.setInput("schema", "public\nprivate")
+		tt.setInput("exclude", "internal")
+		tt.setInput("include", "users")
+		tt.setInput("vars", `{"var1": "value1", "var2": "value2"}`)
+		require.NoError(t, tt.newActs(t).SchemaInspect(context.Background()))
+		outputs, err := tt.outputs()
+		require.NoError(t, err)
+		require.Equal(t, "CREATE TABLE users (id int NOT NULL);", outputs["schema"])
+	})
+	t.Run("with mock atlas", func(t *testing.T) {
+		m := &mockAtlas{}
+		m.schemaInspect = func(_ context.Context, p *atlasexec.SchemaInspectParams) (string, error) {
+			require.Equal(t, "test", p.Env)
+			require.Equal(t, "file://testdata/config/atlas.hcl", p.ConfigURL)
+			require.Equal(t, "sqlite://file?mode=memory", p.DevURL)
+			require.Equal(t, "sqlite://db?mode=memory", p.URL)
+			require.Equal(t, "{{ sql . }}", p.Format)
+			require.Equal(t, []string{"public"}, p.Schema)
+			require.Equal(t, []string{"internal"}, p.Exclude)
+			require.Equal(t, []string{"users"}, p.Include)
+			return `CREATE TABLE users (id int NOT NULL);`, nil
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"url":     "sqlite://db?mode=memory",
+				"dev-url": "sqlite://file?mode=memory",
+				"format":  "{{ sql . }}",
+				"schema":  "public",
+				"exclude": "internal",
+				"include": "users",
+				"config":  "file://testdata/config/atlas.hcl",
+				"env":     "test",
+				"vars":    `{"var1": "value1", "var2": "value2"}`,
+			},
+			output: map[string]string{},
+			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		}
+		a, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(m),
+		)
+		require.NoError(t, err)
+		err = a.SchemaInspect(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "CREATE TABLE users (id int NOT NULL);", act.output["schema"])
+	})
+	t.Run("error", func(t *testing.T) {
+		m := &mockAtlas{}
+		m.schemaInspect = func(_ context.Context, p *atlasexec.SchemaInspectParams) (string, error) {
+			return "", errors.New("connection refused")
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"url": "sqlite://db?mode=memory",
+			},
+			output: map[string]string{},
+			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		}
+		a, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(m),
+		)
+		require.NoError(t, err)
+		err = a.SchemaInspect(context.Background())
+		require.ErrorContains(t, err, "connection refused")
+		require.Empty(t, act.output["schema"])
+	})
+}
+
 func TestMigrateE2E(t *testing.T) {
 	type (
 		pushDir struct {

@@ -1,0 +1,29 @@
+# Mock the atlas command outputs
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-inspect
+# Setup the action input variables
+env INPUT_CONFIG=file://testdata/config/atlas.hcl
+env INPUT_ENV=test
+env INPUT_VARS='{"var1":"value1","var2":"value2"}'
+env INPUT_DEV-URL=sqlite://file?mode=memory
+env INPUT_URL=sqlite://db?mode=memory
+env INPUT_FORMAT=sql
+
+atlas-action --action=schema/inspect
+stdout '`atlas schema inspect` completed successfully'
+output expected-output.txt
+
+! atlas-action --action=schema/inspect
+stdout '::error::`atlas schema inspect` completed with errors:%0AFailure'
+
+-- expected-output.txt --
+schema<<_GitHubActionsFileCommandDelimeter_
+CREATE TABLE users (id int NOT NULL);
+_GitHubActionsFileCommandDelimeter_
+-- schema-inspect/1/args --
+schema inspect --env test --config file://testdata/config/atlas.hcl --url sqlite://db?mode=memory --dev-url sqlite://file?mode=memory --format {{ sql . }} --var var1=value1 --var var2=value2
+-- schema-inspect/1/stdout --
+CREATE TABLE users (id int NOT NULL);
+-- schema-inspect/2/args --
+schema inspect --env test --config file://testdata/config/atlas.hcl --url sqlite://db?mode=memory --dev-url sqlite://file?mode=memory --format {{ sql . }} --var var1=value1 --var var2=value2
+-- schema-inspect/2/stderr --
+Failure
