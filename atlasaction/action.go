@@ -344,6 +344,7 @@ const (
 	CmdSchemaPlan        = "schema/plan"
 	CmdSchemaPlanApprove = "schema/plan/approve"
 	CmdSchemaApply       = "schema/apply"
+	CmdSchemaInspect     = "schema/inspect"
 	// Monitoring Commands
 	CmdMonitorSchema = "monitor/schema"
 	// Copilot Commands
@@ -387,6 +388,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.SchemaPlanApprove(ctx)
 	case CmdSchemaApply:
 		return a.SchemaApply(ctx)
+	case CmdSchemaInspect:
+		return a.SchemaInspect(ctx)
 	case CmdMonitorSchema:
 		return a.MonitorSchema(ctx)
 	case CmdCopilot:
@@ -1003,6 +1006,28 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 	}
 	a.Infof("`atlas schema test` completed successfully, no issues found")
 	a.Infof(result)
+	return nil
+}
+
+// SchemaInspect runs the GitHub Action for "ariga/atlas-action/schema/inspect"
+func (a *Actions) SchemaInspect(ctx context.Context) error {
+	params := &atlasexec.SchemaInspectParams{
+		ConfigURL: a.GetConfigURL(),
+		DevURL:    a.GetInput("dev-url"),
+		Env:       a.GetInput("env"),
+		Exclude:   a.GetArrayInput("exclude"),
+		Format:    a.GetInput("format"),
+		Include:   a.GetArrayInput("include"),
+		Schema:    a.GetArrayInput("schema"),
+		URL:       a.GetInput("url"),
+		Vars:      a.GetVarsInput("vars"),
+	}
+	result, err := a.Atlas.SchemaInspect(ctx, params)
+	if err != nil {
+		return fmt.Errorf("`atlas schema inspect` completed with errors:\n%s", err)
+	}
+	a.SetOutput("schema", result)
+	a.Infof("`atlas schema inspect` completed successfully")
 	return nil
 }
 

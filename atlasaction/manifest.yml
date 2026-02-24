@@ -601,6 +601,33 @@ actions:
       url:
         type: string
         description: The URL of the pushed schema version.
+  - id: schema/inspect
+    description: Inspect a database schema
+    name: Schema Inspect
+    inputs:
+      <<: *schemaInputs
+      url:
+        type: string
+        label: Database URL
+        description: |
+          The URL of the database to inspect. For example: `mysql://root:pass@localhost:3306/db`.
+      include: *inspectInclude
+      exclude: *inspectExclude
+      schema:
+        type: string
+        multiLine: true
+        label: Database schema(s)
+        description: |
+          List of database schema(s) to inspect. For example: `public`.
+      format:
+        type: string
+        label: Output format
+        description: |
+          Go template to use to format the output. For example, `{{ sql . }}` outputs the schema as SQL.
+    outputs:
+      schema:
+        type: string
+        description: The inspected schema of the database.
   - id: schema/test
     description: Run schema tests against the desired schema
     name: Schema Test

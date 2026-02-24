@@ -214,6 +214,49 @@ jobs:
         with:
           script: |
             core.setFailed('expected test to fail, but it did not')
+  schema-inspect:
+    runs-on: ubuntu-latest
+    env:
+      ATLAS_ACTION_LOCAL: 1
+    steps:
+      - uses: ariga/setup-atlas@v0
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - name: Create test database
+        run: |
+          sqlite3 atlasaction/testdata/inspect-test.db "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL);"
+      - id: inspect
+        uses: ./schema/inspect
+        with:
+          url: "sqlite://atlasaction/testdata/inspect-test.db"
+      - name: Verify schema output is non-empty
+        env:
+          SCHEMA: ${{ steps.inspect.outputs.schema }}
+        run: test -n "$SCHEMA"
+      - id: inspect_sql
+        uses: ./schema/inspect
+        with:
+          url: "sqlite://atlasaction/testdata/inspect-test.db"
+          format: "sql"
+      - name: Verify SQL format output
+        env:
+          SCHEMA: ${{ steps.inspect_sql.outputs.schema }}
+        run: |
+          printf '%s' "$SCHEMA" > got.sql
+          cat > expected.sql <<'EOF'
+          -- Create "users" table
+          CREATE TABLE `users` (
+            `id` integer NULL,
+            `name` text NOT NULL,
+            PRIMARY KEY (`id`)
+          );
+          EOF
+          diff expected.sql got.sql
   migrate-down:
     runs-on: ubuntu-latest
     env:
