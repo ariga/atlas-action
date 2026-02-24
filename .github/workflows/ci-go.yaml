@@ -247,7 +247,7 @@ jobs:
         env:
           SCHEMA: ${{ steps.inspect_sql.outputs.schema }}
         run: |
-          printf '%s\n' "$SCHEMA" > got.sql
+          printf '%s' "$SCHEMA" > got.sql
           cat > expected.sql <<'EOF'
           -- Create "users" table
           CREATE TABLE `users` (
