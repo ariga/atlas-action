@@ -16,6 +16,11 @@ inputs:
       The remote to fetch from. Defaults to `origin`.
   working-directory:
     description: Atlas working directory. Default is project root
+outputs:
+  latest_version:
+    description: The latest migration version in the directory after rebase.
+  rebased:
+    description: Whether migration files were rebased. Either "true" or "false".
 runs:
   using: node20
   main: index.js
