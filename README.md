@@ -195,8 +195,21 @@ permissions:
   contents: read
   pull-requests: write
 jobs:
-  atlas:
+  migration-safety:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
@@ -205,7 +218,7 @@ jobs:
           fetch-depth: 0
       # Optional: check PostgreSQL migration safety (lock modes, risk levels)
       - name: Check migration safety
-        run: npx --yes @flvmnt/pgfence analyze --ci migrations/*.sql
+        run: npx --yes @flvmnt/pgfence@0.2.1 analyze --ci migrations/*.sql
       - uses: ariga/setup-atlas@v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
@@ -213,7 +226,7 @@ jobs:
         with:
           dir: 'file://migrations'
           dir-name: 'my-project'
-          dev-url: "postgres://postgres:pass@localhost:5432/dev?sslmode=disable"
+          dev-url: "postgres://postgres:postgres@localhost:5432/dev?sslmode=disable"
 ```
 
 pgfence reports which lock modes each DDL statement acquires, what it blocks, and provides safe
