@@ -125,6 +125,8 @@ type (
 		MigratePush(context.Context, *atlasexec.MigratePushParams) (string, error)
 		// MigrateTest runs the `migrate test` command.
 		MigrateTest(context.Context, *atlasexec.MigrateTestParams) (string, error)
+		// MigrateLs runs the `migrate ls` command.
+		MigrateLs(context.Context, *atlasexec.MigrateLsParams) (string, error)
 		// SchemaInspect runs the `schema inspect` command.
 		SchemaInspect(ctx context.Context, params *atlasexec.SchemaInspectParams) (string, error)
 		// SchemaStatsInspect runs the `schema stats inspect` command.
@@ -742,42 +744,16 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	a.Infof("Migrations rebased successfully")
 	a.SetOutput("rebased", "true")
 	// Get the latest migration version from the directory
-	if latest, err := a.latestMigrationVersion(dirPath); err != nil {
+	if latest, err := a.Atlas.MigrateLs(ctx, &atlasexec.MigrateLsParams{
+		DirURL:    dirURL,
+		Short:     true,
+		Latest:    true,
+	}); err != nil {
 		a.Warningf("failed to get latest migration version: %v", err)
 	} else {
 		a.SetOutput("latest_version", latest)
 	}
 	return nil
-}
-
-// latestMigrationVersion returns the latest migration version from the directory.
-// Migration files are expected to be named like: 20230922132634_description.sql or 20001.sql
-func (a *Actions) latestMigrationVersion(dirPath string) (string, error) {
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read directory: %w", err)
-	}
-	var latest string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".sql") {
-			continue
-		}
-		// Remove .sql extension first
-		name = strings.TrimSuffix(name, ".sql")
-		// Extract version (everything before the first underscore, or the whole name if no underscore)
-		version := strings.SplitN(name, "_", 2)[0]
-		if version > latest {
-			latest = version
-		}
-	}
-	if latest == "" {
-		return "", fmt.Errorf("no migration files found")
-	}
-	return latest, nil
 }
 
 func (a *Actions) MigrateHash(ctx context.Context) error {
