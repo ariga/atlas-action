@@ -176,6 +176,51 @@ and apply it to the target database.
 
 For more examples, see the [documentation](https://atlasgo.io/integrations/github-actions).
 
+### Optional: PostgreSQL Lock Safety Analysis with pgfence
+
+For PostgreSQL migrations, you can add [pgfence](https://github.com/flvmnt/pgfence) as a pre-check step
+to detect dangerous lock patterns before Atlas linting. pgfence analyzes SQL migration files for
+`ACCESS EXCLUSIVE` locks, missing `lock_timeout`, non-concurrent index builds, and other common
+PostgreSQL footguns that can cause downtime.
+
+Add it as an optional step before `migrate/lint`:
+
+```yaml
+name: Atlas CI
+on:
+  pull_request:
+    paths:
+      - 'migrations/*'
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  atlas:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      # Optional: check PostgreSQL migration safety (lock modes, risk levels)
+      - name: Check migration safety
+        run: npx --yes @flvmnt/pgfence analyze --ci migrations/*.sql
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: ariga/atlas-action/migrate/lint@v1
+        with:
+          dir: 'file://migrations'
+          dir-name: 'my-project'
+          dev-url: "postgres://postgres:pass@localhost:5432/dev?sslmode=disable"
+```
+
+pgfence reports which lock modes each DDL statement acquires, what it blocks, and provides safe
+rewrite recipes (e.g., `CREATE INDEX CONCURRENTLY`, `NOT VALID` + `VALIDATE CONSTRAINT`).
+Learn more at [pgfence.dev](https://pgfence.dev).
+
+
 ## API 
 
 ### `ariga/setup-atlas`
