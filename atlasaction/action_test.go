@@ -627,7 +627,9 @@ type mockAtlas struct {
 	migrateDiff       func(context.Context, *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
 	migrateDown       func(context.Context, *atlasexec.MigrateDownParams) (*atlasexec.MigrateDown, error)
 	migrateHash       func(context.Context, *atlasexec.MigrateHashParams) error
+	migrateSet        func(context.Context, *atlasexec.MigrateSetParams) error
 	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
+	migrateLs         func(context.Context, *atlasexec.MigrateLsParams) (string, error)
 	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
@@ -672,9 +674,19 @@ func (m *mockAtlas) MigrateHash(ctx context.Context, params *atlasexec.MigrateHa
 	return m.migrateHash(ctx, params)
 }
 
+// MigrateSet implements AtlasExec.
+func (m *mockAtlas) MigrateSet(ctx context.Context, params *atlasexec.MigrateSetParams) error {
+	return m.migrateSet(ctx, params)
+}
+
 // MigrateInspect implements AtlasExec.
 func (m *mockAtlas) MigrateRebase(ctx context.Context, params *atlasexec.MigrateRebaseParams) error {
 	return m.migrateRebase(ctx, params)
+}
+
+// MigrateInspect implements AtlasExec.
+func (m *mockAtlas) MigrateLs(ctx context.Context, params *atlasexec.MigrateLsParams) (string, error) {
+	return m.migrateLs(ctx, params)
 }
 
 // MigrateApplySlice implements AtlasExec.
@@ -988,6 +1000,9 @@ func TestMigrateAutoRebase(t *testing.T) {
 			migrateRebase: func(ctx context.Context, params *atlasexec.MigrateRebaseParams) error {
 				rebasedFiles = params.Files
 				return nil
+			},
+			migrateLs: func(ctx context.Context, mlp *atlasexec.MigrateLsParams) (string, error) {
+				return "20250309093464", nil
 			},
 		}
 		out := &bytes.Buffer{}

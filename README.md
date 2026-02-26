@@ -18,6 +18,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown) | Reverts deployed migration files on a target database |
 | [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint) | CI for database schema changes with Atlas |
 | [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush) | Push the current version of your migration directory to Atlas Cloud. |
+| [ariga/atlas-action/migrate/set](#arigaatlas-actionmigrateset) | Edits the revision table to consider all migrations up to and including the given version to be applied. |
 | [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest) | CI for database schema changes with Atlas |
 | [ariga/atlas-action/monitor/schema](#arigaatlas-actionmonitorschema) | Sync the database schema to Atlas Cloud. |
 | [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply) | Applies schema changes to a target database |
@@ -257,6 +258,8 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `dir` - The URL of the migration directory to apply. For example: `atlas://dir-name` for cloud
   based directories or `file://migrations` for local ones.
 * `dry-run` - Print SQL without executing it. Either "true" or "false".
+* `exec-order` - How Atlas computes and executes pending migration files to the database.
+  Either "linear", "linear-skip", or "non-linear". Learn more about [execution order](https://atlasgo.io/versioned/apply#execution-order).
 * `revisions-schema` - The name of the schema containing the revisions table.
 * `to-version` - The target version to apply migrations to. Mutually exclusive with `amount`.
 * `tx-mode` - Transaction mode to use. Either "file", "all", or "none".
@@ -338,6 +341,39 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `dev-url` - The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.
   Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 
+### `ariga/atlas-action/migrate/set`
+
+Edits the revision table to consider all migrations up to and including the given version to be applied.
+This command is usually used after manually making changes to the managed database.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `dir` - The URL of the migration directory. For example: `file://migrations`.
+  Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+* `revisions-schema` - The name of the schema containing the revisions table.
+* `url` - The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
+* `version` - (Required) The version to set the revision table to. All migrations up to and including this version
+  will be marked as applied.
+* `working-directory` - Atlas working directory. Default is project root
+* `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
+* `vars` - A JSON object containing variables to be used in the Atlas configuration file.
+  For example, `{"var1": "value1", "var2": "value2"}`.
+
+#### Example usage
+
+```yaml
+- uses: ariga/atlas-action/migrate/set@v1
+  with:
+    url: 'mysql://root:pass@localhost:3306/dev'
+    dir: 'file://migrations'
+    version: '20230922132634'
+```
+
 ### `ariga/atlas-action/migrate/autorebase`
 
 Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch. 
@@ -362,6 +398,11 @@ All inputs are optional
 * `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
 * `remote` - The remote to fetch from. Defaults to `origin`.
 * `working-directory` - Atlas working directory. Default is project root
+
+#### Outputs
+
+* `rebased` - Whether migration files were rebased. Either "true" or "false".
+* `latest_version` - The latest migration version in the directory after rebase.
 
 #### Example usage
 
