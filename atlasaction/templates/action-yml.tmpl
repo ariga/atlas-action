@@ -18,8 +18,20 @@ outputs:
 {{- range $name, $output := .SortedOutputs }}
   {{ $name }}:
     description: {{ $output.Description | yaml 6 | trimnl }}
+    value: {{ $name | printf "${{ steps.action.outputs.%s }}" }}
 {{- end }}
 {{- end }}
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - run: printenv
+      shell: bash
+    - id: action
+      run: {{ printf "${{ github.action_path }}/%s %s" .Shim .ID }}
+      shell: bash
+{{- if .Inputs }}
+      env:
+{{- range $name, $input := .SortedInputs }}
+        {{ $name | printf "input_%s" | env }}: {{ $name | printf "${{ inputs.%s }}" }}
+{{- end }}
+{{- end }}

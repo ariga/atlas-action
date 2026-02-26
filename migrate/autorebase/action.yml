@@ -22,5 +22,15 @@ outputs:
   rebased:
     description: Whether migration files were rebased. Either "true" or "false".
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - run: printenv
+      shell: bash
+    - id: action
+      run: ${{ github.action_path }}/../../scripts/shim.sh migrate/autorebase
+      shell: bash
+      env:
+        INPUT_BASE-BRANCH: ${{ inputs.base-branch }}
+        INPUT_DIR: ${{ inputs.dir }}
+        INPUT_REMOTE: ${{ inputs.remote }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}

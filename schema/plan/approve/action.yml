@@ -53,10 +53,31 @@ inputs:
 outputs:
   link:
     description: Link to the schema plan on Atlas.
+    value: ${{ steps.action.outputs.link }}
   plan:
     description: The plan to be applied or generated. (e.g. `atlas://<schema>/plans/<id>`)
+    value: ${{ steps.action.outputs.plan }}
   status:
     description: The status of the plan. (e.g, `PENDING`, `APPROVED`)
+    value: ${{ steps.action.outputs.status }}
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - run: printenv
+      shell: bash
+    - id: action
+      run: ${{ github.action_path }}/../../../scripts/shim.sh schema/plan/approve
+      shell: bash
+      env:
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+        INPUT_FROM: ${{ inputs.from }}
+        INPUT_INCLUDE: ${{ inputs.include }}
+        INPUT_PLAN: ${{ inputs.plan }}
+        INPUT_SCHEMA: ${{ inputs.schema }}
+        INPUT_SCHEMA-NAME: ${{ inputs.schema-name }}
+        INPUT_TO: ${{ inputs.to }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENV: ${{ inputs.env }}
+        INPUT_VARS: ${{ inputs.vars }}
+        INPUT_DEV-URL: ${{ inputs.dev-url }}

@@ -47,10 +47,31 @@ inputs:
 outputs:
   link:
     description: Link to the schema version on Atlas.
+    value: ${{ steps.action.outputs.link }}
   slug:
     description: The slug of the pushed schema version.
+    value: ${{ steps.action.outputs.slug }}
   url:
     description: The URL of the pushed schema version.
+    value: ${{ steps.action.outputs.url }}
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - run: printenv
+      shell: bash
+    - id: action
+      run: ${{ github.action_path }}/../../scripts/shim.sh schema/push
+      shell: bash
+      env:
+        INPUT_DESCRIPTION: ${{ inputs.description }}
+        INPUT_LATEST: ${{ inputs.latest }}
+        INPUT_SCHEMA: ${{ inputs.schema }}
+        INPUT_SCHEMA-NAME: ${{ inputs.schema-name }}
+        INPUT_TAG: ${{ inputs.tag }}
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENV: ${{ inputs.env }}
+        INPUT_VARS: ${{ inputs.vars }}
+        INPUT_DEV-URL: ${{ inputs.dev-url }}
