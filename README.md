@@ -397,6 +397,7 @@ All inputs are optional
 * `base-branch` - The base branch to rebase the migration directory onto. Default to the default branch of the repository.
 * `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
 * `remote` - The remote to fetch from. Defaults to `origin`.
+* `force-rebase` - When true, skip the merge step and rebase whenever there are dev-only migrations (e.g. out-of-order workflow after merging base and running apply with exec-order non-linear). Default is false.
 * `working-directory` - Atlas working directory. Default is project root
 
 #### Outputs
@@ -441,6 +442,86 @@ jobs:
         base-branch: master
         dir: file://migrations
 ```
+
+For out-of-order migrations (e.g. [git-flow hotfix resolution](https://atlasgo.io/faq/out-of-order-migrations)), run apply → autorebase with `force-rebase: true` → set only when main was merged in and the migration dir changed. Use a detect step so the job only runs when needed:
+
+```yaml
+name: Out-of-order migrations
+on:
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+env:
+  MIGRATIONS_DIR: migrations
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: app
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect out-of-order migrations
+        id: detect
+        run: |
+          need_rebase=false
+          git fetch origin main develop
+          if git merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
+            if [ -n "$(git diff --name-only origin/develop HEAD -- ${{ env.MIGRATIONS_DIR }}/)" ]; then
+              need_rebase=true
+              echo "need_rebase=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          if [ "$need_rebase" = "true" ]; then
+            echo "Base is develop, main is merged in, and migrations dir changed → running apply → rebase → set."
+          else
+            echo "Skipping: need base=develop, main merged in, and changes in ${{ env.MIGRATIONS_DIR }}/."
+          fi
+
+      - name: Install Atlas
+        if: steps.detect.outputs.need_rebase == 'true'
+        uses: ariga/setup-atlas@v0
+        with:
+          version: v0.29.1
+
+      - name: Apply migrations (non-linear)
+        if: steps.detect.outputs.need_rebase == 'true'
+        uses: ariga/atlas-action/migrate/apply@v1
+        with:
+          dir: file://${{ env.MIGRATIONS_DIR }}
+          url: mysql://root:root@localhost:3306/app
+          exec-order: non-linear
+
+      - name: Rebase migrations
+        if: steps.detect.outputs.need_rebase == 'true'
+        id: rebase
+        uses: ariga/atlas-action/migrate/autorebase@v1
+        with:
+          dir: file://${{ env.MIGRATIONS_DIR }}
+          base-branch: main
+          force-rebase: true
+
+      - name: Set migration version
+        if: steps.detect.outputs.need_rebase == 'true'
+        uses: ariga/atlas-action/migrate/set@v1
+        with:
+          dir: file://${{ env.MIGRATIONS_DIR }}
+          url: mysql://root:root@localhost:3306/app
+          version: ${{ steps.rebase.outputs.latest_version }}
+```
+
 ### `ariga/atlas-action/migrate/hash`
 
 Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.

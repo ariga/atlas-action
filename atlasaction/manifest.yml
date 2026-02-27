@@ -194,6 +194,12 @@ actions:
         label: Git remote
         description: |
           The remote to fetch from. Defaults to `origin`.
+      force-rebase:
+        type: boolean
+        label: Force rebase
+        description: |
+          When true, skip the merge step and rebase whenever there are dev-only migrations (e.g. out-of-order workflow after merging base and running apply with exec-order non-linear).
+        default: false
     outputs:
       rebased:
         type: string

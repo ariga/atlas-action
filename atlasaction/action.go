@@ -702,22 +702,24 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		a.SetOutput("rebased", "false")
 		return nil
 	}
-	// Try to merge the base branch into the current branch.
-	if _, err := a.exec(ctx, "git", "merge", "--no-ff",
-		fmt.Sprintf("%s/%s", remote, baseBranch)); err == nil {
-		a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
-		a.SetOutput("rebased", "false")
-		return nil
-	}
-	// If merge failed due to conflict, check that the conflict is only in atlas.sum file.
-	switch out, err := a.exec(ctx, "git", "diff", "--name-only", "--diff-filter=U"); {
-	case err != nil:
-		return fmt.Errorf("failed to get conflicting files: %w", err)
-	case len(out) == 0:
-		return errors.New("conflict found but no conflicting files found")
-	case strings.TrimSpace(string(out)) != sumPath:
-		a.Infof("Conflict files are:\n%s", out)
-		return fmt.Errorf("conflict found in files other than %s", sumPath)
+	if !a.GetBoolInput("force-rebase") {
+		// Try to merge the base branch into the current branch.
+		if _, err := a.exec(ctx, "git", "merge", "--no-ff",
+			fmt.Sprintf("%s/%s", remote, baseBranch)); err == nil {
+			a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
+			a.SetOutput("rebased", "false")
+			return nil
+		}
+		// If merge failed due to conflict, check that the conflict is only in atlas.sum file.
+		switch out, err := a.exec(ctx, "git", "diff", "--name-only", "--diff-filter=U"); {
+		case err != nil:
+			return fmt.Errorf("failed to get conflicting files: %w", err)
+		case len(out) == 0:
+			return errors.New("conflict found but no conflicting files found")
+		case strings.TrimSpace(string(out)) != sumPath:
+			a.Infof("Conflict files are:\n%s", out)
+			return fmt.Errorf("conflict found in files other than %s", sumPath)
+		}
 	}
 	// Re-hash the migrations and rebase the migrations.
 	if err = a.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{
@@ -745,13 +747,13 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	a.SetOutput("rebased", "true")
 	// Get the latest migration version from the directory
 	if latest, err := a.Atlas.MigrateLs(ctx, &atlasexec.MigrateLsParams{
-		DirURL:    dirURL,
-		Short:     true,
-		Latest:    true,
+		DirURL: dirURL,
+		Short:  true,
+		Latest: true,
 	}); err != nil {
 		a.Warningf("failed to get latest migration version: %v", err)
 	} else {
-		a.SetOutput("latest_version", latest)
+		a.SetOutput("latest_version", strings.TrimSpace(latest))
 	}
 	return nil
 }
