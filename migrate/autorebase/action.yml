@@ -11,6 +11,10 @@ inputs:
   dir:
     description: |
       The URL of the migration directory to rebase on. By default: `file://migrations`.
+  force-rebase:
+    description: |
+      When true, skip the merge step and rebase whenever there are dev-only migrations (e.g. out-of-order workflow after merging base and running apply with exec-order non-linear).
+    default: "false"
   remote:
     description: |
       The remote to fetch from. Defaults to `origin`.

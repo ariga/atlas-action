@@ -945,6 +945,171 @@ func (m *mockCmdExecutor) ExecCmd(ctx context.Context, name string, args ...stri
 	return m.onCommand(ctx, name, args...)
 }
 
+// TestOutOfOrderMigrationsWorkflow tests using atlas actions to solve out-of-order
+// migrations as described in https://atlasgo.io/faq/out-of-order-migrations.
+//
+// (1) merge main into develop and resolve conflicts (manually by dev, shell action)
+// (2) apply --non-linear
+// (3) run migrate/autorebase action with force-rebase (rebase without requiring merge conflict)
+// (4) run migrate/set action with step 3's output
+func TestOutOfOrderMigrationsWorkflow(t *testing.T) {
+	if _, err := exec.LookPath("atlas"); err != nil {
+		t.Skip("atlas CLI not in PATH, skipping integration test")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not in PATH, skipping integration test")
+	}
+
+	ctx := context.Background()
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "remote"), 0755))
+
+	remotePath := filepath.Join(root, "remote")
+	runCmd(t, root, "git", "init", "--bare", "remote")
+
+	// Main and develop must diverge so "git merge origin/main" can conflict. So: main has 001 then 003;
+	// develop has 001 then 002,004 (no 003). Same 001 content on both.
+	initialSQL := "create table t1 ( c int );\n"
+	mainRepo := filepath.Join(root, "main-repo")
+	runCmd(t, root, "git", "clone", remotePath, "main-repo")
+	runCmd(t, mainRepo, "git", "config", "user.email", "test@example.com")
+	runCmd(t, mainRepo, "git", "config", "user.name", "Test User")
+	migrationsMain := filepath.Join(mainRepo, "migrations")
+	require.NoError(t, os.MkdirAll(migrationsMain, 0755))
+	writeFile(t, filepath.Join(migrationsMain, "001_initial.sql"), initialSQL)
+	runCmd(t, mainRepo, "atlas", "migrate", "hash", "--dir", "file://migrations")
+	runCmd(t, mainRepo, "git", "add", "migrations")
+	runCmd(t, mainRepo, "git", "commit", "-m", "main: 001")
+	runCmd(t, mainRepo, "git", "push", "origin", "HEAD:main")
+
+	// Develop: 001, 002, 004 (branch from main when it only had 001)
+	devRepo := filepath.Join(root, "dev-repo")
+	runCmd(t, root, "git", "clone", remotePath, "dev-repo")
+	runCmd(t, devRepo, "git", "config", "user.email", "test@example.com")
+	runCmd(t, devRepo, "git", "config", "user.name", "Test User")
+	// Always branch from origin/main to avoid relying on remote default branch.
+	runCmd(t, devRepo, "git", "checkout", "-b", "develop", "origin/main")
+	migrationsDev := filepath.Join(devRepo, "migrations")
+	require.NoError(t, os.MkdirAll(migrationsDev, 0755))
+	writeFile(t, filepath.Join(migrationsDev, "002_add_posts.sql"), "create table posts ( id integer primary key );\n")
+	writeFile(t, filepath.Join(migrationsDev, "004_add_index.sql"), "create index idx_t1_c on t1(c);\n")
+	runCmd(t, devRepo, "atlas", "migrate", "hash", "--dir", "file://migrations")
+	runCmd(t, devRepo, "git", "add", "migrations")
+	runCmd(t, devRepo, "git", "commit", "-m", "develop: 002, 004")
+	runCmd(t, devRepo, "git", "push", "-u", "origin", "develop")
+
+	// Add hotfix 003 on main so main = 001 -> 003, develop = 001 -> 002,004 (diverged)
+	writeFile(t, filepath.Join(mainRepo, "migrations", "003_hotfix_add_email.sql"), "alter table t1 add column email text;\n")
+	runCmd(t, mainRepo, "atlas", "migrate", "hash", "--dir", "file://migrations")
+	runCmd(t, mainRepo, "git", "add", "migrations")
+	runCmd(t, mainRepo, "git", "commit", "-m", "main: 003 hotfix")
+	runCmd(t, mainRepo, "git", "push", "origin", "HEAD:main")
+
+	// Dev DB: 001, 002, 004 applied (develop state without hotfix)
+	devDB := filepath.Join(root, "dev.db")
+	runCmd(t, devRepo, "atlas", "migrate", "apply", "--url", "sqlite://"+devDB, "--dir", "file://migrations")
+
+	cli, err := atlasexec.NewClient("", "atlas")
+	require.NoError(t, err)
+	workDir := devRepo
+	origWd, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(workDir))
+	defer func() { _ = os.Chdir(origWd) }()
+	cmdExec := func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		cmd := exec.CommandContext(ctx, name, args...)
+		cmd.Dir = workDir
+		return cmd
+	}
+	act := &mockAction{
+		inputs: map[string]string{
+			"dir":          "file://migrations",
+			"url":          "sqlite://" + devDB,
+			"exec-order":   "non-linear",
+			"base-branch":  "main",
+			"remote":       "origin",
+			"force-rebase": "true",
+		},
+		trigger: &atlasaction.TriggerContext{
+			Branch:        "develop",
+			DefaultBranch: "main",
+		},
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	actions, err := atlasaction.New(
+		atlasaction.WithAction(act),
+		atlasaction.WithAtlas(cli),
+		atlasaction.WithCmdExecutor(cmdExec),
+		atlasaction.WithVersion("v1.0.0"),
+	)
+	require.NoError(t, err)
+
+	// Step 1: Merge main into develop and resolve conflicts (developer step).
+	// Bring hotfix from main and re-hash (no merge commit so step 3's merge will conflict in atlas.sum).
+	runCmd(t, workDir, "git", "fetch", "origin", "main")
+	runCmd(t, workDir, "git", "checkout", "origin/main", "--", "migrations/003_hotfix_add_email.sql")
+	runCmd(t, workDir, "atlas", "migrate", "hash", "--dir", "file://migrations")
+	runCmd(t, workDir, "git", "add", "migrations")
+	runCmd(t, workDir, "git", "commit", "-m", "merge main: bring in hotfix, resolve atlas.sum")
+	runCmd(t, workDir, "git", "push", "origin", "develop")
+
+	// Step 2: Apply --non-linear to apply the missing hotfix (003) to dev DB.
+	require.NoError(t, actions.MigrateApply(ctx))
+
+	// Step 3: Run migrate/autorebase action with force-rebase (rebase dev-only migrations; outputs latest_version).
+	require.NoError(t, actions.MigrateAutoRebase(ctx))
+	require.Equal(t, "true", act.output["rebased"], "autorebase must have rebased")
+	latestVer := act.output["latest_version"]
+	require.NotEmpty(t, latestVer, "autorebase must set latest_version output")
+
+	// Step 4: Run migrate/set action with the version from step 3.
+	act.inputs["version"] = latestVer
+	require.NoError(t, actions.MigrateSet(ctx))
+
+	// Verify: migration dir has 001, 003, and rebased 002->005, 004->006 (or similar timestamps).
+	entries, err := os.ReadDir(filepath.Join(workDir, "migrations"))
+	require.NoError(t, err)
+	require.Len(t, entries, 5) // 4 migrations + atlas.sum
+	expected := []string{"initial", "hotfix_add_email", "add_posts", "add_index", "atlas.sum"}
+	found := make(map[string]bool)
+	for _, e := range entries {
+		for _, desc := range expected {
+			if strings.Contains(e.Name(), desc) {
+				found[desc] = true
+				break
+			}
+		}
+	}
+	for _, desc := range expected {
+		require.True(t, found[desc], "migration dir should contain a file matching %q", desc)
+	}
+
+	// Verify DB: all migrations applied and current is the latest (timestamp or full name)
+	status, err := cli.MigrateStatus(ctx, &atlasexec.MigrateStatusParams{
+		URL:    "sqlite://" + devDB,
+		DirURL: "file://" + filepath.Join(workDir, "migrations"),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, status.Applied, "migrations should be applied")
+	require.True(t, status.Current == latestVer || strings.HasPrefix(status.Current, latestVer) || strings.HasPrefix(latestVer, status.Current),
+		"current version %q should match latest %q", status.Current, latestVer)
+}
+
+func runCmd(t *testing.T, dir, name string, args ...string) {
+	t.Helper()
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("run %s %v in %s: %v\n%s", name, args, dir, err, out)
+	}
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+}
+
 func TestMigrateAutoRebase(t *testing.T) {
 	t.Run("no conflict", func(t *testing.T) {
 		c, err := atlasexec.NewClient("", "atlas")
