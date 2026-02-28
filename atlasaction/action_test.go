@@ -987,7 +987,8 @@ func TestOutOfOrderMigrationsWorkflow(t *testing.T) {
 	runCmd(t, root, "git", "clone", remotePath, "dev-repo")
 	runCmd(t, devRepo, "git", "config", "user.email", "test@example.com")
 	runCmd(t, devRepo, "git", "config", "user.name", "Test User")
-	runCmd(t, devRepo, "git", "checkout", "-b", "develop")
+	// Always branch from origin/main to avoid relying on remote default branch.
+	runCmd(t, devRepo, "git", "checkout", "-b", "develop", "origin/main")
 	migrationsDev := filepath.Join(devRepo, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDev, 0755))
 	writeFile(t, filepath.Join(migrationsDev, "002_add_posts.sql"), "create table posts ( id integer primary key );\n")
