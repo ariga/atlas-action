@@ -48,16 +48,40 @@ inputs:
 outputs:
   applied_count:
     description: The number of migrations that were applied.
+    value: ${{ steps.action.outputs.applied_count }}
   current:
     description: The current version of the database. (before applying migrations)
+    value: ${{ steps.action.outputs.current }}
   pending_count:
     description: The number of migrations that will be applied.
+    value: ${{ steps.action.outputs.pending_count }}
   runs:
     description: |
       A JSON array of objects containing the current version, target version,
       applied count, and pending count for each migration run.
+    value: ${{ steps.action.outputs.runs }}
   target:
     description: The target version of the database.
+    value: ${{ steps.action.outputs.target }}
 runs:
-  using: node20
-  main: index.js
+  using: composite
+  steps:
+    - run: printenv
+      shell: bash
+    - id: action
+      run: ${{ github.action_path }}/../../scripts/shim.sh migrate/apply
+      shell: bash
+      env:
+        INPUT_ALLOW-DIRTY: ${{ inputs.allow-dirty }}
+        INPUT_AMOUNT: ${{ inputs.amount }}
+        INPUT_DIR: ${{ inputs.dir }}
+        INPUT_DRY-RUN: ${{ inputs.dry-run }}
+        INPUT_EXEC-ORDER: ${{ inputs.exec-order }}
+        INPUT_REVISIONS-SCHEMA: ${{ inputs.revisions-schema }}
+        INPUT_TO-VERSION: ${{ inputs.to-version }}
+        INPUT_TX-MODE: ${{ inputs.tx-mode }}
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_WORKING-DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENV: ${{ inputs.env }}
+        INPUT_VARS: ${{ inputs.vars }}

@@ -34,6 +34,7 @@ type (
 	ActionSpec struct {
 		ID          string                  `yaml:"id"`
 		Name        string                  `yaml:"name"`
+		Shim        string                  `yaml:"shim,omitempty"` // Optional shim script to run the action.
 		Description string                  `yaml:"description"`
 		Inputs      map[string]ActionInput  `yaml:"inputs,omitempty"`
 		Outputs     map[string]ActionOutput `yaml:"outputs,omitempty"`
@@ -157,8 +158,14 @@ func (a ActionsManifest) GitHubManifests(path string) error {
 			return fmt.Errorf("creating action.yml in %s: %w", dir, err)
 		}
 		defer file.Close()
+		s, err := filepath.Rel(dir, path)
+		if err != nil {
+			return fmt.Errorf("calculating relative path from %s to %s: %w", dir, path, err)
+		}
+		a.Shim = filepath.Join(s, "scripts/shim.sh")
 		return templates.ExecuteTemplate(file, "action-yml.tmpl", a)
 	}
+
 	for _, act := range a.Actions {
 		if act.ID == "" {
 			continue
