@@ -164,8 +164,16 @@ func (c *GitLabClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *a
 }
 
 // CommentSchemaLint implements SCMClient.
-func (c *GitLabClient) CommentSchemaLint(context.Context, *TriggerContext, *SchemaLintReport) error {
-	return nil
+func (c *GitLabClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
+	comment, err := RenderTemplate("schema-lint.tmpl", r, tc)
+	if err != nil {
+		return err
+	}
+	id := "schema-lint"
+	if url := tc.Act.GetInput("url"); url != "" {
+		id = url
+	}
+	return c.upsertComment(ctx, tc.PullRequest, id, comment)
 }
 
 func (c *GitLabClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
