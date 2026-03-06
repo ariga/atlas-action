@@ -108,8 +108,10 @@ run() {
     case "$version" in
       v*) ;;
       *)
-        log_error "Invalid version: $version (must start with 'v')"
-        exit 1 ;;
+        if ! printf '%s' "$version" | grep -qE '^[0-9a-fA-F]{40}$'; then
+          log_error "Invalid version: $version (must start with 'v' or be a 40-character SHA)"
+          exit 1
+        fi ;;
     esac
     log_notice "Using version $version"
 

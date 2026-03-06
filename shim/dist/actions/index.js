@@ -23,7 +23,7 @@ module.exports = async function run(action) {
   } else {
     // Download the binary if not in local mode
     const version = process.env.GITHUB_ACTION_REF || "master";
-    if (!version.startsWith("v") && version !== "master") {
+    if (!version.startsWith("v") && version !== "master" && !/^[0-9a-f]{40}$/i.test(version)) {
       throw new Error(`Invalid version: ${version}`);
     }
     core.info(`Using version ${version}`);
