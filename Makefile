@@ -88,8 +88,11 @@ azure-devops-dev:
 	$(MAKE) -C .github/azure-devops VERSION=$(VERSION) version-dev vsix
 
 .PHONY: manifest
-manifest:
+manifest: gitlab-manifest
 	go run -tags manifest ./cmd/gen github-manifest
-	go run -tags manifest ./cmd/gen gitlab-template -o gitlab
 	go run -tags manifest ./cmd/gen teamcity-template -o teamcity -v $(VERSION)
 	go run -tags manifest ./cmd/gen azure-task -t ./.github/azure-devops/action/task.json
+
+.PHONY: gitlab-manifest
+gitlab-manifest:
+	go run -tags manifest ./cmd/gen gitlab-template -o gitlab
