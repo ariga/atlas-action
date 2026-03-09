@@ -53,15 +53,6 @@ $[[ inputs.job_name ]]:
 {{- if ne .ID "monitor/schema" }}
       atlas login --token $[[ inputs.atlas-cloud-token ]]
 {{- end }}
-      BINARY_NAME="atlas-action-${CI_RUNNER_EXECUTABLE_ARCH//\//-}-v1"
-      DOWNLOAD_URL="https://release.ariga.io/atlas-action/${BINARY_NAME}"
-      echo "Downloading ${DOWNLOAD_URL}"
-      if curl -L -o atlas-action --fail "-#" "$DOWNLOAD_URL"; then
-        chmod +x ./atlas-action
-      else
-        echo "Failed to download atlas-action from $DOWNLOAD_URL" >&2
-        exit 1;
-      fi
 {{- if eq .ID "migrate/diff" }}
       # Set up git
       git fetch $[[ inputs.remote ]] $CI_COMMIT_REF_NAME
@@ -70,7 +61,10 @@ $[[ inputs.job_name ]]:
       git remote set-url $[[ inputs.remote ]] "https://oauth2:$[[ inputs.gitlab-token ]]@$CI_SERVER_HOST/$CI_PROJECT_PATH.git"
 {{- end }}
   script:
-    - ./atlas-action --action={{ .ID }}
+    - curl -sSf https://raw.githubusercontent.com/ariga/atlas-action/v1.14.2/scripts/shim.sh || \
+      curl -sSf https://atlasbinaries.com/atlas-action/scripts-v1.14.2/shim.sh || \
+      curl -sSf https://release.ariga.io/atlas-action/scripts-v1.14.2/shim.sh | \
+      CI=true sh -s -- {{ .ID }}
   variables:
     GITLAB_TOKEN: $[[ inputs.gitlab-token ]]
 {{- range $name, $input := .SortedInputs }}

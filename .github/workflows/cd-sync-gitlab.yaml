@@ -1,0 +1,60 @@
+name: Sync to GitLab
+
+on:  
+  push:
+    branches:
+      - master
+    paths:
+      - 'gitlab/**' #
+      - '.github/workflows/cd-sync-gitlab.yaml'
+
+jobs:
+  sync:
+    name: Sync Code to GitLab
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      - run: make gitlab-manifest
+
+      - env:
+          SSH_PRIVATE_KEY: ${{ secrets.GITLAB_SYNC_KEY }}
+        run: |
+          # Create the .ssh directory
+          mkdir -p ~/.ssh
+          
+          # Write the secret key to the default ed25519 key file
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          
+          # SSH requires private keys to have strict read/write permissions
+          chmod 600 ~/.ssh/id_ed25519
+          
+          # Add GitLab.com to known_hosts to bypass the interactive fingerprint prompt
+          ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+
+      - env:
+          GITLAB_SSH_REPO: 'git@gitlab.com:arigaio/atlas.git'
+          COMMIT_MSG: ${{ github.event.head_commit.message || format('Sync branch for {0}', github.actor) }}
+          AUTHOR_NAME: ${{ github.event.head_commit.author.name || github.actor }}
+          AUTHOR_EMAIL: ${{ github.event.head_commit.author.email || 'actions@github.com' }}
+        run: |
+          git config --global user.name "$AUTHOR_NAME"
+          git config --global user.email "$AUTHOR_EMAIL"
+          
+          git clone ${GITLAB_SSH_REPO} gitlab-repo
+
+          mkdir -p gitlab-repo/templates
+          rsync -av --delete gitlab/ gitlab-repo/templates/
+
+          cd gitlab-repo
+          git add templates/
+          
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "$COMMIT_MSG"
+            git push origin master
+          else
+            echo "No changes detected in the gitlab directory. Nothing to sync."
+          fi
