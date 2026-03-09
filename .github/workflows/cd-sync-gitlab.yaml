@@ -13,8 +13,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - run: make gitlab-manifest
-
       - env:
           SSH_PRIVATE_KEY: ${{ secrets.GITLAB_SYNC_KEY }}
         run: |
@@ -34,6 +32,7 @@ jobs:
 
           git clone ${GITLAB_SSH_REPO} gitlab-repo
 
+          make gitlab-manifest
           mkdir -p gitlab-repo/templates
           rsync -av --delete gitlab/ gitlab-repo/templates/
 
