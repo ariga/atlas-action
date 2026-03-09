@@ -61,9 +61,9 @@ $[[ inputs.job_name ]]:
       git remote set-url $[[ inputs.remote ]] "https://oauth2:$[[ inputs.gitlab-token ]]@$CI_SERVER_HOST/$CI_PROJECT_PATH.git"
 {{- end }}
   script:
-    - curl -sSf https://raw.githubusercontent.com/ariga/atlas-action/v1.14.2/scripts/shim.sh || \
-      curl -sSf https://atlasbinaries.com/atlas-action/scripts-v1.14.2/shim.sh || \
-      curl -sSf https://release.ariga.io/atlas-action/scripts-v1.14.2/shim.sh | \
+    - curl -sSf https://raw.githubusercontent.com/ariga/atlas-action/v{{ .Version }}/scripts/shim.sh || \
+      curl -sSf https://atlasbinaries.com/atlas-action/scripts-v{{ .Version }}/shim.sh || \
+      curl -sSf https://release.ariga.io/atlas-action/scripts-v{{ .Version }}/shim.sh | \
       CI=true sh -s -- {{ .ID }}
   variables:
     GITLAB_TOKEN: $[[ inputs.gitlab-token ]]

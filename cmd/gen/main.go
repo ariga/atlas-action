@@ -63,7 +63,7 @@ func githubManifestCmd() *cobra.Command {
 func gitlabTemplateCmd() *cobra.Command {
 	var (
 		flags struct {
-			OutputDir string
+			OutputDir, Version string
 		}
 		cmd = &cobra.Command{
 			Use:   "gitlab-template",
@@ -73,11 +73,16 @@ func gitlabTemplateCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
+				ver := strings.TrimPrefix(flags.Version, "v")
+				for actionIdx := range actions.Actions {
+					actions.Actions[actionIdx].Version = ver
+				}
 				return actions.GitLabTemplates(flags.OutputDir)
 			},
 		}
 	)
 	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
+	cmd.Flags().StringVarP(&flags.Version, "version", "v", "v1.0.0", "The version of the TeamCity recipes")
 	return cmd
 }
 

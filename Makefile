@@ -95,4 +95,4 @@ manifest: gitlab-manifest
 
 .PHONY: gitlab-manifest
 gitlab-manifest:
-	go run -tags manifest ./cmd/gen gitlab-template -o gitlab
+	go run -tags manifest ./cmd/gen gitlab-template -o gitlab -v $(VERSION)
