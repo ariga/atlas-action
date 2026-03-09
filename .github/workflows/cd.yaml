@@ -93,6 +93,10 @@ jobs:
         with:
           name: azure-devops-extension
           path: .github/azure-devops/ariga.atlas-action-*.vsix
+  sync-gitlab:
+    needs: build
+    uses: ./.github/workflows/cd-sync-gitlab.yaml
+    secrets: inherit
   # Run end-to-end test on the published binary.
   e2e-test:
     needs: build

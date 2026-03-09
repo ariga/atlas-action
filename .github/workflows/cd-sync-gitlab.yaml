@@ -1,12 +1,7 @@
 name: Sync to GitLab
 
-on:  
-  push:
-    branches:
-      - master
-    paths:
-      - 'gitlab/**' #
-      - '.github/workflows/cd-sync-gitlab.yaml'
+on:
+  workflow_call:
 
 jobs:
   sync:
@@ -16,23 +11,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0
 
       - run: make gitlab-manifest
 
       - env:
           SSH_PRIVATE_KEY: ${{ secrets.GITLAB_SYNC_KEY }}
         run: |
-          # Create the .ssh directory
           mkdir -p ~/.ssh
-          
-          # Write the secret key to the default ed25519 key file
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          
-          # SSH requires private keys to have strict read/write permissions
           chmod 600 ~/.ssh/id_ed25519
-          
-          # Add GitLab.com to known_hosts to bypass the interactive fingerprint prompt
           ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
 
       - env:
@@ -43,7 +31,7 @@ jobs:
         run: |
           git config --global user.name "$AUTHOR_NAME"
           git config --global user.email "$AUTHOR_EMAIL"
-          
+
           git clone ${GITLAB_SSH_REPO} gitlab-repo
 
           mkdir -p gitlab-repo/templates
@@ -51,10 +39,26 @@ jobs:
 
           cd gitlab-repo
           git add templates/
-          
+
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "$COMMIT_MSG"
             git push origin master
           else
             echo "No changes detected in the gitlab directory. Nothing to sync."
           fi
+
+          # Tag and push according to VERSION.txt (full + major)
+          VERSION=$(cat ../VERSION.txt | tr -d '[:space:]')
+          [ -z "$VERSION" ] && { echo "VERSION.txt is empty"; exit 1; }
+          case "$VERSION" in v*) ;; *) VERSION="v$VERSION"; esac
+          MAJOR_VER="v$(echo "$VERSION" | sed 's/^v//' | cut -d. -f1)"
+
+          if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
+            git tag "$VERSION"
+            git push origin "$VERSION"
+          else
+            echo "Tag $VERSION already exists on GitLab."
+          fi
+
+          git tag -f "$MAJOR_VER"
+          git push -f origin "$MAJOR_VER"
