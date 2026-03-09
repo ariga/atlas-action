@@ -895,7 +895,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      # This action builds the binary locally
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      # This action builds the binary locally, 
+      # this action won't replace `ariga/setup-atlas` action. You need both.
       - uses: ariga/atlas-action/setup@<commit-sha>
       # Pin other actions without `atlas-action/setup` won't work
       - uses: ariga/atlas-action/migrate/apply@<commit-sha>
