@@ -39,6 +39,19 @@ spec:
 ---
 $[[ inputs.job_name ]]:
   stage: $[[ inputs.stage ]]
+  cache: {{/* cross-pipeline sharing */}}
+    key: atlas-grant-cache
+    paths:
+      - .atlas/
+    policy: pull-push
+  artifacts: {{/* cross-job sharing */}}
+{{- if .Outputs }}
+    reports:
+      dotenv: .env
+{{- end }}
+    paths:
+      - .atlas/
+    expire_in: 1 day
   before_script:
     - |
       if command -v apk >/dev/null 2>&1; then
@@ -49,9 +62,12 @@ $[[ inputs.job_name ]]:
         echo "Unsupported OS: neither apk nor apt found"
         exit 1
       fi
+      {{- /* cannot cache/artifact non project files */}}
+      mkdir -p ~/.atlas
+      cp -a $CI_PROJECT_DIR/.atlas/. ~/.atlas/ 2>/dev/null || true
       curl -sSf https://atlasgo.sh | ATLAS_VERSION="$[[ inputs.atlas-version ]]" sh
 {{- if ne .ID "monitor/schema" }}
-      atlas login --token $[[ inputs.atlas-cloud-token ]]
+      atlas login --token $[[ inputs.atlas-cloud-token ]] --grant-only
 {{- end }}
 {{- if eq .ID "migrate/diff" }}
       # Set up git
@@ -61,19 +77,21 @@ $[[ inputs.job_name ]]:
       git remote set-url $[[ inputs.remote ]] "https://oauth2:$[[ inputs.gitlab-token ]]@$CI_SERVER_HOST/$CI_PROJECT_PATH.git"
 {{- end }}
   script:
-    - curl -sSf https://raw.githubusercontent.com/ariga/atlas-action/v{{ .Version }}/scripts/shim.sh || \
-      curl -sSf https://atlasbinaries.com/atlas-action/scripts-v{{ .Version }}/shim.sh || \
-      curl -sSf https://release.ariga.io/atlas-action/scripts-v{{ .Version }}/shim.sh | \
+    - |
+      ( curl -sSf https://raw.githubusercontent.com/ariga/atlas-action/v{{ .Version }}/scripts/shim.sh || \
+        curl -sSf https://atlasbinaries.com/atlas-action/scripts-v{{ .Version }}/shim.sh || \
+        curl -sSf https://release.ariga.io/atlas-action/scripts-v{{ .Version }}/shim.sh ) | \
       CI=true sh -s -- {{ .ID }}
+  after_script:
+    - mkdir -p $CI_PROJECT_DIR/.atlas
+    - cp -a ~/.atlas/. $CI_PROJECT_DIR/.atlas/ 2>/dev/null || true
   variables:
     GITLAB_TOKEN: $[[ inputs.gitlab-token ]]
+{{- if ne .ID "monitor/schema" }}
+    ATLAS_TOKEN: $[[ inputs.atlas-cloud-token ]]
+{{- end }}
 {{- range $name, $input := .SortedInputs }}
     {{ $name | inputvar }}: $[[ inputs.{{ $name }} ]]
-{{- end }}
-{{- if .Outputs }}
-  artifacts:
-    reports:
-      dotenv: .env
 {{- end }}
 {{- if or (eq .ID "migrate/diff") (eq .ID "migrate/lint") }}
   rules:

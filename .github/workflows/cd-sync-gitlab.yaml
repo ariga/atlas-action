@@ -23,12 +23,9 @@ jobs:
 
       - env:
           GITLAB_SSH_REPO: 'git@gitlab.com:arigaio/atlas.git'
-          COMMIT_MSG: ${{ github.event.head_commit.message || format('Sync branch for {0}', github.actor) }}
-          AUTHOR_NAME: ${{ github.event.head_commit.author.name || github.actor }}
-          AUTHOR_EMAIL: ${{ github.event.head_commit.author.email || 'actions@github.com' }}
         run: |
-          git config --global user.name "$AUTHOR_NAME"
-          git config --global user.email "$AUTHOR_EMAIL"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
           git clone ${GITLAB_SSH_REPO} gitlab-repo
 
@@ -40,7 +37,7 @@ jobs:
           git add templates/
 
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "$COMMIT_MSG"
+            git commit -m "Sync branch master from GitHub"
             git push origin master
           else
             echo "No changes detected in the gitlab directory. Nothing to sync."
