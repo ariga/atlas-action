@@ -47,7 +47,6 @@ jobs:
           VERSION=$(cat ../VERSION.txt | tr -d '[:space:]')
           [ -z "$VERSION" ] && { echo "VERSION.txt is empty"; exit 1; }
           case "$VERSION" in v*) ;; *) VERSION="v$VERSION"; esac
-          MAJOR_VER="v$(echo "$VERSION" | sed 's/^v//' | cut -d. -f1)"
 
           if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
             git tag "$VERSION"
@@ -55,6 +54,3 @@ jobs:
           else
             echo "Tag $VERSION already exists on GitLab."
           fi
-
-          git tag -f "$MAJOR_VER"
-          git push -f origin "$MAJOR_VER"
