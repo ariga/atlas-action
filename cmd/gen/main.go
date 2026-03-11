@@ -29,6 +29,7 @@ func main() {
 	root.AddCommand(
 		githubManifestCmd(),
 		gitlabTemplateCmd(),
+		orbTemplateCmd(),
 		teamcityTemplateCmd(),
 		azureTaskCmd(),
 		markdownDocCmd(),
@@ -110,6 +111,33 @@ func teamcityTemplateCmd() *cobra.Command {
 	)
 	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
 	cmd.Flags().StringVarP(&flags.Version, "version", "v", "v1.0.0", "The version of the TeamCity recipes")
+	return cmd
+}
+
+func orbTemplateCmd() *cobra.Command {
+	var (
+		flags struct {
+			OutputDir string
+			Version   string
+		}
+		cmd = &cobra.Command{
+			Use:   "orb-template",
+			Short: "Generate CircleCI orb command files from a manifest",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				actions, err := atlasaction.ParseManifest()
+				if err != nil {
+					return err
+				}
+				ver := strings.TrimPrefix(flags.Version, "v")
+				for actionIdx := range actions.Actions {
+					actions.Actions[actionIdx].Version = ver
+				}
+				return actions.OrbTemplates(flags.OutputDir)
+			},
+		}
+	)
+	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
+	cmd.Flags().StringVarP(&flags.Version, "version", "v", "v1.0.0", "The version of the Atlas Action used by the orb")
 	return cmd
 }
 

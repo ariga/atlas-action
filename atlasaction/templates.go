@@ -71,10 +71,13 @@ var (
 		"majorver": func(v string) string {
 			return strings.SplitN(v, ".", 2)[0]
 		},
-		"env":       toEnvName,
-		"quote":     strconv.Quote,
-		"inputvar":  toInputVarName,
-		"outputvar": toOutputVarName,
+		"env":           toEnvName,
+		"quote":         strconv.Quote,
+		"inputvar":      toInputVarName,
+		"outputvar":     toOutputVarName,
+		"orbparam":      orbParamName,
+		"orbtype":       orbParamType,
+		"needGitHubEnv": needGitHubEnv,
 		"dockers": func() []DockerURL {
 			return []DockerURL{
 				{Label: "MySQL", Driver: "mysql"},

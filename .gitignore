@@ -62,4 +62,5 @@ ariga.atlas-action-*.vsix
 
 !atlas-actions.yml
 gitlab/*
+orb/*
 teamcity/*

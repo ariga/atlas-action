@@ -194,6 +194,78 @@ func (a ActionsManifest) GitLabTemplates(path string) error {
 	return nil
 }
 
+// orbParamName converts a manifest input name to a CircleCI orb parameter name (snake_case).
+func orbParamName(input string) string {
+	return strings.ReplaceAll(input, "-", "_")
+}
+
+// orbParamType returns the CircleCI orb parameter type for the given action input.
+func orbParamType(v any) string {
+	input, ok := v.(ActionInput)
+	if !ok {
+		return "string"
+	}
+	switch input.Type {
+	case "boolean":
+		return "boolean"
+	case "number":
+		return "integer"
+	}
+	if len(input.Options) > 0 {
+		return "enum"
+	}
+	return "string"
+}
+
+// needGitHubEnv returns true for actions that accept github_repo_env and github_token_env.
+func needGitHubEnv(id string) bool {
+	switch id {
+	case "migrate/push", "migrate/lint", "schema/plan", "schema/plan/approve":
+		return true
+	}
+	return false
+}
+
+// OrbTemplates writes the actions and setup command to the given path as CircleCI orb command YAML files.
+func (a ActionsManifest) OrbTemplates(path string) error {
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return fmt.Errorf("creating directory %s: %w", path, err)
+	}
+	version := "1"
+	for _, act := range a.Actions {
+		if act.Version != "" {
+			version = act.Version
+			break
+		}
+	}
+	setupFile, err := os.OpenFile(filepath.Join(path, "setup.yml"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("creating setup.yml: %w", err)
+	}
+	defer setupFile.Close()
+	if err := templates.ExecuteTemplate(setupFile, "orb-setup-yml.tmpl", map[string]string{"Version": version}); err != nil {
+		return fmt.Errorf("writing setup: %w", err)
+	}
+	write := func(spec ActionSpec) error {
+		name := strings.NewReplacer("/", "_", "-", "_").Replace(spec.ID)
+		file, err := os.OpenFile(filepath.Join(path, name+".yml"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			return fmt.Errorf("creating %s.yml: %w", name, err)
+		}
+		defer file.Close()
+		return templates.ExecuteTemplate(file, "orb-yml.tmpl", spec)
+	}
+	for _, act := range a.Actions {
+		if act.ID == "" {
+			continue
+		}
+		if err := write(act); err != nil {
+			return fmt.Errorf("writing action %s: %w", act.ID, err)
+		}
+	}
+	return nil
+}
+
 // TeamCityTemplates writes the actions to the given path as TeamCity build configuration templates.
 func (a ActionsManifest) TeamCityTemplates(path string) error {
 	write := func(a ActionSpec) error {
