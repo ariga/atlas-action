@@ -1,0 +1,55 @@
+# Syncs generated CircleCI orb command YAML from this repo to github.com/ariga/atlas-orb.
+# Requires repository secret: ORB_SYNC_TOKEN (GitHub PAT with push access to ariga/atlas-orb).
+name: Sync to CircleCI Orb
+
+on:
+  workflow_call:
+
+jobs:
+  sync:
+    name: Sync Orb to GitHub (atlas-orb)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+
+      - env:
+          ORB_SYNC_TOKEN: ${{ secrets.ORB_SYNC_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git clone https://x-access-token:${ORB_SYNC_TOKEN}@github.com/ariga/atlas-orb.git orb-repo
+
+          make orb-manifest
+          mkdir -p orb-repo/src/commands
+          rsync -av --delete orb/ orb-repo/src/commands/
+
+          cd orb-repo
+          git add src/commands/
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Sync orb commands from atlas-action (GitHub master)"
+            git push origin master
+          else
+            echo "No changes detected in orb commands. Nothing to sync."
+          fi
+
+          # Tag and push according to VERSION.txt (full + major)
+          VERSION=$(cat ../VERSION.txt | tr -d '[:space:]')
+          [ -z "$VERSION" ] && { echo "VERSION.txt is empty"; exit 1; }
+          case "$VERSION" in v*) ;; *) VERSION="v$VERSION"; esac
+
+          if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
+            git tag "$VERSION"
+            git push origin "$VERSION"
+          else
+            echo "Tag $VERSION already exists on atlas-orb."
+          fi
