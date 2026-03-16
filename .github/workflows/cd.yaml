@@ -97,6 +97,10 @@ jobs:
     needs: build
     uses: ./.github/workflows/cd-sync-gitlab.yaml
     secrets: inherit
+  sync-orb:
+    needs: build
+    uses: ./.github/workflows/cd-sync-orb.yaml
+    secrets: inherit
   # Run end-to-end test on the published binary.
   e2e-test:
     needs: build
