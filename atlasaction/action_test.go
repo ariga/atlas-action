@@ -1056,7 +1056,10 @@ func TestOutOfOrderMigrationsWorkflow(t *testing.T) {
 	// Step 2: Apply --non-linear to apply the missing hotfix (003) to dev DB.
 	require.NoError(t, actions.MigrateApply(ctx))
 
-	// Step 3: Run migrate/autorebase action with force-rebase (rebase dev-only migrations; outputs latest_version).
+	// Step 3: Run migrate/autorebase with base-sha (commit at origin/main) to verify SHA path with local remote.
+	mainSHA := runCmdOut(t, workDir, "git", "rev-parse", "origin/main")
+	act.inputs["base-sha"] = strings.TrimSpace(mainSHA)
+	delete(act.inputs, "base-branch")
 	require.NoError(t, actions.MigrateAutoRebase(ctx))
 	require.Equal(t, "true", act.output["rebased"], "autorebase must have rebased")
 	latestVer := act.output["latest_version"]
@@ -1103,6 +1106,18 @@ func runCmd(t *testing.T, dir, name string, args ...string) {
 	if err != nil {
 		t.Fatalf("run %s %v in %s: %v\n%s", name, args, dir, err, out)
 	}
+}
+
+// runCmdOut runs the command and returns stdout; fails the test on error.
+func runCmdOut(t *testing.T, dir, name string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("run %s %v in %s: %v\n%s", name, args, dir, err, out)
+	}
+	return string(out)
 }
 
 func writeFile(t *testing.T, path, content string) {
@@ -1294,6 +1309,101 @@ func TestMigrateAutoRebase(t *testing.T) {
 		require.Equal(t, []string{"show", "origin/my-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[4].args)
 		require.Equal(t, []string{"merge", "--no-ff", "origin/rebase-branch"}, mockExec.ran[5].args)
 		require.Equal(t, []string{"diff", "--name-only", "--diff-filter=U"}, mockExec.ran[6].args)
+	})
+	t.Run("invalid base-sha", func(t *testing.T) {
+		act := &mockAction{
+			inputs: map[string]string{
+				"dir":      "file://testdata/need_rebase",
+				"base-sha": "not-a-sha",
+			},
+			trigger: &atlasaction.TriggerContext{
+				Branch: "my-branch",
+			},
+			logger: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		}
+		acts, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithCmdExecutor(exec.CommandContext),
+		)
+		require.NoError(t, err)
+		err = acts.MigrateAutoRebase(context.Background())
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "base-sha")
+		require.Contains(t, err.Error(), "not a valid git SHA")
+	})
+	t.Run("conflict in atlas.sum with base-sha", func(t *testing.T) {
+		const baseSHA = "abc1234567890123456789012345678901234567"
+		var rebasedFiles []string
+		cli := &mockAtlas{
+			migrateHash: func(ctx context.Context, p *atlasexec.MigrateHashParams) error {
+				return nil
+			},
+			migrateRebase: func(ctx context.Context, params *atlasexec.MigrateRebaseParams) error {
+				rebasedFiles = params.Files
+				return nil
+			},
+			migrateLs: func(ctx context.Context, mlp *atlasexec.MigrateLsParams) (string, error) {
+				return "20250309093464", nil
+			},
+		}
+		out := &bytes.Buffer{}
+		mockExec := &mockCmdExecutor{
+			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+				cmd := exec.CommandContext(ctx, "echo")
+				switch {
+				case len(args) > 2 && args[0] == "merge" && args[2] == baseSHA:
+					cmd.Err = &exec.ExitError{Stderr: []byte("conflict")}
+				case len(args) > 1 && args[0] == "show":
+					var res string
+					switch args[1] {
+					case baseSHA + ":testdata/need_rebase/atlas.sum":
+						res = `h1:I/42uUoInXTRcwooAuTKQpGPF4jfNmEqDD1L66btb+E=
+                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+                               20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
+					case "origin/my-branch:testdata/need_rebase/atlas.sum":
+						res = `h1:U12LVflnyphPTk0O6cKIbrbaea0L3nJx+DJ8nRVuvn8=
+                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
+                               20250309093464_rebase.sql h1:H7yD0qrDOB7HQvUUkyrX2N4qspo6/Mro+Od+l8XCX+c=`
+					}
+					cmd = exec.CommandContext(ctx, "echo", res)
+				case len(args) > 1 && args[0] == "diff" && args[1] == "--name-only":
+					cmd = exec.CommandContext(ctx, "echo", "testdata/need_rebase/atlas.sum")
+				}
+				return cmd
+			},
+		}
+		act := &mockAction{
+			inputs: map[string]string{
+				"dir":      "file://testdata/need_rebase",
+				"base-sha": baseSHA,
+			},
+			trigger: &atlasaction.TriggerContext{
+				Branch: "my-branch",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+		acts, err := atlasaction.New(
+			atlasaction.WithAction(act),
+			atlasaction.WithAtlas(cli),
+			atlasaction.WithCmdExecutor(mockExec.ExecCmd),
+		)
+		require.NoError(t, err)
+
+		require.NoError(t, acts.MigrateAutoRebase(context.Background()))
+		require.Contains(t, out.String(), "Migrations rebased successfully")
+		require.Len(t, rebasedFiles, 1)
+		require.Equal(t, "20250309093464_rebase.sql", rebasedFiles[0])
+		require.Len(t, mockExec.ran, 10)
+		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
+		require.Equal(t, []string{"fetch", "origin", baseSHA}, mockExec.ran[1].args)
+		require.Equal(t, []string{"checkout", "my-branch"}, mockExec.ran[2].args)
+		require.Equal(t, []string{"show", baseSHA + ":testdata/need_rebase/atlas.sum"}, mockExec.ran[3].args)
+		require.Equal(t, []string{"show", "origin/my-branch:testdata/need_rebase/atlas.sum"}, mockExec.ran[4].args)
+		require.Equal(t, []string{"merge", "--no-ff", baseSHA}, mockExec.ran[5].args)
+		require.Equal(t, []string{"diff", "--name-only", "--diff-filter=U"}, mockExec.ran[6].args)
+		require.Equal(t, []string{"add", "testdata/need_rebase"}, mockExec.ran[7].args)
+		require.Equal(t, []string{"commit", "--message", "testdata/need_rebase: rebase migration files"}, mockExec.ran[8].args)
+		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[9].args)
 	})
 }
 

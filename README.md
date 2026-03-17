@@ -395,6 +395,7 @@ Automatically resolves `atlas.sum` conflicts and rebases the migration directory
 All inputs are optional
 
 * `base-branch` - The base branch to rebase the migration directory onto. Default to the default branch of the repository.
+* `base-sha` - Optional. When set, use this git commit SHA as the base instead of base-branch. Requires the git server to support fetch-by-SHA (e.g. GitHub, GitLab).
 * `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
 * `remote` - The remote to fetch from. Defaults to `origin`.
 * `force-rebase` - When true, skip the merge step and rebase whenever there are dev-only migrations (e.g. out-of-order workflow after merging base and running apply with exec-order non-linear). Default is false.
@@ -540,6 +541,7 @@ Automatically resolves `atlas.sum` out of sync issues by re-generating the `atla
 All inputs are optional
 
 * `base-branch` - The base branch to rebase the migration directory onto. Default to the default branch of the repository.
+* `base-sha` - Optional. When set, use this git commit SHA as the base instead of base-branch. Requires the git server to support fetch-by-SHA (e.g. GitHub, GitLab).
 * `dir` - The URL of the migration directory to hash. By default: `file://migrations`.
 * `remote` - The remote to fetch from. Defaults to `origin`.
 * `working-directory` - Atlas working directory. Default is project root
