@@ -666,16 +666,30 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	}
 	var (
 		remote     = a.GetInputDefault("remote", "origin")
-		baseBranch = a.GetInputDefault("base-branch", tc.DefaultBranch)
 		currBranch = tc.Branch
 	)
+	// Base is either a SHA (base-sha input) or a branch (base-branch input).
+	var baseRef, baseLabel string
+	if baseSHA := strings.TrimSpace(a.GetInput("base-sha")); baseSHA != "" {
+		if !isGitSHA(baseSHA) {
+			return fmt.Errorf("base-sha %q is not a valid git SHA (7–40 hex characters)", baseSHA)
+		}
+		baseRef = baseSHA
+		baseLabel = baseSHA
+	} else {
+		baseBranch := a.GetInputDefault("base-branch", tc.DefaultBranch)
+		baseRef = fmt.Sprintf("%s/%s", remote, baseBranch)
+		baseLabel = baseBranch
+	}
 	if v, err := a.exec(ctx, "git", "--version"); err != nil {
 		return fmt.Errorf("failed to get git version: %w", err)
 	} else {
 		a.Infof("auto-rebase with %s", v)
 	}
-	if _, err := a.exec(ctx, "git", "fetch", remote, baseBranch); err != nil {
-		return fmt.Errorf("failed to fetch the branch %s: %w", baseBranch, err)
+	// Fetch the base (branch or SHA). Fetching by SHA is supported by git when the server
+	// allows it (e.g. uploadpack.allowReachableSHA1InWant); many hosts (GitHub, GitLab, etc.) support it.
+	if _, err := a.exec(ctx, "git", "fetch", remote, baseLabel); err != nil {
+		return fmt.Errorf("failed to fetch the base ref %s: %w", baseLabel, err)
 	}
 	// Since running in detached HEAD, we need to switch to the branch.
 	if _, err := a.exec(ctx, "git", "checkout", currBranch); err != nil {
@@ -688,11 +702,12 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	}
 	dirPath := filepath.Join(u.Host, u.Path)
 	sumPath := filepath.Join(a.WorkingDir(), dirPath, migrate.HashFileName)
-	baseHash, err := a.hashFileFrom(ctx, remote, baseBranch, sumPath)
+	baseHash, err := a.hashFileFrom(ctx, baseRef, sumPath)
 	if err != nil {
-		return fmt.Errorf("failed to get the atlas.sum file from the base branch: %w", err)
+		return fmt.Errorf("failed to get the atlas.sum file from the base: %w", err)
 	}
-	currHash, err := a.hashFileFrom(ctx, remote, currBranch, sumPath)
+	currRef := fmt.Sprintf("%s/%s", remote, currBranch)
+	currHash, err := a.hashFileFrom(ctx, currRef, sumPath)
 	if err != nil {
 		return fmt.Errorf("failed to get the atlas.sum file from the current branch: %w", err)
 	}
@@ -703,10 +718,9 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return nil
 	}
 	if !a.GetBoolInput("force-rebase") {
-		// Try to merge the base branch into the current branch.
-		if _, err := a.exec(ctx, "git", "merge", "--no-ff",
-			fmt.Sprintf("%s/%s", remote, baseBranch)); err == nil {
-			a.Infof("No conflict found when merging %s into %s", baseBranch, currBranch)
+		// Try to merge the base into the current branch.
+		if _, err := a.exec(ctx, "git", "merge", "--no-ff", baseRef); err == nil {
+			a.Infof("No conflict found when merging %s into %s", baseLabel, currBranch)
 			a.SetOutput("rebased", "false")
 			return nil
 		}
@@ -893,10 +907,9 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 	return nil
 }
 
-// hashFileFrom returns the hash file from the remote branch.
-func (a *Actions) hashFileFrom(ctx context.Context, remote, branch, path string) (migrate.HashFile, error) {
-	data, err := a.exec(ctx, "git", "show",
-		fmt.Sprintf("%s/%s:%s", remote, branch, path))
+// hashFileFrom returns the hash file from the given ref (a branch ref like "origin/main" or a git SHA).
+func (a *Actions) hashFileFrom(ctx context.Context, ref, path string) (migrate.HashFile, error) {
+	data, err := a.exec(ctx, "git", "show", fmt.Sprintf("%s:%s", ref, path))
 	if err != nil {
 		return nil, err
 	}
@@ -905,6 +918,21 @@ func (a *Actions) hashFileFrom(ctx context.Context, remote, branch, path string)
 		return nil, fmt.Errorf("failed to unmarshal atlas.sum: %w", err)
 	}
 	return hf, nil
+}
+
+// isGitSHA reports whether s is a valid git SHA (7–40 hex characters).
+func isGitSHA(s string) bool {
+	s = strings.TrimSpace(s)
+	if len(s) < 7 || len(s) > 40 {
+		return false
+	}
+	for _, c := range s {
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // exec runs the command and returns the output.

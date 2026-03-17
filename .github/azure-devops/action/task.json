@@ -88,6 +88,13 @@
     },
     {
       "type": "string",
+      "label": "Base SHA",
+      "helpMarkDown": "Optional. When set, use this git commit SHA as the base instead of base-branch. Requires the git server to support fetch-by-SHA (e.g. GitHub, GitLab).\n",
+      "name": "base_sha",
+      "visibleRule": "action == migrate autorebase"
+    },
+    {
+      "type": "string",
       "label": "Atlas Cloud token",
       "helpMarkDown": "The token that is used to connect to Atlas Cloud (should be passed as a secret).",
       "name": "cloud_token",
