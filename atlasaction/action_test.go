@@ -1125,6 +1125,13 @@ func writeFile(t *testing.T, path, content string) {
 	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
 }
 
+func marshalHashFile(t *testing.T, hf migrate.HashFile) string {
+	t.Helper()
+	b, err := hf.MarshalText()
+	require.NoError(t, err)
+	return strings.TrimSuffix(string(b), "\n")
+}
+
 func TestMigrateAutoRebase(t *testing.T) {
 	t.Run("no conflict", func(t *testing.T) {
 		c, err := atlasexec.NewClient("", "atlas")
@@ -1173,6 +1180,16 @@ func TestMigrateAutoRebase(t *testing.T) {
 	})
 	t.Run("conflict in atlas.sum", func(t *testing.T) {
 		var rebasedFiles []string
+		baseHash := marshalHashFile(t, migrate.HashFile{
+			{N: "20250309093454_init_1.sql", H: "h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4="},
+			{N: "20250309093833_second.sql", H: "gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE="},
+		})
+		currentHash := marshalHashFile(t, migrate.HashFile{
+			{N: "20250309093454_init_1.sql", H: "h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4="},
+			{N: "20250309093520_zeta.sql", H: "VfJwA9b9hN3v0A8U2C1iL7vd6z0Vx6J7S7zW2l3fQ0M="},
+			{N: "20250309093464_rebase.sql", H: "H7yD0qrDOB7HQvUUkyrX2N4qspo6/Mro+Od+l8XCX+c="},
+			{N: "20250309093500_alpha.sql", H: "0rmxpt3ogS3yKQ/KL9DL49myIIZeF1P0uohsEiL41GU="},
+		})
 		cli := &mockAtlas{
 			migrateHash: func(ctx context.Context, p *atlasexec.MigrateHashParams) error {
 				return nil
@@ -1199,13 +1216,9 @@ func TestMigrateAutoRebase(t *testing.T) {
 					var res string
 					switch args[1] {
 					case "origin/rebase-branch:testdata/need_rebase/atlas.sum":
-						res = `h1:I/42uUoInXTRcwooAuTKQpGPF4jfNmEqDD1L66btb+E=
-                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-                               20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
+						res = baseHash
 					case "origin/my-branch:testdata/need_rebase/atlas.sum":
-						res = `h1:U12LVflnyphPTk0O6cKIbrbaea0L3nJx+DJ8nRVuvn8=
-                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-                               20250309093464_rebase.sql h1:H7yD0qrDOB7HQvUUkyrX2N4qspo6/Mro+Od+l8XCX+c=`
+						res = currentHash
 					}
 					// print the result to the stdout
 					cmd = exec.CommandContext(ctx, "echo", res)
@@ -1235,9 +1248,11 @@ func TestMigrateAutoRebase(t *testing.T) {
 
 		require.NoError(t, acts.MigrateAutoRebase(context.Background()))
 		require.Contains(t, out.String(), "Migrations rebased successfully")
-		// Check files were rebased
-		require.Len(t, rebasedFiles, 1)
-		require.Equal(t, "20250309093464_rebase.sql", rebasedFiles[0])
+		require.Equal(t, []string{
+			"20250309093464_rebase.sql",
+			"20250309093500_alpha.sql",
+			"20250309093520_zeta.sql",
+		}, rebasedFiles)
 		// Check that the correct git commands were executed
 		require.Len(t, mockExec.ran, 10)
 		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
@@ -1252,6 +1267,16 @@ func TestMigrateAutoRebase(t *testing.T) {
 		require.Equal(t, []string{"push", "origin", "my-branch"}, mockExec.ran[9].args)
 	})
 	t.Run("conflict, but not only in atlas.sum", func(t *testing.T) {
+		baseHash := marshalHashFile(t, migrate.HashFile{
+			{N: "20250309093454_init_1.sql", H: "h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4="},
+			{N: "20250309093833_second.sql", H: "gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE="},
+		})
+		currentHash := marshalHashFile(t, migrate.HashFile{
+			{N: "20250309093454_init_1.sql", H: "h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4="},
+			{N: "20250309093520_zeta.sql", H: "VfJwA9b9hN3v0A8U2C1iL7vd6z0Vx6J7S7zW2l3fQ0M="},
+			{N: "20250309093464_rebase.sql", H: "H7yD0qrDOB7HQvUUkyrX2N4qspo6/Mro+Od+l8XCX+c="},
+			{N: "20250309093500_alpha.sql", H: "0rmxpt3ogS3yKQ/KL9DL49myIIZeF1P0uohsEiL41GU="},
+		})
 		mockExec := &mockCmdExecutor{
 			onCommand: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 				// Dummy command to avoid errors
@@ -1265,13 +1290,9 @@ func TestMigrateAutoRebase(t *testing.T) {
 					var res string
 					switch args[1] {
 					case "origin/rebase-branch:testdata/need_rebase/atlas.sum":
-						res = `h1:I/42uUoInXTRcwooAuTKQpGPF4jfNmEqDD1L66btb+E=
-                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-                               20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
+						res = baseHash
 					case "origin/my-branch:testdata/need_rebase/atlas.sum":
-						res = `h1:U12LVflnyphPTk0O6cKIbrbaea0L3nJx+DJ8nRVuvn8=
-                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-                               20250309093464_rebase.sql h1:H7yD0qrDOB7HQvUUkyrX2N4qspo6/Mro+Od+l8XCX+c=`
+						res = currentHash
 					}
 					// print the result to the stdout
 					cmd = exec.CommandContext(ctx, "echo", res)
@@ -1334,6 +1355,16 @@ func TestMigrateAutoRebase(t *testing.T) {
 	t.Run("conflict in atlas.sum with base-sha", func(t *testing.T) {
 		const baseSHA = "abc1234567890123456789012345678901234567"
 		var rebasedFiles []string
+		baseHash := marshalHashFile(t, migrate.HashFile{
+			{N: "20250309093454_init_1.sql", H: "h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4="},
+			{N: "20250309093833_second.sql", H: "gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE="},
+		})
+		currentHash := marshalHashFile(t, migrate.HashFile{
+			{N: "20250309093454_init_1.sql", H: "h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4="},
+			{N: "20250309093520_zeta.sql", H: "VfJwA9b9hN3v0A8U2C1iL7vd6z0Vx6J7S7zW2l3fQ0M="},
+			{N: "20250309093464_rebase.sql", H: "H7yD0qrDOB7HQvUUkyrX2N4qspo6/Mro+Od+l8XCX+c="},
+			{N: "20250309093500_alpha.sql", H: "0rmxpt3ogS3yKQ/KL9DL49myIIZeF1P0uohsEiL41GU="},
+		})
 		cli := &mockAtlas{
 			migrateHash: func(ctx context.Context, p *atlasexec.MigrateHashParams) error {
 				return nil
@@ -1357,13 +1388,9 @@ func TestMigrateAutoRebase(t *testing.T) {
 					var res string
 					switch args[1] {
 					case baseSHA + ":testdata/need_rebase/atlas.sum":
-						res = `h1:I/42uUoInXTRcwooAuTKQpGPF4jfNmEqDD1L66btb+E=
-                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-                               20250309093833_second.sql h1:gDi08EnaiS7cPo+IbS72CkQFg/2vanxGLMjfNN9XHEE=`
+						res = baseHash
 					case "origin/my-branch:testdata/need_rebase/atlas.sum":
-						res = `h1:U12LVflnyphPTk0O6cKIbrbaea0L3nJx+DJ8nRVuvn8=
-                               20250309093454_init_1.sql h1:h6tXkQgcuEtcMlIT3Q2ei1WKXqaqb2PK7F87YFUcSR4=
-                               20250309093464_rebase.sql h1:H7yD0qrDOB7HQvUUkyrX2N4qspo6/Mro+Od+l8XCX+c=`
+						res = currentHash
 					}
 					cmd = exec.CommandContext(ctx, "echo", res)
 				case len(args) > 1 && args[0] == "diff" && args[1] == "--name-only":
@@ -1391,8 +1418,11 @@ func TestMigrateAutoRebase(t *testing.T) {
 
 		require.NoError(t, acts.MigrateAutoRebase(context.Background()))
 		require.Contains(t, out.String(), "Migrations rebased successfully")
-		require.Len(t, rebasedFiles, 1)
-		require.Equal(t, "20250309093464_rebase.sql", rebasedFiles[0])
+		require.Equal(t, []string{
+			"20250309093464_rebase.sql",
+			"20250309093500_alpha.sql",
+			"20250309093520_zeta.sql",
+		}, rebasedFiles)
 		require.Len(t, mockExec.ran, 10)
 		require.Equal(t, []string{"--version"}, mockExec.ran[0].args)
 		require.Equal(t, []string{"fetch", "origin", baseSHA}, mockExec.ran[1].args)

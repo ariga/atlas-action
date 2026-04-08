@@ -1811,7 +1811,7 @@ func newFiles(base, current migrate.HashFile) []string {
 	for k := range hashIter(base) {
 		delete(m, k)
 	}
-	return slices.Collect(maps.Keys(m))
+	return slices.Sorted(maps.Keys(m))
 }
 
 func hashIter(hf migrate.HashFile) iter.Seq2[string, string] {
