@@ -2,10 +2,11 @@
 # This source code is licensed under the Apache 2.0 license found
 # in the LICENSE file in the root directory of this source tree.
 
-BUILD_DATE = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-VERSION    = $(shell cat VERSION.txt)
-COMMIT    ?= $(shell git rev-parse --short HEAD)
-MAJOR_VER  = $(shell echo "$(VERSION)" | cut -d. -f1)
+BUILD_DATE  = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+VERSION     = $(shell cat VERSION.txt)
+COMMIT     ?= $(shell git rev-parse --short HEAD)
+FULL_COMMIT = $(shell git rev-parse HEAD)
+MAJOR_VER   = $(shell echo "$(VERSION)" | cut -d. -f1)
 LDFLAGS    = "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}"
 
 BINARY_NAME  = atlas-action
@@ -33,18 +34,24 @@ s3-upload: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
 	aws s3 cp ./scripts/setup-atlas.sh s3://release.ariga.io/atlas-action/scripts-$(VERSION)/setup-atlas.sh; \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(VERSION); \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(MAJOR_VER); \
+	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(FULL_COMMIT); \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION); \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(MAJOR_VER); \
+	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(FULL_COMMIT); \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(VERSION); \
 	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER); \
+	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(FULL_COMMIT); \
 	rclone copyto ./scripts/shim.sh r2:atlas-binaries/atlas-action/scripts-$(VERSION)/shim.sh; \
 	rclone copyto ./scripts/setup-atlas.sh r2:atlas-binaries/atlas-action/scripts-$(VERSION)/setup-atlas.sh; \
 	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(BINARY_NAME)-$(VERSION); \
 	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(BINARY_NAME)-$(MAJOR_VER); \
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(BINARY_NAME)-$(FULL_COMMIT); \
 	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION); \
 	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(MAJOR_VER); \
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(FULL_COMMIT); \
 	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(VERSION); \
-	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER);
+	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER); \
+	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(FULL_COMMIT);
 
 .PHONY: docker
 docker: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)

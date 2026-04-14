@@ -219,6 +219,18 @@ EOF
   [[ "$output" == *"must start with 'v'"* ]]
 }
 
+@test "accepts full commit SHA as version" {
+  command -v curl >/dev/null || skip "curl not installed"
+  export ATLAS_ACTION_VERSION="54eb978c022091c1ebf9a3c90806f36a977fad03"
+  export GITHUB_ACTIONS="true"
+  # Will fail to download but should not reject the version
+  run ! "$SHIM_SCRIPT" "test"
+  [[ "$output" == *"Using version 54eb978c022091c1ebf9a3c90806f36a977fad03"* ]]
+  [[ "$output" != *"Invalid version"* ]]
+  [[ "$output" == *"Failed to download"* ]]
+  [[ "$output" == *"ariga/atlas-action/setup"* ]]
+}
+
 @test "accepts version with v prefix" {
   export ATLAS_ACTION_LOCAL="1"
   export ATLAS_ACTION_VERSION="v1.0.0"
