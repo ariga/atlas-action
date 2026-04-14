@@ -53,9 +53,17 @@
     {
       "type": "string",
       "label": "Atlas version",
-      "helpMarkDown": "The version of Atlas CLI to install, e.g. `v0.14.1`. Defaults to `latest`. Only used when action is `setup`.",
+      "helpMarkDown": "The version of Atlas CLI to install, e.g. `v1.2.0`. Defaults to `latest`.",
       "name": "atlas_version",
       "defaultValue": "latest",
+      "visibleRule": "action == setup"
+    },
+    {
+      "type": "string",
+        "label": "Atlas flavor",
+        "helpMarkDown": "The flavor of Atlas CLI to install, e.g. `spanner`.",
+      "name": "flavor",
+      "defaultValue": "",
       "visibleRule": "action == setup"
     },
     {{- $lenActions := len .Actions -}}

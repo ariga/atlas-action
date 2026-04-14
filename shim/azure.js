@@ -20,7 +20,10 @@ if (!action) {
 
 if (action === "setup") {
   const token = process.env.INPUT_CLOUD_TOKEN;
-  const version = process.env.INPUT_ATLAS_VERSION || "latest";
+  const baseVersion = process.env.INPUT_ATLAS_VERSION || "latest";
+  const flavor = (process.env.INPUT_FLAVOR || "").trim();
+  // Mirror setup-atlas behavior: prepend "extended-" when a flavor is specified.
+  const version = flavor ? `${flavor}-${baseVersion}` : baseVersion;
 
   // Azure Pipelines Cache@2 can only cache paths inside Pipeline.Workspace.
   // ~/.atlas lives outside it, so we mirror it into a workspace-relative
