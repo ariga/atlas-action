@@ -23,8 +23,13 @@ module.exports = async function run(action) {
   } else {
     // Download the binary if not in local mode
     const version = process.env.GITHUB_ACTION_REF || "master";
-    if (!version.startsWith("v") && version !== "master") {
-      throw new Error(`Invalid version: ${version}`);
+    const isCommitSHA = /^[0-9a-f]{40}$/i.test(version);
+    if (!isCommitSHA && !version.startsWith("v") && version !== "master") {
+      throw new Error(
+        `Invalid version: ${version}. ` +
+          `If you are pinning by commit SHA, please use the full 40-character hash. ` +
+          `Alternatively, add a step to build the binary using ariga/atlas-action/setup.`
+      );
     }
     core.info(`Using version ${version}`);
     const toolName = "atlas-action";
@@ -47,7 +52,17 @@ module.exports = async function run(action) {
         } catch (err) {
           core.warning(`Primary server failed (${err.message}), falling back to release.ariga.io`);
           core.info(`Downloading atlas-action binary: ${fallbackUrl} to ${dest}`);
-          await toolCache.downloadTool(fallbackUrl, dest);
+          try {
+            await toolCache.downloadTool(fallbackUrl, dest);
+          } catch (err2) {
+            throw new Error(
+              `Failed to download atlas-action binary from all sources.\n` +
+                `If you are pinning the action by commit SHA, the binary for this commit may not be available.\n` +
+                `To fix this, add a setup step before running atlas-action:\n\n` +
+                `  - uses: ariga/atlas-action/setup@${version}\n\n` +
+                `This will build the atlas-action binary directly in your CI environment.`
+            );
+          }
         }
         fs.chmodSync(dest, "700");
       }

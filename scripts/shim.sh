@@ -47,6 +47,11 @@ get_version() {
   fi
 }
 
+# Check if a string looks like a full commit SHA (40 hex chars)
+is_commit_sha() {
+  echo "$1" | grep -qE '^[0-9a-fA-F]{40}$'
+}
+
 # Logging functions
 log_notice() {
   case "$CI_PLATFORM" in
@@ -105,12 +110,15 @@ run() {
     log_notice "Running in local mode"
   else
     version="$(get_version)"
-    case "$version" in
-      v*) ;;
-      *)
-        log_error "Invalid version: $version (must start with 'v')"
-        exit 1 ;;
-    esac
+    if ! is_commit_sha "$version"; then
+      case "$version" in
+        v*) ;;
+        *)
+          log_error "Invalid version: $version (must start with 'v' or be a full 40-character commit SHA)"
+          log_error "Alternatively, add a setup step using ariga/atlas-action/setup to build the binary in your CI/CD."
+          exit 1 ;;
+      esac
+    fi
     log_notice "Using version $version"
 
     tool_path="$(get_tool_cache)/${BINARY_NAME}/${version}/${platform}"
@@ -123,11 +131,21 @@ run() {
       fallback_url="https://release.ariga.io/atlas-action/atlas-action-${platform}-${version}"
       mkdir -p "$tool_path"
       log_notice "Downloading: $primary_url"
-      if ! curl -sSfL "$primary_url" -o "$dest"; then
-        log_notice "Primary server failed, falling back to release.ariga.io"
+      if curl -sSfL "$primary_url" -o "$dest" 2>/dev/null; then
+        : # success
+      else
         rm -f "$dest"
+        log_notice "Primary server failed, falling back to release.ariga.io"
         log_notice "Downloading: $fallback_url"
-        curl -sSfL "$fallback_url" -o "$dest"
+        if ! curl -sSfL "$fallback_url" -o "$dest" 2>/dev/null; then
+          rm -f "$dest"
+          log_error "Failed to download atlas-action binary from all sources."
+          log_error "If you are pinning the action by commit SHA, the binary for this commit may not be available."
+          log_error "To fix this, add a setup step before running atlas-action:"
+          log_error "  - uses: ariga/atlas-action/setup@${version}"
+          log_error "This will build the atlas-action binary directly in your CI environment."
+          exit 1
+        fi
       fi
       chmod 700 "$dest"
     fi
