@@ -33,10 +33,7 @@ if (!fs.existsSync(homeAtlas)) {
 
 fs.mkdirSync(cacheDir, { recursive: true });
 console.log(`post-shim: copying ${homeAtlas} → ${cacheDir}`);
-const { status } = childProcess.spawnSync(
-  "cp", ["-a", homeAtlas + "/.", cacheDir + "/"],
-  { stdio: "inherit" }
-);
+const { status } = childProcess.spawnSync("cp", ["-a", homeAtlas + "/.", cacheDir + "/"], { stdio: "inherit" });
 if (status === 0) {
   console.log("post-shim: grant cache saved successfully.");
 } else {

@@ -45,7 +45,8 @@ if (action === "setup") {
   // Install Atlas CLI
   console.log(`##[section]Installing Atlas CLI (version: ${version})`);
   const install = childProcess.spawnSync(
-    "sh", ["-c", `curl -sSf https://atlasgo.sh | ATLAS_VERSION="${version}" CI=true sh`],
+    "sh",
+    ["-c", `curl -sSf https://atlasgo.sh | ATLAS_VERSION="${version}" CI=true sh`],
     { stdio: "inherit" }
   );
   if (install.status !== 0) {
@@ -56,10 +57,7 @@ if (action === "setup") {
   // Fetch/refresh the offline grant
   if (token) {
     console.log("##[section]Authenticating to Atlas Cloud (grant-only)");
-    const login = childProcess.spawnSync(
-      "atlas", ["login", "--token", token, "--grant-only"],
-      { stdio: "inherit" }
-    );
+    const login = childProcess.spawnSync("atlas", ["login", "--token", token, "--grant-only"], { stdio: "inherit" });
     if (login.status !== 0) {
       console.error("##[error]Atlas login failed.");
       process.exit(login.status || 1);
