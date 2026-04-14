@@ -49,10 +49,6 @@ steps:
   displayName: Push Schema
 ```
 
-The `Build.BuildId` in the primary cache key ensures a fresh entry is written each run (since Azure caches are immutable). The `restoreKeys` prefix `"atlas-grant" | "$(Agent.OS)"` restores the most recent entry from any previous run on the same OS.
-
-
-
 ## Features
 
 - Support for running Atlas actions on Azure DevOps (Linux runners).
