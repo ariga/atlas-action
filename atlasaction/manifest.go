@@ -73,6 +73,14 @@ func (a ActionsManifest) AsOptions() map[string]string {
 	return opts
 }
 
+// AsSetupOptions returns the action options with "setup" prepended, for the Azure DevOps task.json.
+// "setup" is Azure-specific and not part of the manifest since it is CI infrastructure, not an Atlas operation.
+func (a ActionsManifest) AsSetupOptions() map[string]string {
+	opts := a.AsOptions()
+	opts["setup"] = "Setup Atlas"
+	return opts
+}
+
 func (a ActionSpec) SortedInputs() iter.Seq2[string, ActionInput] {
 	return SortedInputs(a.Inputs, []string{
 		"working-directory", "config", "env", "vars", "dev-url",
