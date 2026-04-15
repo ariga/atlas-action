@@ -30,6 +30,16 @@
       "argumentFormat": ""
     }
   },
+  "postjobexecution": {
+    "Node16": {
+      "target": "post-shim.js",
+      "argumentFormat": ""
+    },
+    "Node20_1": {
+      "target": "post-shim.js",
+      "argumentFormat": ""
+    }
+  },
   "instanceNameFormat": "Atlas Action: $(action)",
   "inputs": [
     {
@@ -55,8 +65,25 @@
         "schema plan": "Schema Plan",
         "schema plan approve": "Schema Plan Approve",
         "schema push": "Schema Push",
-        "schema test": "Schema Test"
+        "schema test": "Schema Test",
+        "setup": "Setup Atlas"
       }
+    },
+    {
+      "type": "string",
+      "label": "Atlas version",
+      "helpMarkDown": "The version of Atlas CLI to install, e.g. `v1.2.0`. Defaults to `latest`.",
+      "name": "atlas_version",
+      "defaultValue": "latest",
+      "visibleRule": "action == setup"
+    },
+    {
+      "type": "string",
+        "label": "Atlas flavor",
+        "helpMarkDown": "The flavor of Atlas CLI to install, e.g. `spanner`.",
+      "name": "flavor",
+      "defaultValue": "",
+      "visibleRule": "action == setup"
     },
     {
       "type": "boolean",
@@ -98,7 +125,7 @@
       "label": "Atlas Cloud token",
       "helpMarkDown": "The token that is used to connect to Atlas Cloud (should be passed as a secret).",
       "name": "cloud_token",
-      "visibleRule": "action == monitor schema"
+      "visibleRule": "action == setup || action == monitor schema"
     },
     {
       "type": "boolean",

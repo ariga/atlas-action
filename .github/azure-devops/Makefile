@@ -10,6 +10,7 @@ VER_PATCH  = $(shell echo $(VER_NO_V) | cut -d. -f3)
 prepare:
 	cp ../../atlas-action ./action/atlas-action
 	cp ../../shim/dist/azure/index.js ./action/shim.js
+	cp ../../shim/dist/azure-post/index.js ./action/post-shim.js
 	cp ./images/atlas.png ./action/icon.png
 
 version:
@@ -22,10 +23,10 @@ version:
 	mv ./vss-extension.json.tmp ./vss-extension.json
 
 version-dev: version
-	jq '.name = "AtlasActionDev" | .friendlyName = "Atlas Action Dev" | .id = $$id' \
-	  --arg id "43908d25-6448-44e3-accf-49df010ca313" \
+	jq '.name = "AtlasActionDevPrivate" | .friendlyName = "Atlas Action Dev" | .id = $$id' \
+	  --arg id "9bd205be-4550-45e6-8dcd-39621d905ce9" \
 	  ./action/task.json > ./action/task.json.tmp
-	jq '.name = "Atlas Action Dev" | .id = "atlas-action-dev"' \
+	jq '.name = "Atlas Action Dev" | .id = "atlas-action-dev-private"' \
 	  ./vss-extension.json > ./vss-extension.json.tmp
 	mv ./action/task.json.tmp ./action/task.json
 	mv ./vss-extension.json.tmp ./vss-extension.json
@@ -36,5 +37,5 @@ vsix: prepare
 
 .PHONY: clean
 clean:
-	rm -f ./action/atlas-action ./action/shim.js ./action/task.json.tmp ./vss-extension.json.tmp
+	rm -f ./action/atlas-action ./action/shim.js ./action/post-shim.js ./action/task.json.tmp ./vss-extension.json.tmp
 	rm -f *.vsix

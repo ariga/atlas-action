@@ -59,6 +59,7 @@ atlas-action*
 # the extension file for Azure DevOps marketplace
 ariga.atlas-action-*.vsix
 .github/azure-devops/action/shim.js
+.github/azure-devops/action/post-shim.js
 
 !atlas-actions.yml
 gitlab/*

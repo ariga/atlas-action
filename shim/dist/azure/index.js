@@ -17,6 +17,14 @@ module.exports = require("fs");
 
 /***/ }),
 
+/***/ 37:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("os");
+
+/***/ }),
+
 /***/ 17:
 /***/ ((module) => {
 
@@ -72,6 +80,7 @@ var __webpack_exports__ = {};
 
 const childProcess = __nccwpck_require__(81);
 const fs = __nccwpck_require__(147);
+const os = __nccwpck_require__(37);
 const path = __nccwpck_require__(17);
 
 // The action input uses spaces (e.g., "schema plan approve") instead of slashes
@@ -84,6 +93,57 @@ const action = (process.env.INPUT_ACTION || "").trim().replaceAll(" ", "/").toLo
 if (!action) {
   throw new Error("Missing required input: action.");
 }
+
+if (action === "setup") {
+  const token = process.env.INPUT_CLOUD_TOKEN;
+  const baseVersion = process.env.INPUT_ATLAS_VERSION || "latest";
+  const flavor = (process.env.INPUT_FLAVOR || "").trim();
+  // Mirror setup-atlas behavior: prepend "extended-" when a flavor is specified.
+  const version = flavor ? `${flavor}-${baseVersion}` : baseVersion;
+
+  // Azure Pipelines Cache@2 can only cache paths inside Pipeline.Workspace.
+  // ~/.atlas lives outside it, so we mirror it into a workspace-relative
+  // directory that Cache@2 manages, and copy back here on every run.
+  const pipelineWorkspace = process.env.PIPELINE_WORKSPACE || process.env.AGENT_BUILDDIRECTORY;
+  if (!pipelineWorkspace) {
+    console.error("##[error]PIPELINE_WORKSPACE is not set. Is this running on an Azure Pipelines agent?");
+    process.exit(1);
+  }
+  const cacheDir = path.join(pipelineWorkspace, ".atlas");
+  const homeAtlas = path.join(os.homedir(), ".atlas");
+
+  // Restore cached grant from workspace into ~/.atlas (populated by Cache@2 before this step)
+  fs.mkdirSync(homeAtlas, { recursive: true });
+  if (fs.existsSync(cacheDir)) {
+    childProcess.spawnSync("cp", ["-a", cacheDir + "/.", homeAtlas + "/"], { stdio: "inherit" });
+  }
+
+  // Install Atlas CLI
+  console.log(`##[section]Installing Atlas CLI (version: ${version})`);
+  const install = childProcess.spawnSync(
+    "sh",
+    ["-c", `curl -sSf https://atlasgo.sh | ATLAS_VERSION="${version}" CI=true sh`],
+    { stdio: "inherit" }
+  );
+  if (install.status !== 0) {
+    console.error("##[error]Failed to install Atlas CLI.");
+    process.exit(install.status || 1);
+  }
+
+  // Fetch/refresh the offline grant
+  if (token) {
+    console.log("##[section]Authenticating to Atlas Cloud (grant-only)");
+    const login = childProcess.spawnSync("atlas", ["login", "--token", token, "--grant-only"], { stdio: "inherit" });
+    if (login.status !== 0) {
+      console.error("##[error]Atlas login failed.");
+      process.exit(login.status || 1);
+    }
+    // Expose the token for subsequent AtlasAction steps in the same job
+    process.stdout.write(`##vso[task.setvariable variable=ATLAS_TOKEN;issecret=true;]${token}\n`);
+  }
+  process.exit(0);
+}
+
 const bin = path.join(__dirname, "atlas-action");
 try {
   // Only change permission if execute is not set
