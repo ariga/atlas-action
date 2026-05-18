@@ -176,6 +176,21 @@ func TestUpdateComment(t *testing.T) {
 	})
 }
 
+func TestDeleteComment(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		expectedPath := "/myorg/myproject/_apis/git/repositories/myrepo/pullrequests/123/threads/456/comments/789"
+		require.Equal(t, http.MethodDelete, r.Method)
+		require.Contains(t, r.URL.Path, expectedPath)
+		require.Contains(t, r.URL.RawQuery, "api-version=7.1")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	client, err := NewClient("myorg", "myproject", "myrepo")
+	require.NoError(t, err)
+	client.baseURL = srv.URL
+	require.NoError(t, client.DeleteComment(context.Background(), 123, 456, 789))
+}
+
 func TestGetCommentThread(t *testing.T) {
 	t.Run("successful thread retrieval", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

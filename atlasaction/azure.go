@@ -324,18 +324,39 @@ func (c *AzureDevOpsClient) CommentPlan(ctx context.Context, tc *TriggerContext,
 
 // CommentSchemaLint implements SCMClient.
 func (c *AzureDevOpsClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
+	id := schemaLintCommentID(tc)
+	if len(r.Steps) == 0 {
+		return c.deleteComment(ctx, tc.PullRequest, id)
+	}
 	comment, err := RenderTemplate("schema-lint.tmpl", r, tc)
 	if err != nil {
 		return err
-	}
-	id := "schema-lint"
-	if url := tc.Act.GetInput("url"); url != "" {
-		id = url
 	}
 	return c.upsertComment(ctx, tc.PullRequest, id, comment)
 }
 
 func (c *AzureDevOpsClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	return c.comment(ctx, pr, id, comment, true)
+}
+
+func (c *AzureDevOpsClient) deleteComment(ctx context.Context, pr *PullRequest, id string) error {
+	if pr == nil {
+		return fmt.Errorf("pull request is required for commenting")
+	}
+	threads, err := c.ListCommentThreads(ctx, pr.Number)
+	if err != nil {
+		return fmt.Errorf("failed to list comment threads: %w", err)
+	}
+	marker := commentMarker(id)
+	for _, thread := range threads {
+		if len(thread.Comments) > 0 && strings.Contains(thread.Comments[0].Content, marker) {
+			return c.DeleteComment(ctx, pr.Number, thread.ID, thread.Comments[0].ID)
+		}
+	}
+	return nil
+}
+
+func (c *AzureDevOpsClient) comment(ctx context.Context, pr *PullRequest, id, comment string, create bool) error {
 	if pr == nil {
 		return fmt.Errorf("pull request is required for commenting")
 	}
@@ -356,6 +377,9 @@ func (c *AzureDevOpsClient) upsertComment(ctx context.Context, pr *PullRequest, 
 				return err
 			}
 		}
+	}
+	if !create {
+		return nil
 	}
 	// No existing thread found, create a new one
 	_, err = c.AddComment(ctx, pr.Number, comment)

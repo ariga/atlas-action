@@ -192,6 +192,28 @@ func (c *Client) UpdateIssueComment(ctx context.Context, id int, comment string)
 	return err
 }
 
+// DeleteIssueComment deletes the issue comment with the given id.
+func (c *Client) DeleteIssueComment(ctx context.Context, id int) error {
+	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", c.baseURL, c.repo, id)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	res, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
+		}
+		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	return nil
+}
+
 // ReviewComments for the trigger event pull request.
 func (c *Client) ReviewComments(ctx context.Context, prID int) ([]PullRequestComment, error) {
 	url := fmt.Sprintf("%v/repos/%v/pulls/%v/comments", c.baseURL, c.repo, prID)

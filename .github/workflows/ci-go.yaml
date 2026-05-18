@@ -376,6 +376,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
   schema-lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     strategy:
       matrix:
         test:
@@ -418,6 +421,54 @@ jobs:
         run: |
           echo "::error title=Unexpected Failure::${{ matrix.test.url }} must pass"
           exit 1
+  schema-lint-sticky-comment:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      ATLAS_ACTION_LOCAL: 1
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - id: sticky_lint_failure
+        continue-on-error: true
+        uses: ./schema/lint
+        with:
+          working-directory: atlasaction/testdata/schema-lint
+          config: file://atlas.hcl
+          dev-url: sqlite://file?mode=memory
+          url: file://sticky.lt.hcl
+          vars: '{"rulefile":"schema.rule.hcl"}'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Fail if sticky lint did not post a failure
+        if: steps.sticky_lint_failure.outcome == 'success'
+        run: |
+          echo "::error title=Unexpected Success::sticky schema lint must fail before cleanup"
+          exit 1
+      - name: Replace sticky schema with clean schema
+        working-directory: atlasaction/testdata/schema-lint
+        run: cp ok.lt.hcl sticky.lt.hcl
+      - id: sticky_lint_clean
+        uses: ./schema/lint
+        with:
+          working-directory: atlasaction/testdata/schema-lint
+          config: file://atlas.hcl
+          dev-url: sqlite://file?mode=memory
+          url: file://sticky.lt.hcl
+          vars: '{"rulefile":"schema.rule.hcl"}'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
   schema-apply:
     runs-on: ubuntu-latest
     env:
