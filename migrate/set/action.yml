@@ -34,5 +34,5 @@ inputs:
       A JSON object containing variables to be used in the Atlas configuration file.
       For example, `{"var1": "value1", "var2": "value2"}`.
 runs:
-  using: node20
+  using: node24
   main: index.js

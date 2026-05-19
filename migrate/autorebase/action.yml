@@ -29,5 +29,5 @@ outputs:
   rebased:
     description: Whether migration files were rebased. Either "true" or "false".
 runs:
-  using: node20
+  using: node24
   main: index.js

@@ -39,5 +39,5 @@ outputs:
       The URL of the CI report in Atlas Cloud, containing an ERD visualization
       and analysis of the schema migrations.
 runs:
-  using: node20
+  using: node24
   main: index.js

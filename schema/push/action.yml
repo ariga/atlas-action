@@ -52,5 +52,5 @@ outputs:
   url:
     description: The URL of the pushed schema version.
 runs:
-  using: node20
+  using: node24
   main: index.js
