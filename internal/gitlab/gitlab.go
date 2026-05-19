@@ -139,6 +139,28 @@ func (c *Client) UpdateNote(ctx context.Context, prID int, noteID int, comment s
 	return err
 }
 
+func (c *Client) DeleteNote(ctx context.Context, prID int, noteID int) error {
+	url := fmt.Sprintf("%v/projects/%v/merge_requests/%v/notes/%v", c.baseURL, c.project, prID, noteID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			return fmt.Errorf("unexpected status code %v: unable to read body %v", res.StatusCode, err)
+		}
+		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	return nil
+}
+
 func (t *PrivateToken) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("PRIVATE-TOKEN", t.Token)
 	return t.base().RoundTrip(req)

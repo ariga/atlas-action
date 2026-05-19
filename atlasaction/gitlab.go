@@ -165,18 +165,39 @@ func (c *GitLabClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *a
 
 // CommentSchemaLint implements SCMClient.
 func (c *GitLabClient) CommentSchemaLint(ctx context.Context, tc *TriggerContext, r *SchemaLintReport) error {
+	id := schemaLintCommentID(tc)
+	if len(r.Steps) == 0 {
+		return c.deleteComment(ctx, tc.PullRequest, id)
+	}
 	comment, err := RenderTemplate("schema-lint.tmpl", r, tc)
 	if err != nil {
 		return err
-	}
-	id := "schema-lint"
-	if url := tc.Act.GetInput("url"); url != "" {
-		id = url
 	}
 	return c.upsertComment(ctx, tc.PullRequest, id, comment)
 }
 
 func (c *GitLabClient) upsertComment(ctx context.Context, pr *PullRequest, id, comment string) error {
+	return c.comment(ctx, pr, id, comment, true)
+}
+
+func (c *GitLabClient) deleteComment(ctx context.Context, pr *PullRequest, id string) error {
+	if pr == nil {
+		return fmt.Errorf("pull request is required for commenting")
+	}
+	comments, err := c.PullRequestNotes(ctx, pr.Number)
+	if err != nil {
+		return err
+	}
+	marker := commentMarker(id)
+	if found := slices.IndexFunc(comments, func(c gitlab.Note) bool {
+		return !c.System && strings.Contains(c.Body, marker)
+	}); found != -1 {
+		return c.DeleteNote(ctx, pr.Number, comments[found].ID)
+	}
+	return nil
+}
+
+func (c *GitLabClient) comment(ctx context.Context, pr *PullRequest, id, comment string, create bool) error {
 	if pr == nil {
 		return fmt.Errorf("pull request is required for commenting")
 	}
@@ -190,6 +211,9 @@ func (c *GitLabClient) upsertComment(ctx context.Context, pr *PullRequest, id, c
 		return !c.System && strings.Contains(c.Body, marker)
 	}); found != -1 {
 		return c.UpdateNote(ctx, pr.Number, comments[found].ID, comment)
+	}
+	if !create {
+		return nil
 	}
 	return c.CreateNote(ctx, pr.Number, comment)
 }

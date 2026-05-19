@@ -228,6 +228,25 @@ func (c *Client) UpdateComment(ctx context.Context, prID, threadID, commentID in
 	return &comment, nil
 }
 
+// DeleteComment deletes an existing comment in a pull request thread.
+func (c *Client) DeleteComment(ctx context.Context, prID, threadID, commentID int) error {
+	url := fmt.Sprintf("%s/%s/%s/_apis/git/repositories/%s/pullrequests/%d/threads/%d/comments/%d?api-version=7.1",
+		c.baseURL, c.org, c.project, c.repo, prID, threadID, commentID)
+	res, err := c.json(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("deleting comment %d in thread %d for pull request %d: %w", commentID, threadID, prID, err)
+	}
+	defer res.Body.Close()
+	buf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("reading response for comment deletion: %w", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code %d when deleting comment. body: %s", res.StatusCode, string(buf))
+	}
+	return nil
+}
+
 // UpdateFirstComment updates the first comment in a comment thread.
 func (c *Client) UpdateFirstComment(ctx context.Context, prID, threadID int, content string) (*Comment, error) {
 	// First, get the thread to find the first comment ID
