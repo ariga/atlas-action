@@ -6,7 +6,7 @@ jobs:
   shim:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
           node-version: 24.x
@@ -28,7 +28,7 @@ jobs:
   manifest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -48,7 +48,7 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 0 # Disable local mode
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: ariga/setup-atlas@50e8000b32f475818655b84116e65a9a7c85cf10 # master
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
@@ -69,7 +69,7 @@ jobs:
   golangci-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -84,7 +84,7 @@ jobs:
       - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -98,7 +98,7 @@ jobs:
       - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -182,7 +182,7 @@ jobs:
       - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -219,7 +219,7 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -312,7 +312,7 @@ jobs:
       - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -333,7 +333,7 @@ jobs:
       - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -358,7 +358,7 @@ jobs:
       - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -391,7 +391,7 @@ jobs:
       - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -433,7 +433,7 @@ jobs:
       - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -516,7 +516,7 @@ jobs:
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
           version: ${{ matrix.test.atlas }}
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
@@ -616,7 +616,7 @@ jobs:
           EOF
           echo "Table and view created with $NUM_ROWS users!"
       - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
