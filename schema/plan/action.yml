@@ -56,5 +56,5 @@ outputs:
   status:
     description: The status of the plan. For example, `PENDING` or `APPROVED`.
 runs:
-  using: node20
+  using: node24
   main: index.js

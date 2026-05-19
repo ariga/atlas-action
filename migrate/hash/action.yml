@@ -25,5 +25,5 @@ inputs:
     description: |
       The environment to use from the Atlas configuration file. For example, `dev`.
 runs:
-  using: node20
+  using: node24
   main: index.js

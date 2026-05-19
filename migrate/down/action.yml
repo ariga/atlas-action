@@ -55,5 +55,5 @@ outputs:
   url:
     description: If given, the URL for reviewing the revert plan.
 runs:
-  using: node20
+  using: node24
   main: index.js

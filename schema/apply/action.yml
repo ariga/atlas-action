@@ -65,5 +65,5 @@ outputs:
   error:
     description: The error message if the action fails.
 runs:
-  using: node20
+  using: node24
   main: index.js
