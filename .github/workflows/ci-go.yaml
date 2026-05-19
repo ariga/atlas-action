@@ -6,10 +6,10 @@ jobs:
   shim:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
-          node-version: 20.x
+          node-version: 24.x
           cache: "npm"
           cache-dependency-path: shim/package-lock.json
       - name: Install
@@ -28,8 +28,8 @@ jobs:
   manifest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - name: Run `make manifest`
@@ -48,8 +48,8 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 0 # Disable local mode
     steps:
-      - uses: actions/checkout@v3
-      - uses: ariga/setup-atlas@master
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: ariga/setup-atlas@50e8000b32f475818655b84116e65a9a7c85cf10 # master
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - name: "Run Migrate Lint"
@@ -69,23 +69,23 @@ jobs:
   golangci-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - name: Run Go linters
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc # v3
         with:
           args: --verbose --timeout=5m
           skip-pkg-cache: true
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: ariga/setup-atlas@v0
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - name: Run tests
@@ -95,11 +95,11 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
-      - uses: ariga/setup-atlas@v0
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
@@ -139,7 +139,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
       - id: check-lint-failure
         if: steps.lint_failure.outcome == 'success'
-        uses: actions/github-script@v3
+        uses: actions/github-script@ffc2c79a5b2490bd33e0a41c1de74b877714d736 # v3
         with:
           script: |
             core.setFailed('lint did not when it was supposed to')
@@ -170,7 +170,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
       - id: check-test-failure
         if: steps.test_failure.outcome == 'success'
-        uses: actions/github-script@v3
+        uses: actions/github-script@ffc2c79a5b2490bd33e0a41c1de74b877714d736 # v3
         with:
           script: |
             core.setFailed('expected test to fail, but it did not')
@@ -179,11 +179,11 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
-      - uses: ariga/setup-atlas@v0
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
@@ -210,7 +210,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
       - id: check-test-failure
         if: steps.test_failure.outcome == 'success'
-        uses: actions/github-script@v3
+        uses: actions/github-script@ffc2c79a5b2490bd33e0a41c1de74b877714d736 # v3
         with:
           script: |
             core.setFailed('expected test to fail, but it did not')
@@ -219,8 +219,8 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
@@ -242,7 +242,7 @@ jobs:
           TEST_EXIT_CODE: 1
       - name: check-exit-code
         if: steps.pending-approval.outcome == 'success'
-        uses: actions/github-script@v3
+        uses: actions/github-script@ffc2c79a5b2490bd33e0a41c1de74b877714d736 # v3
         with:
           script: |
             core.setFailed('expect to fail, but did not')
@@ -259,7 +259,7 @@ jobs:
           TEST_EXIT_CODE: 1
       - name: check-exit-code-wait
         if: steps.pending-approval-wait.outcome == 'success'
-        uses: actions/github-script@v3
+        uses: actions/github-script@ffc2c79a5b2490bd33e0a41c1de74b877714d736 # v3
         with:
           script: |
             core.setFailed('expect to fail, but did not')
@@ -275,7 +275,7 @@ jobs:
           TEST_EXIT_CODE: 1
       - name: check-exit-code
         if: steps.aborted.outcome == 'success'
-        uses: actions/github-script@v3
+        uses: actions/github-script@ffc2c79a5b2490bd33e0a41c1de74b877714d736 # v3
         with:
           script: |
             core.setFailed('expect to fail, but did not')
@@ -309,11 +309,11 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
-      - uses: ariga/setup-atlas@v0
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
@@ -330,11 +330,11 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
-      - uses: ariga/setup-atlas@v0
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
@@ -355,11 +355,11 @@ jobs:
       ATLAS_ACTION_LOCAL: 1
     if: ${{ github.event_name == 'push' }}
     steps:
-      - uses: ariga/setup-atlas@v0
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
@@ -388,11 +388,11 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
-      - uses: ariga/setup-atlas@v0
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
@@ -430,11 +430,11 @@ jobs:
     env:
       ATLAS_ACTION_LOCAL: 1
     steps:
-      - uses: ariga/setup-atlas@v0
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
@@ -512,12 +512,12 @@ jobs:
             error: "was not approved within the specified waiting period"
             wait-timeout: 5s
     steps:
-      - uses: ariga/setup-atlas@v0
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
           version: ${{ matrix.test.atlas }}
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
@@ -615,9 +615,9 @@ jobs:
           SELECT id, email FROM users;
           EOF
           echo "Table and view created with $NUM_ROWS users!"
-      - uses: ariga/setup-atlas@v0
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: ariga/setup-atlas@d1698c9cc991e6d65a02ce8bb9cd69fba6223cff # v0
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version-file: go.mod
       - run: go install ./cmd/atlas-action
