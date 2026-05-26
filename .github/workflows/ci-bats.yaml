@@ -12,11 +12,11 @@ jobs:
   bats:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: ariga/setup-atlas@v0
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea # v0
       - name: Setup Bats and bats libs
         id: setup-bats
-        uses: bats-core/bats-action@4.0.0
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # v4.0.0
       - name: Run bats tests
         shell: bash
         env:
