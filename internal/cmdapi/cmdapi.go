@@ -47,7 +47,7 @@ func Main(ctx context.Context, version, commit string) int {
 		if uerr := errors.Unwrap(err); uerr != nil {
 			err = uerr
 		}
-		act.Fatalf(err.Error())
+		act.Fatalf("%s", err.Error())
 	}
 	return 0
 }

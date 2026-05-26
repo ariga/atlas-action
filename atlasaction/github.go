@@ -102,7 +102,7 @@ func (*GitHub) GetType() atlasexec.TriggerType {
 
 // GetTriggerContext returns the context of the action.
 func (a *GitHub) GetTriggerContext(context.Context) (*TriggerContext, error) {
-	ctx, err := a.Action.Context()
+	ctx, err := a.Context()
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +311,7 @@ func (c *GitHubClient) CommentLint(ctx context.Context, tc *TriggerContext, r *a
 	}
 	switch files, err := c.ListPullRequestFiles(ctx, tc.PullRequest.Number); {
 	case err != nil:
-		tc.Act.Errorf("failed to list pull request files: %w", err)
+		tc.Act.Errorf("failed to list pull request files: %v", err)
 	default:
 		err = addSuggestions(tc.Act.GetInput("working-directory"), r, func(s *Suggestion) error {
 			// Add suggestion only if the file is part of the pull request.

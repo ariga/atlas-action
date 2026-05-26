@@ -74,10 +74,9 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run Go linters
-        uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc # v3
+        uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9
         with:
           args: --verbose --timeout=5m
-          skip-pkg-cache: true
   unit-tests:
     runs-on: ubuntu-latest
     steps:

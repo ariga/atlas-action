@@ -147,7 +147,7 @@ func (a *Actions) copilot(ctx context.Context, p *atlasexec.CopilotParams) (*Cop
 	defer log.Close()
 	go func() {
 		for scan.Scan() {
-			a.Infof(scan.Text())
+			a.Infof("%s", scan.Text())
 		}
 	}()
 	for st.Next() {
