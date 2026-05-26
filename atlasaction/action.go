@@ -654,7 +654,7 @@ func (a *Actions) MigrateTest(ctx context.Context) error {
 		return fmt.Errorf("`atlas migrate test` completed with errors:\n%s", err)
 	}
 	a.Infof("`atlas migrate test` completed successfully, no issues found")
-	a.Infof(result)
+	a.Infof("%s", result)
 	return nil
 }
 
@@ -1079,7 +1079,7 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 		return fmt.Errorf("`atlas schema test` completed with errors:\n%s", err)
 	}
 	a.Infof("`atlas schema test` completed successfully, no issues found")
-	a.Infof(result)
+	a.Infof("%s", result)
 	return nil
 }
 
@@ -1886,20 +1886,20 @@ func RenderTemplate(name string, data any, tc *TriggerContext) (string, error) {
 					return planLink
 				},
 				"stmtsDetected": func(plan *atlasexec.SchemaPlanFile) string {
-					switch l := len(plan.Stmts); {
-					case l == 0:
+					switch l := len(plan.Stmts); l {
+					case 0:
 						return "No statements detected"
-					case l == 1:
+					case 1:
 						return "1 new statement detected"
 					default:
 						return fmt.Sprintf("%d new statements detected", l)
 					}
 				},
 				"filesDetected": func(files []*atlasexec.FileReport) string {
-					switch l := len(files); {
-					case l == 0:
+					switch l := len(files); l {
+					case 0:
 						return "No migration files detected"
-					case l == 1:
+					case 1:
 						return "1 new migration file detected"
 					default:
 						return fmt.Sprintf("%d new migration files detected", l)
