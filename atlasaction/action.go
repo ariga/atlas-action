@@ -1133,7 +1133,15 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		case name != "" && nameFormat != "":
 			return errors.New(`inputs "name" and "name-format" are mutually exclusive`)
 		case name == "" && nameFormat == "":
-			nameFormat = defaultNameFormat(tc)
+			// returns the built-in plan name template used when the
+			// caller does not provide name or name-format, so Atlas can derive a
+			// deterministic name from the computed schema transition in a single plan call.
+			const hashTmpl = `{{ printf "%.8s" (base64url .FromHash) }}`
+			if tc.PullRequest != nil {
+				nameFormat = fmt.Sprintf("pr-%d-%s", tc.PullRequest.Number, hashTmpl)
+			} else {
+				nameFormat = fmt.Sprintf("ref-%.8s-%s", tc.Commit, hashTmpl)
+			}
 		}
 		if name != "" {
 			a.Infof("Schema plan does not exist, creating a new one with name %q", name)
@@ -1830,14 +1838,6 @@ func hashIter(hf migrate.HashFile) iter.Seq2[string, string] {
 
 func execTime(start, end time.Time) string {
 	return end.Sub(start).String()
-}
-
-func defaultNameFormat(tc *TriggerContext) string {
-	const hashTmpl = `{{ printf "%.8s" (base64url .FromHash) }}`
-	if tc.PullRequest != nil {
-		return fmt.Sprintf("pr-%d-%s", tc.PullRequest.Number, hashTmpl)
-	}
-	return fmt.Sprintf("ref-%.8s-%s", tc.Commit, hashTmpl)
 }
 
 func appliedStmts(a *atlasexec.MigrateApply) int {
