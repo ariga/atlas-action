@@ -1128,11 +1128,17 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		}
 	case len(planFiles) == 0:
 		name := a.GetInput("name")
-	runPlan:
-		// Dry run if the name is not provided.
-		dryRun := name == ""
-		if !dryRun {
+		nameFormat := a.GetInput("name-format")
+		switch {
+		case name != "" && nameFormat != "":
+			return errors.New(`inputs "name" and "name-format" are mutually exclusive`)
+		case name == "" && nameFormat == "":
+			nameFormat = defaultNameFormat(tc)
+		}
+		if name != "" {
 			a.Infof("Schema plan does not exist, creating a new one with name %q", name)
+		} else {
+			a.Infof("Schema plan does not exist, creating a new one with name format %q", nameFormat)
 		}
 		switch plan, err = a.Atlas.SchemaPlan(ctx, &atlasexec.SchemaPlanParams{
 			ConfigURL:  params.ConfigURL,
@@ -1147,8 +1153,8 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 			To:         params.To,
 			Repo:       params.Repo,
 			Name:       name,
-			DryRun:     dryRun,
-			Pending:    !dryRun,
+			NameFormat: nameFormat,
+			Pending:    true,
 			Directives: tc.PullRequest.AtlasDirectives(),
 		}); {
 		// The schema plan is already in sync.
@@ -1158,17 +1164,6 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 			return nil
 		case err != nil:
 			return fmt.Errorf("failed to save schema plan: %w", err)
-		case dryRun:
-			// RFC4648 base64url encoding without padding.
-			h := strings.NewReplacer("+", "-", "/", "_", "=", "").
-				Replace(plan.File.FromHash)
-			if tc.PullRequest == nil {
-				name = fmt.Sprintf("ref-%.8s-%.8s", tc.Commit, h)
-			} else {
-				name = fmt.Sprintf("pr-%d-%.8s", tc.PullRequest.Number, h)
-			}
-			// Save the plan with the generated name.
-			goto runPlan
 		}
 	default:
 		for _, f := range planFiles {
@@ -1779,15 +1774,16 @@ func (a *Actions) schemaPlanParams(
 	withParams ...func(*atlasexec.SchemaPlanParams),
 ) *atlasexec.SchemaPlanParams {
 	params := &atlasexec.SchemaPlanParams{
-		ConfigURL: a.GetConfigURL(),
-		Env:       a.GetInput("env"),
-		Vars:      a.GetVarsInput("vars"),
-		Schema:    a.GetArrayInput("schema"),
-		From:      a.GetArrayInput("from"),
-		To:        a.GetArrayInput("to"),
-		DevURL:    a.GetInput("dev-url"),
-		Repo:      a.GetInput("repo"),
-		Name:      a.GetInput("name"),
+		ConfigURL:  a.GetConfigURL(),
+		Env:        a.GetInput("env"),
+		Vars:       a.GetVarsInput("vars"),
+		Schema:     a.GetArrayInput("schema"),
+		From:       a.GetArrayInput("from"),
+		To:         a.GetArrayInput("to"),
+		DevURL:     a.GetInput("dev-url"),
+		Repo:       a.GetInput("repo"),
+		Name:       a.GetInput("name"),
+		NameFormat: a.GetInput("name-format"),
 	}
 	for _, f := range withParams {
 		f(params)
@@ -1834,6 +1830,14 @@ func hashIter(hf migrate.HashFile) iter.Seq2[string, string] {
 
 func execTime(start, end time.Time) string {
 	return end.Sub(start).String()
+}
+
+func defaultNameFormat(tc *TriggerContext) string {
+	const hashTmpl = `{{ printf "%.8s" (base64url .FromHash) }}`
+	if tc.PullRequest != nil {
+		return fmt.Sprintf("pr-%d-%s", tc.PullRequest.Number, hashTmpl)
+	}
+	return fmt.Sprintf("ref-%.8s-%s", tc.Commit, hashTmpl)
 }
 
 func appliedStmts(a *atlasexec.MigrateApply) int {

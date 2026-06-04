@@ -19,7 +19,11 @@ inputs:
       see: https://atlasgo.io/declarative/inspect#include-schemas
   name:
     description: |
-      The name of the plan. By default, Atlas will generate a name based on the schema changes.
+      The explicit name of the plan. Mutually exclusive with `name-format`.
+  name-format:
+    description: |
+      A template used by Atlas to generate the final plan name after the schema transition is computed.
+      Mutually exclusive with `name`.
   schema:
     description: |
       List of database schema(s). For example: `public`.

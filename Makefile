@@ -72,12 +72,28 @@ release:
 	if [ "$$LATEST_VERSION" = "$(VERSION)" ]; then \
 		echo "Latest release is already $(VERSION). No action needed."; \
 		if [ ! -z "$$GITHUB_OUTPUT" ]; then \
-			echo "status=skipped" >> "$$GITHUB_OUTPUT"; \
+			echo "status=exists" >> "$$GITHUB_OUTPUT"; \
 		fi; \
 	else \
 		echo "Creating new release for version $(VERSION)"; \
-		gh release create "$(VERSION)" \
-			--notes-start-tag="$$LATEST_VERSION" --generate-notes; \
+		git fetch --force --tags origin; \
+		if git rev-parse "$(VERSION)" >/dev/null 2>&1; then \
+			tag_commit=$$(git rev-list -n 1 "$(VERSION)"); \
+			if [ "$$tag_commit" != "$(FULL_COMMIT)" ]; then \
+				echo "Tag $(VERSION) already exists at $$tag_commit, expected $(FULL_COMMIT)." >&2; \
+				exit 1; \
+			fi; \
+		else \
+			git tag -a "$(VERSION)" "$(FULL_COMMIT)" -m "release: $(VERSION)"; \
+			git push origin "refs/tags/$(VERSION)"; \
+		fi; \
+		if [ "$$LATEST_VERSION" = "none" ]; then \
+			gh release create "$(VERSION)" --verify-tag --generate-notes; \
+		else \
+			gh release create "$(VERSION)" \
+				--verify-tag \
+				--notes-start-tag="$$LATEST_VERSION" --generate-notes; \
+		fi; \
 		echo "Updating major version tag to $(MAJOR_VER)"; \
 		git tag -fa "$(MAJOR_VER)" -m "release: update $(MAJOR_VER) tag"; \
 		git push origin "$(MAJOR_VER)" --force; \

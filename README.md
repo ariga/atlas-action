@@ -768,7 +768,9 @@ Plan a declarative migration for a schema transition.
   If that is also not set, Atlas defaults to the **last known state in the Atlas Registry** (use [`schema.repo`](https://atlasgo.io/hcl/config#env.schema.repo) from the config file).
 * `include` - List of glob patterns used to select which resources to keep in inspection
   see: https://atlasgo.io/declarative/inspect#include-schemas
-* `name` - The name of the plan. By default, Atlas will generate a name based on the schema changes.
+* `name` - The explicit name of the plan. Mutually exclusive with `name-format`.
+* `name-format` - A template used by Atlas to generate the final plan name after the schema transition is computed.
+  Mutually exclusive with `name`.
 * `schema` - List of database schema(s). For example: `public`.
 * `schema-name` - The name (slug) of the schema repository in Atlas Registry.
   Read more in Atlas website: https://atlasgo.io/registry.

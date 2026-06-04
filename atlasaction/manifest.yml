@@ -566,7 +566,13 @@ actions:
         type: string
         label: Plan name
         description: |
-          The name of the plan. By default, Atlas will generate a name based on the schema changes.
+          The explicit name of the plan. Mutually exclusive with `name-format`.
+      name-format:
+        type: string
+        label: Plan name format
+        description: |
+          A template used by Atlas to generate the final plan name after the schema transition is computed.
+          Mutually exclusive with `name`.
     outputs:
       link:
         description: Link to the schema plan on Atlas.

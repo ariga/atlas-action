@@ -2766,9 +2766,11 @@ func TestSchemaPlan(t *testing.T) {
 		planErr, approveErr error
 		planprams           *atlasexec.SchemaPlanParams
 		planFiles           []atlasexec.SchemaPlanFile
+		planCalls           int
 	)
 	m := &mockAtlas{
 		schemaPlan: func(_ context.Context, p *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+			planCalls++
 			planprams = p
 			// Common input checks
 			require.Equal(t, "file://atlas.hcl", p.ConfigURL)
@@ -2874,8 +2876,13 @@ func TestSchemaPlan(t *testing.T) {
 	// No existing plan
 	planErr = nil
 	planFiles = nil
+	planCalls = 0
 	act.resetOutputs()
 	require.NoError(t, newActs().SchemaPlan(ctx))
+	require.Equal(t, 1, planCalls, "expected a single schema plan call")
+	require.Equal(t, "", planprams.Name)
+	require.Equal(t, `pr-1-{{ printf "%.8s" (base64url .FromHash) }}`, planprams.NameFormat)
+	require.False(t, planprams.DryRun)
 	require.Equal(t, 1, act.summary, "Expected 1 summary")
 	require.Equal(t, 1, commentCounter, "Expected 1 comment generated")
 	require.Equal(t, 0, commentEdited, "No comment should be edited")
@@ -2886,8 +2893,10 @@ func TestSchemaPlan(t *testing.T) {
 	}, act.output, "expected output with plan URL")
 
 	act.trigger.PullRequest.Body = "Text\n/atlas:txmode: none\nText"
+	planCalls = 0
 	act.resetOutputs()
 	require.NoError(t, newActs().SchemaPlan(ctx))
+	require.Equal(t, 1, planCalls, "expected a single schema plan call")
 	require.Equal(t, 2, act.summary, "Expected 2 summary")
 	require.Equal(t, []string{"atlas:txmode: none"}, planprams.Directives)
 	act.trigger.PullRequest.Body = ""
@@ -2908,9 +2917,10 @@ func TestSchemaPlan(t *testing.T) {
 	// Check all logs output
 	require.Equal(t, `time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
 time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4lBdMk"
+time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name format \"pr-1-{{ printf \\\"%.8s\\\" (base64url .FromHash) }}\""
 time=NOW level=INFO msg="The current state is synced with the desired state, no changes to be made"
-time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-ufnTS7Nr\""
-time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name \"pr-1-ufnTS7Nr\""
+time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name format \"pr-1-{{ printf \\\"%.8s\\\" (base64url .FromHash) }}\""
+time=NOW level=INFO msg="Schema plan does not exist, creating a new one with name format \"pr-1-{{ printf \\\"%.8s\\\" (base64url .FromHash) }}\""
 time=NOW level=INFO msg="Schema plan already exists, linting the plan \"pr-1-Rl4lBdMk\""
 `, out.String())
 
@@ -2925,6 +2935,139 @@ time=NOW level=INFO msg="Schema plan already exists, linting the plan \"pr-1-Rl4
 		}, nil
 	}
 	require.EqualError(t, newActs().SchemaPlan(ctx), "`atlas schema plan` completed with lint errors:\ndestructive changes detected")
+}
+
+func TestSchemaPlanNameInputs(t *testing.T) {
+	newActs := func(t *testing.T, act *mockAction, atlas *mockAtlas) *atlasaction.Actions {
+		t.Helper()
+		act.trigger.Act = act
+		a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(atlas))
+		require.NoError(t, err)
+		return a
+	}
+	newAction := func(inputs map[string]string) *mockAction {
+		return &mockAction{
+			inputs: inputs,
+			trigger: &atlasaction.TriggerContext{
+				Repo:    "ariga/atlas-action",
+				RepoURL: "https://github.com/ariga/atlas-action",
+				Branch:  "feature/name-format",
+				Commit:  "deadbeefcafebabe",
+				SCMClient: func() (atlasaction.SCMClient, error) {
+					return &mockSCM{}, nil
+				},
+			},
+		}
+	}
+	newPlan := func() *atlasexec.SchemaPlan {
+		return &atlasexec.SchemaPlan{
+			File: &atlasexec.SchemaPlanFile{
+				Name:   "generated-plan",
+				URL:    "atlas://atlas-action/plans/generated-plan",
+				Link:   "https://gh.atlasgo.cloud/plan/generated-plan",
+				Status: "PENDING",
+			},
+			Lint: &atlasexec.SummaryReport{Files: []*atlasexec.FileReport{}},
+		}
+	}
+	t.Run("explicit name", func(t *testing.T) {
+		var (
+			calls  int
+			params *atlasexec.SchemaPlanParams
+		)
+		atlas := &mockAtlas{
+			schemaPlanList: func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+				return nil, nil
+			},
+			schemaPlan: func(_ context.Context, p *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+				calls++
+				params = p
+				return newPlan(), nil
+			},
+		}
+		act := newAction(map[string]string{
+			"config": "file://atlas.hcl",
+			"env":    "test",
+			"name":   "custom-plan",
+		})
+		require.NoError(t, newActs(t, act, atlas).SchemaPlan(context.Background()))
+		require.Equal(t, 1, calls)
+		require.Equal(t, "custom-plan", params.Name)
+		require.Equal(t, "", params.NameFormat)
+		require.False(t, params.DryRun)
+		require.True(t, params.Pending)
+	})
+	t.Run("explicit name format", func(t *testing.T) {
+		var (
+			calls  int
+			params *atlasexec.SchemaPlanParams
+		)
+		atlas := &mockAtlas{
+			schemaPlanList: func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+				return nil, nil
+			},
+			schemaPlan: func(_ context.Context, p *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+				calls++
+				params = p
+				return newPlan(), nil
+			},
+		}
+		act := newAction(map[string]string{
+			"config":      "file://atlas.hcl",
+			"env":         "test",
+			"name-format": `plan-{{ printf "%.8s" (base64url .FromHash) }}`,
+		})
+		require.NoError(t, newActs(t, act, atlas).SchemaPlan(context.Background()))
+		require.Equal(t, 1, calls)
+		require.Equal(t, "", params.Name)
+		require.Equal(t, `plan-{{ printf "%.8s" (base64url .FromHash) }}`, params.NameFormat)
+		require.False(t, params.DryRun)
+		require.True(t, params.Pending)
+	})
+	t.Run("default branch name format", func(t *testing.T) {
+		var (
+			calls  int
+			params *atlasexec.SchemaPlanParams
+		)
+		atlas := &mockAtlas{
+			schemaPlanList: func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+				return nil, nil
+			},
+			schemaPlan: func(_ context.Context, p *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+				calls++
+				params = p
+				return newPlan(), nil
+			},
+		}
+		act := newAction(map[string]string{
+			"config": "file://atlas.hcl",
+			"env":    "test",
+		})
+		require.NoError(t, newActs(t, act, atlas).SchemaPlan(context.Background()))
+		require.Equal(t, 1, calls)
+		require.Equal(t, "", params.Name)
+		require.Equal(t, `ref-deadbeef-{{ printf "%.8s" (base64url .FromHash) }}`, params.NameFormat)
+		require.False(t, params.DryRun)
+		require.True(t, params.Pending)
+	})
+	t.Run("name and name format are mutually exclusive", func(t *testing.T) {
+		atlas := &mockAtlas{
+			schemaPlanList: func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+				return nil, nil
+			},
+			schemaPlan: func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
+				t.Fatal("schemaPlan should not be called")
+				return nil, nil
+			},
+		}
+		act := newAction(map[string]string{
+			"config":      "file://atlas.hcl",
+			"env":         "test",
+			"name":        "custom-plan",
+			"name-format": `plan-{{ printf "%.8s" (base64url .FromHash) }}`,
+		})
+		require.EqualError(t, newActs(t, act, atlas).SchemaPlan(context.Background()), `inputs "name" and "name-format" are mutually exclusive`)
+	})
 }
 
 func TestSchemaPlanApprove(t *testing.T) {
