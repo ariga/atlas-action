@@ -514,7 +514,7 @@ jobs:
       - uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea # v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
-          version: ${{ matrix.test.atlas }}
+          version: ${{ matrix.test.version }}
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
