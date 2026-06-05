@@ -241,15 +241,8 @@
     {
       "type": "string",
       "label": "Plan name",
-      "helpMarkDown": "The explicit name of the plan. Mutually exclusive with `name-format`.\n",
+      "helpMarkDown": "The explicit name of the plan.\n",
       "name": "name",
-      "visibleRule": "action == schema plan"
-    },
-    {
-      "type": "string",
-      "label": "Plan name format",
-      "helpMarkDown": "A template used by Atlas to generate the final plan name after the schema transition is computed.\nMutually exclusive with `name`.\n",
-      "name": "name_format",
       "visibleRule": "action == schema plan"
     },
     {

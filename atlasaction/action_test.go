@@ -2997,33 +2997,6 @@ func TestSchemaPlanNameInputs(t *testing.T) {
 		require.False(t, params.DryRun)
 		require.True(t, params.Pending)
 	})
-	t.Run("explicit name format", func(t *testing.T) {
-		var (
-			calls  int
-			params *atlasexec.SchemaPlanParams
-		)
-		atlas := &mockAtlas{
-			schemaPlanList: func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
-				return nil, nil
-			},
-			schemaPlan: func(_ context.Context, p *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
-				calls++
-				params = p
-				return newPlan(), nil
-			},
-		}
-		act := newAction(map[string]string{
-			"config":      "file://atlas.hcl",
-			"env":         "test",
-			"name-format": `plan-{{ printf "%.8s" (base64url .FromHash) }}`,
-		})
-		require.NoError(t, newActs(t, act, atlas).SchemaPlan(context.Background()))
-		require.Equal(t, 1, calls)
-		require.Equal(t, "", params.Name)
-		require.Equal(t, `plan-{{ printf "%.8s" (base64url .FromHash) }}`, params.NameFormat)
-		require.False(t, params.DryRun)
-		require.True(t, params.Pending)
-	})
 	t.Run("default branch name format", func(t *testing.T) {
 		var (
 			calls  int
@@ -3049,24 +3022,6 @@ func TestSchemaPlanNameInputs(t *testing.T) {
 		require.Equal(t, `ref-deadbeef-{{ printf "%.8s" (base64url .FromHash) }}`, params.NameFormat)
 		require.False(t, params.DryRun)
 		require.True(t, params.Pending)
-	})
-	t.Run("name and name format are mutually exclusive", func(t *testing.T) {
-		atlas := &mockAtlas{
-			schemaPlanList: func(context.Context, *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
-				return nil, nil
-			},
-			schemaPlan: func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error) {
-				t.Fatal("schemaPlan should not be called")
-				return nil, nil
-			},
-		}
-		act := newAction(map[string]string{
-			"config":      "file://atlas.hcl",
-			"env":         "test",
-			"name":        "custom-plan",
-			"name-format": `plan-{{ printf "%.8s" (base64url .FromHash) }}`,
-		})
-		require.EqualError(t, newActs(t, act, atlas).SchemaPlan(context.Background()), `inputs "name" and "name-format" are mutually exclusive`)
 	})
 }
 

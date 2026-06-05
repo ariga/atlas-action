@@ -1128,14 +1128,8 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		}
 	case len(planFiles) == 0:
 		name := a.GetInput("name")
-		nameFormat := a.GetInput("name-format")
-		switch {
-		case name != "" && nameFormat != "":
-			return errors.New(`inputs "name" and "name-format" are mutually exclusive`)
-		case name == "" && nameFormat == "":
-			// returns the built-in plan name template used when the
-			// caller does not provide name or name-format, so Atlas can derive a
-			// deterministic name from the computed schema transition in a single plan call.
+		nameFormat := ""
+		if name == "" {
 			const hashTmpl = `{{ printf "%.8s" (base64url .FromHash) }}`
 			if tc.PullRequest != nil {
 				nameFormat = fmt.Sprintf("pr-%d-%s", tc.PullRequest.Number, hashTmpl)
@@ -1782,16 +1776,15 @@ func (a *Actions) schemaPlanParams(
 	withParams ...func(*atlasexec.SchemaPlanParams),
 ) *atlasexec.SchemaPlanParams {
 	params := &atlasexec.SchemaPlanParams{
-		ConfigURL:  a.GetConfigURL(),
-		Env:        a.GetInput("env"),
-		Vars:       a.GetVarsInput("vars"),
-		Schema:     a.GetArrayInput("schema"),
-		From:       a.GetArrayInput("from"),
-		To:         a.GetArrayInput("to"),
-		DevURL:     a.GetInput("dev-url"),
-		Repo:       a.GetInput("repo"),
-		Name:       a.GetInput("name"),
-		NameFormat: a.GetInput("name-format"),
+		ConfigURL: a.GetConfigURL(),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		Schema:    a.GetArrayInput("schema"),
+		From:      a.GetArrayInput("from"),
+		To:        a.GetArrayInput("to"),
+		DevURL:    a.GetInput("dev-url"),
+		Repo:      a.GetInput("repo"),
+		Name:      a.GetInput("name"),
 	}
 	for _, f := range withParams {
 		f(params)
