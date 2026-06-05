@@ -30,7 +30,8 @@
   },
   "homepage": "https://github.com/ariga/atlas#readme",
   "devDependencies": {
-    "@vercel/ncc": "0.38.1",
+    "@vercel/ncc": "^0.38.4",
+    "eslint": "8.57.1",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-github": "^4.3.6",
     "eslint-plugin-import": "^2.26.0",
@@ -39,8 +40,7 @@
     "prettier": "^2.6.2"
   },
   "dependencies": {
-    "@actions/core": "^1.6.0",
-    "@actions/tool-cache": "^1.7.2",
-    "@octokit/rest": "^19.0.4"
+    "@actions/core": "^1.11.1",
+    "@actions/tool-cache": "^2.0.2"
   }
 }

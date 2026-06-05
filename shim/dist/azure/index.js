@@ -1,7 +1,7 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 81:
+/***/ 317:
 /***/ ((module) => {
 
 "use strict";
@@ -9,7 +9,7 @@ module.exports = require("child_process");
 
 /***/ }),
 
-/***/ 147:
+/***/ 896:
 /***/ ((module) => {
 
 "use strict";
@@ -17,7 +17,7 @@ module.exports = require("fs");
 
 /***/ }),
 
-/***/ 37:
+/***/ 857:
 /***/ ((module) => {
 
 "use strict";
@@ -25,7 +25,7 @@ module.exports = require("os");
 
 /***/ }),
 
-/***/ 17:
+/***/ 928:
 /***/ ((module) => {
 
 "use strict";
@@ -72,16 +72,14 @@ module.exports = require("path");
 /******/ 	
 /************************************************************************/
 var __webpack_exports__ = {};
-// This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
-(() => {
 // Copyright 2021-present The Atlas Authors. All rights reserved.
 // This source code is licensed under the Apache 2.0 license found
 // in the LICENSE file in the root directory of this source tree.
 
-const childProcess = __nccwpck_require__(81);
-const fs = __nccwpck_require__(147);
-const os = __nccwpck_require__(37);
-const path = __nccwpck_require__(17);
+const childProcess = __nccwpck_require__(317);
+const fs = __nccwpck_require__(896);
+const os = __nccwpck_require__(857);
+const path = __nccwpck_require__(928);
 
 // The action input uses spaces (e.g., "schema plan approve") instead of slashes
 // due to limitations in Azure DevOps task.json's visibleRule field,
@@ -165,8 +163,6 @@ if (status !== 0 || error) {
   // Always exit with an error code to fail the action
   process.exit(status || 1);
 }
-
-})();
 
 module.exports = __webpack_exports__;
 /******/ })()
