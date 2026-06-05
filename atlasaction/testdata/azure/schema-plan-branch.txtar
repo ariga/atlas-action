@@ -15,12 +15,12 @@ env BUILD_REQUESTEDFOR=Test User
 env SYSTEM_ACCESSTOKEN=test-token
 
 atlas-action --action=schema/plan
-stdout 'Schema plan does not exist, creating a new one with name "ref-abc123de-3RRRcLHF"'
+stdout 'creating a new one with name format'
 
 cmp stdout output-expected.txt
 
 -- output-expected.txt --
-Schema plan does not exist, creating a new one with name "ref-abc123de-3RRRcLHF"
+Schema plan does not exist, creating a new one with name format "ref-abc123de-{{ printf \"%.8s\" (base64url .FromHash) }}"
 ##vso[task.setvariable isOutput=true;isSecret=false;variable=link;]http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511
 ##vso[task.setvariable isOutput=true;isSecret=false;variable=plan;]atlas://app/plans/20241010143904
 ##vso[task.setvariable isOutput=true;isSecret=false;variable=status;]PENDING
@@ -29,53 +29,8 @@ schema plan list --format {{ json . }} --context {"repo":"test-repo","commit":"a
 -- schema-plan-comment/1/stdout --
 []
 -- schema-plan-comment/2/args --
-schema plan --format {{ json . }} --context {"repo":"test-repo","commit":"abc123def456","url":"https://dev.azure.com/testorg/testproject/_git/test-repo","username":"Test","scmType":"AZURE_DEVOPS"} --dry-run
+schema plan --format {{ json . }} --context {"repo":"test-repo","commit":"abc123def456","url":"https://dev.azure.com/testorg/testproject/_git/test-repo","username":"Test","scmType":"AZURE_DEVOPS"} --name-format ref-abc123de-{{ printf "%.8s" (base64url .FromHash) }} --pending --auto-approve
 -- schema-plan-comment/2/stdout --
-{
-    "Repo": "app",
-    "Lint": {
-        "Steps": [
-            {
-                "Name": "Analyze 20241010143904.sql",
-                "Text": "0 reports were found in analysis",
-                "Result": {
-                    "Name": "20241010143904.sql",
-                    "Text": "-- Create \"users\" table\nCREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);\n"
-                }
-            }
-        ],
-        "Files": [
-            {
-                "Name": "20241010143904.sql",
-                "Text": "-- Create \"users\" table\nCREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);\n"
-            }
-        ]
-    },
-    "File": {
-        "Name": "20241010143904",
-        "FromHash": "3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=",
-        "FromDesc": "file://schema.lt.hcl",
-        "ToHash": "6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=",
-        "ToDesc": "file://schema1.lt.hcl",
-        "Migration": "-- Create \"users\" table\nCREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);\n",
-        "Stmts": [
-            {
-                "Pos": 25,
-                "Text": "CREATE TABLE [users] (\n  [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,\n  [name] nvarchar(255) NOT NULL\n);",
-                "Comments": [
-                    "-- Create \"users\" table\n"
-                ]
-            }
-        ],
-        "URL": "atlas://app/plans/20241010143904",
-        "Link": "http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511",
-        "Status": "PENDING"
-    }
-}
-
--- schema-plan-comment/3/args --
-schema plan --format {{ json . }} --context {"repo":"test-repo","commit":"abc123def456","url":"https://dev.azure.com/testorg/testproject/_git/test-repo","username":"Test","scmType":"AZURE_DEVOPS"} --name ref-abc123de-3RRRcLHF --pending --auto-approve
--- schema-plan-comment/3/stdout --
 {
     "Repo": "app",
     "Lint": {
