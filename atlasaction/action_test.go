@@ -367,8 +367,18 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 		tt := setup(t)
 		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
-		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
-		tt.cloud.AddPlan("pr-0-r1cgcsfo-2", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
+		const migration = `create table "t1" ("id" int null);`
+		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=", migration)
+		tt.cloud.AddPlan("pr-0-r1cgcsfo-2", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=", migration)
+		require.NoError(t, tt.newActs(t).SchemaApply(context.Background()))
+	})
+
+	t.Run("generating an approval plan when having > 1 pending plan with different migration content", func(t *testing.T) {
+		tt := setup(t)
+		tt.setInput("lint-review", "ALWAYS")
+		tt.setInput("to", "atlas://example")
+		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=", `create table "t1" ("id" int null);`)
+		tt.cloud.AddPlan("pr-0-r1cgcsfo-2", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=", `create table "t1" ("id" int not null);`)
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "multiple pre-planned migrations were found in the registry for this schema transition")
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "atlas://repo/schema/example/plans/pr-0-r1cgcsfo")
 	})
@@ -456,6 +466,7 @@ type (
 		Status     string `json:"status"`
 		FromHash   string `json:"fromHash"`
 		ToHash     string `json:"toHash"`
+		Migration  string `json:"migration"`
 		Link       string `json:"link"`
 		URL        string `json:"url"`
 	}
@@ -479,12 +490,16 @@ func (m *mockAtlasCloud) AddSchema(name, schema string) {
 	}
 }
 
-func (m *mockAtlasCloud) AddPlan(name, schemaSlug, status, fromHash, toHash string) {
+func (m *mockAtlasCloud) AddPlan(name, schemaSlug, status, fromHash, toHash string, migration ...string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.planCount++
 	link := fmt.Sprintf("https://a8m.atlasgo.cloud/schemas/%d/plans/%d", m.schemaCount, m.planCount)
 	url := fmt.Sprintf("atlas://repo/schema/%s/plans/%s", schemaSlug, name)
+	content := ""
+	if len(migration) > 0 {
+		content = migration[0]
+	}
 	plan := Plan{
 		ID:         m.planCount,
 		Name:       name,
@@ -492,6 +507,7 @@ func (m *mockAtlasCloud) AddPlan(name, schemaSlug, status, fromHash, toHash stri
 		Status:     status,
 		FromHash:   fromHash,
 		ToHash:     toHash,
+		Migration:  content,
 		Link:       link,
 		URL:        url,
 	}
