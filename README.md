@@ -10,23 +10,23 @@ To learn more about the recommended way to build workflows, read our guide on
 | Action                                                                        | Description                                                                         |
 |-------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
 | [ariga/setup-atlas](#arigasetup-atlas)                                        | Setup the Atlas CLI and optionally login to Atlas Cloud                             |
-| [ariga/atlas-action/copilot](#arigaatlas-actioncopilot) | Talk to Atlas Copilot. |
-| [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply) | Applies a migration directory on a target database |
-| [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase) | Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch. |
-| [ariga/atlas-action/migrate/hash](#arigaatlas-actionmigratehash) | Automatically generate a hash of the schema migrations directory, and commit it to the migration directory. |
-| [ariga/atlas-action/migrate/diff](#arigaatlas-actionmigratediff) | Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory. |
-| [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown) | Reverts deployed migration files on a target database |
-| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint) | CI for database schema changes with Atlas |
-| [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush) | Push the current version of your migration directory to Atlas Cloud. |
-| [ariga/atlas-action/migrate/set](#arigaatlas-actionmigrateset) | Edits the revision table to consider all migrations up to and including the given version to be applied. |
-| [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest) | CI for database schema changes with Atlas |
-| [ariga/atlas-action/monitor/schema](#arigaatlas-actionmonitorschema) | Sync the database schema to Atlas Cloud. |
-| [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply) | Applies schema changes to a target database |
-| [ariga/atlas-action/schema/lint](#arigaatlas-actionschemalint) | Lint database schema with Atlas |
-| [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan) | Plan a declarative migration to move from the current state to the desired state |
-| [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a migration plan by its URL |
-| [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush) | Push a schema version with an optional tag to Atlas |
-| [ariga/atlas-action/schema/test](#arigaatlas-actionschematest) | Run schema tests against the desired schema |
+| [ariga/atlas-action/copilot](#arigaatlas-actioncopilot)                       | Talk to Atlas Copilot.                                                              |
+| [ariga/atlas-action/migrate/apply](#arigaatlas-actionmigrateapply)            | Applies a migration directory on a target database                                  |
+| [ariga/atlas-action/migrate/autorebase](#arigaatlas-actionmigrateautorebase)  | Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch. |
+| [ariga/atlas-action/migrate/hash](#arigaatlas-actionmigratehash)              | Automatically generate a hash of the schema migrations directory, and commit it to the migration directory. |
+| [ariga/atlas-action/migrate/diff](#arigaatlas-actionmigratediff)              | Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory. |
+| [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Reverts deployed migration files on a target database                               |
+| [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)              | CI for database schema changes with Atlas                                           |
+| [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)              | Push the current version of your migration directory to Atlas Cloud.                |
+| [ariga/atlas-action/migrate/set](#arigaatlas-actionmigrateset)                | Edits the revision table to consider all migrations up to and including the given version to be applied. |
+| [ariga/atlas-action/migrate/test](#arigaatlas-actionmigratetest)              | CI for database schema changes with Atlas                                           |
+| [ariga/atlas-action/monitor/schema](#arigaatlas-actionmonitorschema)          | Sync the database schema to Atlas Cloud.                                            |
+| [ariga/atlas-action/schema/apply](#arigaatlas-actionschemaapply)              | Applies schema changes to a target database                                         |
+| [ariga/atlas-action/schema/lint](#arigaatlas-actionschemalint)                | Lint database schema with Atlas                                                     |
+| [ariga/atlas-action/schema/plan](#arigaatlas-actionschemaplan)                | Plan a declarative migration to move from the current state to the desired state    |
+| [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a migration plan by its URL                                                 |
+| [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema version with an optional tag to Atlas                                 |
+| [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Run schema tests against the desired schema                                         |
 
 ## Examples
 
@@ -373,7 +373,6 @@ All inputs are optional as they may be specified in the Atlas configuration file
     dir: 'file://migrations'
     version: '20230922132634'
 ```
-
 ### `ariga/atlas-action/migrate/autorebase`
 
 Automatically resolves `atlas.sum` conflicts and rebases the migration directory onto the target branch. 
@@ -522,7 +521,6 @@ jobs:
           url: mysql://root:root@localhost:3306/app
           version: ${{ steps.rebase.outputs.latest_version }}
 ```
-
 ### `ariga/atlas-action/migrate/hash`
 
 Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.
@@ -768,7 +766,7 @@ Plan a declarative migration for a schema transition.
   If that is also not set, Atlas defaults to the **last known state in the Atlas Registry** (use [`schema.repo`](https://atlasgo.io/hcl/config#env.schema.repo) from the config file).
 * `include` - List of glob patterns used to select which resources to keep in inspection
   see: https://atlasgo.io/declarative/inspect#include-schemas
-* `name` - The name of the plan. By default, Atlas will generate a name based on the schema changes.
+* `name` - The explicit name of the plan.
 * `schema` - List of database schema(s). For example: `public`.
 * `schema-name` - The name (slug) of the schema repository in Atlas Registry.
   Read more in Atlas website: https://atlasgo.io/registry.

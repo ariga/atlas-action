@@ -3,7 +3,7 @@ module ariga.io/atlas-action
 go 1.26.3
 
 require (
-	ariga.io/atlas v1.1.1-0.20260227074143-2bb7a098411f
+	ariga.io/atlas v1.2.2-0.20260604053807-7a791d2f70d1
 	github.com/alecthomas/kong v0.8.0
 	github.com/fatih/color v1.17.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
@@ -38,9 +38,9 @@ require (
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/zclconf/go-cty v1.16.3 // indirect
 	github.com/zclconf/go-cty-yaml v1.1.0 // indirect
-	golang.org/x/mod v0.26.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
-	golang.org/x/tools v0.35.0 // indirect
+	golang.org/x/mod v0.35.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/tools v0.44.0 // indirect
 )

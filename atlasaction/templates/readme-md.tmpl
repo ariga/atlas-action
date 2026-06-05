@@ -12,8 +12,39 @@ To learn more about the recommended way to build workflows, read our guide on
 | Action                                                                        | Description                                                                         |
 |-------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
 | [ariga/setup-atlas](#arigasetup-atlas)                                        | Setup the Atlas CLI and optionally login to Atlas Cloud                             |
-{{- range .Actions }}
-| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- with action . "copilot" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "migrate/apply" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "migrate/autorebase" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "migrate/hash" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "migrate/diff" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "migrate/down" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "migrate/lint" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "migrate/push" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "migrate/set" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "migrate/test" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "monitor/schema" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "schema/apply" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "schema/lint" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "schema/plan" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "schema/plan/approve" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "schema/push" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "schema/test" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
 {{- end }}
 
 ## Examples
@@ -251,6 +282,28 @@ Run schema migration tests. Read more in [Atlas website](https://atlasgo.io/test
 All inputs are optional as they may be specified in the Atlas configuration file.
 
 {{ template "readme/inputs" . }}
+{{- end }}
+{{- with action . "migrate/set" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Edits the revision table to consider all migrations up to and including the given version to be applied.
+This command is usually used after manually making changes to the managed database.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+
+#### Example usage
+
+```yaml
+- uses: ariga/atlas-action/migrate/set@v1
+  with:
+    url: 'mysql://root:pass@localhost:3306/dev'
+    dir: 'file://migrations'
+    version: '20230922132634'
+```
 {{- end }}
 {{- with action . "migrate/autorebase" }}
 ### `ariga/atlas-action/{{ .ID }}`
@@ -627,7 +680,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      # This action builds the binary locally
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{$oc}} secrets.ATLAS_TOKEN {{$cc}}
+      # This action builds the binary locally, 
+      # this action won't replace `ariga/setup-atlas` action. You need both.
       - uses: ariga/atlas-action/setup@<commit-sha>
       # Pin other actions without `atlas-action/setup` won't work
       - uses: ariga/atlas-action/migrate/apply@<commit-sha>

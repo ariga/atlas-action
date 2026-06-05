@@ -1128,11 +1128,19 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 		}
 	case len(planFiles) == 0:
 		name := a.GetInput("name")
-	runPlan:
-		// Dry run if the name is not provided.
-		dryRun := name == ""
-		if !dryRun {
+		nameFormat := ""
+		if name == "" {
+			const hashTmpl = `{{ printf "%.8s" (base64url .FromHash) }}`
+			if tc.PullRequest != nil {
+				nameFormat = fmt.Sprintf("pr-%d-%s", tc.PullRequest.Number, hashTmpl)
+			} else {
+				nameFormat = fmt.Sprintf("ref-%.8s-%s", tc.Commit, hashTmpl)
+			}
+		}
+		if name != "" {
 			a.Infof("Schema plan does not exist, creating a new one with name %q", name)
+		} else {
+			a.Infof("Schema plan does not exist, creating a new one with name format %q", nameFormat)
 		}
 		switch plan, err = a.Atlas.SchemaPlan(ctx, &atlasexec.SchemaPlanParams{
 			ConfigURL:  params.ConfigURL,
@@ -1147,8 +1155,8 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 			To:         params.To,
 			Repo:       params.Repo,
 			Name:       name,
-			DryRun:     dryRun,
-			Pending:    !dryRun,
+			NameFormat: nameFormat,
+			Pending:    true,
 			Directives: tc.PullRequest.AtlasDirectives(),
 		}); {
 		// The schema plan is already in sync.
@@ -1158,17 +1166,6 @@ func (a *Actions) SchemaPlan(ctx context.Context) error {
 			return nil
 		case err != nil:
 			return fmt.Errorf("failed to save schema plan: %w", err)
-		case dryRun:
-			// RFC4648 base64url encoding without padding.
-			h := strings.NewReplacer("+", "-", "/", "_", "=", "").
-				Replace(plan.File.FromHash)
-			if tc.PullRequest == nil {
-				name = fmt.Sprintf("ref-%.8s-%.8s", tc.Commit, h)
-			} else {
-				name = fmt.Sprintf("pr-%d-%.8s", tc.PullRequest.Number, h)
-			}
-			// Save the plan with the generated name.
-			goto runPlan
 		}
 	default:
 		for _, f := range planFiles {

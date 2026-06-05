@@ -241,7 +241,7 @@
     {
       "type": "string",
       "label": "Plan name",
-      "helpMarkDown": "The name of the plan. By default, Atlas will generate a name based on the schema changes.\n",
+      "helpMarkDown": "The explicit name of the plan.\n",
       "name": "name",
       "visibleRule": "action == schema plan"
     },

@@ -566,7 +566,7 @@ actions:
         type: string
         label: Plan name
         description: |
-          The name of the plan. By default, Atlas will generate a name based on the schema changes.
+          The explicit name of the plan.
     outputs:
       link:
         description: Link to the schema plan on Atlas.
