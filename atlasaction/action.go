@@ -1543,8 +1543,6 @@ func (a *Actions) CloudRepoCreate(ctx context.Context) error {
 	return nil
 }
 
-
-
 func (a *Actions) cloudClient(ctx context.Context, tokenInput string) (CloudClient, error) {
 	t := a.GetInput(tokenInput)
 	if t == "" {
