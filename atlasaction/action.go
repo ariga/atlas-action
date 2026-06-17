@@ -149,6 +149,8 @@ type (
 		SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error)
 		// WhoAmI runs the `whoami` command.
 		WhoAmI(context.Context, *atlasexec.WhoAmIParams) (*atlasexec.WhoAmI, error)
+		// CloudRepoCreate runs the 'cloud repo create' command.
+		CloudRepoCreate(ctx context.Context, params *atlasexec.CloudRepoCreateParams) (*atlasexec.CloudRepo, error)
 		// SetStderr sets the standard error output for the client.
 		SetStderr(io.Writer)
 	}
@@ -353,6 +355,8 @@ const (
 	CmdMonitorSchema = "monitor/schema"
 	// Copilot Commands
 	CmdCopilot = "copilot"
+	// Misc Commands
+	CmdCloudRepoCreate = "create-repo"
 )
 
 // Run runs the action based on the command name.
@@ -398,6 +402,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MonitorSchema(ctx)
 	case CmdCopilot:
 		return a.Copilot(ctx)
+	case CmdCloudRepoCreate:
+		return a.CloudRepoCreate(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", act)
 	}
@@ -1516,6 +1522,24 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 	}
 	a.SetOutput("url", u)
 	a.Infof(`"atlas monitor schema" completed successfully, see the schema in Atlas Cloud: %s`, u)
+	return nil
+}
+
+// CloudRepoCreate runs the Action for "ariga/atlas-action/create-repo".
+func (a *Actions) CloudRepoCreate(ctx context.Context) error {
+	params := &atlasexec.CloudRepoCreateParams{
+		Name:         a.GetInput("name"),
+		Type:         a.GetInput("type"),
+		Driver:       a.GetInput("driver"),
+		Description:  a.GetInput("description"),
+		SkipIfExists: true,
+	}
+	rsp, err := a.Atlas.CloudRepoCreate(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to create the repo: %w", err)
+	}
+	a.SetOutput("url", rsp.URL)
+	a.Infof(`"atlas create repo" completed successfully, see the repo in Atlas Cloud: %s`, rsp.URL)
 	return nil
 }
 
