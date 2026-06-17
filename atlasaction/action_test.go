@@ -3766,7 +3766,6 @@ func TestCloudRepoCreate(t *testing.T) {
 				"name":        "payments",
 				"type":        "MIGRATION",
 				"driver":      "mysql",
-				"description": "Payments service migrations",
 			},
 		}
 		atlas := &mockAtlas{
@@ -3787,8 +3786,6 @@ func TestCloudRepoCreate(t *testing.T) {
 		require.Equal(t, "payments", capturedParams.Name)
 		require.Equal(t, "MIGRATION", capturedParams.Type)
 		require.Equal(t, "mysql", capturedParams.Driver)
-		require.Equal(t, "Payments service migrations", capturedParams.Description)
-		require.True(t, capturedParams.SkipIfExists)
 		require.Equal(t, "https://gh.atlasgo.cloud/repos/payments", act.output["url"])
 	})
 	t.Run("atlas-error", func(t *testing.T) {

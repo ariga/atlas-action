@@ -1531,8 +1531,6 @@ func (a *Actions) CloudRepoCreate(ctx context.Context) error {
 		Name:         a.GetInput("name"),
 		Type:         a.GetInput("type"),
 		Driver:       a.GetInput("driver"),
-		Description:  a.GetInput("description"),
-		SkipIfExists: true,
 	}
 	rsp, err := a.Atlas.CloudRepoCreate(ctx, params)
 	if err != nil {
