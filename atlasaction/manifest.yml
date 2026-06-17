@@ -109,6 +109,30 @@ actions:
         label: Generate tests
         description: Generate atlas tests for the schema changes.
         default: false
+  - id: create-repo
+    name: Create Repository
+    description: Create a new repository in Atlas Cloud.
+    inputs:
+      driver:
+        type: string
+        label: Database driver
+        description: The database driver to use for the repository.
+        required: true
+      type:
+        type: string
+        label: Repository type
+        description: The type of the repository, either "migration" or "schema".
+        options: [migration, schema]
+        required: true
+      name:
+        type: string        
+        label: Repository name
+        description: The name of the repository to create in Atlas Cloud.
+        required: true
+      description:
+        type: string
+        label: Repository description
+        description: The description of the repository to create in Atlas Cloud.
   - id: migrate/apply
     name: Migrate Apply
     description: Applies a migration directory on a target database

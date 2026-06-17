@@ -653,6 +653,7 @@ type mockAtlas struct {
 	schemaPlanLint    func(context.Context, *atlasexec.SchemaPlanLintParams) (*atlasexec.SchemaPlan, error)
 	schemaPlanApprove func(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 	whoAmI            func(context.Context, *atlasexec.WhoAmIParams) (*atlasexec.WhoAmI, error)
+	cloudRepoCreate   func(ctx context.Context, params *atlasexec.CloudRepoCreateParams) (*atlasexec.CloudRepo, error)
 	schemaLint        func(context.Context, *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error)
 }
 
@@ -777,6 +778,11 @@ func (m *mockAtlas) MigrateDown(ctx context.Context, params *atlasexec.MigrateDo
 // WhoAmI implements AtlasExec.
 func (m *mockAtlas) WhoAmI(ctx context.Context, params *atlasexec.WhoAmIParams) (*atlasexec.WhoAmI, error) {
 	return m.whoAmI(ctx, params)
+}
+
+// CloudRepoCreate implements AtlasExec.
+func (m *mockAtlas) CloudRepoCreate(ctx context.Context, params *atlasexec.CloudRepoCreateParams) (*atlasexec.CloudRepo, error) {
+	return m.cloudRepoCreate(ctx, params)
 }
 
 func TestMigratePush(t *testing.T) {
@@ -3743,5 +3749,63 @@ func TestSchemaLint(t *testing.T) {
 		require.Equal(t, 1, postCount)
 		require.Equal(t, 0, patchCount)
 		require.Equal(t, 1, deleteCount)
+	})
+}
+
+func TestCloudRepoCreate(t *testing.T) {
+	newActs := func(t *testing.T, act *mockAction, atlas *mockAtlas) *atlasaction.Actions {
+		t.Helper()
+		a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(atlas))
+		require.NoError(t, err)
+		return a
+	}
+	t.Run("success", func(t *testing.T) {
+		var capturedParams *atlasexec.CloudRepoCreateParams
+		act := &mockAction{
+			inputs: map[string]string{
+				"name":        "payments",
+				"type":        "MIGRATION",
+				"driver":      "mysql",
+				"description": "Payments service migrations",
+			},
+		}
+		atlas := &mockAtlas{
+			cloudRepoCreate: func(_ context.Context, p *atlasexec.CloudRepoCreateParams) (*atlasexec.CloudRepo, error) {
+				capturedParams = p
+				return &atlasexec.CloudRepo{
+					Slug:   "payments",
+					Title:  "payments",
+					Type:   "MIGRATION",
+					Driver: "mysql",
+					URL:    "https://gh.atlasgo.cloud/repos/payments",
+				}, nil
+			},
+		}
+		err := newActs(t, act, atlas).CloudRepoCreate(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, capturedParams)
+		require.Equal(t, "payments", capturedParams.Name)
+		require.Equal(t, "MIGRATION", capturedParams.Type)
+		require.Equal(t, "mysql", capturedParams.Driver)
+		require.Equal(t, "Payments service migrations", capturedParams.Description)
+		require.True(t, capturedParams.SkipIfExists)
+		require.Equal(t, "https://gh.atlasgo.cloud/repos/payments", act.output["url"])
+	})
+	t.Run("atlas-error", func(t *testing.T) {
+		act := &mockAction{
+			inputs: map[string]string{
+				"name":   "payments",
+				"type":   "MIGRATION",
+				"driver": "mysql",
+			},
+		}
+		atlas := &mockAtlas{
+			cloudRepoCreate: func(_ context.Context, _ *atlasexec.CloudRepoCreateParams) (*atlasexec.CloudRepo, error) {
+				return nil, errors.New("atlas: repo creation failed")
+			},
+		}
+		err := newActs(t, act, atlas).CloudRepoCreate(context.Background())
+		require.ErrorContains(t, err, "failed to create the repo")
+		require.ErrorContains(t, err, "atlas: repo creation failed")
 	})
 }
