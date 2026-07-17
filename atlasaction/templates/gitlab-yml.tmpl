@@ -20,7 +20,7 @@ spec:
 {{- end }}
 {{- range $name, $input := .SortedInputs }}
     {{ $name }}:
-      type: {{ $input.Type }}
+      type: {{ $input.GitLabType }}
       description: {{ $input.Description | yaml 8 | trimnl }}{{ with $input.Default }}
       default: {{ . }}{{ else }}{{ if not .Required }}
       default: {{ if eq $input.Type "number" }}0{{ else }}""{{ end }}
