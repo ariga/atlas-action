@@ -150,6 +150,17 @@ func (a ActionInput) AzureInputType() string {
 	}
 }
 
+// GitLabType returns the GitLab CI/CD input type for the action input. GitLab
+// only supports "array", "boolean", "number", and "string" as input types;
+// constrained values are expressed as a "string" with "options". The manifest's
+// "enum" type is therefore mapped to "string" (its options are emitted separately).
+func (a ActionInput) GitLabType() string {
+	if a.Type == "enum" {
+		return "string"
+	}
+	return a.Type
+}
+
 // GitHubManifests writes the actions to the given path as GitHub Actions manifests.
 // It creates a directory for each action with the action ID as the name and writes
 // the action.yml file inside it. The action.yml file is generated using the

@@ -46,7 +46,7 @@ jobs:
           # Tag and push according to VERSION.txt (full + major)
           VERSION=$(cat ../VERSION.txt | tr -d '[:space:]')
           [ -z "$VERSION" ] && { echo "VERSION.txt is empty"; exit 1; }
-          case "$VERSION" in v*) ;; *) VERSION="v$VERSION"; esac
+          VERSION="${VERSION#v}" # GitLab catalog tags are published without the v prefix
 
           if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
             git tag "$VERSION"
