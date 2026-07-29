@@ -67,6 +67,11 @@
         "schema plan approve": "Schema Plan Approve",
         "schema push": "Schema Push",
         "schema test": "Schema Test",
+        "script exec": "Script Exec",
+        "script loop": "Script Loop",
+        "script push": "Script Push",
+        "script query": "Script Query",
+        "script test": "Script Test",
         "setup": "Setup Atlas"
       }
     },
@@ -188,6 +193,13 @@
       "visibleRule": "action == migrate apply"
     },
     {
+      "type": "multiLine",
+      "label": "Script files",
+      "helpMarkDown": "URL(s) of the script files or directories to run. For example: `file://scripts`.\nIf not set, Atlas uses the scripts defined in the Atlas configuration file.\n",
+      "name": "files",
+      "visibleRule": "action == script exec || action == script loop || action == script push || action == script query"
+    },
+    {
       "type": "boolean",
       "label": "Force rebase",
       "helpMarkDown": "When true, skip the merge step and rebase whenever there are dev-only migrations (e.g. out-of-order workflow after merging base and running apply with exec-order non-linear).\n",
@@ -248,6 +260,13 @@
     },
     {
       "type": "string",
+      "label": "Script filter",
+      "helpMarkDown": "Run only the scripts matching the given regexp.\nFor example, `^purge_.*` will only run scripts that start with `purge_`.\nDefault is to run all scripts.\n",
+      "name": "match",
+      "visibleRule": "action == script exec || action == script loop || action == script query"
+    },
+    {
+      "type": "string",
       "label": "Repository name",
       "helpMarkDown": "The name of the repository to create in Atlas Cloud.",
       "name": "name",
@@ -258,7 +277,7 @@
       "label": "Test paths",
       "helpMarkDown": "List of directories containing test files.\n",
       "name": "paths",
-      "visibleRule": "action == migrate test || action == schema test"
+      "visibleRule": "action == migrate test || action == schema test || action == script test"
     },
     {
       "type": "string",
@@ -286,7 +305,7 @@
       "label": "Test filter",
       "helpMarkDown": "Filter tests to run by regexp.\nFor example, `^test_.*` will only run tests that start with `test_`.\nDefault is to run all tests.\n",
       "name": "run",
-      "visibleRule": "action == migrate test || action == schema test"
+      "visibleRule": "action == migrate test || action == schema test || action == script test"
     },
     {
       "type": "multiLine",
@@ -308,6 +327,13 @@
       "helpMarkDown": "List of database schemas to include (by default includes all schemas). see: https://atlasgo.io/declarative/inspect#inspect-multiple-schemas",
       "name": "schemas",
       "visibleRule": "action == monitor schema"
+    },
+    {
+      "type": "string",
+      "label": "Script repository name",
+      "helpMarkDown": "The name (slug) of the script repository in Atlas Registry.\nRead more in Atlas website: https://atlasgo.io/registry.\n",
+      "name": "script_name",
+      "visibleRule": "action == script push"
     },
     {
       "type": "string",
@@ -369,7 +395,7 @@
       "label": "Target database URL",
       "helpMarkDown": "The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.\n",
       "name": "url",
-      "visibleRule": "action == migrate apply || action == migrate down || action == migrate set || action == monitor schema || action == schema apply || action == schema lint || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate down || action == migrate set || action == monitor schema || action == schema apply || action == schema lint || action == schema push || action == schema test || action == script exec || action == script loop || action == script query"
     },
     {
       "type": "string",
@@ -397,35 +423,35 @@
       "label": "Working directory",
       "helpMarkDown": "Atlas working directory. Default is project root",
       "name": "working_directory",
-      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate autorebase || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test || action == script exec || action == script loop || action == script push || action == script query || action == script test"
     },
     {
       "type": "string",
       "label": "Atlas config",
       "helpMarkDown": "The URL of the Atlas configuration file. By default, Atlas will look for a file\nnamed `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.\nLearn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).\n",
       "name": "config",
-      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test || action == script exec || action == script loop || action == script push || action == script query || action == script test"
     },
     {
       "type": "string",
       "label": "Environment",
       "helpMarkDown": "The environment to use from the Atlas configuration file. For example, `dev`.\n",
       "name": "env",
-      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate hash || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == monitor schema || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test || action == script exec || action == script loop || action == script push || action == script query || action == script test"
     },
     {
       "type": "multiLine",
       "label": "Variables",
       "helpMarkDown": "A JSON object containing variables to be used in the Atlas configuration file.\nFor example, `{\"var1\": \"value1\", \"var2\": \"value2\"}`.\n",
       "name": "vars",
-      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate apply || action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate set || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test || action == script exec || action == script loop || action == script push || action == script query || action == script test"
     },
     {
       "type": "string",
       "label": "Dev database URL",
       "helpMarkDown": "The URL of the dev-database to use for analysis. For example: `mysql://root:pass@localhost:3306/dev`.\nRead more about [dev-databases](https://atlasgo.io/concepts/dev-database).\n",
       "name": "dev_url",
-      "visibleRule": "action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test"
+      "visibleRule": "action == migrate diff || action == migrate down || action == migrate lint || action == migrate push || action == migrate test || action == schema apply || action == schema lint || action == schema plan || action == schema plan approve || action == schema push || action == schema test || action == script test"
     },
     {
       "name": "githubConnection",

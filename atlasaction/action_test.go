@@ -655,6 +655,11 @@ type mockAtlas struct {
 	whoAmI            func(context.Context, *atlasexec.WhoAmIParams) (*atlasexec.WhoAmI, error)
 	cloudRepoCreate   func(ctx context.Context, params *atlasexec.CloudRepoCreateParams) (*atlasexec.CloudRepo, error)
 	schemaLint        func(context.Context, *atlasexec.SchemaLintParams) (*atlasexec.SchemaLintReport, error)
+	scriptExec        func(context.Context, *atlasexec.ScriptExecParams) (*atlasexec.ScriptExec, error)
+	scriptQuery       func(context.Context, *atlasexec.ScriptQueryParams) (*atlasexec.ScriptExec, error)
+	scriptLoop        func(context.Context, *atlasexec.ScriptLoopParams) (*atlasexec.ScriptExec, error)
+	scriptTest        func(context.Context, *atlasexec.ScriptTestParams) (string, error)
+	scriptPush        func(context.Context, *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error)
 }
 
 var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
@@ -783,6 +788,31 @@ func (m *mockAtlas) WhoAmI(ctx context.Context, params *atlasexec.WhoAmIParams) 
 // CloudRepoCreate implements AtlasExec.
 func (m *mockAtlas) CloudRepoCreate(ctx context.Context, params *atlasexec.CloudRepoCreateParams) (*atlasexec.CloudRepo, error) {
 	return m.cloudRepoCreate(ctx, params)
+}
+
+// ScriptExec implements AtlasExec.
+func (m *mockAtlas) ScriptExec(ctx context.Context, params *atlasexec.ScriptExecParams) (*atlasexec.ScriptExec, error) {
+	return m.scriptExec(ctx, params)
+}
+
+// ScriptQuery implements AtlasExec.
+func (m *mockAtlas) ScriptQuery(ctx context.Context, params *atlasexec.ScriptQueryParams) (*atlasexec.ScriptExec, error) {
+	return m.scriptQuery(ctx, params)
+}
+
+// ScriptLoop implements AtlasExec.
+func (m *mockAtlas) ScriptLoop(ctx context.Context, params *atlasexec.ScriptLoopParams) (*atlasexec.ScriptExec, error) {
+	return m.scriptLoop(ctx, params)
+}
+
+// ScriptTest implements AtlasExec.
+func (m *mockAtlas) ScriptTest(ctx context.Context, params *atlasexec.ScriptTestParams) (string, error) {
+	return m.scriptTest(ctx, params)
+}
+
+// ScriptPush implements AtlasExec.
+func (m *mockAtlas) ScriptPush(ctx context.Context, params *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error) {
+	return m.scriptPush(ctx, params)
 }
 
 func TestMigratePush(t *testing.T) {
@@ -3804,5 +3834,256 @@ func TestCloudRepoCreate(t *testing.T) {
 		err := newActs(t, act, atlas).CloudRepoCreate(context.Background())
 		require.ErrorContains(t, err, "failed to create the repo")
 		require.ErrorContains(t, err, "atlas: repo creation failed")
+	})
+}
+
+func TestScript(t *testing.T) {
+	newActs := func(t *testing.T, act *mockAction, atlas *mockAtlas) *atlasaction.Actions {
+		t.Helper()
+		a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(atlas))
+		require.NoError(t, err)
+		return a
+	}
+	inputs := map[string]string{
+		"config": "file://atlas.hcl",
+		"env":    "prod",
+		"url":    "sqlite://file?mode=memory",
+		"files":  "file://a.script.hcl\nfile://b.script.hcl",
+		"match":  "^purge_.*",
+	}
+	t.Run("exec", func(t *testing.T) {
+		var params *atlasexec.ScriptExecParams
+		act := &mockAction{inputs: inputs}
+		atlas := &mockAtlas{
+			scriptExec: func(_ context.Context, p *atlasexec.ScriptExecParams) (*atlasexec.ScriptExec, error) {
+				params = p
+				return &atlasexec.ScriptExec{
+					Scripts: []*atlasexec.ScriptFile{{
+						Name:    "purge_events",
+						Execs:   []*atlasexec.ScriptStmt{{SQL: "DELETE FROM events", AffectedRows: 42}},
+						Outputs: []string{"deleted 42 rows"},
+					}},
+				}, nil
+			},
+		}
+		err := newActs(t, act, atlas).ScriptExec(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "file://atlas.hcl", params.ConfigURL)
+		require.Equal(t, "prod", params.Env)
+		require.Equal(t, "sqlite://file?mode=memory", params.URL)
+		require.Equal(t, []string{"file://a.script.hcl", "file://b.script.hcl"}, params.Files)
+		require.Equal(t, "^purge_.*", params.Match)
+		require.Equal(t, "deleted 42 rows", act.output["output"])
+		require.JSONEq(t,
+			`{"Scripts":[{"Name":"purge_events","Execs":[{"SQL":"DELETE FROM events","AffectedRows":42,"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}],"Outputs":["deleted 42 rows"],"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}],"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}`,
+			act.output["report"])
+	})
+	t.Run("exec-error", func(t *testing.T) {
+		act := &mockAction{inputs: inputs}
+		atlas := &mockAtlas{
+			scriptExec: func(_ context.Context, _ *atlasexec.ScriptExecParams) (*atlasexec.ScriptExec, error) {
+				return nil, errors.New("atlas: connection refused")
+			},
+		}
+		err := newActs(t, act, atlas).ScriptExec(context.Background())
+		require.ErrorContains(t, err, "`atlas script exec` completed with errors")
+		require.ErrorContains(t, err, "atlas: connection refused")
+	})
+	t.Run("exec-script-failed", func(t *testing.T) {
+		act := &mockAction{inputs: inputs}
+		atlas := &mockAtlas{
+			scriptExec: func(_ context.Context, _ *atlasexec.ScriptExecParams) (*atlasexec.ScriptExec, error) {
+				return &atlasexec.ScriptExec{
+					Scripts: []*atlasexec.ScriptFile{
+						{
+							Name:       "purge_events",
+							Conditions: []*atlasexec.ScriptCond{{Name: "has_rows", Passed: false}},
+						},
+						{
+							Name:    "purge_logs",
+							Asserts: []*atlasexec.ScriptBool{{Name: "no_rows_left", Passed: false}},
+							Checks: []*atlasexec.ScriptCheck{
+								{Name: "row_count", Passed: false, Diff: "-1 +0"},
+								{Name: "no_orphans", Passed: false, Error: "column not found"},
+							},
+						},
+						{
+							Name:  "purge_users",
+							Error: "table not found",
+						},
+					},
+				}, nil
+			},
+		}
+		err := newActs(t, act, atlas).ScriptExec(context.Background())
+		require.EqualError(t, err, "`atlas script exec` completed with errors:\n"+
+			`purge_logs: assert "no_rows_left" failed`+"\n"+
+			`purge_logs: check "row_count" failed:`+"\n-1 +0\n"+
+			`purge_logs: check "no_orphans" failed: column not found`+"\n"+
+			`purge_users: table not found`)
+	})
+	t.Run("exec-run-error", func(t *testing.T) {
+		act := &mockAction{inputs: inputs}
+		atlas := &mockAtlas{
+			scriptExec: func(_ context.Context, _ *atlasexec.ScriptExecParams) (*atlasexec.ScriptExec, error) {
+				return &atlasexec.ScriptExec{Error: "no scripts were found"}, nil
+			},
+		}
+		err := newActs(t, act, atlas).ScriptExec(context.Background())
+		require.ErrorContains(t, err, "no scripts were found")
+	})
+	t.Run("query", func(t *testing.T) {
+		var params *atlasexec.ScriptQueryParams
+		act := &mockAction{inputs: inputs}
+		atlas := &mockAtlas{
+			scriptQuery: func(_ context.Context, p *atlasexec.ScriptQueryParams) (*atlasexec.ScriptExec, error) {
+				params = p
+				return &atlasexec.ScriptExec{
+					Scripts: []*atlasexec.ScriptFile{{
+						Name:     "count_users",
+						Queries:  []*atlasexec.ScriptResult{{Index: 0, Out: "10"}, {Index: 1, Out: "20"}},
+						Messages: []string{"querying users"},
+					}},
+				}, nil
+			},
+		}
+		err := newActs(t, act, atlas).ScriptQuery(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "sqlite://file?mode=memory", params.URL)
+		require.Equal(t, []string{"file://a.script.hcl", "file://b.script.hcl"}, params.Files)
+		require.Equal(t, "10\n20", act.output["output"])
+	})
+	t.Run("query-error", func(t *testing.T) {
+		act := &mockAction{inputs: inputs}
+		atlas := &mockAtlas{
+			scriptQuery: func(_ context.Context, _ *atlasexec.ScriptQueryParams) (*atlasexec.ScriptExec, error) {
+				return nil, errors.New("atlas: syntax error")
+			},
+		}
+		err := newActs(t, act, atlas).ScriptQuery(context.Background())
+		require.ErrorContains(t, err, "`atlas script query` completed with errors")
+		require.ErrorContains(t, err, "atlas: syntax error")
+	})
+	t.Run("loop", func(t *testing.T) {
+		var params *atlasexec.ScriptLoopParams
+		act := &mockAction{inputs: inputs}
+		atlas := &mockAtlas{
+			scriptLoop: func(_ context.Context, p *atlasexec.ScriptLoopParams) (*atlasexec.ScriptExec, error) {
+				params = p
+				return &atlasexec.ScriptExec{
+					Scripts: []*atlasexec.ScriptFile{{
+						Name:       "backfill",
+						Iterations: []*atlasexec.ScriptIteration{{Index: 0, Size: 10}, {Index: 1, Size: 5}},
+					}},
+				}, nil
+			},
+		}
+		err := newActs(t, act, atlas).ScriptLoop(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "^purge_.*", params.Match)
+		require.Equal(t, "", act.output["output"])
+	})
+	t.Run("loop-error", func(t *testing.T) {
+		act := &mockAction{inputs: inputs}
+		atlas := &mockAtlas{
+			scriptLoop: func(_ context.Context, _ *atlasexec.ScriptLoopParams) (*atlasexec.ScriptExec, error) {
+				return nil, errors.New("atlas: deadlock detected")
+			},
+		}
+		err := newActs(t, act, atlas).ScriptLoop(context.Background())
+		require.ErrorContains(t, err, "`atlas script loop` completed with errors")
+		require.ErrorContains(t, err, "atlas: deadlock detected")
+	})
+	t.Run("test", func(t *testing.T) {
+		var params *atlasexec.ScriptTestParams
+		act := &mockAction{inputs: map[string]string{
+			"config":  "file://atlas.hcl",
+			"env":     "test",
+			"dev-url": "sqlite://file?mode=memory",
+			"paths":   "./scripts\n./more-scripts",
+			"run":     "^test_purge",
+		}}
+		atlas := &mockAtlas{
+			scriptTest: func(_ context.Context, p *atlasexec.ScriptTestParams) (string, error) {
+				params = p
+				return "-- PASS: test_purge (0.01s)\nPASS", nil
+			},
+		}
+		err := newActs(t, act, atlas).ScriptTest(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "file://atlas.hcl", params.ConfigURL)
+		require.Equal(t, "test", params.Env)
+		require.Equal(t, "sqlite://file?mode=memory", params.DevURL)
+		require.Equal(t, []string{"./scripts", "./more-scripts"}, params.Paths)
+		require.Equal(t, "^test_purge", params.Run)
+	})
+	t.Run("test-error", func(t *testing.T) {
+		act := &mockAction{inputs: map[string]string{"paths": "./scripts"}}
+		atlas := &mockAtlas{
+			scriptTest: func(_ context.Context, _ *atlasexec.ScriptTestParams) (string, error) {
+				return "", errors.New("-- FAIL: test_purge (0.01s)")
+			},
+		}
+		err := newActs(t, act, atlas).ScriptTest(context.Background())
+		require.ErrorContains(t, err, "`atlas script test` completed with errors")
+		require.ErrorContains(t, err, "-- FAIL: test_purge")
+	})
+	t.Run("push", func(t *testing.T) {
+		var params *atlasexec.ScriptPushParams
+		act := &mockAction{inputs: map[string]string{
+			"config":      "file://atlas.hcl",
+			"env":         "prod",
+			"files":       "file://scripts",
+			"script-name": "my-scripts",
+		}}
+		atlas := &mockAtlas{
+			scriptPush: func(_ context.Context, p *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error) {
+				params = p
+				return &atlasexec.ScriptPush{
+					Name:  "my-scripts",
+					Files: 3,
+					Link:  "https://gh.atlasgo.cloud/scripts/my-scripts",
+				}, nil
+			},
+		}
+		err := newActs(t, act, atlas).ScriptPush(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "file://atlas.hcl", params.ConfigURL)
+		require.Equal(t, "prod", params.Env)
+		require.Equal(t, "my-scripts", params.Name)
+		require.Equal(t, []string{"file://scripts"}, params.Files)
+		require.Equal(t, map[string]string{
+			"name":  "my-scripts",
+			"files": "3",
+			"link":  "https://gh.atlasgo.cloud/scripts/my-scripts",
+		}, act.output)
+	})
+	t.Run("push-backup-error", func(t *testing.T) {
+		act := &mockAction{inputs: map[string]string{"files": "file://scripts"}}
+		atlas := &mockAtlas{
+			scriptPush: func(_ context.Context, _ *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error) {
+				return &atlasexec.ScriptPush{
+					Name:    "my-scripts",
+					Files:   1,
+					Link:    "https://gh.atlasgo.cloud/scripts/my-scripts",
+					Backups: []*atlasexec.ScriptPushBackup{{URL: "s3://backups", Error: "access denied"}},
+				}, nil
+			},
+		}
+		// A failed backup replication is reported as a warning, not as an error.
+		err := newActs(t, act, atlas).ScriptPush(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "https://gh.atlasgo.cloud/scripts/my-scripts", act.output["link"])
+	})
+	t.Run("push-error", func(t *testing.T) {
+		act := &mockAction{inputs: map[string]string{"files": "file://scripts"}}
+		atlas := &mockAtlas{
+			scriptPush: func(_ context.Context, _ *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error) {
+				return &atlasexec.ScriptPush{Error: "repository not found"}, nil
+			},
+		}
+		err := newActs(t, act, atlas).ScriptPush(context.Background())
+		require.ErrorContains(t, err, "`atlas script push` completed with errors")
+		require.ErrorContains(t, err, "repository not found")
 	})
 }

@@ -147,6 +147,16 @@ type (
 		SchemaPlanApprove(context.Context, *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error)
 		// SchemaApplySlice runs the `schema apply` command.
 		SchemaApplySlice(context.Context, *atlasexec.SchemaApplyParams) ([]*atlasexec.SchemaApply, error)
+		// ScriptExec runs the `script exec` command.
+		ScriptExec(context.Context, *atlasexec.ScriptExecParams) (*atlasexec.ScriptExec, error)
+		// ScriptQuery runs the `script query` command.
+		ScriptQuery(context.Context, *atlasexec.ScriptQueryParams) (*atlasexec.ScriptExec, error)
+		// ScriptLoop runs the `script loop` command.
+		ScriptLoop(context.Context, *atlasexec.ScriptLoopParams) (*atlasexec.ScriptExec, error)
+		// ScriptTest runs the `script test` command.
+		ScriptTest(context.Context, *atlasexec.ScriptTestParams) (string, error)
+		// ScriptPush runs the `script push` command.
+		ScriptPush(context.Context, *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error)
 		// WhoAmI runs the `whoami` command.
 		WhoAmI(context.Context, *atlasexec.WhoAmIParams) (*atlasexec.WhoAmI, error)
 		// CloudRepoCreate runs the 'cloud repo create' command.
@@ -351,6 +361,12 @@ const (
 	CmdSchemaPlan        = "schema/plan"
 	CmdSchemaPlanApprove = "schema/plan/approve"
 	CmdSchemaApply       = "schema/apply"
+	// Script workflow Commands
+	CmdScriptExec  = "script/exec"
+	CmdScriptQuery = "script/query"
+	CmdScriptLoop  = "script/loop"
+	CmdScriptTest  = "script/test"
+	CmdScriptPush  = "script/push"
 	// Monitoring Commands
 	CmdMonitorSchema = "monitor/schema"
 	// Copilot Commands
@@ -398,6 +414,16 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.SchemaPlanApprove(ctx)
 	case CmdSchemaApply:
 		return a.SchemaApply(ctx)
+	case CmdScriptExec:
+		return a.ScriptExec(ctx)
+	case CmdScriptQuery:
+		return a.ScriptQuery(ctx)
+	case CmdScriptLoop:
+		return a.ScriptLoop(ctx)
+	case CmdScriptTest:
+		return a.ScriptTest(ctx)
+	case CmdScriptPush:
+		return a.ScriptPush(ctx)
 	case CmdMonitorSchema:
 		return a.MonitorSchema(ctx)
 	case CmdCopilot:
@@ -1441,6 +1467,163 @@ You can approve the plan by visiting: %s`, f.Name, f.Link)
 	default:
 		return nil, errors.New("unexpected state")
 	}
+}
+
+// ScriptExec runs the Action for "ariga/atlas-action/script/exec"
+func (a *Actions) ScriptExec(ctx context.Context) error {
+	run, err := a.Atlas.ScriptExec(ctx, &atlasexec.ScriptExecParams{
+		ConfigURL: a.GetConfigURL(),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		URL:       a.GetInput("url"),
+		Files:     a.GetArrayInput("files"),
+		Match:     a.GetInput("match"),
+	})
+	if err != nil {
+		return fmt.Errorf("`atlas script exec` completed with errors:\n%s", err)
+	}
+	return a.reportScriptRun("exec", run)
+}
+
+// ScriptQuery runs the Action for "ariga/atlas-action/script/query"
+func (a *Actions) ScriptQuery(ctx context.Context) error {
+	run, err := a.Atlas.ScriptQuery(ctx, &atlasexec.ScriptQueryParams{
+		ConfigURL: a.GetConfigURL(),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		URL:       a.GetInput("url"),
+		Files:     a.GetArrayInput("files"),
+		Match:     a.GetInput("match"),
+	})
+	if err != nil {
+		return fmt.Errorf("`atlas script query` completed with errors:\n%s", err)
+	}
+	return a.reportScriptRun("query", run)
+}
+
+// ScriptLoop runs the Action for "ariga/atlas-action/script/loop"
+func (a *Actions) ScriptLoop(ctx context.Context) error {
+	run, err := a.Atlas.ScriptLoop(ctx, &atlasexec.ScriptLoopParams{
+		ConfigURL: a.GetConfigURL(),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		URL:       a.GetInput("url"),
+		Files:     a.GetArrayInput("files"),
+		Match:     a.GetInput("match"),
+	})
+	if err != nil {
+		return fmt.Errorf("`atlas script loop` completed with errors:\n%s", err)
+	}
+	return a.reportScriptRun("loop", run)
+}
+
+// ScriptTest runs the Action for "ariga/atlas-action/script/test"
+func (a *Actions) ScriptTest(ctx context.Context) error {
+	result, err := a.Atlas.ScriptTest(ctx, &atlasexec.ScriptTestParams{
+		ConfigURL: a.GetConfigURL(),
+		DevURL:    a.GetInput("dev-url"),
+		Env:       a.GetInput("env"),
+		Paths:     a.GetArrayInput("paths"),
+		Run:       a.GetInput("run"),
+		Vars:      a.GetVarsInput("vars"),
+	})
+	if err != nil {
+		return fmt.Errorf("`atlas script test` completed with errors:\n%s", err)
+	}
+	a.Infof("`atlas script test` completed successfully, no issues found")
+	a.Infof("%s", result)
+	return nil
+}
+
+// ScriptPush runs the Action for "ariga/atlas-action/script/push"
+func (a *Actions) ScriptPush(ctx context.Context) error {
+	rsp, err := a.Atlas.ScriptPush(ctx, &atlasexec.ScriptPushParams{
+		ConfigURL: a.GetConfigURL(),
+		Env:       a.GetInput("env"),
+		Vars:      a.GetVarsInput("vars"),
+		Name:      a.GetInput("script-name"),
+		Files:     a.GetArrayInput("files"),
+	})
+	if err != nil {
+		return fmt.Errorf("`atlas script push` completed with errors:\n%s", err)
+	}
+	if rsp.Error != "" {
+		return fmt.Errorf("`atlas script push` completed with errors:\n%s", rsp.Error)
+	}
+	// Backups are replicated on a best-effort basis, a failure to
+	// replicate one of them does not fail the push itself.
+	for _, b := range rsp.Backups {
+		if b.Error != "" {
+			a.Warningf("failed to back up the scripts to %s: %s", b.URL, b.Error)
+		}
+	}
+	a.SetOutput("name", rsp.Name)
+	a.SetOutput("files", strconv.Itoa(rsp.Files))
+	a.SetOutput("link", rsp.Link)
+	a.Infof("`atlas script push` completed successfully, pushed %d file(s) to: %s", rsp.Files, rsp.Link)
+	return nil
+}
+
+// reportScriptRun logs the report of a "script exec|query|loop" run, sets the
+// action outputs and reports an error if the run, or any script in it, failed.
+func (a *Actions) reportScriptRun(cmd string, run *atlasexec.ScriptExec) error {
+	report, err := json.Marshal(run)
+	if err != nil {
+		return fmt.Errorf("failed to marshal the script report: %w", err)
+	}
+	a.SetOutput("report", string(report))
+	var outputs, failures []string
+	// detail describes a failed step of a script, with its error or diff, if any.
+	detail := func(name, kind, step, err, diff string) string {
+		msg := fmt.Sprintf("%s: %s %q failed", name, kind, step)
+		switch {
+		case err != "":
+			return msg + ": " + err
+		case diff != "":
+			return msg + ":\n" + diff
+		}
+		return msg
+	}
+	if run.Error != "" {
+		failures = append(failures, run.Error)
+	}
+	for _, s := range run.Scripts {
+		for _, m := range s.Messages {
+			a.Infof("%s: %s", s.Name, m)
+		}
+		outputs = append(outputs, s.Outputs...)
+		for _, q := range s.Queries {
+			outputs = append(outputs, q.Out)
+		}
+		if s.Error != "" {
+			failures = append(failures, fmt.Sprintf("%s: %s", s.Name, s.Error))
+		}
+		for _, c := range s.Conditions {
+			switch {
+			case c.Error != "":
+				failures = append(failures, detail(s.Name, "condition", c.Name, c.Error, ""))
+			case !c.Passed:
+				// An unmet condition stops the script gracefully, it is not a failure.
+				a.Infof("%s: skipped, condition %q was not met", s.Name, c.Name)
+			}
+		}
+		for _, as := range s.Asserts {
+			if !as.Passed {
+				failures = append(failures, detail(s.Name, "assert", as.Name, as.Error, ""))
+			}
+		}
+		for _, c := range s.Checks {
+			if !c.Passed {
+				failures = append(failures, detail(s.Name, "check", c.Name, c.Error, c.Diff))
+			}
+		}
+	}
+	a.SetOutput("output", strings.Join(outputs, "\n"))
+	if len(failures) > 0 {
+		return fmt.Errorf("`atlas script %s` completed with errors:\n%s", cmd, strings.Join(failures, "\n"))
+	}
+	a.Infof("`atlas script %s` completed successfully, %d script(s) were executed", cmd, len(run.Scripts))
+	return nil
 }
 
 // MonitorSchema runs the Action for "ariga/atlas-action/monitor/schema"
