@@ -99,6 +99,28 @@ inputs:
         Filter tests to run by regexp.
         For example, `^test_.*` will only run tests that start with `test_`.
         Default is to run all tests.
+  scriptInputs: &scriptInputs
+    <<: *commonInputs
+    files:
+      type: string
+      multiLine: true
+      label: Script files
+      description: |
+        URL(s) of the script files or directories to run. For example: `file://scripts`.
+        If not set, Atlas uses the scripts defined in the Atlas configuration file.
+    url:
+      type: string
+      label: Target database URL
+      description: |
+        The URL of the target database to run the scripts against.
+        For example: `mysql://root:pass@localhost:3306/prod`.
+    match:
+      type: string
+      label: Script filter
+      description: |
+        Run only the scripts matching the given regexp.
+        For example, `^purge_.*` will only run scripts that start with `purge_`.
+        Default is to run all scripts.
 actions:
   - id: copilot
     name: Atlas Copilot
@@ -676,3 +698,63 @@ actions:
         multiLine: true
         label: Schema URL
         description: The desired schema URL(s) to test
+  - id: script/exec
+    description: Execute Atlas scripts on a target database
+    name: Script Exec
+    inputs:
+      <<: *scriptInputs
+    outputs: &scriptOutputs
+      output:
+        type: string
+        description: |
+          The output of the executed scripts, joined by newlines. It contains the values
+          emitted by their `output` blocks and the results of their `query` blocks.
+      report:
+        type: string
+        description: |
+          A JSON report of the run, containing the result of each executed script.
+  - id: script/loop
+    description: Run Atlas loop scripts, processing rows in batches, on a target database
+    name: Script Loop
+    inputs:
+      <<: *scriptInputs
+    outputs: *scriptOutputs
+  - id: script/push
+    description: Push Atlas scripts to the Atlas Registry
+    name: Script Push
+    inputs:
+      <<: *commonInputs
+      files:
+        type: string
+        multiLine: true
+        label: Script files
+        description: |
+          URL(s) of the script files or directories to push. For example: `file://scripts`.
+          If not set, Atlas uses the scripts defined in the Atlas configuration file.
+      script-name:
+        type: string
+        label: Script repository name
+        description: |
+          The name (slug) of the script repository in Atlas Registry.
+          Read more in Atlas website: https://atlasgo.io/registry.
+    outputs:
+      files:
+        type: number
+        description: The number of script files that were pushed.
+      link:
+        type: string
+        description: Link to the scripts in Atlas Registry.
+      name:
+        type: string
+        description: The name of the script repository that was pushed to.
+  - id: script/query
+    description: Run Atlas query scripts on a target database
+    name: Script Query
+    inputs:
+      <<: *scriptInputs
+    outputs: *scriptOutputs
+  - id: script/test
+    description: Run tests for Atlas scripts
+    name: Script Test
+    inputs:
+      <<: *testInputs
