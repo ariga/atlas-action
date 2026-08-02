@@ -97,10 +97,6 @@ jobs:
     needs: build
     uses: ./.github/workflows/cd-sync-gitlab.yaml
     secrets: inherit
-  sync-orb:
-    needs: build
-    uses: ./.github/workflows/cd-sync-orb.yaml
-    secrets: inherit
   # Run end-to-end test on the published binary.
   e2e-test:
     needs: build
@@ -115,7 +111,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         uses: jenseng/dynamic-uses@8bc24f0360175e710da532c4d19eafdbed489a06 # v1
         with:
-          uses: ariga/atlas-action/migrate/lint@v1
+          uses: ariga/atlas-action/migrate/lint@bd4788aca759a66eeda1ff9561d2dcb675a7c182 # v1.16.0
           with: '{
               "dir": "file://atlasaction/testdata/migrations",
               "dev-url": "sqlite://dev?mode=memory",
@@ -124,7 +120,7 @@ jobs:
       - name: Run Migrate Push
         uses: jenseng/dynamic-uses@8bc24f0360175e710da532c4d19eafdbed489a06 # v1
         with:
-          uses: ariga/atlas-action/migrate/push@v1
+          uses: ariga/atlas-action/migrate/push@bd4788aca759a66eeda1ff9561d2dcb675a7c182 # v1.16.0
           with: '{
               "dir": "file://atlasaction/testdata/migrations",
               "dev-url": "sqlite://dev?mode=memory",
