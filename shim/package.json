@@ -6,7 +6,7 @@
   "scripts": {
     "format": "prettier --write *.js",
     "format-check": "prettier --check *.js",
-    "lint": "eslint *.js",
+    "lint": "tsc --noEmit --allowJs --checkJs --module node18 --strict false *.js",
     "all": "npm run format && npm run lint && npm run shim",
     "shim": "npm run shim:actions && npm run shim:azure && npm run shim:azure-post",
     "shim:actions": "ncc build actions.js -o dist/actions",
@@ -30,14 +30,10 @@
   },
   "homepage": "https://github.com/ariga/atlas#readme",
   "devDependencies": {
+    "@types/node": "20.19.43",
     "@vercel/ncc": "0.38.4",
-    "eslint": "8.57.1",
-    "eslint-config-prettier": "8.3.0",
-    "eslint-plugin-github": "4.3.6",
-    "eslint-plugin-import": "2.26.0",
-    "eslint-plugin-jest": "26.1.4",
-    "eslint-plugin-unused-imports": "2.0.0",
-    "prettier": "2.6.2"
+    "prettier": "2.6.2",
+    "typescript": "6.0.3"
   },
   "dependencies": {
     "@actions/core": "1.11.1",
