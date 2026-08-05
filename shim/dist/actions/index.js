@@ -17,7 +17,7 @@ const toolCache = __nccwpck_require__(472);
 module.exports = async function run(action) {
   const binaryName = "atlas-action";
   // Check for local mode (for testing)
-  if (process.env.ATLAS_ACTION_LOCAL == 1) {
+  if (process.env.ATLAS_ACTION_LOCAL === "1") {
     // In the local mode, the atlas-action binary is expected to be in the PATH
     core.info("Running in local mode");
   } else {
