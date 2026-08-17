@@ -1,11 +1,19 @@
 {
 	"name": "Go",
-	"image": "mcr.microsoft.com/devcontainers/go:2-1.26-bookworm",
+	"image": "mcr.microsoft.com/devcontainers/base:2-debian",
 	"features": {
-		"ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/devcontainers/features/node:2": {
+			"version": "24.14.1",
+			"npmVersion": "11.11.0"
+		},
+		"ghcr.io/devcontainers/features/go:1": {
+			"version": "1.26.6",
+			"golangciLintVersion": "2.10.1"
+		},
 		"ghcr.io/devcontainers/features/copilot-cli:1": {
 			"version": "latest"
-		}
+		},
+		"ghcr.io/ariga/atlas/cli:1": {}
 	},
 	"mounts": [
 		{

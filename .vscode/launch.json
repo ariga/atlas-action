@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run GitHubActions",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}/atlasaction",
+      "args": [
+        "-test.run=^TestGitHubActions/${fileBasenameNoExtension}$",
+        "-test.timeout=1200s",
+        "-test.count=1",
+        "-test.v",
+      ],
+      "showLog": true
+    },
+  ]
+}
