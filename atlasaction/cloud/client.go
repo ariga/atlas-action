@@ -24,15 +24,29 @@ type (
 	// roundTripper is a http.RoundTripper that adds the Authorization header.
 	roundTripper struct {
 		token, version, cliVersion string
+		// base is the transport this one wraps. Falling back to
+		// http.DefaultTransport would drop the pooling configured on the client.
+		base http.RoundTripper
 	}
 )
 
 // RoundTrip implements http.RoundTripper.
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	// A RoundTripper must not modify the request it is given.
+	req = req.Clone(req.Context())
 	req.Header.Set("Authorization", "Bearer "+r.token)
 	req.Header.Set("User-Agent", fmt.Sprintf("Atlas Action/%s Atlas CLI/%s", r.version, r.cliVersion))
 	req.Header.Set("Content-Type", "application/json")
-	return http.DefaultTransport.RoundTrip(req)
+	return r.base.RoundTrip(req)
+}
+
+// CloseIdleConnections implements the optional interface http.Client looks for.
+// Without it the CloseIdleConnections call retryablehttp makes after a failed
+// request is a no-op, and dead connections are kept in the pool.
+func (r *roundTripper) CloseIdleConnections() {
+	if c, ok := r.base.(interface{ CloseIdleConnections() }); ok {
+		c.CloseIdleConnections()
+	}
 }
 
 func newClient(endpoint, token, version, cliVersion string) *Client {
@@ -40,11 +54,14 @@ func newClient(endpoint, token, version, cliVersion string) *Client {
 		endpoint = cloudURL
 	}
 	client := retryablehttp.NewClient()
-	client.HTTPClient.Timeout = time.Second * 60 * 5
+	// Bounds a single request: http.Client recomputes its deadline on every Do
+	// call, and retryablehttp calls Do once per attempt.
+	client.HTTPClient.Timeout = 5 * time.Minute
 	client.HTTPClient.Transport = &roundTripper{
 		token:      token,
 		version:    version,
 		cliVersion: cliVersion,
+		base:       client.HTTPClient.Transport,
 	}
 	return &Client{
 		endpoint: endpoint,
@@ -155,7 +172,7 @@ func (c *Client) post(ctx context.Context, query string, vars, data any) error {
 	if err != nil {
 		return err
 	}
-	defer req.Body.Close()
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
