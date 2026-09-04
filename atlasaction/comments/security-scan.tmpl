@@ -1,0 +1,28 @@
+<code>atlas security scan</code> on <strong>{{ len .Targets }}</strong> database{{ if ne (len .Targets) 1 }}s{{ end }}
+{{- range $t := .Targets }}
+<h4><code>{{ $t.URL }}</code>{{ if $t.Driver }} ({{ $t.Driver }}{{ if $t.Version }} {{ $t.Version }}{{ end }}){{ end }}</h4>
+{{- if $t.Error }}
+<p>The database could not be scanned, its state is unknown: <code>{{ $t.Error }}</code></p>
+{{- else if not $t.Vulnerabilities }}
+<p>No known vulnerabilities in {{ len $t.Extensions }} extension{{ if ne (len $t.Extensions) 1 }}s{{ end }}.</p>
+{{- else }}
+<table>
+  <thead>
+    <tr>
+      <th>Extension</th>
+      <th>CVE</th>
+      <th>Severity</th>
+      <th>Remediation</th>
+    </tr>
+  </thead>
+  <tbody>{{ range $v := $t.Vulnerabilities }}
+    <tr>
+      <td><code>{{ $v.Name }}</code> {{ $v.Version }}</td>
+      <td><a href="https://www.cve.org/CVERecord?id={{ $v.ID }}" target="_blank">{{ $v.ID }}</a></td>
+      <td>{{ $v.Level }}</td>
+      <td>{{ or $v.Suggestion $v.Title }}</td>
+    </tr>{{ end }}
+  </tbody>
+</table>
+{{- end }}
+{{- end }}

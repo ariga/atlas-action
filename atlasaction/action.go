@@ -69,6 +69,10 @@ type (
 		SchemaApply(context.Context, *atlasexec.SchemaApply)
 		SchemaLint(context.Context, *SchemaLintReport)
 	}
+	// SecurityScanReporter is implemented by the actions that report security scans.
+	SecurityScanReporter interface {
+		SecurityScan(context.Context, *atlasexec.SecurityScan)
+	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
 		// PullRequest returns information about a pull request.
@@ -163,6 +167,11 @@ type (
 		CloudRepoCreate(ctx context.Context, params *atlasexec.CloudRepoCreateParams) (*atlasexec.CloudRepo, error)
 		// SetStderr sets the standard error output for the client.
 		SetStderr(io.Writer)
+	}
+
+	// SecurityScanner is implemented by the Atlas clients that run the `security scan` command.
+	SecurityScanner interface {
+		SecurityScan(context.Context, *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error)
 	}
 
 	// CloudClient lets an action talk to Atlas Cloud.
@@ -367,6 +376,8 @@ const (
 	CmdScriptLoop  = "script/loop"
 	CmdScriptTest  = "script/test"
 	CmdScriptPush  = "script/push"
+	// Security Commands
+	CmdSecurityScan = "security/scan"
 	// Monitoring Commands
 	CmdMonitorSchema = "monitor/schema"
 	// Copilot Commands
@@ -424,6 +435,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.ScriptTest(ctx)
 	case CmdScriptPush:
 		return a.ScriptPush(ctx)
+	case CmdSecurityScan:
+		return a.SecurityScan(ctx)
 	case CmdMonitorSchema:
 		return a.MonitorSchema(ctx)
 	case CmdCopilot:
@@ -1623,6 +1636,82 @@ func (a *Actions) reportScriptRun(cmd string, run *atlasexec.ScriptExec) error {
 		return fmt.Errorf("`atlas script %s` completed with errors:\n%s", cmd, strings.Join(failures, "\n"))
 	}
 	a.Infof("`atlas script %s` completed successfully, %d script(s) were executed", cmd, len(run.Scripts))
+	return nil
+}
+
+// SecurityScan runs the Action for "ariga/atlas-action/security/scan"
+func (a *Actions) SecurityScan(ctx context.Context) error {
+	c, ok := a.Atlas.(SecurityScanner)
+	if !ok {
+		return errors.New("security scan is not supported by the configured atlas client")
+	}
+	scan, err := c.SecurityScan(ctx, &atlasexec.SecurityScanParams{
+		ConfigURL:   a.GetConfigURL(),
+		Env:         a.GetInput("env"),
+		Vars:        a.GetVarsInput("vars"),
+		URL:         a.GetArrayInput("urls"),
+		MinSeverity: a.GetInput("min-severity"),
+		FailOn:      a.GetInput("fail-on"),
+		Ignore:      a.GetArrayInput("ignore"),
+	})
+	// The command prints its report before failing on it, or on a step that
+	// follows it. e.g., a notify block. Its findings are reported either way.
+	if scan == nil {
+		return fmt.Errorf("`atlas security scan` completed with errors:\n%s", err)
+	}
+	report, jsonErr := json.Marshal(scan)
+	if jsonErr != nil {
+		return fmt.Errorf("failed to marshal the scan report: %w", jsonErr)
+	}
+	a.SetOutput("report", string(report))
+	count, failed := scan.Count(), scan.Failures()
+	a.SetOutput("count", strconv.Itoa(count))
+	a.SetOutput("failures", strconv.Itoa(len(failed)))
+	for _, t := range scan.Targets {
+		switch {
+		case t.Error != "":
+			a.Errorf("%s could not be scanned: %s", t.URL, t.Error)
+		case len(t.Vulnerabilities) == 0:
+			a.Infof("%s: no issues found in %d extension(s)", t.URL, len(t.Extensions))
+		}
+		for _, v := range t.Vulnerabilities {
+			a.Warningf("%s: %s", t.URL, v.LevelText())
+		}
+	}
+	if r, ok := a.Action.(SecurityScanReporter); ok {
+		r.SecurityScan(ctx, scan)
+	}
+	// issues summarizes the reported issues. e.g., "3 issue(s): 1 critical, 2 high".
+	issues := func() string {
+		reported := scan.Levels()
+		levels := make([]string, 0, len(reported))
+		for _, l := range reported {
+			levels = append(levels, fmt.Sprintf("%d %s", l.Count, strings.ToLower(l.Level)))
+		}
+		return fmt.Sprintf("%d issue(s): %s", count, strings.Join(levels, ", "))
+	}
+	switch {
+	// Anything but a failing result failed the command itself.
+	case err != nil && !errors.Is(err, atlasexec.ErrSecurityScan):
+		return fmt.Errorf("`atlas security scan` completed with errors:\n%s", err)
+	// A database that was not scanned leaves its state unknown.
+	case len(failed) > 0:
+		urls := make([]string, 0, len(failed))
+		for _, t := range failed {
+			urls = append(urls, t.URL)
+		}
+		msg := fmt.Sprintf("`atlas security scan` could not scan %d database(s): %s", len(failed), strings.Join(urls, ", "))
+		if count > 0 {
+			msg += "; also reported " + issues()
+		}
+		return errors.New(msg)
+	case err != nil:
+		return fmt.Errorf("`atlas security scan` completed with %s, check the annotations for details", issues())
+	case count > 0:
+		a.Infof("`atlas security scan` completed successfully with %s, check the annotations for details", issues())
+	default:
+		a.Infof("`atlas security scan` completed successfully, no issues found")
+	}
 	return nil
 }
 
