@@ -1,8 +1,8 @@
 <code>atlas security scan</code> on <strong>{{ len .Targets }}</strong> database{{ if ne (len .Targets) 1 }}s{{ end }}
 {{- range $t := .Targets }}
-<h4><code>{{ $t.URL }}</code>{{ if $t.Driver }} ({{ $t.Driver }}{{ if $t.Version }} {{ $t.Version }}{{ end }}){{ end }}</h4>
+<h4><code>{{ $t.URL | html }}</code>{{ if $t.Driver }} ({{ $t.Driver | html }}{{ if $t.Version }} {{ $t.Version | html }}{{ end }}){{ end }}</h4>
 {{- if $t.Error }}
-<p>The database could not be scanned, its state is unknown: <code>{{ $t.Error }}</code></p>
+<p>The database could not be scanned, its state is unknown: <code>{{ $t.Error | html }}</code></p>
 {{- else if not $t.Vulnerabilities }}
 <p>No known vulnerabilities in {{ len $t.Extensions }} extension{{ if ne (len $t.Extensions) 1 }}s{{ end }}.</p>
 {{- else }}
