@@ -46,6 +46,8 @@ To learn more about the recommended way to build workflows, read our guide on
 {{- end }}
 {{- with action . "schema/test" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
 {{- end }}
+{{- with action . "security/scan" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
 
 ## Examples
 
@@ -654,6 +656,38 @@ In case the database URL is subject to change, the `slug` parameter can use to i
           schemas: |-
             auth
             app
+```
+{{ end }}
+{{- with action . "security/scan" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Scan databases for security issues with Atlas. The scan reports the extensions installed in the
+database that carry known vulnerabilities, as recorded in the Atlas Security Graph. It requires a
+login to Atlas Cloud, on a plan that includes the Security Graph.
+
+The action fails when a database could not be scanned, as that leaves its state unknown. The issues
+it reports do not fail it; set `fail-on` to the severity an issue must reach to fail the action.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+#### Usage
+
+The following action scans two databases, reports every issue it finds, and fails the workflow if
+any of them is graded `HIGH` or above.
+
+```yaml
+        uses: ariga/atlas-action/security/scan@v1
+        with:
+          urls: |-
+            postgres://postgres:pass@localhost:5432/app?sslmode=disable
+            postgres://postgres:pass@localhost:5432/reports?sslmode=disable
+          fail-on: HIGH
 ```
 {{ end }}
 ### `ariga/atlas-action/setup`

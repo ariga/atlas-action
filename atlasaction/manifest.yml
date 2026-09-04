@@ -758,3 +758,48 @@ actions:
     name: Script Test
     inputs:
       <<: *testInputs
+  - id: security/scan
+    description: Scan databases for security issues with Atlas
+    name: Security Scan
+    inputs:
+      <<: *commonInputs
+      urls: &urls
+        type: string
+        multiLine: true
+        label: Database URLs
+        description: |
+          URL(s) of the target databases, one per line.
+          For example: `postgres://localhost:5432/app?sslmode=disable`.
+          If not set, Atlas uses the [`url`](https://atlasgo.io/hcl/config#env.url) from the config file.
+          Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+      min-severity:
+        type: string
+        label: Minimum severity
+        description: |
+          The lowest severity to report. For example, `HIGH` reports only the `HIGH`
+          and `CRITICAL` issues.
+        options: [NORMAL, ELEVATED, HIGH, CRITICAL]
+      fail-on:
+        type: string
+        label: Failing severity
+        description: |
+          The lowest severity that fails the action. By default, reported issues do not
+          fail it, and only a database that could not be scanned does.
+        options: [NORMAL, ELEVATED, HIGH, CRITICAL]
+      ignore:
+        type: string
+        multiLine: true
+        label: Ignored CVEs
+        description: |
+          CVE identifier(s) not to report. For example: `CVE-2017-18359`.
+    outputs:
+      count:
+        type: number
+        description: The number of security issues that were reported.
+      failures:
+        type: number
+        description: The number of databases that could not be scanned.
+      report:
+        type: string
+        description: |
+          A JSON report of the scan, containing the issues found in each scanned database.
