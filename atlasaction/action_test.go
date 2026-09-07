@@ -660,6 +660,7 @@ type mockAtlas struct {
 	scriptLoop        func(context.Context, *atlasexec.ScriptLoopParams) (*atlasexec.ScriptExec, error)
 	scriptTest        func(context.Context, *atlasexec.ScriptTestParams) (string, error)
 	scriptPush        func(context.Context, *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error)
+	securityScan      func(context.Context, *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error)
 }
 
 var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
@@ -813,6 +814,11 @@ func (m *mockAtlas) ScriptTest(ctx context.Context, params *atlasexec.ScriptTest
 // ScriptPush implements AtlasExec.
 func (m *mockAtlas) ScriptPush(ctx context.Context, params *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error) {
 	return m.scriptPush(ctx, params)
+}
+
+// SecurityScan implements AtlasExec.
+func (m *mockAtlas) SecurityScan(ctx context.Context, params *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+	return m.securityScan(ctx, params)
 }
 
 func TestMigratePush(t *testing.T) {
@@ -3396,6 +3402,7 @@ func TestRenderTemplates(t *testing.T) {
 			"render-lint":          renderTemplate[*atlasexec.SummaryReport],
 			"render-migrate-apply": renderTemplate[*atlasexec.MigrateApply],
 			"render-schema-lint":   renderTemplate[*atlasaction.SchemaLintReport],
+			"render-security-scan": renderTemplate[*atlasexec.SecurityScan],
 		},
 	})
 }
@@ -3516,6 +3523,11 @@ func (m *mockAtlas) SchemaLint(ctx context.Context, p *atlasexec.SchemaLintParam
 
 // SchemaLint implements atlasaction.Reporter.
 func (m *mockAction) SchemaLint(context.Context, *atlasaction.SchemaLintReport) {
+	m.summary++
+}
+
+// SecurityScan implements atlasaction.SecurityScanReporter.
+func (m *mockAction) SecurityScan(context.Context, *atlasexec.SecurityScan) {
 	m.summary++
 }
 
@@ -4085,5 +4097,166 @@ func TestScript(t *testing.T) {
 		err := newActs(t, act, atlas).ScriptPush(context.Background())
 		require.ErrorContains(t, err, "`atlas script push` completed with errors")
 		require.ErrorContains(t, err, "repository not found")
+	})
+}
+
+func TestSecurityScan(t *testing.T) {
+	newActs := func(t *testing.T, act *mockAction, atlas *mockAtlas) *atlasaction.Actions {
+		t.Helper()
+		a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(atlas))
+		require.NoError(t, err)
+		return a
+	}
+	newAct := func() *mockAction {
+		return &mockAction{
+			inputs: map[string]string{
+				"config":       "file://atlas.hcl",
+				"env":          "prod",
+				"urls":         "postgres://localhost:5432/app\npostgres://localhost:5433/reports",
+				"min-severity": "ELEVATED",
+				"fail-on":      "HIGH",
+				"ignore":       "CVE-2017-18359\nCVE-2014-2669",
+			},
+			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		}
+	}
+	t.Run("clean", func(t *testing.T) {
+		var params *atlasexec.SecurityScanParams
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, p *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				params = p
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{{
+					URL:        "postgres://localhost:5432/app",
+					Driver:     "postgres",
+					Version:    "18.0",
+					Extensions: []string{"pgcrypto"},
+				}}}, nil
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "file://atlas.hcl", params.ConfigURL)
+		require.Equal(t, "prod", params.Env)
+		require.Equal(t, []string{"postgres://localhost:5432/app", "postgres://localhost:5433/reports"}, params.URL)
+		require.Equal(t, "ELEVATED", params.MinSeverity)
+		require.Equal(t, "HIGH", params.FailOn)
+		require.Equal(t, []string{"CVE-2017-18359", "CVE-2014-2669"}, params.Ignore)
+		require.Equal(t, "0", act.output["count"])
+		require.Equal(t, "0", act.output["failures"])
+		require.Equal(t, 1, act.summary)
+		require.JSONEq(t,
+			`{"Targets":[{"URL":"postgres://localhost:5432/app","Driver":"postgres","Version":"18.0","Extensions":["pgcrypto"]}],"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}`,
+			act.output["report"])
+	})
+	// Issues that did not reach the failing severity are reported without failing the step.
+	t.Run("issues", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{{
+					URL:        "postgres://localhost:5432/app",
+					Extensions: []string{"postgis"},
+					Vulnerabilities: []*atlasexec.SecurityVulnerability{
+						{Name: "hstore", Version: "1.3", ID: "CVE-2014-2669", Level: "ELEVATED", Severity: "MEDIUM"},
+					},
+				}}}, nil
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "1", act.output["count"])
+	})
+	t.Run("fail-on", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{{
+					URL: "postgres://localhost:5432/app",
+					Vulnerabilities: []*atlasexec.SecurityVulnerability{
+						{Name: "postgis", Version: "2.3.1", ID: "CVE-2017-18359", Level: "HIGH", Severity: "HIGH"},
+						{Name: "hstore", Version: "1.3", ID: "CVE-2014-2669", Level: "ELEVATED", Severity: "MEDIUM"},
+						{Name: "pgcrypto", Version: "1.0", ID: "CVE-2015-0243", Level: "ELEVATED", Severity: "MEDIUM"},
+					},
+				}}}, atlasexec.ErrSecurityScan
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` completed with 3 issue(s): 1 high, 2 elevated, check the annotations for details")
+		require.Equal(t, "3", act.output["count"])
+		require.Equal(t, 1, act.summary, "the summary is written before the step fails")
+	})
+	// A database that could not be scanned fails the step, and the ones that were scanned are still reported.
+	t.Run("unreachable", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{
+					{URL: "postgres://localhost:5432/app", Extensions: []string{"pgcrypto"}},
+					{URL: "postgres://localhost:5433/reports", Error: "connection refused"},
+				}}, atlasexec.ErrSecurityScan
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` could not scan 1 database(s): postgres://localhost:5433/reports")
+		require.Equal(t, "0", act.output["count"])
+		require.Equal(t, "1", act.output["failures"])
+	})
+	// A failing database does not hide the issues found in the ones that were scanned.
+	t.Run("unreachable-with-issues", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{
+					{
+						URL: "postgres://localhost:5432/app",
+						Vulnerabilities: []*atlasexec.SecurityVulnerability{
+							{Name: "postgis", Version: "2.3.1", ID: "CVE-2017-18359", Level: "HIGH", Severity: "HIGH"},
+						},
+					},
+					{URL: "postgres://localhost:5433/reports", Error: "connection refused"},
+				}}, atlasexec.ErrSecurityScan
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` could not scan 1 database(s): postgres://localhost:5433/reports; also reported 1 issue(s): 1 high")
+		require.Equal(t, "1", act.output["count"])
+		require.Equal(t, "1", act.output["failures"])
+	})
+	// The command reports its findings before a later step fails it, e.g. a notify
+	// block. The step fails, but the findings are still reported.
+	t.Run("reported-then-failed", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{{
+					URL: "postgres://localhost:5432/app",
+					Vulnerabilities: []*atlasexec.SecurityVulnerability{
+						{Name: "postgis", Version: "2.3.1", ID: "CVE-2017-18359", Level: "HIGH", Severity: "HIGH"},
+					},
+				}}}, errors.New(`security.notify.http "slack": unexpected status 500`)
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` completed with errors:\nsecurity.notify.http \"slack\": unexpected status 500")
+		require.Equal(t, "1", act.output["count"])
+	})
+	// A client from before the action satisfies AtlasExec without SecurityScan.
+	t.Run("client without security scan", func(t *testing.T) {
+		a, err := atlasaction.New(atlasaction.WithAction(newAct()), atlasaction.WithAtlas(struct{ atlasaction.AtlasExec }{}))
+		require.NoError(t, err)
+		err = a.SecurityScan(context.Background())
+		require.EqualError(t, err, "security scan is not supported by the configured atlas client")
+	})
+	t.Run("error", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return nil, atlasexec.ErrRequireLogin
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` completed with errors:\ncommand requires 'atlas login'")
+		require.Empty(t, act.output)
 	})
 }

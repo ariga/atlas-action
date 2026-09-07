@@ -95,6 +95,16 @@ func (a *GitHub) SchemaLint(_ context.Context, r *SchemaLintReport) {
 	a.AddStepSummary(summary)
 }
 
+// SecurityScan implements SecurityScanReporter.
+func (a *GitHub) SecurityScan(_ context.Context, r *atlasexec.SecurityScan) {
+	summary, err := RenderTemplate("security-scan.tmpl", r, nil)
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
+
 // GetType implements the Action interface.
 func (*GitHub) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeGithubAction

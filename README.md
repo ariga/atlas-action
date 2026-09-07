@@ -27,6 +27,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a migration plan by its URL                                                 |
 | [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema version with an optional tag to Atlas                                 |
 | [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Run schema tests against the desired schema                                         |
+| [ariga/atlas-action/security/scan](#arigaatlas-actionsecurityscan)            | Scan databases for security issues with Atlas                                       |
 
 ## Examples
 
@@ -869,6 +870,56 @@ In case the database URL is subject to change, the `slug` parameter can use to i
           schemas: |-
             auth
             app
+```
+
+### `ariga/atlas-action/security/scan`
+
+Scan databases for security issues with Atlas. The scan reports the extensions installed in the
+database that carry known vulnerabilities, as recorded in the Atlas Security Graph. It requires a
+login to Atlas Cloud, on a plan that includes the Security Graph.
+
+The action fails when a database could not be scanned, as that leaves its state unknown. The issues
+it reports do not fail it; set `fail-on` to the severity an issue must reach to fail the action.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `fail-on` - The lowest severity that fails the action. By default, reported issues do not
+  fail it, and only a database that could not be scanned does.
+* `ignore` - CVE identifier(s) not to report. For example: `CVE-2017-18359`.
+* `min-severity` - The lowest severity to report. For example, `HIGH` reports only the `HIGH`
+  and `CRITICAL` issues.
+* `urls` - URL(s) of the target databases, one per line.
+  For example: `postgres://localhost:5432/app?sslmode=disable`.
+  If not set, Atlas uses the [`url`](https://atlasgo.io/hcl/config#env.url) from the config file.
+  Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+* `working-directory` - Atlas working directory. Default is project root
+* `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
+* `vars` - A JSON object containing variables to be used in the Atlas configuration file.
+  For example, `{"var1": "value1", "var2": "value2"}`.
+
+#### Outputs
+
+* `count` - The number of security issues that were reported.
+* `failures` - The number of databases that could not be scanned.
+* `report` - A JSON report of the scan, containing the issues found in each scanned database.
+
+#### Usage
+
+The following action scans two databases, reports every issue it finds, and fails the workflow if
+any of them is graded `HIGH` or above.
+
+```yaml
+        uses: ariga/atlas-action/security/scan@v1
+        with:
+          urls: |-
+            postgres://postgres:pass@localhost:5432/app?sslmode=disable
+            postgres://postgres:pass@localhost:5432/reports?sslmode=disable
+          fail-on: HIGH
 ```
 
 ### `ariga/atlas-action/setup`

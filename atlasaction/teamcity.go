@@ -125,6 +125,15 @@ func (t *TeamCity) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
 	t.lintReport(r, "lint")
 }
 
+// SecurityScan implements SecurityScanReporter.
+func (t *TeamCity) SecurityScan(_ context.Context, r *atlasexec.SecurityScan) {
+	if r == nil {
+		return
+	}
+	t.BuildStatisticValue("atlas.security.scan.issues", fmt.Sprintf("%d", r.Count()))
+	t.BuildStatisticValue("atlas.security.scan.failures", fmt.Sprintf("%d", len(r.Failures())))
+}
+
 // SchemaLint implements Reporter.
 func (t *TeamCity) SchemaLint(_ context.Context, r *SchemaLintReport) {
 	if r == nil || r.SchemaLintReport == nil {
