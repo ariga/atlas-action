@@ -57,12 +57,6 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.DOCKERHUB_USERNAME }}
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
-        with:
-          aws-access-key-id: ${{ secrets.RELEASE_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.RELEASE_AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
       - name: Setup Go Environment
         uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
@@ -71,36 +65,70 @@ jobs:
         run: npm install -g tfx-cli@0.23.1
       - name: Install Atlas
         uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea # v0
+      - name: Build assets
+        run: make DOCKER_IMAGE=$DOCKER_IMAGE atlas-action test docker azure-devops
+        env:
+          CGO_ENABLED: 0
+          DOCKER_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          GH_TOKEN: ${{ github.token }}
+      - name: Upload binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: binaries
+          path: |
+            atlas-action-linux-amd64
+            atlas-action-linux-arm64
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload Azure DevOps Extension
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: azure-devops-extension
+          path: .github/azure-devops/ariga.atlas-action-*.vsix
+  # Sync the built binaries to the release CDN (R2 and S3).
+  # Runs in the "release" environment so the release credentials are scoped to it.
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Download binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: binaries
+          path: .
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          aws-access-key-id: ${{ secrets.RELEASE_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.RELEASE_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
       - name: Install rclone
         run: |
           sudo apt-get update
           sudo apt-get install -y rclone
           rclone version
-      - name: Build assets
-        run: make DOCKER_IMAGE=$DOCKER_IMAGE atlas-action test s3-upload docker azure-devops
+      - name: Sync binaries to CDN
+        run: make s3-upload
         env:
-          CGO_ENABLED: 0
           AWS_REGION: us-east-1
-          DOCKER_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          GH_TOKEN: ${{ github.token }}
           RCLONE_CONFIG_R2_TYPE: s3
           RCLONE_CONFIG_R2_PROVIDER: Cloudflare
           RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           RCLONE_S3_NO_CHECK_BUCKET: true
-      - name: Upload Azure DevOps Extension
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: azure-devops-extension
-          path: .github/azure-devops/ariga.atlas-action-*.vsix
   sync-gitlab:
     needs: build
     uses: ./.github/workflows/cd-sync-gitlab.yaml
     secrets: inherit
   # Run end-to-end test on the published binary.
   e2e-test:
-    needs: build
+    needs: upload
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
