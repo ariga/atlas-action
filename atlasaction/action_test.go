@@ -3185,7 +3185,7 @@ time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4l
 time=NOW level=INFO msg="No plan URL provided, searching for the pending plan"
 time=NOW level=INFO msg="Schema plan approved successfully: https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk"
 time=NOW level=INFO msg="No plan URL provided, searching for the pending plan"
-time=NOW level=INFO msg="No schema plan found"
+time=NOW level=INFO msg="No pending schema plan found. If this commit has schema changes and no approved plan exists, `+"`schema/apply`"+` will fail. Re-run the schema/plan step to create a new plan"
 `, out.String())
 }
 

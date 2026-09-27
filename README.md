@@ -297,8 +297,10 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `to-tag` - The tag to revert to. Mutually exclusive with `amount` and `to-version`.
 * `to-version` - The version to revert to. Mutually exclusive with `amount` and `to-tag`.
 * `url` - The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
-* `wait-interval` - Time in seconds between different migrate down attempts.
-* `wait-timeout` - Time after which no other retry attempt is made and the action exits.
+* `wait-interval` - Duration between approval checks, e.g. `30s` or `5m`.
+  Each check re-inspects the target database, so prefer `30s` or more when `wait-timeout` is long.
+* `wait-timeout` - How long to wait for approval, e.g. `30m`.
+  If unset, the action does not wait: it creates the plan, prints its link and fails. Re-run the action after approving.
 * `working-directory` - Atlas working directory. Default is project root
 * `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
@@ -681,14 +683,21 @@ Apply a declarative migrations to a database.
   see: https://atlasgo.io/declarative/inspect#include-schemas
 * `lint-review` - Automatically generate an approval plan before applying changes. Options are "ALWAYS", "ERROR" or "WARNING".
   Use "ALWAYS" to generate a plan for every apply, or "WARNING" and "ERROR" to generate a plan only based on review policy.
+  With "WARNING" and "ERROR", set the same policy in the `lint { review }` block of the project config. Otherwise,
+  changes that do not require approval are applied with the config policy (default "ALWAYS"), and the step fails.
+  If unset, and the project config requires approval for the changes, the step fails. In this case, set this
+  input (plus `wait-timeout`/`wait-interval`) to create and approve plans during deployment, or re-run the PR's
+  `schema/plan` step.
 * `plan` - The plan to apply. For example, `atlas://<schema>/plans/<id>`.
 * `schema` - List of database schema(s). For example: `public`.
 * `to` - URL(s) of the desired schema state.
 * `tx-mode` - Transaction mode to use. Either "file", "all", or "none".
 * `url` - The URL of the target database to apply changes to.
   For example: `mysql://root:pass@localhost:3306/prod`.
-* `wait-interval` - Time in seconds between different apply attempts.
-* `wait-timeout` - Time after which no other retry attempt is made and the action exits.
+* `wait-interval` - Duration between approval checks, e.g. `30s` or `5m`.
+  Each check re-inspects the target database, so prefer `30s` or more when `wait-timeout` is long.
+* `wait-timeout` - How long to wait for approval, e.g. `30m`.
+  If unset, the action does not wait: it creates the plan, prints its link and fails. Re-run the action after approving.
 * `working-directory` - Atlas working directory. Default is project root
 * `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.

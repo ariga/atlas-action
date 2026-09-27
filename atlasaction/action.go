@@ -1280,7 +1280,8 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 		case len(planFiles) == 1:
 			params.URL = planFiles[0].URL
 		case len(planFiles) == 0:
-			a.Infof("No schema plan found")
+			a.Infof("No pending schema plan found. If this commit has schema changes and no approved plan exists, " +
+				"`schema/apply` will fail. Re-run the schema/plan step to create a new plan")
 			return nil
 		default:
 			for _, f := range planFiles {
