@@ -272,7 +272,7 @@
         "ALWAYS":"ALWAYS","ERROR":"ERROR","WARNING":"WARNING"
       },
       "label": "Lint review policy",
-      "helpMarkDown": "Automatically generate an approval plan before applying changes. Options are \"ALWAYS\", \"ERROR\" or \"WARNING\".\nUse \"ALWAYS\" to generate a plan for every apply, or \"WARNING\" and \"ERROR\" to generate a plan only based on review policy.\n",
+      "helpMarkDown": "Automatically generate an approval plan before applying changes. Options are \"ALWAYS\", \"ERROR\" or \"WARNING\".\nUse \"ALWAYS\" to generate a plan for every apply, or \"WARNING\" and \"ERROR\" to generate a plan only based on review policy.\nWith \"WARNING\" and \"ERROR\", set the same policy in the `lint { review }` block of the project config. Otherwise,\nchanges that do not require approval are applied with the config policy (default \"ALWAYS\"), and the step fails.\nIf unset, and the project config requires approval for the changes, the step fails. In this case, set this\ninput (plus `wait-timeout`/`wait-interval`) to create and approve plans during deployment, or re-run the PR's\n`schema/plan` step.\n",
       "name": "lint_review",
       "visibleRule": "action == schema apply"
     },
@@ -442,14 +442,14 @@
     {
       "type": "string",
       "label": "Wait interval",
-      "helpMarkDown": "Time in seconds between different migrate down attempts.",
+      "helpMarkDown": "Duration between approval checks, e.g. `30s` or `5m`.\nEach check re-inspects the target database, so prefer `30s` or more when `wait-timeout` is long.\n",
       "name": "wait_interval",
       "visibleRule": "action == migrate down || action == schema apply"
     },
     {
       "type": "string",
       "label": "Wait timeout",
-      "helpMarkDown": "Time after which no other retry attempt is made and the action exits.",
+      "helpMarkDown": "How long to wait for approval, e.g. `30m`.\nIf unset, the action does not wait: it creates the plan, prints its link and fails. Re-run the action after approving.\n",
       "name": "wait_timeout",
       "visibleRule": "action == migrate down || action == schema apply"
     },
