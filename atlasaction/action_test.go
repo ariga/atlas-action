@@ -661,6 +661,7 @@ type mockAtlas struct {
 	scriptTest        func(context.Context, *atlasexec.ScriptTestParams) (string, error)
 	scriptPush        func(context.Context, *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error)
 	securityScan      func(context.Context, *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error)
+	migrateDriftSlice func(context.Context, *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error)
 }
 
 var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
@@ -819,6 +820,11 @@ func (m *mockAtlas) ScriptPush(ctx context.Context, params *atlasexec.ScriptPush
 // SecurityScan implements AtlasExec.
 func (m *mockAtlas) SecurityScan(ctx context.Context, params *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
 	return m.securityScan(ctx, params)
+}
+
+// MigrateDriftSlice implements AtlasExec.
+func (m *mockAtlas) MigrateDriftSlice(ctx context.Context, params *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error) {
+	return m.migrateDriftSlice(ctx, params)
 }
 
 func TestMigratePush(t *testing.T) {
@@ -1578,6 +1584,145 @@ func TestMigrateDiff(t *testing.T) {
 		t.Cleanup(func() {
 			_ = os.Remove(filepath.Join("testdata/migrations", "t1.sql"))
 		})
+	})
+}
+
+func TestMigrateDrift(t *testing.T) {
+	newActs := func(t *testing.T, act *mockAction, atlas *mockAtlas) *atlasaction.Actions {
+		t.Helper()
+		a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(atlas))
+		require.NoError(t, err)
+		return a
+	}
+	run := func(t *testing.T, act *mockAction, reports []*atlasexec.MigrateDrift, err error) error {
+		t.Helper()
+		return newActs(t, act, &mockAtlas{
+			migrateDriftSlice: func(context.Context, *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error) {
+				return reports, err
+			},
+		}).MigrateDrift(context.Background())
+	}
+	newAct := func(out io.Writer) *mockAction {
+		return &mockAction{
+			inputs: map[string]string{
+				"config":           "file://atlas.hcl",
+				"env":              "prod",
+				"vars":             `{"tenant":"t1"}`,
+				"url":              "postgres://localhost:5432/app",
+				"dir":              "atlas://app",
+				"dev-url":          "docker://postgres/17/dev",
+				"revisions-schema": "atlas",
+				"exclude":          "audit_log\nmonitoring_*",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+	}
+	drifted := &atlasexec.MigrateDrift{
+		URL:         "postgres://localhost:5432/app",
+		Dir:         "atlas://app",
+		Mode:        "registry",
+		Version:     "20260423120000",
+		Drifted:     true,
+		Fingerprint: "KCdKkeAdYP6336FeduFd3KVw8Z5YBHF2DObTpGGzAsc=",
+		Summary:     &atlasexec.MigrateDriftSummary{Total: 2, Extra: 1, Modified: 1, Types: map[string]int{"table": 2}},
+		Changes: []atlasexec.MigrateDriftChange{
+			{Type: "table", Kind: "extra", Object: `table "audit"`, Cmds: []string{`CREATE TABLE "audit" ("id" integer NOT NULL)`}},
+			{Type: "table", Kind: "modified", Object: `table "users"`, Cmds: []string{`ALTER TABLE "users" ADD COLUMN "nickname" text NULL`}},
+		},
+	}
+	t.Run("no drift", func(t *testing.T) {
+		var params *atlasexec.MigrateDriftParams
+		act := newAct(io.Discard)
+		atlas := &mockAtlas{
+			migrateDriftSlice: func(_ context.Context, p *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error) {
+				params = p
+				return []*atlasexec.MigrateDrift{{URL: "postgres://localhost:5432/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000"}}, nil
+			},
+		}
+		err := newActs(t, act, atlas).MigrateDrift(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, &atlasexec.MigrateDriftParams{
+			ConfigURL:       "file://atlas.hcl",
+			Env:             "prod",
+			Vars:            atlasexec.Vars2{"tenant": "t1"},
+			URL:             "postgres://localhost:5432/app",
+			DirURL:          "atlas://app",
+			DevURL:          "docker://postgres/17/dev",
+			RevisionsSchema: "atlas",
+			Exclude:         []string{"audit_log", "monitoring_*"},
+		}, params)
+		require.Equal(t, "false", act.output["drifted"])
+		require.NotContains(t, act.output, "fingerprint")
+		require.JSONEq(t, `[{"URL":"postgres://localhost:5432/app","Dir":"atlas://app","Mode":"registry","Version":"20260423120000"}]`, act.output["report"])
+		require.Equal(t, 1, act.summary)
+	})
+	t.Run("drift", func(t *testing.T) {
+		var out bytes.Buffer
+		act := newAct(&out)
+		err := run(t, act, []*atlasexec.MigrateDrift{drifted}, nil)
+		require.EqualError(t, err, "`atlas migrate drift` detected drift in 1 database(s): postgres://localhost:5432/app")
+		require.Equal(t, "true", act.output["drifted"])
+		require.Equal(t, drifted.Fingerprint, act.output["fingerprint"])
+		require.Equal(t, 1, act.summary, "the summary is written before the step fails")
+		require.Contains(t, out.String(), "postgres://localhost:5432/app drifted from the expected state at version 20260423120000 with 2 change(s): 1 extra, 1 modified")
+	})
+	// The drift of one target of an environment
+	// is reported, but its fingerprint is not.
+	t.Run("multiple targets", func(t *testing.T) {
+		act := newAct(io.Discard)
+		err := run(t, act, []*atlasexec.MigrateDrift{
+			{URL: "postgres://localhost:5433/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000", Cached: true},
+			drifted,
+		}, nil)
+		require.EqualError(t, err, "`atlas migrate drift` detected drift in 1 database(s): postgres://localhost:5432/app")
+		require.Equal(t, "true", act.output["drifted"])
+		require.NotContains(t, act.output, "fingerprint")
+		require.Equal(t, 1, act.summary)
+	})
+	t.Run("multiple targets drifted", func(t *testing.T) {
+		act := newAct(io.Discard)
+		other := *drifted
+		other.URL = "postgres://localhost:5433/app"
+		err := run(t, act, []*atlasexec.MigrateDrift{drifted, &other}, nil)
+		require.EqualError(t, err, "`atlas migrate drift` detected drift in 2 database(s): postgres://localhost:5432/app, postgres://localhost:5433/app")
+		require.Equal(t, "true", act.output["drifted"])
+		require.NotContains(t, act.output, "fingerprint")
+	})
+	// A check that could not be completed stops the run and fails the
+	// step. The targets checked before it are reported along with it.
+	t.Run("check failed", func(t *testing.T) {
+		act := newAct(io.Discard)
+		err := run(t, act, nil, &atlasexec.MigrateDriftError{Result: []*atlasexec.MigrateDrift{
+			drifted,
+			{URL: "postgres://localhost:5433/app", Dir: "atlas://app", Error: "no migration history found on the connected database"},
+		}})
+		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\nno migration history found on the connected database\nalso detected drift in 1 database(s): postgres://localhost:5432/app")
+		require.Equal(t, "true", act.output["drifted"])
+		require.NotContains(t, act.output, "fingerprint")
+		require.Equal(t, 1, act.summary)
+		var reports []*atlasexec.MigrateDrift
+		require.NoError(t, json.Unmarshal([]byte(act.output["report"]), &reports))
+		require.Len(t, reports, 2)
+		require.Equal(t, "no migration history found on the connected database", reports[1].Error)
+	})
+	// A database that could not be checked fails the step, even if no drift was detected.
+	t.Run("check failed without drift", func(t *testing.T) {
+		act := newAct(io.Discard)
+		err := run(t, act, nil, &atlasexec.MigrateDriftError{Result: []*atlasexec.MigrateDrift{
+			{URL: "postgres://localhost:5432/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000"},
+			{URL: "postgres://localhost:5433/app", Dir: "atlas://app", Error: "cannot determine the expected state: migration 20260423120000 was partially applied. Run 'atlas migrate status' for details"},
+		}})
+		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\ncannot determine the expected state: migration 20260423120000 was partially applied. Run 'atlas migrate status' for details")
+		require.Equal(t, "false", act.output["drifted"])
+		require.NotContains(t, act.output, "fingerprint")
+		require.Equal(t, 1, act.summary)
+	})
+	t.Run("error", func(t *testing.T) {
+		act := newAct(io.Discard)
+		err := run(t, act, nil, atlasexec.ErrRequireLogin)
+		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\ncommand requires 'atlas login'")
+		require.Empty(t, act.output)
+		require.Zero(t, act.summary)
 	})
 }
 
@@ -3403,6 +3548,7 @@ func TestRenderTemplates(t *testing.T) {
 			"render-migrate-apply": renderTemplate[*atlasexec.MigrateApply],
 			"render-schema-lint":   renderTemplate[*atlasaction.SchemaLintReport],
 			"render-security-scan": renderTemplate[*atlasexec.SecurityScan],
+			"render-migrate-drift": renderTemplate[[]*atlasexec.MigrateDrift],
 		},
 	})
 }
@@ -3528,6 +3674,11 @@ func (m *mockAction) SchemaLint(context.Context, *atlasaction.SchemaLintReport) 
 
 // SecurityScan implements atlasaction.SecurityScanReporter.
 func (m *mockAction) SecurityScan(context.Context, *atlasexec.SecurityScan) {
+	m.summary++
+}
+
+// MigrateDrift implements atlasaction.MigrateDriftReporter.
+func (m *mockAction) MigrateDrift(context.Context, []*atlasexec.MigrateDrift) {
 	m.summary++
 }
 

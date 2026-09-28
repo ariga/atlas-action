@@ -1,0 +1,339 @@
+# Mock the atlas command outputs
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-drift
+# Setup the action input variables
+env INPUT_URL=sqlite://file.db
+env INPUT_DIR=file://migrations
+env INPUT_DEV-URL=sqlite://dev?mode=memory
+env INPUT_EXCLUDE=audit_log
+
+atlas-action --action=migrate/drift
+stdout 'sqlite://file.db matches the expected state at version 2'
+stdout 'completed successfully, no drift detected'
+
+# The command exits with an error on drift, after the report was written.
+# Drift fails the action, and its changes are still reported.
+env TEST_EXIT_CODE=1
+! atlas-action --action=migrate/drift
+stdout '::warning::sqlite://file.db drifted from the expected state at version 2 with 2 change.s.: 1 extra, 1 modified'
+stdout '  -- extra table "t3":'
+stdout '    -> CREATE TABLE "t3" \("c" int NULL\);'
+stdout '::error::`atlas migrate drift` detected drift in 1 database.s.: sqlite://file.db'
+
+# A database that could not be checked leaves its state unknown.
+! atlas-action --action=migrate/drift
+stdout '::error::sqlite://file.db could not be checked: no migration history found on the connected database'
+stdout '::error::`atlas migrate drift` completed with errors:%0Ano migration history found on the connected database'
+
+# The targets of an environment are reported one by one. A drifted
+# target fails the action, but its fingerprint is not the one of the run.
+env INPUT_URL= INPUT_DIR= INPUT_DEV-URL= INPUT_EXCLUDE= INPUT_ENV=tenants
+! atlas-action --action=migrate/drift
+stdout 'sqlite://t1.db matches the expected state at version 2'
+stdout '::warning::sqlite://t2.db drifted from the expected state at version 2 with 1 change.s.: 1 extra'
+stdout '::error::`atlas migrate drift` detected drift in 1 database.s.: sqlite://t2.db'
+
+# A statement over multiple lines is aligned with its first line, as the CLI prints it.
+env INPUT_ENV= INPUT_URL=sqlite://file.db INPUT_DIR=file://migrations INPUT_DEV-URL=sqlite://dev?mode=memory INPUT_EXCLUDE=audit_log
+! atlas-action --action=migrate/drift
+stdout '  -- extra view "active_users":\n    -> CREATE VIEW `active_users` \(`id`, `name`\) AS SELECT id,\n       name\n       FROM users\n       WHERE name IS NOT NULL;'
+
+output output.txt
+summary summary.html
+
+-- migrate-drift/1/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory --exclude audit_log
+-- migrate-drift/1/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Pending":1}
+-- migrate-drift/2/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory --exclude audit_log
+-- migrate-drift/2/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"3062373192f2","Summary":{"Total":2,"Extra":1,"Modified":1,"Types":{"table":2}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"t3\"","Cmds":["CREATE TABLE \"t3\" (\"c\" int NULL)"]},{"Type":"table","Kind":"modified","Object":"table \"t1\"","Cmds":["ALTER TABLE \"t1\" ADD COLUMN \"d\" int NULL"]}],"Cached":true}
+-- migrate-drift/3/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory --exclude audit_log
+-- migrate-drift/3/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Error":"no migration history found on the connected database"}
+-- migrate-drift/4/args --
+migrate drift --format {{ json . }} --env tenants
+-- migrate-drift/4/stdout --
+{"URL":"sqlite://t1.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true}
+{"URL":"sqlite://t2.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"H8W7ggzJrh+WrRhcVg3cw448ylyTBPdvO4oTbSF/BKQ=","Summary":{"Total":1,"Extra":1,"Types":{"table":1}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"extra_t\"","Cmds":["CREATE TABLE \"extra_t\" (\"c\" int NULL)"]}],"Cached":true}
+-- migrate-drift/5/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory --exclude audit_log
+-- migrate-drift/5/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"M7RhPTwTp3kVHkkuHTlwQUy3T0gP4rxtn69pM/j/2KU=","Summary":{"Total":1,"Extra":1,"Types":{"view":1}},"Changes":[{"Type":"view","Kind":"extra","Object":"view \"active_users\"","Cmds":["CREATE VIEW `active_users` (`id`, `name`) AS SELECT id,\nname\nFROM users\nWHERE name IS NOT NULL"]}],"Cached":true}
+-- summary.html --
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> No Drift Detected</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://file.db</code></td>
+  </tr>
+  <tr>
+    <td>Current Version</td>
+    <td><code>2</code></td>
+  </tr>
+  <tr>
+    <td>Expected State</td>
+    <td><code>file://migrations</code> (local)</td>
+  </tr>
+  <tr>
+    <td>Pending Files</td>
+    <td>1 (ignored)</td>
+  </tr>
+</table>
+
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture> Drift Detected</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://file.db</code></td>
+  </tr>
+  <tr>
+    <td>Current Version</td>
+    <td><code>2</code></td>
+  </tr>
+  <tr>
+    <td>Expected State</td>
+    <td><code>file://migrations</code> (local, cached)</td>
+  </tr>
+  <tr>
+    <td>Pending Files</td>
+    <td>0</td>
+  </tr>
+  <tr>
+    <td>Changes</td>
+    <td>2 change(s): 1 extra, 1 modified</td>
+  </tr>
+  <tr>
+    <td>Fingerprint</td>
+    <td><code>3062373192f2</code></td>
+  </tr>
+</table>
+<h4>Drifted Objects:</h4>
+<table>
+  <tr>
+    <th>Change</th>
+    <th>Object</th>
+  </tr>
+  <tr>
+    <td>Extra</td>
+    <td><code>table &#34;t3&#34;</code></td>
+  </tr>
+  <tr>
+    <td>Modified</td>
+    <td><code>table &#34;t1&#34;</code></td>
+  </tr>
+</table>
+<details><summary>📄 View SQL Statements</summary>
+
+The database diverged from the expected state as if the following were executed:
+
+```sql
+-- extra table "t3":
+CREATE TABLE "t3" ("c" int NULL);
+-- modified table "t1":
+ALTER TABLE "t1" ADD COLUMN "d" int NULL;
+```
+
+</details>
+
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture> Drift Check Failed</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://file.db</code></td>
+  </tr>
+  <tr>
+    <td>Error</td>
+    <td>no migration history found on the connected database</td>
+  </tr>
+</table>
+
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> No Drift Detected</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://t1.db</code></td>
+  </tr>
+  <tr>
+    <td>Current Version</td>
+    <td><code>2</code></td>
+  </tr>
+  <tr>
+    <td>Expected State</td>
+    <td><code>file://migrations</code> (local, cached)</td>
+  </tr>
+  <tr>
+    <td>Pending Files</td>
+    <td>0</td>
+  </tr>
+</table>
+
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture> Drift Detected</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://t2.db</code></td>
+  </tr>
+  <tr>
+    <td>Current Version</td>
+    <td><code>2</code></td>
+  </tr>
+  <tr>
+    <td>Expected State</td>
+    <td><code>file://migrations</code> (local, cached)</td>
+  </tr>
+  <tr>
+    <td>Pending Files</td>
+    <td>0</td>
+  </tr>
+  <tr>
+    <td>Changes</td>
+    <td>1 change(s): 1 extra</td>
+  </tr>
+  <tr>
+    <td>Fingerprint</td>
+    <td><code>H8W7ggzJrh+WrRhcVg3cw448ylyTBPdvO4oTbSF/BKQ=</code></td>
+  </tr>
+</table>
+<h4>Drifted Objects:</h4>
+<table>
+  <tr>
+    <th>Change</th>
+    <th>Object</th>
+  </tr>
+  <tr>
+    <td>Extra</td>
+    <td><code>table &#34;extra_t&#34;</code></td>
+  </tr>
+</table>
+<details><summary>📄 View SQL Statements</summary>
+
+The database diverged from the expected state as if the following were executed:
+
+```sql
+-- extra table "extra_t":
+CREATE TABLE "extra_t" ("c" int NULL);
+```
+
+</details>
+
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture> Drift Detected</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://file.db</code></td>
+  </tr>
+  <tr>
+    <td>Current Version</td>
+    <td><code>2</code></td>
+  </tr>
+  <tr>
+    <td>Expected State</td>
+    <td><code>file://migrations</code> (local, cached)</td>
+  </tr>
+  <tr>
+    <td>Pending Files</td>
+    <td>0</td>
+  </tr>
+  <tr>
+    <td>Changes</td>
+    <td>1 change(s): 1 extra</td>
+  </tr>
+  <tr>
+    <td>Fingerprint</td>
+    <td><code>M7RhPTwTp3kVHkkuHTlwQUy3T0gP4rxtn69pM/j/2KU=</code></td>
+  </tr>
+</table>
+<h4>Drifted Objects:</h4>
+<table>
+  <tr>
+    <th>Change</th>
+    <th>Object</th>
+  </tr>
+  <tr>
+    <td>Extra</td>
+    <td><code>view &#34;active_users&#34;</code></td>
+  </tr>
+</table>
+<details><summary>📄 View SQL Statements</summary>
+
+The database diverged from the expected state as if the following were executed:
+
+```sql
+-- extra view "active_users":
+CREATE VIEW `active_users` (`id`, `name`) AS SELECT id,
+name
+FROM users
+WHERE name IS NOT NULL;
+```
+
+</details>
+
+-- output.txt --
+report<<_GitHubActionsFileCommandDelimeter_
+[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Pending":1}]
+_GitHubActionsFileCommandDelimeter_
+drifted<<_GitHubActionsFileCommandDelimeter_
+false
+_GitHubActionsFileCommandDelimeter_
+report<<_GitHubActionsFileCommandDelimeter_
+[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"3062373192f2","Summary":{"Total":2,"Extra":1,"Modified":1,"Types":{"table":2}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"t3\"","Cmds":["CREATE TABLE \"t3\" (\"c\" int NULL)"]},{"Type":"table","Kind":"modified","Object":"table \"t1\"","Cmds":["ALTER TABLE \"t1\" ADD COLUMN \"d\" int NULL"]}],"Cached":true}]
+_GitHubActionsFileCommandDelimeter_
+drifted<<_GitHubActionsFileCommandDelimeter_
+true
+_GitHubActionsFileCommandDelimeter_
+fingerprint<<_GitHubActionsFileCommandDelimeter_
+3062373192f2
+_GitHubActionsFileCommandDelimeter_
+report<<_GitHubActionsFileCommandDelimeter_
+[{"URL":"sqlite://file.db","Dir":"file://migrations","Error":"no migration history found on the connected database"}]
+_GitHubActionsFileCommandDelimeter_
+drifted<<_GitHubActionsFileCommandDelimeter_
+false
+_GitHubActionsFileCommandDelimeter_
+report<<_GitHubActionsFileCommandDelimeter_
+[{"URL":"sqlite://t1.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true},{"URL":"sqlite://t2.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"H8W7ggzJrh+WrRhcVg3cw448ylyTBPdvO4oTbSF/BKQ=","Summary":{"Total":1,"Extra":1,"Types":{"table":1}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"extra_t\"","Cmds":["CREATE TABLE \"extra_t\" (\"c\" int NULL)"]}],"Cached":true}]
+_GitHubActionsFileCommandDelimeter_
+drifted<<_GitHubActionsFileCommandDelimeter_
+true
+_GitHubActionsFileCommandDelimeter_
+report<<_GitHubActionsFileCommandDelimeter_
+[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"M7RhPTwTp3kVHkkuHTlwQUy3T0gP4rxtn69pM/j/2KU=","Summary":{"Total":1,"Extra":1,"Types":{"view":1}},"Changes":[{"Type":"view","Kind":"extra","Object":"view \"active_users\"","Cmds":["CREATE VIEW `active_users` (`id`, `name`) AS SELECT id,\nname\nFROM users\nWHERE name IS NOT NULL"]}],"Cached":true}]
+_GitHubActionsFileCommandDelimeter_
+drifted<<_GitHubActionsFileCommandDelimeter_
+true
+_GitHubActionsFileCommandDelimeter_
+fingerprint<<_GitHubActionsFileCommandDelimeter_
+M7RhPTwTp3kVHkkuHTlwQUy3T0gP4rxtn69pM/j/2KU=
+_GitHubActionsFileCommandDelimeter_

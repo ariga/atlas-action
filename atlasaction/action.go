@@ -73,6 +73,11 @@ type (
 	SecurityScanReporter interface {
 		SecurityScan(context.Context, *atlasexec.SecurityScan)
 	}
+	// MigrateDriftReporter is implemented by the actions that report drift checks.
+	MigrateDriftReporter interface {
+		// MigrateDrift reports the checks of a run, one per target database.
+		MigrateDrift(context.Context, []*atlasexec.MigrateDrift)
+	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
 		// PullRequest returns information about a pull request.
@@ -117,6 +122,8 @@ type (
 		MigrateSet(context.Context, *atlasexec.MigrateSetParams) error
 		// MigrateDiff runs the `migrate diff --dry-run` command.
 		MigrateDiff(ctx context.Context, params *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
+		// MigrateDriftSlice runs the `migrate drift` command and returns a report per checked database.
+		MigrateDriftSlice(context.Context, *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error)
 		// MigrateRebase runs the `migrate rebase` command.
 		MigrateRebase(context.Context, *atlasexec.MigrateRebaseParams) error
 		// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
@@ -363,6 +370,7 @@ const (
 	CmdMigrateHash       = "migrate/hash"
 	CmdMigrateSet        = "migrate/set"
 	CmdMigrateDiff       = "migrate/diff"
+	CmdMigrateDrift      = "migrate/drift"
 	// Declarative workflow Commands
 	CmdSchemaPush        = "schema/push"
 	CmdSchemaLint        = "schema/lint"
@@ -413,6 +421,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MigrateSet(ctx)
 	case CmdMigrateDiff:
 		return a.MigrateDiff(ctx)
+	case CmdMigrateDrift:
+		return a.MigrateDrift(ctx)
 	case CmdSchemaPush:
 		return a.SchemaPush(ctx)
 	case CmdSchemaLint:
@@ -949,6 +959,72 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Run migrate/diff completed successfully")
+	return nil
+}
+
+// MigrateDrift runs the Action for "ariga/atlas-action/migrate/drift".
+func (a *Actions) MigrateDrift(ctx context.Context) error {
+	reports, err := a.Atlas.MigrateDriftSlice(ctx, &atlasexec.MigrateDriftParams{
+		ConfigURL:       a.GetConfigURL(),
+		Env:             a.GetInput("env"),
+		Vars:            a.GetVarsInput("vars"),
+		URL:             a.GetInput("url"),
+		DirURL:          a.GetInput("dir"),
+		DevURL:          a.GetInput("dev-url"),
+		RevisionsSchema: a.GetInput("revisions-schema"),
+		Exclude:         a.GetArrayInput("exclude"),
+	})
+	// A check that could not be completed stops the run. The targets
+	// checked before it are reported along with the failed one.
+	if derr, ok := errors.AsType[*atlasexec.MigrateDriftError](err); ok {
+		reports = derr.Result
+	} else if err != nil {
+		return fmt.Errorf("`atlas migrate drift` completed with errors:\n%s", err)
+	}
+	report, jsonErr := json.Marshal(reports)
+	if jsonErr != nil {
+		return fmt.Errorf("failed to marshal the drift report: %w", jsonErr)
+	}
+	a.SetOutput("report", string(report))
+	var drifted []string // URLs of the drifted databases.
+	for _, r := range reports {
+		switch {
+		case r.Error != "":
+			a.Errorf("%s could not be checked: %s", r.URL, r.Error)
+		case r.Drifted:
+			drifted = append(drifted, r.URL)
+			a.Warningf("%s drifted from the expected state at version %s with %s", r.URL, r.Version, driftChanges(r.Summary))
+			for _, ch := range r.Changes {
+				a.Infof("  -- %s %s:", ch.Kind, ch.Object)
+				for _, cmd := range ch.Cmds {
+					// As the CLI prints them, statements over multiple
+					// lines are aligned with their first line.
+					a.Infof("    -> %s;", strings.ReplaceAll(cmd, "\n", "\n       "))
+				}
+			}
+		default:
+			a.Infof("%s matches the expected state at version %s", r.URL, r.Version)
+		}
+	}
+	a.SetOutput("drifted", strconv.FormatBool(len(drifted) > 0))
+	// A fingerprint identifies the drift of one database, not of a set of them.
+	if len(reports) == 1 && reports[0].Drifted {
+		a.SetOutput("fingerprint", reports[0].Fingerprint)
+	}
+	if r, ok := a.Action.(MigrateDriftReporter); ok {
+		r.MigrateDrift(ctx, reports)
+	}
+	found := fmt.Sprintf("detected drift in %d database(s): %s", len(drifted), strings.Join(drifted, ", "))
+	switch {
+	// A database that could not be checked leaves its state unknown.
+	case err != nil && len(drifted) > 0:
+		return fmt.Errorf("`atlas migrate drift` completed with errors:\n%s\nalso %s", err, found)
+	case err != nil:
+		return fmt.Errorf("`atlas migrate drift` completed with errors:\n%s", err)
+	case len(drifted) > 0:
+		return errors.New("`atlas migrate drift` " + found)
+	}
+	a.Infof("`atlas migrate drift` completed successfully, no drift detected")
 	return nil
 }
 
@@ -1801,9 +1877,9 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 // CloudRepoCreate runs the Action for "ariga/atlas-action/create-repo".
 func (a *Actions) CloudRepoCreate(ctx context.Context) error {
 	params := &atlasexec.CloudRepoCreateParams{
-		Name:         a.GetInput("name"),
-		Type:         a.GetInput("type"),
-		Driver:       a.GetInput("driver"),
+		Name:   a.GetInput("name"),
+		Type:   a.GetInput("type"),
+		Driver: a.GetInput("driver"),
 	}
 	rsp, err := a.Atlas.CloudRepoCreate(ctx, params)
 	if err != nil {
@@ -2136,6 +2212,24 @@ func appliedStmts(a *atlasexec.MigrateApply) int {
 	return total
 }
 
+// driftChanges summarizes the changes of a drift report by their kind.
+// e.g., "3 change(s): 1 extra, 2 modified".
+func driftChanges(s *atlasexec.MigrateDriftSummary) string {
+	if s == nil {
+		return "0 change(s)"
+	}
+	kinds := make([]string, 0, 3)
+	for _, k := range []struct {
+		n    int
+		kind string
+	}{{s.Extra, "extra"}, {s.Missing, "missing"}, {s.Modified, "modified"}} {
+		if k.n > 0 {
+			kinds = append(kinds, fmt.Sprintf("%d %s", k.n, k.kind))
+		}
+	}
+	return fmt.Sprintf("%d change(s): %s", s.Total, strings.Join(kinds, ", "))
+}
+
 func filterIssues(steps []*atlasexec.StepReport) []*atlasexec.StepReport {
 	result := make([]*atlasexec.StepReport, 0, len(steps))
 	for _, s := range steps {
@@ -2166,6 +2260,7 @@ func RenderTemplate(name string, data any, tc *TriggerContext) (string, error) {
 			Funcs(template.FuncMap{
 				"execTime":     execTime,
 				"appliedStmts": appliedStmts,
+				"driftChanges": driftChanges,
 				"filterIssues": filterIssues,
 				"stepIsError":  stepIsError,
 				"repoLink": func(planLink string) string {
