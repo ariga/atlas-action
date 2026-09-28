@@ -399,6 +399,42 @@ actions:
       url:
         type: string
         description: If given, the URL for reviewing the revert plan.
+  - id: migrate/drift
+    name: Migrate Drift
+    description: Detect schema drift between a target database and its migration history
+    inputs:
+      <<: *migrateInputs
+      dev-url:
+        <<: *devURL
+        description: |
+          The URL of the dev-database to compute the expected state on. Required when the migration
+          directory is not stored in the Atlas Registry. For example: `docker://postgres/17/dev`.
+          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      url:
+        type: string
+        label: Target database URL
+        description: |
+          The URL of the target database to check for drift. For example: `mysql://root:pass@localhost:3306/prod`.
+      dir:
+        type: string
+        label: Migration directory
+        description: |
+          The URL of the migration directory that defines the expected state. For example: `atlas://dir-name`
+          for cloud based directories or `file://migrations` for local ones.
+      exclude: *inspectExclude
+    outputs:
+      drifted:
+        type: boolean
+        description: Whether drift was detected in any of the checked databases. Either "true" or "false".
+      fingerprint:
+        type: string
+        description: |
+          A stable identifier of the detected drift, which changes only when the drift does. Use it to
+          deduplicate alerts. Set when a single database was checked and drifted.
+      report:
+        type: string
+        description: |
+          A JSON array of the drift reports, one for each checked database.
   - id: migrate/lint
     description: CI for database schema changes with Atlas
     name: Migrate Lint
