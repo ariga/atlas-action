@@ -1021,15 +1021,12 @@ func (a *Actions) MigrateDrift(ctx context.Context) error {
 	if r, ok := a.Action.(MigrateDriftReporter); ok {
 		r.MigrateDrift(ctx, reports)
 	}
-	found := fmt.Sprintf("detected drift in %d database(s): %s", len(drifted), strings.Join(drifted, ", "))
-	switch {
 	// A database that could not be checked leaves its state unknown.
-	case err != nil && len(drifted) > 0:
-		return fmt.Errorf("`atlas migrate drift` completed with errors:\n%s\nalso %s", err, found)
-	case err != nil:
+	if err != nil {
 		return fmt.Errorf("`atlas migrate drift` completed with errors:\n%s", err)
-	case len(drifted) > 0:
-		return errors.New("`atlas migrate drift` " + found)
+	}
+	if len(drifted) > 0 {
+		return fmt.Errorf("`atlas migrate drift` detected drift in %d database(s): %s", len(drifted), strings.Join(drifted, ", "))
 	}
 	a.Infof("`atlas migrate drift` completed successfully, no drift detected")
 	return nil

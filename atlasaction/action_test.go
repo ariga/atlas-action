@@ -1590,20 +1590,6 @@ func TestMigrateDiff(t *testing.T) {
 }
 
 func TestMigrateDrift(t *testing.T) {
-	newActs := func(t *testing.T, act *mockAction, atlas *mockAtlas) *atlasaction.Actions {
-		t.Helper()
-		a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(atlas))
-		require.NoError(t, err)
-		return a
-	}
-	run := func(t *testing.T, act *mockAction, reports []*atlasexec.MigrateDrift, err error) error {
-		t.Helper()
-		return newActs(t, act, &mockAtlas{
-			migrateDriftSlice: func(context.Context, *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error) {
-				return reports, err
-			},
-		}).MigrateDrift(context.Background())
-	}
 	newAct := func(out io.Writer) *mockAction {
 		return &mockAction{
 			inputs: map[string]string{
@@ -1619,6 +1605,27 @@ func TestMigrateDrift(t *testing.T) {
 			logger: slog.New(slog.NewTextHandler(out, nil)),
 		}
 	}
+	want := &atlasexec.MigrateDriftParams{
+		ConfigURL:       "file://atlas.hcl",
+		Env:             "prod",
+		Vars:            atlasexec.Vars2{"tenant": "t1"},
+		URL:             "postgres://localhost:5432/app",
+		DirURL:          "atlas://app",
+		DevURL:          "docker://postgres/17/dev",
+		RevisionsSchema: "atlas",
+		Exclude:         []string{"audit_log", "monitoring_*"},
+	}
+	run := func(t *testing.T, act *mockAction, reports []*atlasexec.MigrateDrift, err error) error {
+		t.Helper()
+		a, aerr := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(&mockAtlas{
+			migrateDriftSlice: func(_ context.Context, p *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error) {
+				require.Equal(t, want, p)
+				return reports, err
+			},
+		}))
+		require.NoError(t, aerr)
+		return a.MigrateDrift(context.Background())
+	}
 	drifted := &atlasexec.MigrateDrift{
 		URL:         "postgres://localhost:5432/app",
 		Dir:         "atlas://app",
@@ -1633,26 +1640,9 @@ func TestMigrateDrift(t *testing.T) {
 		},
 	}
 	t.Run("no drift", func(t *testing.T) {
-		var params *atlasexec.MigrateDriftParams
 		act := newAct(io.Discard)
-		atlas := &mockAtlas{
-			migrateDriftSlice: func(_ context.Context, p *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error) {
-				params = p
-				return []*atlasexec.MigrateDrift{{URL: "postgres://localhost:5432/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000"}}, nil
-			},
-		}
-		err := newActs(t, act, atlas).MigrateDrift(context.Background())
+		err := run(t, act, []*atlasexec.MigrateDrift{{URL: "postgres://localhost:5432/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000"}}, nil)
 		require.NoError(t, err)
-		require.Equal(t, &atlasexec.MigrateDriftParams{
-			ConfigURL:       "file://atlas.hcl",
-			Env:             "prod",
-			Vars:            atlasexec.Vars2{"tenant": "t1"},
-			URL:             "postgres://localhost:5432/app",
-			DirURL:          "atlas://app",
-			DevURL:          "docker://postgres/17/dev",
-			RevisionsSchema: "atlas",
-			Exclude:         []string{"audit_log", "monitoring_*"},
-		}, params)
 		require.Equal(t, "false", act.output["drifted"])
 		require.NotContains(t, act.output, "fingerprint")
 		require.JSONEq(t, `[{"URL":"postgres://localhost:5432/app","Dir":"atlas://app","Mode":"registry","Version":"20260423120000"}]`, act.output["report"])
@@ -1698,7 +1688,7 @@ func TestMigrateDrift(t *testing.T) {
 			drifted,
 			{URL: "postgres://localhost:5433/app", Dir: "atlas://app", Error: "no migration history found on the connected database"},
 		}})
-		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\nno migration history found on the connected database\nalso detected drift in 1 database(s): postgres://localhost:5432/app")
+		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\nno migration history found on the connected database")
 		require.Equal(t, "true", act.output["drifted"])
 		require.NotContains(t, act.output, "fingerprint")
 		require.Equal(t, 1, act.summary)
