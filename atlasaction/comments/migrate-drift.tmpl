@@ -1,0 +1,83 @@
+{{- range $i, $r := . }}
+{{- if $i }}
+
+{{ end -}}
+<h2>
+{{- if .Error -}}
+{{- assetsImage "error.svg" | image "22px" }} Drift Check Failed
+{{- else if .Drifted -}}
+{{- assetsImage "error.svg" | image "22px" }} Drift Detected
+{{- else -}}
+{{- assetsImage "success.svg" | image "22px" }} No Drift Detected
+{{- end -}}
+</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>{{ .URL | html }}</code></td>
+  </tr>
+{{- if .Error }}
+  <tr>
+    <td>Error</td>
+    <td>{{ .Error | html }}</td>
+  </tr>
+{{- else }}
+  <tr>
+    <td>Current Version</td>
+    <td><code>{{ .Version }}</code></td>
+  </tr>
+  <tr>
+    <td>Expected State</td>
+    <td><code>{{ .Dir | html }}</code> ({{ .Mode }}{{ if .Cached }}, cached{{ end }})</td>
+  </tr>
+  <tr>
+    <td>Pending Files</td>
+    <td>{{ .Pending }}{{ if .Pending }} (ignored){{ end }}</td>
+  </tr>
+{{- if .Drifted }}
+  <tr>
+    <td>Changes</td>
+    <td>{{ driftChanges .Summary }}</td>
+  </tr>
+  <tr>
+    <td>Fingerprint</td>
+    <td><code>{{ .Fingerprint }}</code></td>
+  </tr>
+{{- end }}
+{{- end }}
+</table>
+{{- with .Changes }}
+<h4>Drifted Objects:</h4>
+<table>
+  <tr>
+    <th>Change</th>
+    <th>Object</th>
+  </tr>
+{{- range . }}
+  <tr>
+    <td>{{ firstUpper .Kind }}</td>
+    <td><code>{{ .Object | html }}</code></td>
+  </tr>
+{{- end }}
+</table>
+<details><summary>📄 View SQL Statements</summary>
+
+The database diverged from the expected state as if the following were executed:
+
+```sql
+{{- range . }}
+-- {{ .Kind }} {{ .Object }}:
+{{- range .Cmds }}
+{{ . }};
+{{- end }}
+{{- end }}
+```
+
+</details>
+{{- end }}
+{{- end }}

@@ -1,0 +1,47 @@
+# Test migrate/drift action for TeamCity
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-drift
+# Setup the action input variables
+env ATLAS_INPUT_URL=sqlite://file.db
+env ATLAS_INPUT_DIR=file://migrations
+env ATLAS_INPUT_DEV_URL=sqlite://dev?mode=memory
+
+atlas-action --action=migrate/drift
+cmp stdout clean.out
+
+# The command exits with an error on drift, after the report was written.
+env TEST_EXIT_CODE=1
+! atlas-action --action=migrate/drift
+cmp stdout drift.out
+
+-- migrate-drift/1/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
+-- migrate-drift/1/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2"}
+-- migrate-drift/2/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
+-- migrate-drift/2/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"3062373192f2","Summary":{"Total":2,"Extra":1,"Modified":1,"Types":{"table":2}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"t3\"","Cmds":["CREATE TABLE \"t3\" (\"c\" int NULL)"]},{"Type":"table","Kind":"modified","Object":"table \"t1\"","Cmds":["ALTER TABLE \"t1\" ADD COLUMN \"d\" int NULL"]}]}
+-- clean.out --
+##teamcity[setParameter name='atlas-action.migrate-drift.outputs.report' value='|[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2"}|]']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT' value='|[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2"}|]']
+##teamcity[message status='NORMAL' text='sqlite://file.db matches the expected state at version 2']
+##teamcity[setParameter name='atlas-action.migrate-drift.outputs.drifted' value='false']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED' value='false']
+##teamcity[buildStatisticValue key='atlas.migrate.drift.drifted' value='0']
+##teamcity[buildStatisticValue key='atlas.migrate.drift.changes' value='0']
+##teamcity[message status='NORMAL' text='`atlas migrate drift` completed successfully, no drift detected']
+-- drift.out --
+##teamcity[setParameter name='atlas-action.migrate-drift.outputs.report' value='|[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"3062373192f2","Summary":{"Total":2,"Extra":1,"Modified":1,"Types":{"table":2}},"Changes":|[{"Type":"table","Kind":"extra","Object":"table \"t3\"","Cmds":|["CREATE TABLE \"t3\" (\"c\" int NULL)"|]},{"Type":"table","Kind":"modified","Object":"table \"t1\"","Cmds":|["ALTER TABLE \"t1\" ADD COLUMN \"d\" int NULL"|]}|]}|]']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT' value='|[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"3062373192f2","Summary":{"Total":2,"Extra":1,"Modified":1,"Types":{"table":2}},"Changes":|[{"Type":"table","Kind":"extra","Object":"table \"t3\"","Cmds":|["CREATE TABLE \"t3\" (\"c\" int NULL)"|]},{"Type":"table","Kind":"modified","Object":"table \"t1\"","Cmds":|["ALTER TABLE \"t1\" ADD COLUMN \"d\" int NULL"|]}|]}|]']
+##teamcity[message status='WARNING' text='sqlite://file.db drifted from the expected state at version 2 with 2 change(s): 1 extra, 1 modified']
+##teamcity[message status='NORMAL' text='  -- extra table "t3":']
+##teamcity[message status='NORMAL' text='    -> CREATE TABLE "t3" ("c" int NULL);']
+##teamcity[message status='NORMAL' text='  -- modified table "t1":']
+##teamcity[message status='NORMAL' text='    -> ALTER TABLE "t1" ADD COLUMN "d" int NULL;']
+##teamcity[setParameter name='atlas-action.migrate-drift.outputs.drifted' value='true']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED' value='true']
+##teamcity[setParameter name='atlas-action.migrate-drift.outputs.fingerprint' value='3062373192f2']
+##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_DRIFT_FINGERPRINT' value='3062373192f2']
+##teamcity[buildStatisticValue key='atlas.migrate.drift.drifted' value='1']
+##teamcity[buildStatisticValue key='atlas.migrate.drift.changes' value='2']
+##teamcity[message status='FAILURE' text='`atlas migrate drift` detected drift in 1 database(s): sqlite://file.db']

@@ -1,0 +1,190 @@
+# a drifted database, with pending files
+render-migrate-drift migrate-drift.tmpl data-0.json
+cmp stdout golden-0.html
+
+# the targets of an environment: a database that matches its expected state, and one that could not be checked
+render-migrate-drift migrate-drift.tmpl data-1.json
+cmp stdout golden-1.html
+
+# registry mode, a URL to escape, a change without statements, and a statement over multiple lines
+render-migrate-drift migrate-drift.tmpl data-2.json
+cmp stdout golden-2.html
+
+-- data-0.json --
+[{"URL":"postgres://postgres:xxxxx@localhost:5432/app?sslmode=disable","Dir":"atlas://app","Mode":"registry","Version":"20260423120000","Pending":1,"Drifted":true,"Fingerprint":"KCdKkeAdYP6336FeduFd3KVw8Z5YBHF2DObTpGGzAsc=","Summary":{"Total":3,"Extra":1,"Missing":1,"Modified":1,"Types":{"index":1,"table":2}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"audit\"","Cmds":["CREATE TABLE \"audit\" (\"id\" integer NOT NULL)"]},{"Type":"index","Kind":"missing","Object":"index \"users_email\"","Cmds":["DROP INDEX \"users_email\""]},{"Type":"table","Kind":"modified","Object":"table \"users\"","Cmds":["ALTER TABLE \"users\" ADD COLUMN \"nickname\" text NULL","ALTER TABLE \"users\" ALTER COLUMN \"email\" TYPE text"]}]}]
+-- golden-0.html --
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture> Drift Detected</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>postgres://postgres:xxxxx@localhost:5432/app?sslmode=disable</code></td>
+  </tr>
+  <tr>
+    <td>Current Version</td>
+    <td><code>20260423120000</code></td>
+  </tr>
+  <tr>
+    <td>Expected State</td>
+    <td><code>atlas://app</code> (registry)</td>
+  </tr>
+  <tr>
+    <td>Pending Files</td>
+    <td>1 (ignored)</td>
+  </tr>
+  <tr>
+    <td>Changes</td>
+    <td>3 change(s): 1 extra, 1 missing, 1 modified</td>
+  </tr>
+  <tr>
+    <td>Fingerprint</td>
+    <td><code>KCdKkeAdYP6336FeduFd3KVw8Z5YBHF2DObTpGGzAsc=</code></td>
+  </tr>
+</table>
+<h4>Drifted Objects:</h4>
+<table>
+  <tr>
+    <th>Change</th>
+    <th>Object</th>
+  </tr>
+  <tr>
+    <td>Extra</td>
+    <td><code>table &#34;audit&#34;</code></td>
+  </tr>
+  <tr>
+    <td>Missing</td>
+    <td><code>index &#34;users_email&#34;</code></td>
+  </tr>
+  <tr>
+    <td>Modified</td>
+    <td><code>table &#34;users&#34;</code></td>
+  </tr>
+</table>
+<details><summary>📄 View SQL Statements</summary>
+
+The database diverged from the expected state as if the following were executed:
+
+```sql
+-- extra table "audit":
+CREATE TABLE "audit" ("id" integer NOT NULL);
+-- missing index "users_email":
+DROP INDEX "users_email";
+-- modified table "users":
+ALTER TABLE "users" ADD COLUMN "nickname" text NULL;
+ALTER TABLE "users" ALTER COLUMN "email" TYPE text;
+```
+
+</details>
+-- data-1.json --
+[{"URL":"sqlite://t1.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true},{"URL":"sqlite://t2.db","Dir":"file://migrations","Error":"no migration history found on the connected database"}]
+-- golden-1.html --
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture> No Drift Detected</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://t1.db</code></td>
+  </tr>
+  <tr>
+    <td>Current Version</td>
+    <td><code>2</code></td>
+  </tr>
+  <tr>
+    <td>Expected State</td>
+    <td><code>file://migrations</code> (local, cached)</td>
+  </tr>
+  <tr>
+    <td>Pending Files</td>
+    <td>0</td>
+  </tr>
+</table>
+
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture> Drift Check Failed</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>sqlite://t2.db</code></td>
+  </tr>
+  <tr>
+    <td>Error</td>
+    <td>no migration history found on the connected database</td>
+  </tr>
+</table>
+-- data-2.json --
+[{"URL":"postgres://postgres:xxxxx@localhost:5432/app?search_path=public&sslmode=disable","Dir":"atlas://app","Mode":"registry","Version":"20260423120000","Drifted":true,"Fingerprint":"aHiVJOCR71PWWAUjDOEoKORGgA++XoeLRqUnB7Dg6M0=","Summary":{"Total":2,"Extra":1,"Modified":1,"Types":{"function":1,"table":1}},"Changes":[{"Type":"table","Kind":"modified","Object":"table \"users\"","Cmds":null},{"Type":"function","Kind":"extra","Object":"function \"audit\"","Cmds":["CREATE FUNCTION \"audit\" () RETURNS trigger LANGUAGE plpgsql AS $$\nBEGIN\n  RETURN NEW;\nEND;\n$$"]}]}]
+-- golden-2.html --
+<h2><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="22px" height="22px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture> Drift Detected</h2>
+<h4><code>atlas migrate drift</code> Summary:</h4>
+<table>
+  <tr>
+    <th>Parameter</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>Database URL</td>
+    <td><code>postgres://postgres:xxxxx@localhost:5432/app?search_path=public&amp;sslmode=disable</code></td>
+  </tr>
+  <tr>
+    <td>Current Version</td>
+    <td><code>20260423120000</code></td>
+  </tr>
+  <tr>
+    <td>Expected State</td>
+    <td><code>atlas://app</code> (registry)</td>
+  </tr>
+  <tr>
+    <td>Pending Files</td>
+    <td>0</td>
+  </tr>
+  <tr>
+    <td>Changes</td>
+    <td>2 change(s): 1 extra, 1 modified</td>
+  </tr>
+  <tr>
+    <td>Fingerprint</td>
+    <td><code>aHiVJOCR71PWWAUjDOEoKORGgA++XoeLRqUnB7Dg6M0=</code></td>
+  </tr>
+</table>
+<h4>Drifted Objects:</h4>
+<table>
+  <tr>
+    <th>Change</th>
+    <th>Object</th>
+  </tr>
+  <tr>
+    <td>Modified</td>
+    <td><code>table &#34;users&#34;</code></td>
+  </tr>
+  <tr>
+    <td>Extra</td>
+    <td><code>function &#34;audit&#34;</code></td>
+  </tr>
+</table>
+<details><summary>📄 View SQL Statements</summary>
+
+The database diverged from the expected state as if the following were executed:
+
+```sql
+-- modified table "users":
+-- extra function "audit":
+CREATE FUNCTION "audit" () RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RETURN NEW;
+END;
+$$;
+```
+
+</details>
