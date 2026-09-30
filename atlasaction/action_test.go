@@ -33,6 +33,7 @@ import (
 	"ariga.io/atlas-action/internal/cmdapi"
 	"ariga.io/atlas/atlasexec"
 	"ariga.io/atlas/sql/migrate"
+	"ariga.io/atlas/sql/sqlcheck"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rogpeppe/go-internal/diff"
 	"github.com/rogpeppe/go-internal/testscript"
@@ -646,6 +647,7 @@ type mockAtlas struct {
 	migrateSet        func(context.Context, *atlasexec.MigrateSetParams) error
 	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
 	migrateLs         func(context.Context, *atlasexec.MigrateLsParams) (string, error)
+	migrateLintError  func(context.Context, *atlasexec.MigrateLintParams) error
 	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
@@ -718,8 +720,8 @@ func (m *mockAtlas) MigrateApplySlice(context.Context, *atlasexec.MigrateApplyPa
 }
 
 // MigrateLintError implements AtlasExec.
-func (m *mockAtlas) MigrateLintError(context.Context, *atlasexec.MigrateLintParams) error {
-	panic("unimplemented")
+func (m *mockAtlas) MigrateLintError(ctx context.Context, params *atlasexec.MigrateLintParams) error {
+	return m.migrateLintError(ctx, params)
 }
 
 // MigratePush implements AtlasExec.
@@ -2299,6 +2301,134 @@ func TestMigrateLint(t *testing.T) {
 		require.NotEmpty(t, string(c))
 		require.NotEmpty(t, tt.out.String())
 	})
+	t.Run("lint summary - lint error - report not uploaded", func(t *testing.T) {
+		tt := newT(t, nil)
+		tt.env["GITHUB_EVENT_NAME"] = "push"
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		r := destructiveReport()
+		r.ReportError = "unexpected status code: 503"
+		tt.cli = &mockAtlas{migrateLintError: migrateLintReport(t, r, atlasexec.ErrLint)}
+		err := tt.newActs(t).MigrateLint(context.Background())
+		require.EqualError(t, err, "`atlas migrate lint` completed with errors")
+		require.Equal(t, "::warning::`atlas migrate lint` report was not uploaded to Atlas Cloud: unexpected status code: 503\n"+
+			"::error file=testdata/migrations_destructive/20230925192914.sql,line=1,title=destructive changes detected::Dropping table \"t1\" (DS102)%0A%0ADetails: https://atlasgo.io/lint/analyzers#DS102\n", tt.out.String())
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Equal(t, destructiveSummary, string(c))
+		require.Empty(t, must(tt.outputs()))
+	})
+	t.Run("lint summary - no issues - report not uploaded", func(t *testing.T) {
+		tt := newT(t, nil)
+		tt.env["GITHUB_EVENT_NAME"] = "push"
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir-slug")
+		r := &atlasexec.SummaryReport{
+			Files:       []*atlasexec.FileReport{{Name: "20230922132634_init.sql"}},
+			ReportError: "unexpected status code: 503",
+		}
+		r.Env.Dir = "testdata/migrations"
+		tt.cli = &mockAtlas{migrateLintError: migrateLintReport(t, r, nil)}
+		require.NoError(t, tt.newActs(t).MigrateLint(context.Background()))
+		require.Equal(t, "::warning::`atlas migrate lint` report was not uploaded to Atlas Cloud: unexpected status code: 503\n"+
+			"`atlas migrate lint` completed successfully, no issues found\n", tt.out.String())
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Equal(t, `<code>atlas migrate lint</code> on <strong>testdata/migrations</strong>
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>1 new migration file detected</td>
+      <td>20230922132634_init.sql</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No issues found</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+`, string(c))
+		require.Empty(t, must(tt.outputs()))
+	})
+	t.Run("lint summary - lint error - report uploaded", func(t *testing.T) {
+		tt := newT(t, nil)
+		tt.env["GITHUB_EVENT_NAME"] = "push"
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		r := destructiveReport()
+		r.URL = "https://migration-lint-report-url"
+		tt.cli = &mockAtlas{migrateLintError: migrateLintReport(t, r, atlasexec.ErrLint)}
+		err := tt.newActs(t).MigrateLint(context.Background())
+		require.EqualError(t, err, "`atlas migrate lint` completed with errors, see report: https://migration-lint-report-url")
+		require.Equal(t, "::error file=testdata/migrations_destructive/20230925192914.sql,line=1,title=destructive changes detected::Dropping table \"t1\" (DS102)%0A%0ADetails: https://atlasgo.io/lint/analyzers#DS102\n", tt.out.String())
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Equal(t, `<code>atlas migrate lint</code> on <strong>testdata/migrations_destructive</strong>
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>1 new migration file detected</td>
+      <td>20230925192914.sql</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>ERD and visual diff generated</td>
+      <td><a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a></td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td>
+      <td>Analyze 20230925192914.sql<br/>1 reports were found in analysis</td>
+      <td><b>Destructive changes detected</b><br/>Dropping table "t1"&nbsp;<a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/></td>
+    </tr><tr><td colspan="4"><div align="center">Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a></div></td></tr>
+  </tbody>
+</table>
+`, string(c))
+		require.Equal(t, map[string]string{"report-url": "https://migration-lint-report-url"}, must(tt.outputs()))
+	})
+	t.Run("lint comment - lint error - report not uploaded", func(t *testing.T) {
+		tt := newT(t, nil)
+		var comment string
+		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			switch path, method := request.URL.Path, request.Method; {
+			case path == "/repos/test-owner/test-repository/issues/0/comments" && method == http.MethodGet,
+				path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
+				_, err := writer.Write([]byte(`[]`))
+				require.NoError(t, err)
+			case path == "/repos/test-owner/test-repository/issues/0/comments" && method == http.MethodPost:
+				var payload struct{ Body string }
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+				comment = payload.Body
+				writer.WriteHeader(http.StatusCreated)
+			default:
+				writer.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		t.Cleanup(ghMock.Close)
+		tt.env["GITHUB_API_URL"] = ghMock.URL
+		tt.env["GITHUB_REPOSITORY"] = "test-owner/test-repository"
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		r := destructiveReport()
+		r.ReportError = "unexpected status code: 503"
+		tt.cli = &mockAtlas{migrateLintError: migrateLintReport(t, r, atlasexec.ErrLint)}
+		err := tt.newActs(t).MigrateLint(context.Background())
+		require.EqualError(t, err, "`atlas migrate lint` completed with errors")
+		require.Equal(t, destructiveSummary+"<!-- generated by ariga/atlas-action for test-dir-slug -->", comment)
+	})
 	t.Run("lint summary - with diagnostics file not included in the pull request", func(t *testing.T) {
 		tt := newT(t, nil)
 		var comments []map[string]any
@@ -2640,6 +2770,59 @@ func sqlitedb(t *testing.T) string {
 	require.NoError(t, err)
 	return dbpath
 }
+
+// migrateLintReport returns a MigrateLintError mock that writes the report
+// to the params writer and returns err, as "atlas migrate lint" does.
+func migrateLintReport(t *testing.T, r *atlasexec.SummaryReport, err error) func(context.Context, *atlasexec.MigrateLintParams) error {
+	return func(_ context.Context, p *atlasexec.MigrateLintParams) error {
+		require.True(t, p.Web)
+		require.NoError(t, json.NewEncoder(p.Writer).Encode(r))
+		return err
+	}
+}
+
+// destructiveReport returns a lint report with a destructive change.
+func destructiveReport() *atlasexec.SummaryReport {
+	f := &atlasexec.FileReport{
+		Name:  "20230925192914.sql",
+		Text:  "drop table t1;\n",
+		Error: "destructive changes detected",
+		Reports: []sqlcheck.Report{{
+			Text:        "destructive changes detected",
+			Diagnostics: []sqlcheck.Diagnostic{{Text: `Dropping table "t1"`, Code: "DS102"}},
+		}},
+	}
+	r := &atlasexec.SummaryReport{
+		Steps: []*atlasexec.StepReport{{Name: "Analyze 20230925192914.sql", Text: "1 reports were found in analysis", Result: f}},
+		Files: []*atlasexec.FileReport{f},
+	}
+	r.Env.Dir = "testdata/migrations_destructive"
+	return r
+}
+
+// destructiveSummary is the step summary of destructiveReport without a report URL.
+const destructiveSummary = `<code>atlas migrate lint</code> on <strong>testdata/migrations_destructive</strong>
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>1 new migration file detected</td>
+      <td>20230925192914.sql</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td>
+      <td>Analyze 20230925192914.sql<br/>1 reports were found in analysis</td>
+      <td><b>Destructive changes detected</b><br/>Dropping table "t1"&nbsp;<a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/></td>
+    </tr>
+  </tbody>
+</table>
+`
 
 type test struct {
 	db        string
