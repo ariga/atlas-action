@@ -660,6 +660,9 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if err := json.NewDecoder(&resp).Decode(&payload); err != nil {
 		return fmt.Errorf("decoding payload: %w", err)
 	}
+	if payload.ReportError != "" {
+		a.Warningf("`atlas migrate lint` report was not uploaded to Atlas Cloud: %s", payload.ReportError)
+	}
 	if payload.URL != "" {
 		a.SetOutput("report-url", payload.URL)
 	}
@@ -677,7 +680,10 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		}
 	}
 	if isLintErr {
-		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
+		if payload.URL != "" {
+			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
+		}
+		return errors.New("`atlas migrate lint` completed with errors")
 	}
 	a.Infof("`atlas migrate lint` completed successfully, no issues found")
 	return nil
