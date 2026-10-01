@@ -768,6 +768,9 @@ Push a schema to [Atlas Registry](https://atlasgo.io/registry) with an optional 
 
 Plan a declarative migration for a schema transition.
 
+On pull requests, the action comments with the plan and its lint results. On GitHub, if the Atlas CLI reports a change
+summary, the comment also lists each changed object with its diff and statements, trimmed to fit GitHub's size limit.
+
 #### Inputs
 
 * `exclude` - List of glob patterns used to select which resources to filter in inspection

@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -2160,6 +2161,157 @@ func stepIsError(s *atlasexec.StepReport) bool {
 	return s.Error != "" || (s.Result != nil && s.Result.Error != "")
 }
 
+// PlanComment is the data of the schema plan comment template.
+type PlanComment struct {
+	Plan         *atlasexec.SchemaPlan
+	RerunCommand string
+	Summary      bool // Add the change summary of the plan, if it has one.
+	SummarySQL   bool // Show the statements of each object in the summary.
+	Colors       bool // Color the diff counts, which only GitHub comments render.
+}
+
+// Changes returns the change summary the comment adds, if any.
+func (c PlanComment) Changes() *atlasexec.ChangeSummary {
+	if !c.Summary || c.Plan == nil || c.Plan.File == nil {
+		return nil
+	}
+	if s := c.Plan.File.Changes; s != nil && len(s.Objects)+len(s.Other) > 0 {
+		return s
+	}
+	return nil
+}
+
+// SQL returns the plan statements at the given indexes. A plan with a delimiter
+// other than ";", such as "GO", has its statements parsed without it, so it is
+// added back to each statement.
+func (c PlanComment) SQL(idx []int) string {
+	var (
+		f     = c.Plan.File
+		delim string
+		stmts = make([]string, 0, len(idx))
+	)
+	if ds := migrate.NewLocalFile(f.Name, []byte(f.Migration)).Directive("delimiter"); len(ds) > 0 {
+		if d := strings.NewReplacer(`\n`, "\n", `\r`, "\r", `\t`, "\t").Replace(ds[0]); d != ";" {
+			delim = d
+		}
+	}
+	for _, i := range idx {
+		if i >= 0 && i < len(f.Stmts) && f.Stmts[i] != nil {
+			stmts = append(stmts, f.Stmts[i].Text+delim)
+		}
+	}
+	return strings.Join(stmts, "\n")
+}
+
+// renderPlanComment renders the schema plan comment with the change summary of the plan,
+// if it has one and the comment fits in limit: first with the statements of each object,
+// then with their counts only. Otherwise, the comment is rendered as before the change
+// summary. Sizes are measured in bytes, which never undercounts the characters GitHub limits.
+func renderPlanComment(tc *TriggerContext, c *PlanComment, limit int) (string, error) {
+	for _, sql := range []bool{true, false} {
+		if c.Summary, c.SummarySQL = true, sql; c.Changes() == nil {
+			break
+		}
+		// A summary that fails to render is left out, not the comment.
+		if s, err := RenderTemplate("schema-plan.tmpl", c, tc); err == nil && len(s) <= limit {
+			return s, nil
+		}
+	}
+	c.Summary, c.SummarySQL = false, false
+	return RenderTemplate("schema-plan.tmpl", c, tc)
+}
+
+// diffStat holds the line counts of an object diff.
+type diffStat struct {
+	Added, Deleted, Lines int
+}
+
+// newDiffStat counts the lines of a diff, and the ones it adds and deletes.
+func newDiffStat(diff string) diffStat {
+	var s diffStat
+	for _, l := range strings.Split(strings.Trim(diff, "\n"), "\n") {
+		s.Lines++
+		switch {
+		case strings.HasPrefix(l, "+"):
+			s.Added++
+		case strings.HasPrefix(l, "-"):
+			s.Deleted++
+		}
+	}
+	return s
+}
+
+// Keycaps returns the added and deleted line counts as keycaps. GitHub strips CSS
+// from comments, so their colors, if requested, are set by its math renderer.
+func (s diffStat) Keycaps(colors bool) string {
+	var caps []string
+	for _, c := range []struct {
+		n           int
+		sign, color string
+	}{{s.Added, "+", "#2ea043"}, {s.Deleted, "-", "#da3633"}} {
+		switch {
+		case c.n == 0:
+		case colors:
+			caps = append(caps, fmt.Sprintf(`<kbd>$\color{%s}{\texttt{%s%s}}$</kbd>`, c.color, c.sign, thousands(c.n)))
+		default:
+			caps = append(caps, fmt.Sprintf("<kbd>%s%s</kbd>", c.sign, thousands(c.n)))
+		}
+	}
+	return strings.Join(caps, " ")
+}
+
+// changeKinds counts the changed objects by their operation, e.g. "1 added, 3 modified".
+func changeKinds(objs []*atlasexec.ObjectChange) string {
+	counts := make(map[string]int)
+	for _, o := range objs {
+		switch o.Op {
+		case "add", "drop", "rename":
+			counts[o.Op]++
+		default:
+			counts["modify"]++
+		}
+	}
+	var kinds []string
+	for _, k := range [][2]string{{"add", "added"}, {"modify", "modified"}, {"rename", "renamed"}, {"drop", "dropped"}} {
+		if n := counts[k[0]]; n > 0 {
+			kinds = append(kinds, thousands(n)+" "+k[1])
+		}
+	}
+	return strings.Join(kinds, ", ")
+}
+
+// plural returns the count and the word, in plural unless the count is 1.
+func plural(n int, word string) string {
+	if n != 1 {
+		word += "s"
+	}
+	return thousands(n) + " " + word
+}
+
+// thousands formats n with a comma between each group of three digits.
+func thousands(n int) string {
+	s := strconv.Itoa(n)
+	for i := len(s) - 3; i > 0 && s[i-1] != '-'; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
+}
+
+// fence returns the code in a fenced code block. The fence is longer than any line
+// of backticks in the code, as such a line would otherwise close the block early.
+func fence(lang, code string) string {
+	code = strings.Trim(code, "\n")
+	n := 3
+	for _, m := range reFenceLine.FindAllStringSubmatch(code, -1) {
+		n = max(n, len(m[1])+1)
+	}
+	f := strings.Repeat("`", n)
+	return f + lang + "\n" + code + "\n" + f
+}
+
+// reFenceLine matches the lines that close a fenced code block.
+var reFenceLine = regexp.MustCompile("(?m)^ {0,3}(`{3,})[ \t\r]*$")
+
 var (
 	//go:embed comments
 	comments embed.FS
@@ -2286,6 +2438,38 @@ func RenderTemplate(name string, data any, tc *TriggerContext) (string, error) {
 				},
 				"nl2br": func(s string) string { return strings.ReplaceAll(s, "\n", "<br/>") },
 				"nl2sp": func(s string) string { return strings.ReplaceAll(s, "\n", " ") },
+				// codefence is like codeblock, with a fence longer than any line of backticks in the code.
+				"codefence": func(lang, code string) string {
+					return "\n\n" + fence(lang, code) + "\n\n"
+				},
+				// escape escapes the text characters that HTML would read as markup.
+				"escape": strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace,
+				// changeSign marks the operation of a changed object in the plan summary.
+				"changeSign": func(op string) string {
+					switch op {
+					case "add":
+						return "+"
+					case "drop":
+						return "-"
+					default:
+						return "~"
+					}
+				},
+				"num":         thousands,
+				"plural":      plural,
+				"changeKinds": changeKinds,
+				"diffStat":    newDiffStat,
+				"lines": func(s string) int {
+					return strings.Count(strings.Trim(s, "\n"), "\n") + 1
+				},
+				// planComment returns the plan comment data. Other data the template took
+				// before PlanComment, such as a map holding the plan, has no change summary.
+				"planComment": func(data any) *PlanComment {
+					if c, ok := data.(*PlanComment); ok {
+						return c
+					}
+					return &PlanComment{}
+				},
 			}).
 			ParseFS(comments, "comments/*"),
 	)
