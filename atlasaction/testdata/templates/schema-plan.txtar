@@ -1,0 +1,588 @@
+render-plan-comment schema-plan.tmpl data-1.json
+cmp stdout golden-1.html
+
+# Without a change summary, the comment is the same as before it.
+render-plan-comment schema-plan.tmpl data-2.json
+cmp stdout golden-2.html
+
+# Statements that change no object, as in SQLite table rebuilds.
+render-plan-comment schema-plan.tmpl data-3.json
+cmp stdout golden-3.html
+
+# Over the size limit, the summary shows statement counts instead of statements.
+render-plan-comment schema-plan.tmpl data-4.json
+cmp stdout golden-4.html
+-- data-1.json --
+{
+  "Plan": {
+    "Repo": "app",
+    "Lint": {
+      "Steps": [
+        {
+          "Name": "Analyze 20260929120000.sql",
+          "Text": "0 reports were found in analysis",
+          "Result": {
+            "Name": "20260929120000.sql",
+            "Text": ""
+          }
+        }
+      ]
+    },
+    "File": {
+      "Name": "20260929120000",
+      "FromHash": "3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=",
+      "ToHash": "6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=",
+      "Migration": "-- Drop index \"orders_total\" from table: \"orders\"\nDROP INDEX \"orders_total\";\n-- Modify \"orders\" table\nALTER TABLE \"orders\" DROP COLUMN \"total\", ADD COLUMN \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;\n-- Create index \"orders_total\" to table: \"orders\"\nCREATE INDEX \"orders_total\" ON \"orders\" (\"total\");\n-- Drop \"open_order_customers\" view\nDROP VIEW \"open_order_customers\";\n-- Drop \"open_orders\" view\nDROP VIEW \"open_orders\";\n-- Create \"open_orders\" table\nCREATE TABLE \"open_orders\" (\n  \"id\" integer NOT NULL,\n  \"customer_id\" integer NOT NULL,\n  PRIMARY KEY (\"id\")\n);\n-- Create \"open_order_customers\" view\nCREATE VIEW \"open_order_customers\" (\n  \"customer_id\"\n) AS SELECT customer_id\n   FROM open_orders;\n",
+      "Stmts": [
+        {
+          "Pos": 51,
+          "Text": "DROP INDEX \"orders_total\";"
+        },
+        {
+          "Pos": 102,
+          "Text": "ALTER TABLE \"orders\" DROP COLUMN \"total\", ADD COLUMN \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;"
+        },
+        {
+          "Pos": 260,
+          "Text": "CREATE INDEX \"orders_total\" ON \"orders\" (\"total\");"
+        },
+        {
+          "Pos": 345,
+          "Text": "DROP VIEW \"open_order_customers\";"
+        },
+        {
+          "Pos": 405,
+          "Text": "DROP VIEW \"open_orders\";"
+        },
+        {
+          "Pos": 460,
+          "Text": "CREATE TABLE \"open_orders\" (\n  \"id\" integer NOT NULL,\n  \"customer_id\" integer NOT NULL,\n  PRIMARY KEY (\"id\")\n);"
+        },
+        {
+          "Pos": 600,
+          "Text": "CREATE VIEW \"open_order_customers\" (\n  \"customer_id\"\n) AS SELECT customer_id\n   FROM open_orders;"
+        }
+      ],
+      "Changes": {
+        "Objects": [
+          {
+            "Type": "table",
+            "Op": "modify",
+            "Object": "table \"orders\"",
+            "Diff": "   \"updated_at\" timestamptz NULL,\n-  \"total\" integer NULL,\n+  \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED,\n   PRIMARY KEY (\"id\"),",
+            "Stmts": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "Type": "table",
+            "Op": "add",
+            "Object": "table \"open_orders\"",
+            "Diff": "+CREATE TABLE \"open_orders\" (\n+  \"id\" integer NOT NULL,\n+  \"customer_id\" integer NOT NULL,\n+  PRIMARY KEY (\"id\")\n+);",
+            "Stmts": [
+              5
+            ]
+          },
+          {
+            "Type": "view",
+            "Op": "drop",
+            "Object": "view \"open_orders\"",
+            "Diff": "-CREATE VIEW \"open_orders\" (\n-  \"id\",\n-  \"customer_id\"\n-) AS SELECT id,\n-    customer_id\n-   FROM orders\n-  WHERE amount > 0;\n-COMMENT ON VIEW \"open_orders\" IS 'Orders with a positive amount';",
+            "Stmts": [
+              3,
+              4,
+              6
+            ],
+            "Dependents": 2
+          }
+        ],
+        "Stmts": 7,
+        "Dependents": 2
+      },
+      "URL": "atlas://app/plans/20260929120000",
+      "Link": "http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511",
+      "Status": "PENDING"
+    }
+  },
+  "RerunCommand": "gh run rerun 123",
+  "Summary": true,
+  "SummarySQL": true,
+  "Colors": true
+}
+-- golden-1.html --
+<h3>Atlas detected changes to the desired schema</h3>
+<h4>Migration Plan for <a href="http://test.atlasgo.cloud/schemas/141733920769" target="_blank">app</a> • <a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511" target="_blank">View on Atlas Cloud</a></h4>
+<details open><summary><strong>Change summary</strong> · 3 objects: 1 added, 1 modified, 1 dropped · 7 statements, 2 of them recreate dependent objects</summary><p></p>
+<table>
+<tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
+<tr>
+<td><code>~</code> <code>table "orders"</code></td>
+<td>
+
+```diff
+   "updated_at" timestamptz NULL,
+-  "total" integer NULL,
++  "total" integer NULL GENERATED ALWAYS AS (amount * 2) STORED,
+   PRIMARY KEY ("id"),
+```
+
+</td>
+<td><details><summary>3 statements</summary>
+
+```sql
+DROP INDEX "orders_total";
+ALTER TABLE "orders" DROP COLUMN "total", ADD COLUMN "total" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;
+CREATE INDEX "orders_total" ON "orders" ("total");
+```
+
+</details></td>
+</tr>
+<tr>
+<td><code>+</code> <code>table "open_orders"</code></td>
+<td><details><summary><kbd>$\color{#2ea043}{\texttt{+5}}$</kbd></summary>
+
+```diff
++CREATE TABLE "open_orders" (
++  "id" integer NOT NULL,
++  "customer_id" integer NOT NULL,
++  PRIMARY KEY ("id")
++);
+```
+
+</details></td>
+<td><details><summary>1 statement</summary>
+
+```sql
+CREATE TABLE "open_orders" (
+  "id" integer NOT NULL,
+  "customer_id" integer NOT NULL,
+  PRIMARY KEY ("id")
+);
+```
+
+</details></td>
+</tr>
+<tr>
+<td><code>-</code> <code>view "open_orders"</code></td>
+<td><details><summary><kbd>$\color{#da3633}{\texttt{-8}}$</kbd></summary>
+
+```diff
+-CREATE VIEW "open_orders" (
+-  "id",
+-  "customer_id"
+-) AS SELECT id,
+-    customer_id
+-   FROM orders
+-  WHERE amount > 0;
+-COMMENT ON VIEW "open_orders" IS 'Orders with a positive amount';
+```
+
+</details></td>
+<td><details><summary>3 statements, 2 recreate dependents</summary>
+
+```sql
+DROP VIEW "open_order_customers";
+DROP VIEW "open_orders";
+CREATE VIEW "open_order_customers" (
+  "customer_id"
+) AS SELECT customer_id
+   FROM open_orders;
+```
+
+</details></td>
+</tr>
+</table>
+</details>
+<details><summary><strong>Migration script</strong> · 7 statements, 21 lines</summary><p></p>
+
+```sql
+-- Drop index "orders_total" from table: "orders"
+DROP INDEX "orders_total";
+-- Modify "orders" table
+ALTER TABLE "orders" DROP COLUMN "total", ADD COLUMN "total" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;
+-- Create index "orders_total" to table: "orders"
+CREATE INDEX "orders_total" ON "orders" ("total");
+-- Drop "open_order_customers" view
+DROP VIEW "open_order_customers";
+-- Drop "open_orders" view
+DROP VIEW "open_orders";
+-- Create "open_orders" table
+CREATE TABLE "open_orders" (
+  "id" integer NOT NULL,
+  "customer_id" integer NOT NULL,
+  PRIMARY KEY ("id")
+);
+-- Create "open_order_customers" view
+CREATE VIEW "open_order_customers" (
+  "customer_id"
+) AS SELECT customer_id
+   FROM open_orders;
+```
+
+</details>
+<h4>Atlas lint results</h4><table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>Detect schema changes</td><td>7 new statements detected</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No issues found</td>
+      <td></td>
+    </tr></tbody></table><hr>
+<details>
+<summary>📝 Steps to edit this migration plan</summary>
+
+1\. Run the following command to pull the generated plan to your local workstation:
+```bash
+atlas schema plan pull --url "atlas://app/plans/20260929120000" > 20260929120000.plan.hcl
+```
+
+2\. Open `20260929120000` in your editor and modify it as needed. Note that the result of the plan should align
+the database with the desired state. Otherwise, Atlas will report a schema drift.
+
+3\. Push the updated plan to the registry using the following command:
+```bash
+atlas schema plan push --pending --file 20260929120000.plan.hcl
+```
+4\. Re-trigger the `schema/plan` action to update this comment:
+```bash
+gh run rerun 123
+```
+
+</details>
+-- data-2.json --
+{
+  "Plan": {
+    "Repo": "app",
+    "Lint": {
+      "Steps": [
+        {
+          "Name": "Analyze 20241010143904.sql",
+          "Text": "0 reports were found in analysis",
+          "Result": {
+            "Name": "20241010143904.sql",
+            "Text": "-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n"
+          }
+        }
+      ],
+      "Files": [
+        {
+          "Name": "20241010143904.sql",
+          "Text": "-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n"
+        }
+      ]
+    },
+    "File": {
+      "Name": "20241010143904",
+      "FromHash": "3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=",
+      "FromDesc": "file://schema.lt.hcl",
+      "ToHash": "6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=",
+      "ToDesc": "file://schema1.lt.hcl",
+      "Migration": "-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n",
+      "Stmts": [
+        {
+          "Pos": 20,
+          "Text": "CREATE TABLE `1` (\n  `c` int NOT NULL\n);",
+          "Comments": [
+            "-- Create \"1\" table\n"
+          ]
+        }
+      ],
+      "URL": "atlas://app/plans/20241010143904",
+      "Link": "http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511",
+      "Status": "PENDING"
+    }
+  },
+  "RerunCommand": "gh run rerun 123"
+}
+-- golden-2.html --
+<h3>Atlas detected changes to the desired schema</h3>
+<h4>Migration Plan for <a href="http://test.atlasgo.cloud/schemas/141733920769" target="_blank">app</a> • <a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511" target="_blank">View on Atlas Cloud</a></h4>
+
+```sql
+-- Create "1" table
+CREATE TABLE `1` (
+  `c` int NOT NULL
+);
+```
+
+<h4>Atlas lint results</h4><table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>Detect schema changes</td><td>1 new statement detected</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No issues found</td>
+      <td></td>
+    </tr></tbody></table><hr>
+<details>
+<summary>📝 Steps to edit this migration plan</summary>
+
+1\. Run the following command to pull the generated plan to your local workstation:
+```bash
+atlas schema plan pull --url "atlas://app/plans/20241010143904" > 20241010143904.plan.hcl
+```
+
+2\. Open `20241010143904` in your editor and modify it as needed. Note that the result of the plan should align
+the database with the desired state. Otherwise, Atlas will report a schema drift.
+
+3\. Push the updated plan to the registry using the following command:
+```bash
+atlas schema plan push --pending --file 20241010143904.plan.hcl
+```
+4\. Re-trigger the `schema/plan` action to update this comment:
+```bash
+gh run rerun 123
+```
+
+</details>
+-- data-3.json --
+{"Plan":{"Repo":"app","Lint":{"Steps":[{"Name":"Analyze 20260930090000.sql","Text":"0 reports were found in analysis","Result":{"Name":"20260930090000.sql","Text":""}}]},"File":{"Name":"20260930090000","FromHash":"cWXn1XQ7rAe1uAJ3pZ5HzGl0Hq2mDvB9F1rS6nqzv0o=","ToHash":"t0k3Zb8i0mS1c4VbTQ2h9l2Wm8m8y3JwS5aP0Z7eK1A=","Migration":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Create \"new_users\" table\nCREATE TABLE `new_users` (\n  `id` integer NOT NULL,\n  `name` text NOT NULL,\n  PRIMARY KEY (`id`)\n);\n-- Copy rows from old table \"users\" to new temporary table \"new_users\"\nINSERT INTO `new_users` (`id`, `name`) SELECT `id`, IFNULL(`name`, '') FROM `users`;\n-- Drop \"users\" table after copying rows\nDROP TABLE `users`;\n-- Rename temporary table \"new_users\" to \"users\"\nALTER TABLE `new_users` RENAME TO `users`;\n-- Create index \"users_name\" to table: \"users\"\nCREATE INDEX `users_name` ON `users` (`name`);\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Stmts":[{"Pos":55,"Text":"PRAGMA foreign_keys = off;","Comments":["-- Disable the enforcement of foreign-keys constraints\n"]},{"Pos":110,"Text":"CREATE TABLE `new_users` (\n  `id` integer NOT NULL,\n  `name` text NOT NULL,\n  PRIMARY KEY (`id`)\n);","Comments":["-- Create \"new_users\" table\n"]},{"Pos":281,"Text":"INSERT INTO `new_users` (`id`, `name`) SELECT `id`, IFNULL(`name`, '') FROM `users`;","Comments":["-- Copy rows from old table \"users\" to new temporary table \"new_users\"\n"]},{"Pos":407,"Text":"DROP TABLE `users`;","Comments":["-- Drop \"users\" table after copying rows\n"]},{"Pos":476,"Text":"ALTER TABLE `new_users` RENAME TO `users`;","Comments":["-- Rename temporary table \"new_users\" to \"users\"\n"]},{"Pos":566,"Text":"CREATE INDEX `users_name` ON `users` (`name`);","Comments":["-- Create index \"users_name\" to table: \"users\"\n"]},{"Pos":672,"Text":"PRAGMA foreign_keys = on;","Comments":["-- Enable back the enforcement of foreign-keys constraints\n"]}],"Changes":{"Objects":[{"Type":"table","Op":"modify","Object":"table \"users\"","Diff":" CREATE TABLE `users` (\n   `id` integer NOT NULL,\n-  `name` text NULL,\n+  `name` text NOT NULL,\n   PRIMARY KEY (`id`)\n );","Stmts":[1,2,3,4,5]}],"Other":[0,6],"Stmts":7},"URL":"atlas://app/plans/20260930090000","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397512","Status":"PENDING"}},"RerunCommand":"gh run rerun 123","Summary":true,"SummarySQL":true,"Colors":true}
+-- golden-3.html --
+<h3>Atlas detected changes to the desired schema</h3>
+<h4>Migration Plan for <a href="http://test.atlasgo.cloud/schemas/141733920769" target="_blank">app</a> • <a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397512" target="_blank">View on Atlas Cloud</a></h4>
+<details open><summary><strong>Change summary</strong> · 1 object: 1 modified · 7 statements</summary><p></p>
+<table>
+<tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
+<tr>
+<td><code>~</code> <code>table "users"</code></td>
+<td>
+
+```diff
+ CREATE TABLE `users` (
+   `id` integer NOT NULL,
+-  `name` text NULL,
++  `name` text NOT NULL,
+   PRIMARY KEY (`id`)
+ );
+```
+
+</td>
+<td><details><summary>5 statements</summary>
+
+```sql
+CREATE TABLE `new_users` (
+  `id` integer NOT NULL,
+  `name` text NOT NULL,
+  PRIMARY KEY (`id`)
+);
+INSERT INTO `new_users` (`id`, `name`) SELECT `id`, IFNULL(`name`, '') FROM `users`;
+DROP TABLE `users`;
+ALTER TABLE `new_users` RENAME TO `users`;
+CREATE INDEX `users_name` ON `users` (`name`);
+```
+
+</details></td>
+</tr>
+<tr>
+<td>other statements</td>
+<td></td>
+<td><details><summary>2 statements</summary>
+
+```sql
+PRAGMA foreign_keys = off;
+PRAGMA foreign_keys = on;
+```
+
+</details></td>
+</tr>
+</table>
+</details>
+<details><summary><strong>Migration script</strong> · 7 statements, 18 lines</summary><p></p>
+
+```sql
+-- Disable the enforcement of foreign-keys constraints
+PRAGMA foreign_keys = off;
+-- Create "new_users" table
+CREATE TABLE `new_users` (
+  `id` integer NOT NULL,
+  `name` text NOT NULL,
+  PRIMARY KEY (`id`)
+);
+-- Copy rows from old table "users" to new temporary table "new_users"
+INSERT INTO `new_users` (`id`, `name`) SELECT `id`, IFNULL(`name`, '') FROM `users`;
+-- Drop "users" table after copying rows
+DROP TABLE `users`;
+-- Rename temporary table "new_users" to "users"
+ALTER TABLE `new_users` RENAME TO `users`;
+-- Create index "users_name" to table: "users"
+CREATE INDEX `users_name` ON `users` (`name`);
+-- Enable back the enforcement of foreign-keys constraints
+PRAGMA foreign_keys = on;
+```
+
+</details>
+<h4>Atlas lint results</h4><table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>Detect schema changes</td><td>7 new statements detected</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No issues found</td>
+      <td></td>
+    </tr></tbody></table><hr>
+<details>
+<summary>📝 Steps to edit this migration plan</summary>
+
+1\. Run the following command to pull the generated plan to your local workstation:
+```bash
+atlas schema plan pull --url "atlas://app/plans/20260930090000" > 20260930090000.plan.hcl
+```
+
+2\. Open `20260930090000` in your editor and modify it as needed. Note that the result of the plan should align
+the database with the desired state. Otherwise, Atlas will report a schema drift.
+
+3\. Push the updated plan to the registry using the following command:
+```bash
+atlas schema plan push --pending --file 20260930090000.plan.hcl
+```
+4\. Re-trigger the `schema/plan` action to update this comment:
+```bash
+gh run rerun 123
+```
+
+</details>
+-- data-4.json --
+{"Plan":{"Repo":"app","Lint":{"Steps":[{"Name":"Analyze 20260929120000.sql","Text":"0 reports were found in analysis","Result":{"Name":"20260929120000.sql","Text":""}}]},"File":{"Name":"20260929120000","FromHash":"3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=","ToHash":"6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=","Migration":"-- Drop index \"orders_total\" from table: \"orders\"\nDROP INDEX \"orders_total\";\n-- Modify \"orders\" table\nALTER TABLE \"orders\" DROP COLUMN \"total\", ADD COLUMN \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;\n-- Create index \"orders_total\" to table: \"orders\"\nCREATE INDEX \"orders_total\" ON \"orders\" (\"total\");\n-- Drop \"open_order_customers\" view\nDROP VIEW \"open_order_customers\";\n-- Drop \"open_orders\" view\nDROP VIEW \"open_orders\";\n-- Create \"open_orders\" table\nCREATE TABLE \"open_orders\" (\n  \"id\" integer NOT NULL,\n  \"customer_id\" integer NOT NULL,\n  PRIMARY KEY (\"id\")\n);\n-- Create \"open_order_customers\" view\nCREATE VIEW \"open_order_customers\" (\n  \"customer_id\"\n) AS SELECT customer_id\n   FROM open_orders;\n","Stmts":[{"Pos":51,"Text":"DROP INDEX \"orders_total\";"},{"Pos":102,"Text":"ALTER TABLE \"orders\" DROP COLUMN \"total\", ADD COLUMN \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;"},{"Pos":260,"Text":"CREATE INDEX \"orders_total\" ON \"orders\" (\"total\");"},{"Pos":345,"Text":"DROP VIEW \"open_order_customers\";"},{"Pos":405,"Text":"DROP VIEW \"open_orders\";"},{"Pos":460,"Text":"CREATE TABLE \"open_orders\" (\n  \"id\" integer NOT NULL,\n  \"customer_id\" integer NOT NULL,\n  PRIMARY KEY (\"id\")\n);"},{"Pos":600,"Text":"CREATE VIEW \"open_order_customers\" (\n  \"customer_id\"\n) AS SELECT customer_id\n   FROM open_orders;"}],"Changes":{"Objects":[{"Type":"table","Op":"modify","Object":"table \"orders\"","Diff":"   \"updated_at\" timestamptz NULL,\n-  \"total\" integer NULL,\n+  \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED,\n   PRIMARY KEY (\"id\"),","Stmts":[0,1,2]},{"Type":"table","Op":"add","Object":"table \"open_orders\"","Diff":"+CREATE TABLE \"open_orders\" (\n+  \"id\" integer NOT NULL,\n+  \"customer_id\" integer NOT NULL,\n+  PRIMARY KEY (\"id\")\n+);","Stmts":[5]},{"Type":"view","Op":"drop","Object":"view \"open_orders\"","Diff":"-CREATE VIEW \"open_orders\" (\n-  \"id\",\n-  \"customer_id\"\n-) AS SELECT id,\n-    customer_id\n-   FROM orders\n-  WHERE amount > 0;\n-COMMENT ON VIEW \"open_orders\" IS 'Orders with a positive amount';","Stmts":[3,4,6],"Dependents":2}],"Stmts":7,"Dependents":2},"URL":"atlas://app/plans/20260929120000","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511","Status":"PENDING"}},"RerunCommand":"gh run rerun 123","Summary":true,"SummarySQL":false,"Colors":true}
+-- golden-4.html --
+<h3>Atlas detected changes to the desired schema</h3>
+<h4>Migration Plan for <a href="http://test.atlasgo.cloud/schemas/141733920769" target="_blank">app</a> • <a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511" target="_blank">View on Atlas Cloud</a></h4>
+<details open><summary><strong>Change summary</strong> · 3 objects: 1 added, 1 modified, 1 dropped · 7 statements, 2 of them recreate dependent objects</summary><p></p>
+<table>
+<tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
+<tr>
+<td><code>~</code> <code>table "orders"</code></td>
+<td>
+
+```diff
+   "updated_at" timestamptz NULL,
+-  "total" integer NULL,
++  "total" integer NULL GENERATED ALWAYS AS (amount * 2) STORED,
+   PRIMARY KEY ("id"),
+```
+
+</td>
+<td>3 statements</td>
+</tr>
+<tr>
+<td><code>+</code> <code>table "open_orders"</code></td>
+<td><details><summary><kbd>$\color{#2ea043}{\texttt{+5}}$</kbd></summary>
+
+```diff
++CREATE TABLE "open_orders" (
++  "id" integer NOT NULL,
++  "customer_id" integer NOT NULL,
++  PRIMARY KEY ("id")
++);
+```
+
+</details></td>
+<td>1 statement</td>
+</tr>
+<tr>
+<td><code>-</code> <code>view "open_orders"</code></td>
+<td><details><summary><kbd>$\color{#da3633}{\texttt{-8}}$</kbd></summary>
+
+```diff
+-CREATE VIEW "open_orders" (
+-  "id",
+-  "customer_id"
+-) AS SELECT id,
+-    customer_id
+-   FROM orders
+-  WHERE amount > 0;
+-COMMENT ON VIEW "open_orders" IS 'Orders with a positive amount';
+```
+
+</details></td>
+<td>3 statements, 2 recreate dependents</td>
+</tr>
+</table>
+</details>
+<details><summary><strong>Migration script</strong> · 7 statements, 21 lines</summary><p></p>
+
+```sql
+-- Drop index "orders_total" from table: "orders"
+DROP INDEX "orders_total";
+-- Modify "orders" table
+ALTER TABLE "orders" DROP COLUMN "total", ADD COLUMN "total" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;
+-- Create index "orders_total" to table: "orders"
+CREATE INDEX "orders_total" ON "orders" ("total");
+-- Drop "open_order_customers" view
+DROP VIEW "open_order_customers";
+-- Drop "open_orders" view
+DROP VIEW "open_orders";
+-- Create "open_orders" table
+CREATE TABLE "open_orders" (
+  "id" integer NOT NULL,
+  "customer_id" integer NOT NULL,
+  PRIMARY KEY ("id")
+);
+-- Create "open_order_customers" view
+CREATE VIEW "open_order_customers" (
+  "customer_id"
+) AS SELECT customer_id
+   FROM open_orders;
+```
+
+</details>
+<h4>Atlas lint results</h4><table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>Detect schema changes</td><td>7 new statements detected</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No issues found</td>
+      <td></td>
+    </tr></tbody></table><hr>
+<details>
+<summary>📝 Steps to edit this migration plan</summary>
+
+1\. Run the following command to pull the generated plan to your local workstation:
+```bash
+atlas schema plan pull --url "atlas://app/plans/20260929120000" > 20260929120000.plan.hcl
+```
+
+2\. Open `20260929120000` in your editor and modify it as needed. Note that the result of the plan should align
+the database with the desired state. Otherwise, Atlas will report a schema drift.
+
+3\. Push the updated plan to the registry using the following command:
+```bash
+atlas schema plan push --pending --file 20260929120000.plan.hcl
+```
+4\. Re-trigger the `schema/plan` action to update this comment:
+```bash
+gh run rerun 123
+```
+
+</details>

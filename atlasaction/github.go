@@ -71,10 +71,11 @@ func (a *GitHub) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
 
 // SchemaPlan implements Reporter.
 func (a *GitHub) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
-	summary, err := RenderTemplate("schema-plan.tmpl", map[string]any{
-		"Plan":         r,
-		"RerunCommand": fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
-	}, nil)
+	// Job summaries may not render math, so their diff counts are not colored.
+	summary, err := renderPlanComment(nil, &PlanComment{
+		Plan:         r,
+		RerunCommand: fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
+	}, githubSummaryLimit)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -247,6 +248,13 @@ type GitHubClient struct {
 	*github.Client
 }
 
+const (
+	// githubCommentLimit is the size limit of a GitHub comment, in characters.
+	githubCommentLimit = 65536
+	// githubSummaryLimit is the size limit of a GitHub step summary, in bytes.
+	githubSummaryLimit = 1 << 20
+)
+
 func NewGitHubClient(repo, baseURL, token string) (*GitHubClient, error) {
 	c, err := github.NewClient(repo,
 		github.WithBaseURL(baseURL),
@@ -340,10 +348,13 @@ func (c *GitHubClient) CommentLint(ctx context.Context, tc *TriggerContext, r *a
 // CommentPlan implements SCMClient.
 func (c *GitHubClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
 	// Report the schema plan to the user and add a comment to the PR.
-	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
-		"Plan":         p,
-		"RerunCommand": tc.RerunCmd,
-	}, tc)
+	// Leave room for the marker that c.comment appends.
+	limit := githubCommentLimit - len("\n"+commentMarker(p.File.Name))
+	comment, err := renderPlanComment(tc, &PlanComment{
+		Plan:         p,
+		RerunCommand: tc.RerunCmd,
+		Colors:       true,
+	}, limit)
 	if err != nil {
 		return err
 	}

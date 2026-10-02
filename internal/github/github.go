@@ -148,9 +148,12 @@ func (c *Client) IssueComments(ctx context.Context, prID int) ([]IssueComment, e
 }
 
 func (c *Client) CreateIssueComment(ctx context.Context, prID int, comment string) error {
-	content := strings.NewReader(fmt.Sprintf(`{"body":%q}`, comment))
+	b, err := json.Marshal(map[string]string{"body": comment})
+	if err != nil {
+		return err
+	}
 	url := fmt.Sprintf("%v/repos/%v/issues/%v/comments", c.baseURL, c.repo, prID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, content)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -171,9 +174,12 @@ func (c *Client) CreateIssueComment(ctx context.Context, prID int, comment strin
 
 // UpdateIssueComment updates issue comment with the given id.
 func (c *Client) UpdateIssueComment(ctx context.Context, id int, comment string) error {
-	content := strings.NewReader(fmt.Sprintf(`{"body":%q}`, comment))
+	b, err := json.Marshal(map[string]string{"body": comment})
+	if err != nil {
+		return err
+	}
 	url := fmt.Sprintf("%v/repos/%v/issues/comments/%v", c.baseURL, c.repo, id)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, content)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(b))
 	if err != nil {
 		return err
 	}

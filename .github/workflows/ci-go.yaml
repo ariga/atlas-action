@@ -348,6 +348,35 @@ jobs:
             env://url
         env:
           GITHUB_TOKEN: ${{ github.token }}
+  schema-plan-changes:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each case plans the change from its from.sql to its to.sql,
+        # and comments on the pull request with the plan.
+        case: [changes, large]
+    env:
+      ATLAS_ACTION_LOCAL: 1
+    steps:
+      - uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea # v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
+        with:
+          go-version-file: go.mod
+      - run: go install ./cmd/atlas-action
+        env:
+          CGO_ENABLED: 0
+      - uses: ./schema/plan
+        with:
+          working-directory: atlasaction/testdata/schema-plan/${{ matrix.case }}
+          env: test
+          from: file://from.sql
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
   schema-plan-approve:
     runs-on: ubuntu-latest
     env:

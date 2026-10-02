@@ -1,7 +1,15 @@
 <h3>Atlas detected changes to the desired schema</h3>
+{{- $c := planComment . }}
 {{- with .Plan.File }}
 <h4>Migration Plan for <a href="{{- .Link | repoLink -}}" target="_blank">{{ $.Plan.Repo }}</a> • <a href="{{- .Link -}}" target="_blank">View on Atlas Cloud</a></h4>
+{{- if $c.Changes }}
+{{- template "plan-changes" $c }}
+{{- with .Migration }}
+<details><summary><strong>Migration script</strong> · {{ plural (len $c.Plan.File.Stmts) "statement" }}, {{ plural (lines .) "line" }}</summary><p></p>{{ codeblock "sql" . }}</details>
+{{- end }}
+{{ else }}
 {{- with .Migration }}{{ codeblock "sql" . }}{{- end -}}
+{{- end -}}
 {{- end -}}
 <h4>Atlas lint results</h4>
 {{- template "schema-lint" . -}}
@@ -36,4 +44,38 @@
   {{- end -}}
   {{- template "lint-report" .Plan.Lint -}}
   </tbody></table>
+{{- end -}}
+{{- /* plan-changes lists the changed objects of the plan with their diffs and statements,
+       followed by the statements that change no object. The list is collapsed if it has
+       more than 15 objects. The diff of a modified object is shown in its row, unless it
+       is long. Otherwise, its line counts open it. The empty paragraph after a summary
+       line keeps an open section from touching it. */ -}}
+{{- define "plan-changes" -}}
+{{- $sql := .SummarySQL }}
+{{- $colors := .Colors }}
+{{- with .Changes }}
+<details{{ if le (len .Objects) 15 }} open{{ end }}><summary><strong>Change summary</strong>{{ with .Objects }} · {{ plural (len .) "object" }}: {{ changeKinds . }}{{ end }} · {{ plural .Stmts "statement" }}{{ with .Dependents }}, {{ num . }} of them recreate dependent objects{{ end }}</summary><p></p>
+<table>
+<tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
+{{- range $o := .Objects }}
+{{- $d := diffStat $o.Diff }}
+<tr>
+<td><code>{{ changeSign $o.Op }}</code> <code>{{ escape $o.Object }}</code></td>
+<td>{{ with $o.Diff }}{{ if or (eq $o.Op "add" "drop") (gt $d.Lines 20) }}<details><summary>{{ $d.Keycaps $colors }}</summary>{{ codefence "diff" . }}</details>{{ else }}{{ codefence "diff" . }}{{ end }}{{ end }}</td>
+<td>{{ with $o.Stmts }}{{ if $sql }}<details><summary>{{ template "plan-changes/stmts" $o }}</summary>{{ codefence "sql" ($.SQL .) }}</details>{{ else }}{{ template "plan-changes/stmts" $o }}{{ end }}{{ end }}</td>
+</tr>
+{{- end }}
+{{- with .Other }}
+<tr>
+<td>other statements</td>
+<td></td>
+<td>{{ if $sql }}<details><summary>{{ plural (len .) "statement" }}</summary>{{ codefence "sql" ($.SQL .) }}</details>{{ else }}{{ plural (len .) "statement" }}{{ end }}</td>
+</tr>
+{{- end }}
+</table>
+</details>
+{{- end }}
+{{- end -}}
+{{- define "plan-changes/stmts" -}}
+{{ plural (len .Stmts) "statement" }}{{ with .Dependents }}, {{ num . }} recreate dependents{{ end }}
 {{- end -}}
