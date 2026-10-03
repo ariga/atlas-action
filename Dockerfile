@@ -3,7 +3,7 @@
 # in the LICENSE file in the root directory of this source tree.
 # syntax=docker/dockerfile:1
 
-ARG ALPINE_VERSION="3.21"
+ARG ALPINE_VERSION="3.24"
 
 FROM alpine:${ALPINE_VERSION}
 COPY LICENSE README.md /
