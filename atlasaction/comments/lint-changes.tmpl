@@ -1,0 +1,26 @@
+{{- /* lint-changes is the change summary that GitHub adds to the migrate lint comment:
+       the changed objects of each file with their diffs and statements, as in the plan
+       comment, without the statements that change no object. The diff of a modified
+       object is shown in its row, unless it is long. Otherwise, its line counts open it.
+       The empty paragraph after a summary line keeps an open section from touching it. */ -}}
+{{- range $f := .ChangedFiles }}
+<details{{ if $f.Open }} open{{ end }}><summary><strong>Changes in</strong> <code>{{ escape $f.Name }}</code>{{ with $f.Changes }} · {{ plural (len .Objects) "object" }}: {{ changeKinds .Objects }} · {{ plural .Stmts "statement" }}{{ with .Dependents }}, {{ num . }} of them recreate dependent objects{{ end }}{{ end }}</summary><p></p>
+{{- $stmts := $f.HasStmts }}
+<table>
+<tr><th>Object</th><th>Diff</th>{{ if $stmts }}<th>Statements</th>{{ end }}</tr>
+{{- range $o := $f.Changes.Objects }}
+{{- $d := diffStat $o.Diff }}
+<tr>
+<td><code>{{ changeSign $o.Op }}</code> <code>{{ escape $o.Object }}</code></td>
+<td>{{ with $o.Diff }}{{ if or (eq $o.Op "add" "drop") (gt $d.Lines 20) }}<details><summary>{{ $d.Keycaps $.Colors }}</summary>{{ codefence "diff" . }}</details>{{ else }}{{ codefence "diff" . }}{{ end }}{{ end }}</td>
+{{- if $stmts }}
+<td>{{ with $o.Stmts }}{{ if $.SummarySQL }}<details><summary>{{ template "lint-changes/stmts" $o }}</summary>{{ codefence "sql" ($f.SQL .) }}</details>{{ else }}{{ template "lint-changes/stmts" $o }}{{ end }}{{ end }}</td>
+{{- end }}
+</tr>
+{{- end }}
+</table>
+</details>
+{{- end }}
+{{- define "lint-changes/stmts" -}}
+{{ plural (len .Stmts) "statement" }}{{ with .Dependents }}, {{ num . }} recreate dependents{{ end }}
+{{- end -}}

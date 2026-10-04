@@ -51,7 +51,8 @@ func (a *GitHub) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
 	if err := a.addChecks(r); err != nil {
 		a.Errorf("failed to add checks: %v", err)
 	}
-	summary, err := RenderTemplate("migrate-lint.tmpl", r, nil)
+	// Job summaries may not render math, so their diff counts are not colored.
+	summary, err := renderLintComment(nil, &LintComment{Report: r}, githubSummaryLimit)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -319,11 +320,14 @@ func (c *GitHubClient) CommentCopilot(ctx context.Context, pr int, cp *Copilot) 
 
 // CommentLint implements SCMClient.
 func (c *GitHubClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
-	comment, err := RenderTemplate("migrate-lint.tmpl", r, tc)
+	id := tc.Act.GetInput("dir-name")
+	// Leave room for the marker that c.comment appends.
+	limit := githubCommentLimit - len("\n"+commentMarker(id))
+	comment, err := renderLintComment(tc, &LintComment{Report: r, Colors: true}, limit)
 	if err != nil {
 		return err
 	}
-	err = c.upsertComment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
+	err = c.upsertComment(ctx, tc.PullRequest, id, comment)
 	if err != nil {
 		return err
 	}
