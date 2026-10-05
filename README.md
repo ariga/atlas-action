@@ -16,6 +16,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/hash](#arigaatlas-actionmigratehash)              | Automatically generate a hash of the schema migrations directory, and commit it to the migration directory. |
 | [ariga/atlas-action/migrate/diff](#arigaatlas-actionmigratediff)              | Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory. |
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Reverts deployed migration files on a target database                               |
+| [ariga/atlas-action/migrate/drift](#arigaatlas-actionmigratedrift)            | Detect schema drift between a target database and its migration history             |
 | [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)              | CI for database schema changes with Atlas                                           |
 | [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)              | Push the current version of your migration directory to Atlas Cloud.                |
 | [ariga/atlas-action/migrate/set](#arigaatlas-actionmigrateset)                | Edits the revision table to consider all migrations up to and including the given version to be applied. |
@@ -321,6 +322,66 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `reverted_count` - The number of migrations that were reverted.
 * `target` - The target version of the database.
 * `url` - If given, the URL for reviewing the revert plan.
+
+### `ariga/atlas-action/migrate/drift`
+
+Detect schema drift between a target database and its migration history. The action compares the state of
+the database against the state its migration directory defines at the last applied version, and reports the
+objects that diverged from it. Pending migration files are not considered drift. Read more about
+[drift detection](https://atlasgo.io/versioned/drift-detection#migrate-drift).
+
+The expected state is fetched from the Atlas Registry when the migration directory is stored there, e.g.
+`atlas://app`. Otherwise, it is computed by replaying the directory on the dev database given by `dev-url`.
+The action requires a login to Atlas Cloud. It fails when drift is detected, or when a database could not
+be checked.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `dir` - The URL of the migration directory that defines the expected state. For example: `atlas://dir-name`
+  for cloud based directories or `file://migrations` for local ones.
+* `exclude` - List of glob patterns used to select which resources to filter in inspection
+  see: https://atlasgo.io/declarative/inspect#exclude-schemas
+* `revisions-schema` - The name of the schema containing the revisions table.
+* `url` - The URL of the target database to check for drift. For example: `mysql://root:pass@localhost:3306/prod`.
+* `working-directory` - Atlas working directory. Default is project root
+* `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
+* `vars` - A JSON object containing variables to be used in the Atlas configuration file.
+  For example, `{"var1": "value1", "var2": "value2"}`.
+* `dev-url` - The URL of the dev-database to compute the expected state on. Required when the migration
+  directory is not stored in the Atlas Registry. For example: `docker://postgres/17/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+
+#### Outputs
+
+* `drifted` - Whether drift was detected in any of the checked databases. Either "true" or "false".
+* `report` - A JSON array of the drift reports, one for each checked database.
+
+#### Usage
+
+The following workflow checks the production database for drift every hour:
+
+```yaml
+name: Drift Detection
+on:
+  schedule:
+    - cron: '0 * * * *'
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: ariga/atlas-action/migrate/drift@v1
+        with:
+          url: ${{ secrets.DATABASE_URL }}
+          dir: atlas://app
+```
 
 ### `ariga/atlas-action/migrate/test`
 

@@ -107,6 +107,16 @@ func (a *GitHub) SecurityScan(_ context.Context, r *atlasexec.SecurityScan) {
 	a.AddStepSummary(summary)
 }
 
+// MigrateDrift implements MigrateDriftReporter.
+func (a *GitHub) MigrateDrift(_ context.Context, r []*atlasexec.MigrateDrift) {
+	summary, err := RenderTemplate("migrate-drift.tmpl", r, nil)
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
+
 // GetType implements the Action interface.
 func (*GitHub) GetType() atlasexec.TriggerType {
 	return atlasexec.TriggerTypeGithubAction
@@ -533,4 +543,5 @@ func convertPullRequest(pr *github.PullRequest) *PullRequest {
 
 var _ Action = (*GitHub)(nil)
 var _ Reporter = (*GitHub)(nil)
+var _ MigrateDriftReporter = (*GitHub)(nil)
 var _ SCMClient = (*GitHubClient)(nil)
