@@ -24,8 +24,7 @@ stdout '::error::`atlas migrate drift` detected drift in 1 database.s.: sqlite:/
 stdout '::error::sqlite://file.db could not be checked: no migration history found on the connected database'
 stdout '::error::`atlas migrate drift` completed with errors:%0Ano migration history found on the connected database'
 
-# The targets of an environment are reported one by one. A drifted
-# target fails the action, but its fingerprint is not the one of the run.
+# The targets of an environment are reported one by one. A drifted target fails the action.
 env INPUT_URL= INPUT_DIR= INPUT_DEV-URL= INPUT_EXCLUDE= INPUT_ENV=tenants
 ! atlas-action --action=migrate/drift
 stdout 'sqlite://t1.db matches the expected state at version 2'
@@ -313,9 +312,6 @@ _GitHubActionsFileCommandDelimeter_
 drifted<<_GitHubActionsFileCommandDelimeter_
 true
 _GitHubActionsFileCommandDelimeter_
-fingerprint<<_GitHubActionsFileCommandDelimeter_
-3062373192f2
-_GitHubActionsFileCommandDelimeter_
 report<<_GitHubActionsFileCommandDelimeter_
 [{"URL":"sqlite://file.db","Dir":"file://migrations","Error":"no migration history found on the connected database"}]
 _GitHubActionsFileCommandDelimeter_
@@ -333,7 +329,4 @@ report<<_GitHubActionsFileCommandDelimeter_
 _GitHubActionsFileCommandDelimeter_
 drifted<<_GitHubActionsFileCommandDelimeter_
 true
-_GitHubActionsFileCommandDelimeter_
-fingerprint<<_GitHubActionsFileCommandDelimeter_
-M7RhPTwTp3kVHkkuHTlwQUy3T0gP4rxtn69pM/j/2KU=
 _GitHubActionsFileCommandDelimeter_

@@ -1014,10 +1014,6 @@ func (a *Actions) MigrateDrift(ctx context.Context) error {
 		}
 	}
 	a.SetOutput("drifted", strconv.FormatBool(len(drifted) > 0))
-	// A fingerprint identifies the drift of one database, not of a set of them.
-	if len(reports) == 1 && reports[0].Drifted {
-		a.SetOutput("fingerprint", reports[0].Fingerprint)
-	}
 	if r, ok := a.Action.(MigrateDriftReporter); ok {
 		r.MigrateDrift(ctx, reports)
 	}

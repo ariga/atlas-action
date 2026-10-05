@@ -40,8 +40,6 @@ migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migratio
 ##teamcity[message status='NORMAL' text='    -> ALTER TABLE "t1" ADD COLUMN "d" int NULL;']
 ##teamcity[setParameter name='atlas-action.migrate-drift.outputs.drifted' value='true']
 ##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED' value='true']
-##teamcity[setParameter name='atlas-action.migrate-drift.outputs.fingerprint' value='3062373192f2']
-##teamcity[setParameter name='env.ATLAS_OUTPUT_MIGRATE_DRIFT_FINGERPRINT' value='3062373192f2']
 ##teamcity[buildStatisticValue key='atlas.migrate.drift.drifted' value='1']
 ##teamcity[buildStatisticValue key='atlas.migrate.drift.changes' value='2']
 ##teamcity[message status='FAILURE' text='`atlas migrate drift` detected drift in 1 database(s): sqlite://file.db']

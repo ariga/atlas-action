@@ -426,11 +426,6 @@ actions:
       drifted:
         type: boolean
         description: Whether drift was detected in any of the checked databases. Either "true" or "false".
-      fingerprint:
-        type: string
-        description: |
-          A stable identifier of the detected drift, which changes only when the drift does. Use it to
-          deduplicate alerts. Set when a single database was checked and drifted.
       report:
         type: string
         description: |

@@ -351,11 +351,10 @@ jobs:
           NO_HISTORY_REPORT: ${{ steps.no-history.outputs.report }}
         run: |
           [[ "${{ steps.no-drift.outputs.drifted }}" = false ]]
-          [[ -z "${{ steps.no-drift.outputs.fingerprint }}" ]]
           # Drift fails the action, and the extra table is reported.
           [[ "${{ steps.drift.outcome }}" = failure ]]
           [[ "${{ steps.drift.outputs.drifted }}" = true ]]
-          [[ -n "${{ steps.drift.outputs.fingerprint }}" ]]
+          jq -e '.[0].Fingerprint' <<< "$DRIFT_REPORT"
           jq -e '.[0].Changes[0].Object == "table \"t2\""' <<< "$DRIFT_REPORT"
           # A database without migration history cannot be checked.
           [[ "${{ steps.no-history.outcome }}" = failure ]]

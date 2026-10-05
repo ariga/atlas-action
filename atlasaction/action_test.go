@@ -1644,7 +1644,6 @@ func TestMigrateDrift(t *testing.T) {
 		err := run(t, act, []*atlasexec.MigrateDrift{{URL: "postgres://localhost:5432/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000"}}, nil)
 		require.NoError(t, err)
 		require.Equal(t, "false", act.output["drifted"])
-		require.NotContains(t, act.output, "fingerprint")
 		require.JSONEq(t, `[{"URL":"postgres://localhost:5432/app","Dir":"atlas://app","Mode":"registry","Version":"20260423120000"}]`, act.output["report"])
 		require.Equal(t, 1, act.summary)
 	})
@@ -1654,12 +1653,9 @@ func TestMigrateDrift(t *testing.T) {
 		err := run(t, act, []*atlasexec.MigrateDrift{drifted}, nil)
 		require.EqualError(t, err, "`atlas migrate drift` detected drift in 1 database(s): postgres://localhost:5432/app")
 		require.Equal(t, "true", act.output["drifted"])
-		require.Equal(t, drifted.Fingerprint, act.output["fingerprint"])
 		require.Equal(t, 1, act.summary, "the summary is written before the step fails")
 		require.Contains(t, out.String(), "postgres://localhost:5432/app drifted from the expected state at version 20260423120000 with 2 change(s): 1 extra, 1 modified")
 	})
-	// The drift of one target of an environment
-	// is reported, but its fingerprint is not.
 	t.Run("multiple targets", func(t *testing.T) {
 		act := newAct(io.Discard)
 		err := run(t, act, []*atlasexec.MigrateDrift{
@@ -1668,7 +1664,6 @@ func TestMigrateDrift(t *testing.T) {
 		}, nil)
 		require.EqualError(t, err, "`atlas migrate drift` detected drift in 1 database(s): postgres://localhost:5432/app")
 		require.Equal(t, "true", act.output["drifted"])
-		require.NotContains(t, act.output, "fingerprint")
 		require.Equal(t, 1, act.summary)
 	})
 	t.Run("multiple targets drifted", func(t *testing.T) {
@@ -1678,7 +1673,6 @@ func TestMigrateDrift(t *testing.T) {
 		err := run(t, act, []*atlasexec.MigrateDrift{drifted, &other}, nil)
 		require.EqualError(t, err, "`atlas migrate drift` detected drift in 2 database(s): postgres://localhost:5432/app, postgres://localhost:5433/app")
 		require.Equal(t, "true", act.output["drifted"])
-		require.NotContains(t, act.output, "fingerprint")
 	})
 	// A check that could not be completed stops the run and fails the
 	// step. The targets checked before it are reported along with it.
@@ -1690,7 +1684,6 @@ func TestMigrateDrift(t *testing.T) {
 		}})
 		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\nno migration history found on the connected database")
 		require.Equal(t, "true", act.output["drifted"])
-		require.NotContains(t, act.output, "fingerprint")
 		require.Equal(t, 1, act.summary)
 		var reports []*atlasexec.MigrateDrift
 		require.NoError(t, json.Unmarshal([]byte(act.output["report"]), &reports))
@@ -1706,7 +1699,6 @@ func TestMigrateDrift(t *testing.T) {
 		}})
 		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\ncannot determine the expected state: migration 20260423120000 was partially applied. Run 'atlas migrate status' for details")
 		require.Equal(t, "false", act.output["drifted"])
-		require.NotContains(t, act.output, "fingerprint")
 		require.Equal(t, 1, act.summary)
 	})
 	t.Run("error", func(t *testing.T) {

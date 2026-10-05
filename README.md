@@ -356,8 +356,6 @@ All inputs are optional as they may be specified in the Atlas configuration file
 #### Outputs
 
 * `drifted` - Whether drift was detected in any of the checked databases. Either "true" or "false".
-* `fingerprint` - A stable identifier of the detected drift, which changes only when the drift does. Use it to
-  deduplicate alerts. Set when a single database was checked and drifted.
 * `report` - A JSON array of the drift reports, one for each checked database.
 
 #### Usage
