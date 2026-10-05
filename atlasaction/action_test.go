@@ -3583,6 +3583,7 @@ func TestRenderTemplates(t *testing.T) {
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
 			"render-schema-plan":   renderTemplate[*atlasexec.SchemaPlan],
 			"render-plan-comment":  renderTemplate[*atlasaction.PlanComment],
+			"render-lint-comment":  renderTemplate[*atlasaction.LintComment],
 			"render-lint":          renderTemplate[*atlasexec.SummaryReport],
 			"render-migrate-apply": renderTemplate[*atlasexec.MigrateApply],
 			"render-schema-lint":   renderTemplate[*atlasaction.SchemaLintReport],

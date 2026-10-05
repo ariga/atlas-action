@@ -1,0 +1,81 @@
+# Outside a pull request, the change summary of each linted file is in the step summary,
+# with plain keycaps, since job summaries may not render math. The file without schema
+# changes has no section.
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-lint
+env INPUT_DIR-NAME=app
+env INPUT_DIR=file://migrations
+env INPUT_DEV-URL=sqlite://dev?mode=memory
+
+atlas-action --action=migrate/lint
+summary summary-expected.txt
+
+-- migrate-lint/1/args --
+migrate lint -w --context {"path":"file://migrations","scmType":"GITHUB"} --dev-url sqlite://dev?mode=memory --dir file://migrations --base atlas://app --format {{ json . }}
+-- migrate-lint/1/stdout --
+{"Env":{"Dir":"migrations"},"Files":[{"Name":"2_users.sql","Stmts":[{"Text":"ALTER TABLE `users` ADD COLUMN `email` text NULL;"},{"Text":"CREATE TABLE `orders` (`id` integer NOT NULL, PRIMARY KEY (`id`));"}],"Changes":{"Objects":[{"Op":"modify","Object":"table \"users\"","Diff":" `id` integer NOT NULL,\n+ `email` text NULL,\n PRIMARY KEY (`id`)","Stmts":[0]},{"Op":"add","Object":"table \"orders\"","Diff":"+CREATE TABLE `orders` (\n+ `id` integer NOT NULL,\n+ PRIMARY KEY (`id`)\n+);","Stmts":[1]}],"Stmts":2}},{"Name":"3_seed.sql","Stmts":[{"Text":"INSERT INTO `users` (`id`) VALUES (1);"}],"Changes":{"Other":[0],"Stmts":1}}]}
+-- summary-expected.txt --
+<code>atlas migrate lint</code> on <strong>migrations</strong>
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>2 new migration files detected</td>
+      <td>2_users.sql<br/>3_seed.sql</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No issues found</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+<details open><summary><strong>Changes in</strong> <code>2_users.sql</code> · 2 objects: 1 added, 1 modified · 2 statements</summary><p></p>
+<table>
+<tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
+<tr>
+<td><code>~</code> <code>table "users"</code></td>
+<td>
+
+```diff
+ `id` integer NOT NULL,
++ `email` text NULL,
+ PRIMARY KEY (`id`)
+```
+
+</td>
+<td><details><summary>1 statement</summary>
+
+```sql
+ALTER TABLE `users` ADD COLUMN `email` text NULL;
+```
+
+</details></td>
+</tr>
+<tr>
+<td><code>+</code> <code>table "orders"</code></td>
+<td><details><summary><kbd>+4</kbd></summary>
+
+```diff
++CREATE TABLE `orders` (
++ `id` integer NOT NULL,
++ PRIMARY KEY (`id`)
++);
+```
+
+</details></td>
+<td><details><summary>1 statement</summary>
+
+```sql
+CREATE TABLE `orders` (`id` integer NOT NULL, PRIMARY KEY (`id`));
+```
+
+</details></td>
+</tr>
+</table>
+</details>

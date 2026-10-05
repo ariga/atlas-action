@@ -2181,26 +2181,10 @@ func (c PlanComment) Changes() *atlasexec.ChangeSummary {
 	return nil
 }
 
-// SQL returns the plan statements at the given indexes. A plan with a delimiter
-// other than ";", such as "GO", has its statements parsed without it, so it is
-// added back to each statement.
+// SQL returns the plan statements at the given indexes.
 func (c PlanComment) SQL(idx []int) string {
-	var (
-		f     = c.Plan.File
-		delim string
-		stmts = make([]string, 0, len(idx))
-	)
-	if ds := migrate.NewLocalFile(f.Name, []byte(f.Migration)).Directive("delimiter"); len(ds) > 0 {
-		if d := strings.NewReplacer(`\n`, "\n", `\r`, "\r", `\t`, "\t").Replace(ds[0]); d != ";" {
-			delim = d
-		}
-	}
-	for _, i := range idx {
-		if i >= 0 && i < len(f.Stmts) && f.Stmts[i] != nil {
-			stmts = append(stmts, f.Stmts[i].Text+delim)
-		}
-	}
-	return strings.Join(stmts, "\n")
+	f := c.Plan.File
+	return stmtsText(f.Name, f.Migration, f.Stmts, idx)
 }
 
 // renderPlanComment renders the schema plan comment with the change summary of the plan,
@@ -2219,6 +2203,103 @@ func renderPlanComment(tc *TriggerContext, c *PlanComment, limit int) (string, e
 	}
 	c.Summary, c.SummarySQL = false, false
 	return RenderTemplate("schema-plan.tmpl", c, tc)
+}
+
+// openObjects is the number of changed objects a lint comment shows open. The files
+// past them start collapsed.
+const openObjects = 15
+
+// LintComment is the data of the change summary that GitHub adds to the migrate lint comment.
+type LintComment struct {
+	Report     *atlasexec.SummaryReport
+	SummarySQL bool // Show the statements of each object in the summary.
+	Colors     bool // Color the diff counts, which only GitHub comments render.
+}
+
+// LintFile is a linted file in the change summary of the lint comment.
+type LintFile struct {
+	*atlasexec.FileReport
+	Open bool // Show the summary of the file open.
+}
+
+// ChangedFiles returns the files that change schema objects, in lint order. Files that
+// change none, such as data-only files, are left out. A file is open if its objects fit
+// in the openObjects rows, counted across files.
+func (c LintComment) ChangedFiles() []LintFile {
+	if c.Report == nil {
+		return nil
+	}
+	var (
+		fs   []LintFile
+		rows = openObjects
+	)
+	for _, f := range c.Report.Files {
+		if f == nil || f.Changes == nil || len(f.Changes.Objects) == 0 {
+			continue
+		}
+		open := len(f.Changes.Objects) <= rows
+		if open {
+			rows -= len(f.Changes.Objects)
+		}
+		fs = append(fs, LintFile{FileReport: f, Open: open})
+	}
+	return fs
+}
+
+// HasStmts reports if any object of the file has statements. The objects of a file
+// that runs as one batch have none.
+func (f LintFile) HasStmts() bool {
+	if f.FileReport == nil || f.Changes == nil {
+		return false
+	}
+	return slices.ContainsFunc(f.Changes.Objects, func(o *atlasexec.ObjectChange) bool {
+		return o != nil && len(o.Stmts) > 0
+	})
+}
+
+// SQL returns the file statements at the given indexes.
+func (f LintFile) SQL(idx []int) string {
+	return stmtsText(f.Name, f.Text, f.Stmts, idx)
+}
+
+// stmtsText returns the statements at the given indexes, joined by newlines. A file
+// with a delimiter other than ";", such as "GO", has its statements parsed without
+// it, so it is added back to each statement.
+func stmtsText(name, text string, stmts []*migrate.Stmt, idx []int) string {
+	var (
+		delim string
+		lines = make([]string, 0, len(idx))
+	)
+	if ds := migrate.NewLocalFile(name, []byte(text)).Directive("delimiter"); len(ds) > 0 {
+		if d := strings.NewReplacer(`\n`, "\n", `\r`, "\r", `\t`, "\t").Replace(ds[0]); d != ";" {
+			delim = d
+		}
+	}
+	for _, i := range idx {
+		if i >= 0 && i < len(stmts) && stmts[i] != nil {
+			lines = append(lines, stmts[i].Text+delim)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// renderLintComment renders the migrate lint comment as other SCMs do, and adds the
+// change summary of the linted files, if they have one and it fits in limit: first with
+// the statements of each object, then with their counts only. Sizes are measured in
+// bytes, which never undercounts the characters GitHub limits.
+func renderLintComment(tc *TriggerContext, c *LintComment, limit int) (string, error) {
+	comment, err := RenderTemplate("migrate-lint.tmpl", c.Report, tc)
+	if err != nil || len(c.ChangedFiles()) == 0 {
+		return comment, err
+	}
+	for _, sql := range []bool{true, false} {
+		c.SummarySQL = sql
+		// A summary that fails to render is left out, not the comment.
+		if s, err := RenderTemplate("lint-changes.tmpl", c, tc); err == nil && len(comment)+len(s) <= limit {
+			return comment + s, nil
+		}
+	}
+	return comment, nil
 }
 
 // diffStat holds the line counts of an object diff.
