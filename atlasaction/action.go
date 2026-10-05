@@ -2254,7 +2254,6 @@ type PlanComment struct {
 	RerunCommand string
 	Summary      bool // Add the change summary of the plan, if it has one.
 	SummarySQL   bool // Show the statements of each object in the summary.
-	Colors       bool // Color the diff counts, which only GitHub comments render.
 }
 
 // Changes returns the change summary the comment adds, if any.
@@ -2300,7 +2299,6 @@ const openObjects = 15
 type LintComment struct {
 	Report     *atlasexec.SummaryReport
 	SummarySQL bool // Show the statements of each object in the summary.
-	Colors     bool // Color the diff counts, which only GitHub comments render.
 }
 
 // LintFile is a linted file in the change summary of the lint comment.
@@ -2409,19 +2407,16 @@ func newDiffStat(diff string) diffStat {
 	return s
 }
 
-// Keycaps returns the added and deleted line counts as keycaps. GitHub strips CSS
-// from comments, so their colors, if requested, are set by its math renderer.
-func (s diffStat) Keycaps(colors bool) string {
+// Keycaps returns the added and deleted line counts as keycaps. They are plain, as
+// GitHub strips CSS from comments, and its math renderer, the only way to color
+// them, shows an error on GitHub Enterprise Server and raw markup on mobile.
+func (s diffStat) Keycaps() string {
 	var caps []string
 	for _, c := range []struct {
-		n           int
-		sign, color string
-	}{{s.Added, "+", "#2ea043"}, {s.Deleted, "-", "#da3633"}} {
-		switch {
-		case c.n == 0:
-		case colors:
-			caps = append(caps, fmt.Sprintf(`<kbd>$\color{%s}{\texttt{%s%s}}$</kbd>`, c.color, c.sign, thousands(c.n)))
-		default:
+		n    int
+		sign string
+	}{{s.Added, "+"}, {s.Deleted, "-"}} {
+		if c.n != 0 {
 			caps = append(caps, fmt.Sprintf("<kbd>%s%s</kbd>", c.sign, thousands(c.n)))
 		}
 	}

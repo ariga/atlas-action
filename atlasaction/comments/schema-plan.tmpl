@@ -52,7 +52,6 @@
        line keeps an open section from touching it. */ -}}
 {{- define "plan-changes" -}}
 {{- $sql := .SummarySQL }}
-{{- $colors := .Colors }}
 {{- with .Changes }}
 <details{{ if le (len .Objects) 15 }} open{{ end }}><summary><strong>Change summary</strong>{{ with .Objects }} · {{ plural (len .) "object" }}: {{ changeKinds . }}{{ end }} · {{ plural .Stmts "statement" }}{{ with .Dependents }}, {{ num . }} of them recreate dependent objects{{ end }}</summary><p></p>
 <table>
@@ -61,7 +60,7 @@
 {{- $d := diffStat $o.Diff }}
 <tr>
 <td><code>{{ changeSign $o.Op }}</code> <code>{{ escape $o.Object }}</code></td>
-<td>{{ with $o.Diff }}{{ if or (eq $o.Op "add" "drop") (gt $d.Lines 20) }}<details><summary>{{ $d.Keycaps $colors }}</summary>{{ codefence "diff" . }}</details>{{ else }}{{ codefence "diff" . }}{{ end }}{{ end }}</td>
+<td>{{ with $o.Diff }}{{ if or (eq $o.Op "add" "drop") (gt $d.Lines 20) }}<details><summary>{{ $d.Keycaps }}</summary>{{ codefence "diff" . }}</details>{{ else }}{{ codefence "diff" . }}{{ end }}{{ end }}</td>
 <td>{{ with $o.Stmts }}{{ if $sql }}<details><summary>{{ template "plan-changes/stmts" $o }}</summary>{{ codefence "sql" ($.SQL .) }}</details>{{ else }}{{ template "plan-changes/stmts" $o }}{{ end }}{{ end }}</td>
 </tr>
 {{- end }}

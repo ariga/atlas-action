@@ -108,8 +108,7 @@ cmp stdout golden-4.html
   },
   "RerunCommand": "gh run rerun 123",
   "Summary": true,
-  "SummarySQL": true,
-  "Colors": true
+  "SummarySQL": true
 }
 -- golden-1.html --
 <h3>Atlas detected changes to the desired schema</h3>
@@ -141,7 +140,7 @@ CREATE INDEX "orders_total" ON "orders" ("total");
 </tr>
 <tr>
 <td><code>+</code> <code>table "open_orders"</code></td>
-<td><details><summary><kbd>$\color{#2ea043}{\texttt{+5}}$</kbd></summary>
+<td><details><summary><kbd>+5</kbd></summary>
 
 ```diff
 +CREATE TABLE "open_orders" (
@@ -166,7 +165,7 @@ CREATE TABLE "open_orders" (
 </tr>
 <tr>
 <td><code>-</code> <code>view "open_orders"</code></td>
-<td><details><summary><kbd>$\color{#da3633}{\texttt{-8}}$</kbd></summary>
+<td><details><summary><kbd>-8</kbd></summary>
 
 ```diff
 -CREATE VIEW "open_orders" (
@@ -353,7 +352,7 @@ gh run rerun 123
 
 </details>
 -- data-3.json --
-{"Plan":{"Repo":"app","Lint":{"Steps":[{"Name":"Analyze 20260930090000.sql","Text":"0 reports were found in analysis","Result":{"Name":"20260930090000.sql","Text":""}}]},"File":{"Name":"20260930090000","FromHash":"cWXn1XQ7rAe1uAJ3pZ5HzGl0Hq2mDvB9F1rS6nqzv0o=","ToHash":"t0k3Zb8i0mS1c4VbTQ2h9l2Wm8m8y3JwS5aP0Z7eK1A=","Migration":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Create \"new_users\" table\nCREATE TABLE `new_users` (\n  `id` integer NOT NULL,\n  `name` text NOT NULL,\n  PRIMARY KEY (`id`)\n);\n-- Copy rows from old table \"users\" to new temporary table \"new_users\"\nINSERT INTO `new_users` (`id`, `name`) SELECT `id`, IFNULL(`name`, '') FROM `users`;\n-- Drop \"users\" table after copying rows\nDROP TABLE `users`;\n-- Rename temporary table \"new_users\" to \"users\"\nALTER TABLE `new_users` RENAME TO `users`;\n-- Create index \"users_name\" to table: \"users\"\nCREATE INDEX `users_name` ON `users` (`name`);\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Stmts":[{"Pos":55,"Text":"PRAGMA foreign_keys = off;","Comments":["-- Disable the enforcement of foreign-keys constraints\n"]},{"Pos":110,"Text":"CREATE TABLE `new_users` (\n  `id` integer NOT NULL,\n  `name` text NOT NULL,\n  PRIMARY KEY (`id`)\n);","Comments":["-- Create \"new_users\" table\n"]},{"Pos":281,"Text":"INSERT INTO `new_users` (`id`, `name`) SELECT `id`, IFNULL(`name`, '') FROM `users`;","Comments":["-- Copy rows from old table \"users\" to new temporary table \"new_users\"\n"]},{"Pos":407,"Text":"DROP TABLE `users`;","Comments":["-- Drop \"users\" table after copying rows\n"]},{"Pos":476,"Text":"ALTER TABLE `new_users` RENAME TO `users`;","Comments":["-- Rename temporary table \"new_users\" to \"users\"\n"]},{"Pos":566,"Text":"CREATE INDEX `users_name` ON `users` (`name`);","Comments":["-- Create index \"users_name\" to table: \"users\"\n"]},{"Pos":672,"Text":"PRAGMA foreign_keys = on;","Comments":["-- Enable back the enforcement of foreign-keys constraints\n"]}],"Changes":{"Objects":[{"Type":"table","Op":"modify","Object":"table \"users\"","Diff":" CREATE TABLE `users` (\n   `id` integer NOT NULL,\n-  `name` text NULL,\n+  `name` text NOT NULL,\n   PRIMARY KEY (`id`)\n );","Stmts":[1,2,3,4,5]}],"Other":[0,6],"Stmts":7},"URL":"atlas://app/plans/20260930090000","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397512","Status":"PENDING"}},"RerunCommand":"gh run rerun 123","Summary":true,"SummarySQL":true,"Colors":true}
+{"Plan":{"Repo":"app","Lint":{"Steps":[{"Name":"Analyze 20260930090000.sql","Text":"0 reports were found in analysis","Result":{"Name":"20260930090000.sql","Text":""}}]},"File":{"Name":"20260930090000","FromHash":"cWXn1XQ7rAe1uAJ3pZ5HzGl0Hq2mDvB9F1rS6nqzv0o=","ToHash":"t0k3Zb8i0mS1c4VbTQ2h9l2Wm8m8y3JwS5aP0Z7eK1A=","Migration":"-- Disable the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = off;\n-- Create \"new_users\" table\nCREATE TABLE `new_users` (\n  `id` integer NOT NULL,\n  `name` text NOT NULL,\n  PRIMARY KEY (`id`)\n);\n-- Copy rows from old table \"users\" to new temporary table \"new_users\"\nINSERT INTO `new_users` (`id`, `name`) SELECT `id`, IFNULL(`name`, '') FROM `users`;\n-- Drop \"users\" table after copying rows\nDROP TABLE `users`;\n-- Rename temporary table \"new_users\" to \"users\"\nALTER TABLE `new_users` RENAME TO `users`;\n-- Create index \"users_name\" to table: \"users\"\nCREATE INDEX `users_name` ON `users` (`name`);\n-- Enable back the enforcement of foreign-keys constraints\nPRAGMA foreign_keys = on;\n","Stmts":[{"Pos":55,"Text":"PRAGMA foreign_keys = off;","Comments":["-- Disable the enforcement of foreign-keys constraints\n"]},{"Pos":110,"Text":"CREATE TABLE `new_users` (\n  `id` integer NOT NULL,\n  `name` text NOT NULL,\n  PRIMARY KEY (`id`)\n);","Comments":["-- Create \"new_users\" table\n"]},{"Pos":281,"Text":"INSERT INTO `new_users` (`id`, `name`) SELECT `id`, IFNULL(`name`, '') FROM `users`;","Comments":["-- Copy rows from old table \"users\" to new temporary table \"new_users\"\n"]},{"Pos":407,"Text":"DROP TABLE `users`;","Comments":["-- Drop \"users\" table after copying rows\n"]},{"Pos":476,"Text":"ALTER TABLE `new_users` RENAME TO `users`;","Comments":["-- Rename temporary table \"new_users\" to \"users\"\n"]},{"Pos":566,"Text":"CREATE INDEX `users_name` ON `users` (`name`);","Comments":["-- Create index \"users_name\" to table: \"users\"\n"]},{"Pos":672,"Text":"PRAGMA foreign_keys = on;","Comments":["-- Enable back the enforcement of foreign-keys constraints\n"]}],"Changes":{"Objects":[{"Type":"table","Op":"modify","Object":"table \"users\"","Diff":" CREATE TABLE `users` (\n   `id` integer NOT NULL,\n-  `name` text NULL,\n+  `name` text NOT NULL,\n   PRIMARY KEY (`id`)\n );","Stmts":[1,2,3,4,5]}],"Other":[0,6],"Stmts":7},"URL":"atlas://app/plans/20260930090000","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397512","Status":"PENDING"}},"RerunCommand":"gh run rerun 123","Summary":true,"SummarySQL":true}
 -- golden-3.html --
 <h3>Atlas detected changes to the desired schema</h3>
 <h4>Migration Plan for <a href="http://test.atlasgo.cloud/schemas/141733920769" target="_blank">app</a> • <a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397512" target="_blank">View on Atlas Cloud</a></h4>
@@ -466,7 +465,7 @@ gh run rerun 123
 
 </details>
 -- data-4.json --
-{"Plan":{"Repo":"app","Lint":{"Steps":[{"Name":"Analyze 20260929120000.sql","Text":"0 reports were found in analysis","Result":{"Name":"20260929120000.sql","Text":""}}]},"File":{"Name":"20260929120000","FromHash":"3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=","ToHash":"6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=","Migration":"-- Drop index \"orders_total\" from table: \"orders\"\nDROP INDEX \"orders_total\";\n-- Modify \"orders\" table\nALTER TABLE \"orders\" DROP COLUMN \"total\", ADD COLUMN \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;\n-- Create index \"orders_total\" to table: \"orders\"\nCREATE INDEX \"orders_total\" ON \"orders\" (\"total\");\n-- Drop \"open_order_customers\" view\nDROP VIEW \"open_order_customers\";\n-- Drop \"open_orders\" view\nDROP VIEW \"open_orders\";\n-- Create \"open_orders\" table\nCREATE TABLE \"open_orders\" (\n  \"id\" integer NOT NULL,\n  \"customer_id\" integer NOT NULL,\n  PRIMARY KEY (\"id\")\n);\n-- Create \"open_order_customers\" view\nCREATE VIEW \"open_order_customers\" (\n  \"customer_id\"\n) AS SELECT customer_id\n   FROM open_orders;\n","Stmts":[{"Pos":51,"Text":"DROP INDEX \"orders_total\";"},{"Pos":102,"Text":"ALTER TABLE \"orders\" DROP COLUMN \"total\", ADD COLUMN \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;"},{"Pos":260,"Text":"CREATE INDEX \"orders_total\" ON \"orders\" (\"total\");"},{"Pos":345,"Text":"DROP VIEW \"open_order_customers\";"},{"Pos":405,"Text":"DROP VIEW \"open_orders\";"},{"Pos":460,"Text":"CREATE TABLE \"open_orders\" (\n  \"id\" integer NOT NULL,\n  \"customer_id\" integer NOT NULL,\n  PRIMARY KEY (\"id\")\n);"},{"Pos":600,"Text":"CREATE VIEW \"open_order_customers\" (\n  \"customer_id\"\n) AS SELECT customer_id\n   FROM open_orders;"}],"Changes":{"Objects":[{"Type":"table","Op":"modify","Object":"table \"orders\"","Diff":"   \"updated_at\" timestamptz NULL,\n-  \"total\" integer NULL,\n+  \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED,\n   PRIMARY KEY (\"id\"),","Stmts":[0,1,2]},{"Type":"table","Op":"add","Object":"table \"open_orders\"","Diff":"+CREATE TABLE \"open_orders\" (\n+  \"id\" integer NOT NULL,\n+  \"customer_id\" integer NOT NULL,\n+  PRIMARY KEY (\"id\")\n+);","Stmts":[5]},{"Type":"view","Op":"drop","Object":"view \"open_orders\"","Diff":"-CREATE VIEW \"open_orders\" (\n-  \"id\",\n-  \"customer_id\"\n-) AS SELECT id,\n-    customer_id\n-   FROM orders\n-  WHERE amount > 0;\n-COMMENT ON VIEW \"open_orders\" IS 'Orders with a positive amount';","Stmts":[3,4,6],"Dependents":2}],"Stmts":7,"Dependents":2},"URL":"atlas://app/plans/20260929120000","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511","Status":"PENDING"}},"RerunCommand":"gh run rerun 123","Summary":true,"SummarySQL":false,"Colors":true}
+{"Plan":{"Repo":"app","Lint":{"Steps":[{"Name":"Analyze 20260929120000.sql","Text":"0 reports were found in analysis","Result":{"Name":"20260929120000.sql","Text":""}}]},"File":{"Name":"20260929120000","FromHash":"3RRRcLHFkQBqe5Sj/r9kPuT4dtZFRxVEpg/O3gtU/iw=","ToHash":"6HAQUucAV0iOBE6fdNh2hOLU6C+6rCWZmPnO+E0g8zM=","Migration":"-- Drop index \"orders_total\" from table: \"orders\"\nDROP INDEX \"orders_total\";\n-- Modify \"orders\" table\nALTER TABLE \"orders\" DROP COLUMN \"total\", ADD COLUMN \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;\n-- Create index \"orders_total\" to table: \"orders\"\nCREATE INDEX \"orders_total\" ON \"orders\" (\"total\");\n-- Drop \"open_order_customers\" view\nDROP VIEW \"open_order_customers\";\n-- Drop \"open_orders\" view\nDROP VIEW \"open_orders\";\n-- Create \"open_orders\" table\nCREATE TABLE \"open_orders\" (\n  \"id\" integer NOT NULL,\n  \"customer_id\" integer NOT NULL,\n  PRIMARY KEY (\"id\")\n);\n-- Create \"open_order_customers\" view\nCREATE VIEW \"open_order_customers\" (\n  \"customer_id\"\n) AS SELECT customer_id\n   FROM open_orders;\n","Stmts":[{"Pos":51,"Text":"DROP INDEX \"orders_total\";"},{"Pos":102,"Text":"ALTER TABLE \"orders\" DROP COLUMN \"total\", ADD COLUMN \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED;"},{"Pos":260,"Text":"CREATE INDEX \"orders_total\" ON \"orders\" (\"total\");"},{"Pos":345,"Text":"DROP VIEW \"open_order_customers\";"},{"Pos":405,"Text":"DROP VIEW \"open_orders\";"},{"Pos":460,"Text":"CREATE TABLE \"open_orders\" (\n  \"id\" integer NOT NULL,\n  \"customer_id\" integer NOT NULL,\n  PRIMARY KEY (\"id\")\n);"},{"Pos":600,"Text":"CREATE VIEW \"open_order_customers\" (\n  \"customer_id\"\n) AS SELECT customer_id\n   FROM open_orders;"}],"Changes":{"Objects":[{"Type":"table","Op":"modify","Object":"table \"orders\"","Diff":"   \"updated_at\" timestamptz NULL,\n-  \"total\" integer NULL,\n+  \"total\" integer NULL GENERATED ALWAYS AS (amount * 2) STORED,\n   PRIMARY KEY (\"id\"),","Stmts":[0,1,2]},{"Type":"table","Op":"add","Object":"table \"open_orders\"","Diff":"+CREATE TABLE \"open_orders\" (\n+  \"id\" integer NOT NULL,\n+  \"customer_id\" integer NOT NULL,\n+  PRIMARY KEY (\"id\")\n+);","Stmts":[5]},{"Type":"view","Op":"drop","Object":"view \"open_orders\"","Diff":"-CREATE VIEW \"open_orders\" (\n-  \"id\",\n-  \"customer_id\"\n-) AS SELECT id,\n-    customer_id\n-   FROM orders\n-  WHERE amount > 0;\n-COMMENT ON VIEW \"open_orders\" IS 'Orders with a positive amount';","Stmts":[3,4,6],"Dependents":2}],"Stmts":7,"Dependents":2},"URL":"atlas://app/plans/20260929120000","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511","Status":"PENDING"}},"RerunCommand":"gh run rerun 123","Summary":true,"SummarySQL":false}
 -- golden-4.html --
 <h3>Atlas detected changes to the desired schema</h3>
 <h4>Migration Plan for <a href="http://test.atlasgo.cloud/schemas/141733920769" target="_blank">app</a> • <a href="http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511" target="_blank">View on Atlas Cloud</a></h4>
@@ -489,7 +488,7 @@ gh run rerun 123
 </tr>
 <tr>
 <td><code>+</code> <code>table "open_orders"</code></td>
-<td><details><summary><kbd>$\color{#2ea043}{\texttt{+5}}$</kbd></summary>
+<td><details><summary><kbd>+5</kbd></summary>
 
 ```diff
 +CREATE TABLE "open_orders" (
@@ -504,7 +503,7 @@ gh run rerun 123
 </tr>
 <tr>
 <td><code>-</code> <code>view "open_orders"</code></td>
-<td><details><summary><kbd>$\color{#da3633}{\texttt{-8}}$</kbd></summary>
+<td><details><summary><kbd>-8</kbd></summary>
 
 ```diff
 -CREATE VIEW "open_orders" (

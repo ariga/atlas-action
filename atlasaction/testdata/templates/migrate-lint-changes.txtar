@@ -4,7 +4,7 @@
 render-lint-comment lint-changes.tmpl data-1.json
 cmp stdout golden-1.html
 
-# Statement counts only, without colors, as in a job summary over the size limit.
+# Statement counts only, as in a job summary over the size limit.
 render-lint-comment lint-changes.tmpl data-2.json
 cmp stdout golden-2.html
 
@@ -75,8 +75,7 @@ cmp stdout golden-3.html
       }
     ]
   },
-  "SummarySQL": true,
-  "Colors": true
+  "SummarySQL": true
 }
 -- golden-1.html --
 
@@ -125,7 +124,7 @@ CREATE INDEX `orders_status` ON `orders` (`status`);
 </tr>
 <tr>
 <td><code>+</code> <code>table "order_notes"</code></td>
-<td><details><summary><kbd>$\color{#2ea043}{\texttt{+6}}$</kbd></summary>
+<td><details><summary><kbd>+6</kbd></summary>
 
 ```diff
 +CREATE TABLE `order_notes` (
@@ -386,8 +385,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
       }
     ]
   },
-  "SummarySQL": true,
-  "Colors": true
+  "SummarySQL": true
 }
 -- golden-3.html --
 
@@ -396,7 +394,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 <tr><th>Object</th><th>Diff</th></tr>
 <tr>
 <td><code>+</code> <code>table "t001"</code></td>
-<td><details><summary><kbd>$\color{#2ea043}{\texttt{+6}}$</kbd></summary>
+<td><details><summary><kbd>+6</kbd></summary>
 
 ```diff
 +CREATE TABLE `t001` (
@@ -411,7 +409,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 </tr>
 <tr>
 <td><code>+</code> <code>table "t002"</code></td>
-<td><details><summary><kbd>$\color{#2ea043}{\texttt{+6}}$</kbd></summary>
+<td><details><summary><kbd>+6</kbd></summary>
 
 ```diff
 +CREATE TABLE `t002` (
@@ -426,7 +424,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 </tr>
 <tr>
 <td><code>+</code> <code>table "t003"</code></td>
-<td><details><summary><kbd>$\color{#2ea043}{\texttt{+6}}$</kbd></summary>
+<td><details><summary><kbd>+6</kbd></summary>
 
 ```diff
 +CREATE TABLE `t003` (
