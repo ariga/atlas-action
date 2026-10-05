@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -257,6 +258,7 @@ func (a *GitHub) addChecksSchemaLint(lint *SchemaLintReport) error {
 
 type GitHubClient struct {
 	*github.Client
+	colors bool // Color the diff counts in comments.
 }
 
 const (
@@ -274,7 +276,22 @@ func NewGitHubClient(repo, baseURL, token string) (*GitHubClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &GitHubClient{Client: c}, nil
+	return &GitHubClient{Client: c, colors: rendersMathColors(baseURL)}, nil
+}
+
+// rendersMathColors reports if the GitHub at the given API URL colors the math
+// expressions in comments. GitHub Enterprise Server is not known to: old versions
+// show an error instead, so only GitHub.com and GitHub Enterprise Cloud are trusted.
+func rendersMathColors(baseURL string) bool {
+	if baseURL == "" {
+		return true
+	}
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+	h := strings.ToLower(u.Hostname())
+	return h == "api.github.com" || strings.HasSuffix(h, ".ghe.com")
 }
 
 // PullRequest implements SCMClient.
@@ -333,7 +350,7 @@ func (c *GitHubClient) CommentLint(ctx context.Context, tc *TriggerContext, r *a
 	id := tc.Act.GetInput("dir-name")
 	// Leave room for the marker that c.comment appends.
 	limit := githubCommentLimit - len("\n"+commentMarker(id))
-	comment, err := renderLintComment(tc, &LintComment{Report: r, Colors: true}, limit)
+	comment, err := renderLintComment(tc, &LintComment{Report: r, Colors: c.colors}, limit)
 	if err != nil {
 		return err
 	}
@@ -367,7 +384,7 @@ func (c *GitHubClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *a
 	comment, err := renderPlanComment(tc, &PlanComment{
 		Plan:         p,
 		RerunCommand: tc.RerunCmd,
-		Colors:       true,
+		Colors:       c.colors,
 	}, limit)
 	if err != nil {
 		return err
