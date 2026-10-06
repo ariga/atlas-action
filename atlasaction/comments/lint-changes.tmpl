@@ -12,7 +12,7 @@
 {{- $d := diffStat $o.Diff }}
 <tr>
 <td><code>{{ changeSign $o.Op }}</code> <code>{{ escape $o.Object }}</code></td>
-<td>{{ with $o.Diff }}{{ if or (eq $o.Op "add" "drop") (gt $d.Lines 20) }}<details><summary>{{ $d.Keycaps $.Colors }}</summary>{{ codefence "diff" . }}</details>{{ else }}{{ codefence "diff" . }}{{ end }}{{ end }}</td>
+<td>{{ with $o.Diff }}{{ if or (eq $o.Op "add" "drop") (gt $d.Lines 20) }}<details><summary>{{ $d.Keycaps }}</summary>{{ codefence "diff" . }}</details>{{ else }}{{ codefence "diff" . }}{{ end }}{{ end }}</td>
 {{- if $stmts }}
 <td>{{ with $o.Stmts }}{{ if $.SummarySQL }}<details><summary>{{ template "lint-changes/stmts" $o }}</summary>{{ codefence "sql" ($f.SQL .) }}</details>{{ else }}{{ template "lint-changes/stmts" $o }}{{ end }}{{ end }}</td>
 {{- end }}
