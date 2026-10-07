@@ -10,7 +10,7 @@ COPY LICENSE README.md /
 COPY --chmod=001 ./scripts/setup-atlas.sh /usr/local/bin/setup-atlas
 ARG TARGETARCH=amd64
 COPY --chmod=001 ./atlas-action-linux-${TARGETARCH} /usr/local/bin/atlas-action
-RUN apk add --update --no-cache curl
+RUN apk add --update --no-cache curl zlib>=1.3.2-r1
 RUN setup-atlas && rm -rf /root/.atlas /tmp/*
 WORKDIR /root
 VOLUME /root/.atlas
