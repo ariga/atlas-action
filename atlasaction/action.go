@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -69,6 +70,15 @@ type (
 		SchemaApply(context.Context, *atlasexec.SchemaApply)
 		SchemaLint(context.Context, *SchemaLintReport)
 	}
+	// SecurityScanReporter is implemented by the actions that report security scans.
+	SecurityScanReporter interface {
+		SecurityScan(context.Context, *atlasexec.SecurityScan)
+	}
+	// MigrateDriftReporter is implemented by the actions that report drift checks.
+	MigrateDriftReporter interface {
+		// MigrateDrift reports the checks of a run, one per target database.
+		MigrateDrift(context.Context, []*atlasexec.MigrateDrift)
+	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
 		// PullRequest returns information about a pull request.
@@ -113,6 +123,8 @@ type (
 		MigrateSet(context.Context, *atlasexec.MigrateSetParams) error
 		// MigrateDiff runs the `migrate diff --dry-run` command.
 		MigrateDiff(ctx context.Context, params *atlasexec.MigrateDiffParams) (*atlasexec.MigrateDiff, error)
+		// MigrateDriftSlice runs the `migrate drift` command and returns a report per checked database.
+		MigrateDriftSlice(context.Context, *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error)
 		// MigrateRebase runs the `migrate rebase` command.
 		MigrateRebase(context.Context, *atlasexec.MigrateRebaseParams) error
 		// MigrateApplySlice runs the `migrate apply` command and returns the successful runs.
@@ -163,6 +175,11 @@ type (
 		CloudRepoCreate(ctx context.Context, params *atlasexec.CloudRepoCreateParams) (*atlasexec.CloudRepo, error)
 		// SetStderr sets the standard error output for the client.
 		SetStderr(io.Writer)
+	}
+
+	// SecurityScanner is implemented by the Atlas clients that run the `security scan` command.
+	SecurityScanner interface {
+		SecurityScan(context.Context, *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error)
 	}
 
 	// CloudClient lets an action talk to Atlas Cloud.
@@ -354,6 +371,7 @@ const (
 	CmdMigrateHash       = "migrate/hash"
 	CmdMigrateSet        = "migrate/set"
 	CmdMigrateDiff       = "migrate/diff"
+	CmdMigrateDrift      = "migrate/drift"
 	// Declarative workflow Commands
 	CmdSchemaPush        = "schema/push"
 	CmdSchemaLint        = "schema/lint"
@@ -367,6 +385,8 @@ const (
 	CmdScriptLoop  = "script/loop"
 	CmdScriptTest  = "script/test"
 	CmdScriptPush  = "script/push"
+	// Security Commands
+	CmdSecurityScan = "security/scan"
 	// Monitoring Commands
 	CmdMonitorSchema = "monitor/schema"
 	// Copilot Commands
@@ -402,6 +422,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.MigrateSet(ctx)
 	case CmdMigrateDiff:
 		return a.MigrateDiff(ctx)
+	case CmdMigrateDrift:
+		return a.MigrateDrift(ctx)
 	case CmdSchemaPush:
 		return a.SchemaPush(ctx)
 	case CmdSchemaLint:
@@ -424,6 +446,8 @@ func (a *Actions) Run(ctx context.Context, act string) error {
 		return a.ScriptTest(ctx)
 	case CmdScriptPush:
 		return a.ScriptPush(ctx)
+	case CmdSecurityScan:
+		return a.SecurityScan(ctx)
 	case CmdMonitorSchema:
 		return a.MonitorSchema(ctx)
 	case CmdCopilot:
@@ -647,6 +671,9 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 	if err := json.NewDecoder(&resp).Decode(&payload); err != nil {
 		return fmt.Errorf("decoding payload: %w", err)
 	}
+	if payload.ReportError != "" {
+		a.Warningf("`atlas migrate lint` report was not uploaded to Atlas Cloud: %s", payload.ReportError)
+	}
 	if payload.URL != "" {
 		a.SetOutput("report-url", payload.URL)
 	}
@@ -664,7 +691,10 @@ func (a *Actions) MigrateLint(ctx context.Context) error {
 		}
 	}
 	if isLintErr {
-		return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
+		if payload.URL != "" {
+			return fmt.Errorf("`atlas migrate lint` completed with errors, see report: %s", payload.URL)
+		}
+		return errors.New("`atlas migrate lint` completed with errors")
 	}
 	a.Infof("`atlas migrate lint` completed successfully, no issues found")
 	return nil
@@ -936,6 +966,65 @@ func (a *Actions) MigrateDiff(ctx context.Context) error {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 	a.Infof("Run migrate/diff completed successfully")
+	return nil
+}
+
+// MigrateDrift runs the Action for "ariga/atlas-action/migrate/drift".
+func (a *Actions) MigrateDrift(ctx context.Context) error {
+	reports, err := a.Atlas.MigrateDriftSlice(ctx, &atlasexec.MigrateDriftParams{
+		ConfigURL:       a.GetConfigURL(),
+		Env:             a.GetInput("env"),
+		Vars:            a.GetVarsInput("vars"),
+		URL:             a.GetInput("url"),
+		DirURL:          a.GetInput("dir"),
+		DevURL:          a.GetInput("dev-url"),
+		RevisionsSchema: a.GetInput("revisions-schema"),
+		Exclude:         a.GetArrayInput("exclude"),
+	})
+	// A check that could not be completed stops the run. The targets
+	// checked before it are reported along with the failed one.
+	if derr, ok := errors.AsType[*atlasexec.MigrateDriftError](err); ok {
+		reports = derr.Result
+	} else if err != nil {
+		return fmt.Errorf("`atlas migrate drift` completed with errors:\n%s", err)
+	}
+	report, jsonErr := json.Marshal(reports)
+	if jsonErr != nil {
+		return fmt.Errorf("failed to marshal the drift report: %w", jsonErr)
+	}
+	a.SetOutput("report", string(report))
+	var drifted []string // URLs of the drifted databases.
+	for _, r := range reports {
+		switch {
+		case r.Error != "":
+			a.Errorf("%s could not be checked: %s", r.URL, r.Error)
+		case r.Drifted:
+			drifted = append(drifted, r.URL)
+			a.Warningf("%s drifted from the expected state at version %s with %s", r.URL, r.Version, driftChanges(r.Summary))
+			for _, ch := range r.Changes {
+				a.Infof("  -- %s %s:", ch.Kind, ch.Object)
+				for _, cmd := range ch.Cmds {
+					// As the CLI prints them, statements over multiple
+					// lines are aligned with their first line.
+					a.Infof("    -> %s;", strings.ReplaceAll(cmd, "\n", "\n       "))
+				}
+			}
+		default:
+			a.Infof("%s matches the expected state at version %s", r.URL, r.Version)
+		}
+	}
+	a.SetOutput("drifted", strconv.FormatBool(len(drifted) > 0))
+	if r, ok := a.Action.(MigrateDriftReporter); ok {
+		r.MigrateDrift(ctx, reports)
+	}
+	// A database that could not be checked leaves its state unknown.
+	if err != nil {
+		return fmt.Errorf("`atlas migrate drift` completed with errors:\n%s", err)
+	}
+	if len(drifted) > 0 {
+		return fmt.Errorf("`atlas migrate drift` detected drift in %d database(s): %s", len(drifted), strings.Join(drifted, ", "))
+	}
+	a.Infof("`atlas migrate drift` completed successfully, no drift detected")
 	return nil
 }
 
@@ -1267,7 +1356,8 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 		case len(planFiles) == 1:
 			params.URL = planFiles[0].URL
 		case len(planFiles) == 0:
-			a.Infof("No schema plan found")
+			a.Infof("No pending schema plan found. If this commit has schema changes and no approved plan exists, " +
+				"`schema/apply` will fail. Re-run the schema/plan step to create a new plan")
 			return nil
 		default:
 			for _, f := range planFiles {
@@ -1626,6 +1716,82 @@ func (a *Actions) reportScriptRun(cmd string, run *atlasexec.ScriptExec) error {
 	return nil
 }
 
+// SecurityScan runs the Action for "ariga/atlas-action/security/scan"
+func (a *Actions) SecurityScan(ctx context.Context) error {
+	c, ok := a.Atlas.(SecurityScanner)
+	if !ok {
+		return errors.New("security scan is not supported by the configured atlas client")
+	}
+	scan, err := c.SecurityScan(ctx, &atlasexec.SecurityScanParams{
+		ConfigURL:   a.GetConfigURL(),
+		Env:         a.GetInput("env"),
+		Vars:        a.GetVarsInput("vars"),
+		URL:         a.GetArrayInput("urls"),
+		MinSeverity: a.GetInput("min-severity"),
+		FailOn:      a.GetInput("fail-on"),
+		Ignore:      a.GetArrayInput("ignore"),
+	})
+	// The command prints its report before failing on it, or on a step that
+	// follows it. e.g., a notify block. Its findings are reported either way.
+	if scan == nil {
+		return fmt.Errorf("`atlas security scan` completed with errors:\n%s", err)
+	}
+	report, jsonErr := json.Marshal(scan)
+	if jsonErr != nil {
+		return fmt.Errorf("failed to marshal the scan report: %w", jsonErr)
+	}
+	a.SetOutput("report", string(report))
+	count, failed := scan.Count(), scan.Failures()
+	a.SetOutput("count", strconv.Itoa(count))
+	a.SetOutput("failures", strconv.Itoa(len(failed)))
+	for _, t := range scan.Targets {
+		switch {
+		case t.Error != "":
+			a.Errorf("%s could not be scanned: %s", t.URL, t.Error)
+		case len(t.Vulnerabilities) == 0:
+			a.Infof("%s: no issues found in %d extension(s)", t.URL, len(t.Extensions))
+		}
+		for _, v := range t.Vulnerabilities {
+			a.Warningf("%s: %s", t.URL, v.LevelText())
+		}
+	}
+	if r, ok := a.Action.(SecurityScanReporter); ok {
+		r.SecurityScan(ctx, scan)
+	}
+	// issues summarizes the reported issues. e.g., "3 issue(s): 1 critical, 2 high".
+	issues := func() string {
+		reported := scan.Levels()
+		levels := make([]string, 0, len(reported))
+		for _, l := range reported {
+			levels = append(levels, fmt.Sprintf("%d %s", l.Count, strings.ToLower(l.Level)))
+		}
+		return fmt.Sprintf("%d issue(s): %s", count, strings.Join(levels, ", "))
+	}
+	switch {
+	// Anything but a failing result failed the command itself.
+	case err != nil && !errors.Is(err, atlasexec.ErrSecurityScan):
+		return fmt.Errorf("`atlas security scan` completed with errors:\n%s", err)
+	// A database that was not scanned leaves its state unknown.
+	case len(failed) > 0:
+		urls := make([]string, 0, len(failed))
+		for _, t := range failed {
+			urls = append(urls, t.URL)
+		}
+		msg := fmt.Sprintf("`atlas security scan` could not scan %d database(s): %s", len(failed), strings.Join(urls, ", "))
+		if count > 0 {
+			msg += "; also reported " + issues()
+		}
+		return errors.New(msg)
+	case err != nil:
+		return fmt.Errorf("`atlas security scan` completed with %s, check the annotations for details", issues())
+	case count > 0:
+		a.Infof("`atlas security scan` completed successfully with %s, check the annotations for details", issues())
+	default:
+		a.Infof("`atlas security scan` completed successfully, no issues found")
+	}
+	return nil
+}
+
 // MonitorSchema runs the Action for "ariga/atlas-action/monitor/schema"
 func (a *Actions) MonitorSchema(ctx context.Context) error {
 	if err := a.RequiredInputs("cloud-token"); err != nil {
@@ -1711,9 +1877,9 @@ func (a *Actions) MonitorSchema(ctx context.Context) error {
 // CloudRepoCreate runs the Action for "ariga/atlas-action/create-repo".
 func (a *Actions) CloudRepoCreate(ctx context.Context) error {
 	params := &atlasexec.CloudRepoCreateParams{
-		Name:         a.GetInput("name"),
-		Type:         a.GetInput("type"),
-		Driver:       a.GetInput("driver"),
+		Name:   a.GetInput("name"),
+		Type:   a.GetInput("type"),
+		Driver: a.GetInput("driver"),
 	}
 	rsp, err := a.Atlas.CloudRepoCreate(ctx, params)
 	if err != nil {
@@ -2046,6 +2212,24 @@ func appliedStmts(a *atlasexec.MigrateApply) int {
 	return total
 }
 
+// driftChanges summarizes the changes of a drift report by their kind.
+// e.g., "3 change(s): 1 extra, 2 modified".
+func driftChanges(s *atlasexec.MigrateDriftSummary) string {
+	if s == nil {
+		return "0 change(s)"
+	}
+	kinds := make([]string, 0, 3)
+	for _, k := range []struct {
+		n    int
+		kind string
+	}{{s.Extra, "extra"}, {s.Missing, "missing"}, {s.Modified, "modified"}} {
+		if k.n > 0 {
+			kinds = append(kinds, fmt.Sprintf("%d %s", k.n, k.kind))
+		}
+	}
+	return fmt.Sprintf("%d change(s): %s", s.Total, strings.Join(kinds, ", "))
+}
+
 func filterIssues(steps []*atlasexec.StepReport) []*atlasexec.StepReport {
 	result := make([]*atlasexec.StepReport, 0, len(steps))
 	for _, s := range steps {
@@ -2064,6 +2248,233 @@ func stepIsError(s *atlasexec.StepReport) bool {
 	return s.Error != "" || (s.Result != nil && s.Result.Error != "")
 }
 
+// PlanComment is the data of the schema plan comment template.
+type PlanComment struct {
+	Plan         *atlasexec.SchemaPlan
+	RerunCommand string
+	Summary      bool // Add the change summary of the plan, if it has one.
+	SummarySQL   bool // Show the statements of each object in the summary.
+}
+
+// Changes returns the change summary the comment adds, if any.
+func (c PlanComment) Changes() *atlasexec.ChangeSummary {
+	if !c.Summary || c.Plan == nil || c.Plan.File == nil {
+		return nil
+	}
+	if s := c.Plan.File.Changes; s != nil && len(s.Objects)+len(s.Other) > 0 {
+		return s
+	}
+	return nil
+}
+
+// SQL returns the plan statements at the given indexes.
+func (c PlanComment) SQL(idx []int) string {
+	f := c.Plan.File
+	return stmtsText(f.Name, f.Migration, f.Stmts, idx)
+}
+
+// renderPlanComment renders the schema plan comment with the change summary of the plan,
+// if it has one and the comment fits in limit: first with the statements of each object,
+// then with their counts only. Otherwise, the comment is rendered as before the change
+// summary. Sizes are measured in bytes, which never undercounts the characters GitHub limits.
+func renderPlanComment(tc *TriggerContext, c *PlanComment, limit int) (string, error) {
+	for _, sql := range []bool{true, false} {
+		if c.Summary, c.SummarySQL = true, sql; c.Changes() == nil {
+			break
+		}
+		// A summary that fails to render is left out, not the comment.
+		if s, err := RenderTemplate("schema-plan.tmpl", c, tc); err == nil && len(s) <= limit {
+			return s, nil
+		}
+	}
+	c.Summary, c.SummarySQL = false, false
+	return RenderTemplate("schema-plan.tmpl", c, tc)
+}
+
+// openObjects is the number of changed objects a lint comment shows open. The files
+// past them start collapsed.
+const openObjects = 15
+
+// LintComment is the data of the change summary that GitHub adds to the migrate lint comment.
+type LintComment struct {
+	Report     *atlasexec.SummaryReport
+	SummarySQL bool // Show the statements of each object in the summary.
+}
+
+// LintFile is a linted file in the change summary of the lint comment.
+type LintFile struct {
+	*atlasexec.FileReport
+	Open bool // Show the summary of the file open.
+}
+
+// ChangedFiles returns the files that change schema objects, in lint order. Files that
+// change none, such as data-only files, are left out. A file is open if its objects fit
+// in the openObjects rows, counted across files.
+func (c LintComment) ChangedFiles() []LintFile {
+	if c.Report == nil {
+		return nil
+	}
+	var (
+		fs   []LintFile
+		rows = openObjects
+	)
+	for _, f := range c.Report.Files {
+		if f == nil || f.Changes == nil || len(f.Changes.Objects) == 0 {
+			continue
+		}
+		open := len(f.Changes.Objects) <= rows
+		if open {
+			rows -= len(f.Changes.Objects)
+		}
+		fs = append(fs, LintFile{FileReport: f, Open: open})
+	}
+	return fs
+}
+
+// HasStmts reports if any object of the file has statements. The objects of a file
+// that runs as one batch have none.
+func (f LintFile) HasStmts() bool {
+	if f.FileReport == nil || f.Changes == nil {
+		return false
+	}
+	return slices.ContainsFunc(f.Changes.Objects, func(o *atlasexec.ObjectChange) bool {
+		return o != nil && len(o.Stmts) > 0
+	})
+}
+
+// SQL returns the file statements at the given indexes.
+func (f LintFile) SQL(idx []int) string {
+	return stmtsText(f.Name, f.Text, f.Stmts, idx)
+}
+
+// stmtsText returns the statements at the given indexes, joined by newlines. A file
+// with a delimiter other than ";", such as "GO", has its statements parsed without
+// it, so it is added back to each statement.
+func stmtsText(name, text string, stmts []*migrate.Stmt, idx []int) string {
+	var (
+		delim string
+		lines = make([]string, 0, len(idx))
+	)
+	if ds := migrate.NewLocalFile(name, []byte(text)).Directive("delimiter"); len(ds) > 0 {
+		if d := strings.NewReplacer(`\n`, "\n", `\r`, "\r", `\t`, "\t").Replace(ds[0]); d != ";" {
+			delim = d
+		}
+	}
+	for _, i := range idx {
+		if i >= 0 && i < len(stmts) && stmts[i] != nil {
+			lines = append(lines, stmts[i].Text+delim)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// renderLintComment renders the migrate lint comment as other SCMs do, and adds the
+// change summary of the linted files, if they have one and it fits in limit: first with
+// the statements of each object, then with their counts only. Sizes are measured in
+// bytes, which never undercounts the characters GitHub limits.
+func renderLintComment(tc *TriggerContext, c *LintComment, limit int) (string, error) {
+	comment, err := RenderTemplate("migrate-lint.tmpl", c.Report, tc)
+	if err != nil || len(c.ChangedFiles()) == 0 {
+		return comment, err
+	}
+	for _, sql := range []bool{true, false} {
+		c.SummarySQL = sql
+		// A summary that fails to render is left out, not the comment.
+		if s, err := RenderTemplate("lint-changes.tmpl", c, tc); err == nil && len(comment)+len(s) <= limit {
+			return comment + s, nil
+		}
+	}
+	return comment, nil
+}
+
+// diffStat holds the line counts of an object diff.
+type diffStat struct {
+	Added, Deleted, Lines int
+}
+
+// newDiffStat counts the lines of a diff, and the ones it adds and deletes.
+func newDiffStat(diff string) diffStat {
+	var s diffStat
+	for _, l := range strings.Split(strings.Trim(diff, "\n"), "\n") {
+		s.Lines++
+		switch {
+		case strings.HasPrefix(l, "+"):
+			s.Added++
+		case strings.HasPrefix(l, "-"):
+			s.Deleted++
+		}
+	}
+	return s
+}
+
+// Keycaps returns the added and deleted line counts as keycaps. They are plain, as
+// GitHub strips CSS from comments, and its math renderer, the only way to color
+// them, shows an error on GitHub Enterprise Server and raw markup on mobile.
+func (s diffStat) Keycaps() string {
+	var caps []string
+	for _, c := range []struct {
+		n    int
+		sign string
+	}{{s.Added, "+"}, {s.Deleted, "-"}} {
+		if c.n != 0 {
+			caps = append(caps, fmt.Sprintf("<kbd>%s%s</kbd>", c.sign, thousands(c.n)))
+		}
+	}
+	return strings.Join(caps, " ")
+}
+
+// changeKinds counts the changed objects by their operation, e.g. "1 added, 3 modified".
+func changeKinds(objs []*atlasexec.ObjectChange) string {
+	counts := make(map[string]int)
+	for _, o := range objs {
+		switch o.Op {
+		case "add", "drop", "rename":
+			counts[o.Op]++
+		default:
+			counts["modify"]++
+		}
+	}
+	var kinds []string
+	for _, k := range [][2]string{{"add", "added"}, {"modify", "modified"}, {"rename", "renamed"}, {"drop", "dropped"}} {
+		if n := counts[k[0]]; n > 0 {
+			kinds = append(kinds, thousands(n)+" "+k[1])
+		}
+	}
+	return strings.Join(kinds, ", ")
+}
+
+// plural returns the count and the word, in plural unless the count is 1.
+func plural(n int, word string) string {
+	if n != 1 {
+		word += "s"
+	}
+	return thousands(n) + " " + word
+}
+
+// thousands formats n with a comma between each group of three digits.
+func thousands(n int) string {
+	s := strconv.Itoa(n)
+	for i := len(s) - 3; i > 0 && s[i-1] != '-'; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
+}
+
+// fence returns the code in a fenced code block. The fence is longer than any line
+// of backticks in the code, as such a line would otherwise close the block early.
+func fence(lang, code string) string {
+	code = strings.Trim(code, "\n")
+	n := 3
+	for _, m := range reFenceLine.FindAllStringSubmatch(code, -1) {
+		n = max(n, len(m[1])+1)
+	}
+	f := strings.Repeat("`", n)
+	return f + lang + "\n" + code + "\n" + f
+}
+
+// reFenceLine matches the lines that close a fenced code block.
+var reFenceLine = regexp.MustCompile("(?m)^ {0,3}(`{3,})[ \t\r]*$")
+
 var (
 	//go:embed comments
 	comments embed.FS
@@ -2076,6 +2487,7 @@ func RenderTemplate(name string, data any, tc *TriggerContext) (string, error) {
 			Funcs(template.FuncMap{
 				"execTime":     execTime,
 				"appliedStmts": appliedStmts,
+				"driftChanges": driftChanges,
 				"filterIssues": filterIssues,
 				"stepIsError":  stepIsError,
 				"repoLink": func(planLink string) string {
@@ -2190,6 +2602,38 @@ func RenderTemplate(name string, data any, tc *TriggerContext) (string, error) {
 				},
 				"nl2br": func(s string) string { return strings.ReplaceAll(s, "\n", "<br/>") },
 				"nl2sp": func(s string) string { return strings.ReplaceAll(s, "\n", " ") },
+				// codefence is like codeblock, with a fence longer than any line of backticks in the code.
+				"codefence": func(lang, code string) string {
+					return "\n\n" + fence(lang, code) + "\n\n"
+				},
+				// escape escapes the text characters that HTML would read as markup.
+				"escape": strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace,
+				// changeSign marks the operation of a changed object in the plan summary.
+				"changeSign": func(op string) string {
+					switch op {
+					case "add":
+						return "+"
+					case "drop":
+						return "-"
+					default:
+						return "~"
+					}
+				},
+				"num":         thousands,
+				"plural":      plural,
+				"changeKinds": changeKinds,
+				"diffStat":    newDiffStat,
+				"lines": func(s string) int {
+					return strings.Count(strings.Trim(s, "\n"), "\n") + 1
+				},
+				// planComment returns the plan comment data. Other data the template took
+				// before PlanComment, such as a map holding the plan, has no change summary.
+				"planComment": func(data any) *PlanComment {
+					if c, ok := data.(*PlanComment); ok {
+						return c
+					}
+					return &PlanComment{}
+				},
 			}).
 			ParseFS(comments, "comments/*"),
 	)

@@ -125,6 +125,28 @@ func (t *TeamCity) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
 	t.lintReport(r, "lint")
 }
 
+// SecurityScan implements SecurityScanReporter.
+func (t *TeamCity) SecurityScan(_ context.Context, r *atlasexec.SecurityScan) {
+	if r == nil {
+		return
+	}
+	t.BuildStatisticValue("atlas.security.scan.issues", fmt.Sprintf("%d", r.Count()))
+	t.BuildStatisticValue("atlas.security.scan.failures", fmt.Sprintf("%d", len(r.Failures())))
+}
+
+// MigrateDrift implements MigrateDriftReporter.
+func (t *TeamCity) MigrateDrift(_ context.Context, reports []*atlasexec.MigrateDrift) {
+	var drifted, changes int
+	for _, r := range reports {
+		if r.Drifted {
+			drifted++
+			changes += len(r.Changes)
+		}
+	}
+	t.BuildStatisticValue("atlas.migrate.drift.drifted", fmt.Sprintf("%d", drifted))
+	t.BuildStatisticValue("atlas.migrate.drift.changes", fmt.Sprintf("%d", changes))
+}
+
 // SchemaLint implements Reporter.
 func (t *TeamCity) SchemaLint(_ context.Context, r *SchemaLintReport) {
 	if r == nil || r.SchemaLintReport == nil {
@@ -565,6 +587,7 @@ func durationMs(start, end time.Time) int64 {
 }
 
 var (
-	_ Action   = (*TeamCity)(nil)
-	_ Reporter = (*TeamCity)(nil)
+	_ Action               = (*TeamCity)(nil)
+	_ Reporter             = (*TeamCity)(nil)
+	_ MigrateDriftReporter = (*TeamCity)(nil)
 )

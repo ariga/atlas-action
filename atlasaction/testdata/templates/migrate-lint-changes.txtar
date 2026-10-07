@@ -1,0 +1,441 @@
+# The change summary that GitHub adds to the migrate lint comment, for each file that
+# changes schema objects, in lint order. Files without schema changes, such as the seed
+# file, and statements that change no object are left out.
+render-lint-comment lint-changes.tmpl data-1.json
+cmp stdout golden-1.html
+
+# Statement counts only, as in a job summary over the size limit.
+render-lint-comment lint-changes.tmpl data-2.json
+cmp stdout golden-2.html
+
+# The objects of a file that runs as one batch have no statements, and no statements column.
+render-lint-comment lint-changes.tmpl data-3.json
+cmp stdout golden-3.html
+
+-- data-1.json --
+{
+  "Report": {
+    "Files": [
+      {
+        "Name": "20261002000000_orders.sql",
+        "Stmts": [
+          {
+            "Text": "ALTER TABLE `orders` ADD COLUMN `status` text NOT NULL DEFAULT 'new';"
+          },
+          {
+            "Text": "CREATE INDEX `orders_status` ON `orders` (`status`);"
+          },
+          {
+            "Text": "CREATE UNIQUE INDEX `users_email` ON `users` (`email`);"
+          },
+          {
+            "Text": "CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, `body` text NOT NULL, PRIMARY KEY (`id`));"
+          }
+        ],
+        "Changes": {
+          "Objects": [
+            {
+              "Op": "modify",
+              "Object": "table \"users\"",
+              "Diff": " );\n+CREATE UNIQUE INDEX `users_email` ON `users` (`email`);",
+              "Stmts": [
+                2
+              ]
+            },
+            {
+              "Op": "modify",
+              "Object": "table \"orders\"",
+              "Diff": "   `total` integer NOT NULL,\n+  `status` text NOT NULL DEFAULT 'new',\n   PRIMARY KEY (`id`)\n );\n+CREATE INDEX `orders_status` ON `orders` (`status`);",
+              "Stmts": [
+                0,
+                1
+              ]
+            },
+            {
+              "Op": "add",
+              "Object": "table \"order_notes\"",
+              "Diff": "+CREATE TABLE `order_notes` (\n+  `id` integer NOT NULL,\n+  `order_id` integer NOT NULL,\n+  `body` text NOT NULL,\n+  PRIMARY KEY (`id`)\n+);",
+              "Stmts": [
+                3
+              ]
+            }
+          ],
+          "Stmts": 4
+        }
+      },
+      {
+        "Name": "20261003000000_seed.sql",
+        "Changes": {
+          "Other": [
+            0,
+            1
+          ],
+          "Stmts": 2
+        }
+      }
+    ]
+  },
+  "SummarySQL": true
+}
+-- golden-1.html --
+
+<details open><summary><strong>Changes in</strong> <code>20261002000000_orders.sql</code> · 3 objects: 1 added, 2 modified · 4 statements</summary><p></p>
+<table>
+<tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
+<tr>
+<td><code>~</code> <code>table "users"</code></td>
+<td>
+
+```diff
+ );
++CREATE UNIQUE INDEX `users_email` ON `users` (`email`);
+```
+
+</td>
+<td><details><summary>1 statement</summary>
+
+```sql
+CREATE UNIQUE INDEX `users_email` ON `users` (`email`);
+```
+
+</details></td>
+</tr>
+<tr>
+<td><code>~</code> <code>table "orders"</code></td>
+<td>
+
+```diff
+   `total` integer NOT NULL,
++  `status` text NOT NULL DEFAULT 'new',
+   PRIMARY KEY (`id`)
+ );
++CREATE INDEX `orders_status` ON `orders` (`status`);
+```
+
+</td>
+<td><details><summary>2 statements</summary>
+
+```sql
+ALTER TABLE `orders` ADD COLUMN `status` text NOT NULL DEFAULT 'new';
+CREATE INDEX `orders_status` ON `orders` (`status`);
+```
+
+</details></td>
+</tr>
+<tr>
+<td><code>+</code> <code>table "order_notes"</code></td>
+<td><details><summary><kbd>+6</kbd></summary>
+
+```diff
++CREATE TABLE `order_notes` (
++  `id` integer NOT NULL,
++  `order_id` integer NOT NULL,
++  `body` text NOT NULL,
++  PRIMARY KEY (`id`)
++);
+```
+
+</details></td>
+<td><details><summary>1 statement</summary>
+
+```sql
+CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, `body` text NOT NULL, PRIMARY KEY (`id`));
+```
+
+</details></td>
+</tr>
+</table>
+</details>
+-- data-2.json --
+{
+  "Report": {
+    "Files": [
+      {
+        "Name": "20261004000000_orders.sql",
+        "Changes": {
+          "Objects": [
+            {
+              "Op": "modify",
+              "Object": "table \"users\"",
+              "Diff": "   `id` integer NOT NULL,\n-  `name` text NULL,\n+  `name` text NOT NULL,\n   PRIMARY KEY (`id`)",
+              "Stmts": [
+                1
+              ]
+            },
+            {
+              "Op": "modify",
+              "Object": "table \"orders\"",
+              "Diff": "   `total` integer NOT NULL,\n+  `updated_at` text NULL,\n   PRIMARY KEY (`id`)",
+              "Stmts": [
+                2
+              ]
+            },
+            {
+              "Op": "modify",
+              "Object": "table \"order_events\"",
+              "Diff": "   `payload` text NULL,\n-  `retries` integer NOT NULL DEFAULT 0,\n+  `retries` integer NOT NULL DEFAULT 3,\n   `processed_at` text NULL,",
+              "Stmts": [
+                3
+              ]
+            },
+            {
+              "Op": "modify",
+              "Object": "table \"order_totals\"",
+              "Diff": "   `order_id` integer NOT NULL,\n-  `total_x1` integer NOT NULL,\n-  `total_x2` integer NOT NULL,\n-  `total_x3` integer NOT NULL,\n-  `total_x4` integer NOT NULL,\n-  `total_x5` integer NOT NULL,\n-  `total_x6` integer NOT NULL,\n-  `total_x7` integer NOT NULL,\n-  `total_x8` integer NOT NULL,\n-  `total_x9` integer NOT NULL,\n-  `total_x10` integer NOT NULL,\n-  `total_x11` integer NOT NULL,\n-  `total_x12` integer NOT NULL,\n-  `total_x13` integer NOT NULL,\n-  `total_x14` integer NOT NULL,\n-  `total_x15` integer NOT NULL,\n-  `total_x16` integer NOT NULL,\n-  `total_x17` integer NOT NULL,\n-  `total_x18` integer NOT NULL,\n-  `total_x19` integer NOT NULL,\n-  `total_x20` integer NOT NULL,\n-  `total_x21` integer NOT NULL,\n-  `total_x22` integer NOT NULL,\n-  `total_x23` integer NOT NULL,\n-  `total_x24` integer NOT NULL,\n+  `total_x1` real NOT NULL,\n+  `total_x2` real NOT NULL,\n+  `total_x3` real NOT NULL,\n+  `total_x4` real NOT NULL,\n+  `total_x5` real NOT NULL,\n+  `total_x6` real NOT NULL,\n+  `total_x7` real NOT NULL,\n+  `total_x8` real NOT NULL,\n+  `total_x9` real NOT NULL,\n+  `total_x10` real NOT NULL,\n+  `total_x11` real NOT NULL,\n+  `total_x12` real NOT NULL,\n+  `total_x13` real NOT NULL,\n+  `total_x14` real NOT NULL,\n+  `total_x15` real NOT NULL,\n+  `total_x16` real NOT NULL,\n+  `total_x17` real NOT NULL,\n+  `total_x18` real NOT NULL,\n+  `total_x19` real NOT NULL,\n+  `total_x20` real NOT NULL,\n+  `total_x21` real NOT NULL,\n+  `total_x22` real NOT NULL,\n+  `total_x23` real NOT NULL,\n+  `total_x24` real NOT NULL,\n   PRIMARY KEY (`order_id`)",
+              "Stmts": [
+                4
+              ]
+            },
+            {
+              "Op": "drop",
+              "Object": "table \"exports\"",
+              "Diff": "-CREATE TABLE `exports` (\n-  `id` integer NOT NULL,\n-  PRIMARY KEY (`id`)\n-);",
+              "Stmts": [
+                5
+              ]
+            },
+            {
+              "Op": "add",
+              "Object": "table \"order_notes\"",
+              "Diff": "+CREATE TABLE `order_notes` (\n+  `id` integer NOT NULL,\n+  `order_id` integer NOT NULL,\n+  `body` text NOT NULL,\n+  PRIMARY KEY (`id`)\n+);",
+              "Stmts": [
+                6
+              ]
+            }
+          ],
+          "Other": [
+            0,
+            7
+          ],
+          "Stmts": 8
+        }
+      }
+    ]
+  }
+}
+-- golden-2.html --
+
+<details open><summary><strong>Changes in</strong> <code>20261004000000_orders.sql</code> · 6 objects: 1 added, 4 modified, 1 dropped · 8 statements</summary><p></p>
+<table>
+<tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
+<tr>
+<td><code>~</code> <code>table "users"</code></td>
+<td>
+
+```diff
+   `id` integer NOT NULL,
+-  `name` text NULL,
++  `name` text NOT NULL,
+   PRIMARY KEY (`id`)
+```
+
+</td>
+<td>1 statement</td>
+</tr>
+<tr>
+<td><code>~</code> <code>table "orders"</code></td>
+<td>
+
+```diff
+   `total` integer NOT NULL,
++  `updated_at` text NULL,
+   PRIMARY KEY (`id`)
+```
+
+</td>
+<td>1 statement</td>
+</tr>
+<tr>
+<td><code>~</code> <code>table "order_events"</code></td>
+<td>
+
+```diff
+   `payload` text NULL,
+-  `retries` integer NOT NULL DEFAULT 0,
++  `retries` integer NOT NULL DEFAULT 3,
+   `processed_at` text NULL,
+```
+
+</td>
+<td>1 statement</td>
+</tr>
+<tr>
+<td><code>~</code> <code>table "order_totals"</code></td>
+<td><details><summary><kbd>+24</kbd> <kbd>-24</kbd></summary>
+
+```diff
+   `order_id` integer NOT NULL,
+-  `total_x1` integer NOT NULL,
+-  `total_x2` integer NOT NULL,
+-  `total_x3` integer NOT NULL,
+-  `total_x4` integer NOT NULL,
+-  `total_x5` integer NOT NULL,
+-  `total_x6` integer NOT NULL,
+-  `total_x7` integer NOT NULL,
+-  `total_x8` integer NOT NULL,
+-  `total_x9` integer NOT NULL,
+-  `total_x10` integer NOT NULL,
+-  `total_x11` integer NOT NULL,
+-  `total_x12` integer NOT NULL,
+-  `total_x13` integer NOT NULL,
+-  `total_x14` integer NOT NULL,
+-  `total_x15` integer NOT NULL,
+-  `total_x16` integer NOT NULL,
+-  `total_x17` integer NOT NULL,
+-  `total_x18` integer NOT NULL,
+-  `total_x19` integer NOT NULL,
+-  `total_x20` integer NOT NULL,
+-  `total_x21` integer NOT NULL,
+-  `total_x22` integer NOT NULL,
+-  `total_x23` integer NOT NULL,
+-  `total_x24` integer NOT NULL,
++  `total_x1` real NOT NULL,
++  `total_x2` real NOT NULL,
++  `total_x3` real NOT NULL,
++  `total_x4` real NOT NULL,
++  `total_x5` real NOT NULL,
++  `total_x6` real NOT NULL,
++  `total_x7` real NOT NULL,
++  `total_x8` real NOT NULL,
++  `total_x9` real NOT NULL,
++  `total_x10` real NOT NULL,
++  `total_x11` real NOT NULL,
++  `total_x12` real NOT NULL,
++  `total_x13` real NOT NULL,
++  `total_x14` real NOT NULL,
++  `total_x15` real NOT NULL,
++  `total_x16` real NOT NULL,
++  `total_x17` real NOT NULL,
++  `total_x18` real NOT NULL,
++  `total_x19` real NOT NULL,
++  `total_x20` real NOT NULL,
++  `total_x21` real NOT NULL,
++  `total_x22` real NOT NULL,
++  `total_x23` real NOT NULL,
++  `total_x24` real NOT NULL,
+   PRIMARY KEY (`order_id`)
+```
+
+</details></td>
+<td>1 statement</td>
+</tr>
+<tr>
+<td><code>-</code> <code>table "exports"</code></td>
+<td><details><summary><kbd>-4</kbd></summary>
+
+```diff
+-CREATE TABLE `exports` (
+-  `id` integer NOT NULL,
+-  PRIMARY KEY (`id`)
+-);
+```
+
+</details></td>
+<td>1 statement</td>
+</tr>
+<tr>
+<td><code>+</code> <code>table "order_notes"</code></td>
+<td><details><summary><kbd>+6</kbd></summary>
+
+```diff
++CREATE TABLE `order_notes` (
++  `id` integer NOT NULL,
++  `order_id` integer NOT NULL,
++  `body` text NOT NULL,
++  PRIMARY KEY (`id`)
++);
+```
+
+</details></td>
+<td>1 statement</td>
+</tr>
+</table>
+</details>
+-- data-3.json --
+{
+  "Report": {
+    "Files": [
+      {
+        "Name": "20261001000000_init.sql",
+        "Changes": {
+          "Objects": [
+            {
+              "Op": "add",
+              "Object": "table \"t001\"",
+              "Diff": "+CREATE TABLE `t001` (\n+  `id` integer NOT NULL,\n+  `name` text NOT NULL,\n+  `created_at` text NOT NULL,\n+  PRIMARY KEY (`id`)\n+);"
+            },
+            {
+              "Op": "add",
+              "Object": "table \"t002\"",
+              "Diff": "+CREATE TABLE `t002` (\n+  `id` integer NOT NULL,\n+  `name` text NOT NULL,\n+  `created_at` text NOT NULL,\n+  PRIMARY KEY (`id`)\n+);"
+            },
+            {
+              "Op": "add",
+              "Object": "table \"t003\"",
+              "Diff": "+CREATE TABLE `t003` (\n+  `id` integer NOT NULL,\n+  `name` text NOT NULL,\n+  `created_at` text NOT NULL,\n+  PRIMARY KEY (`id`)\n+);"
+            }
+          ],
+          "Other": [
+            0,
+            1,
+            2
+          ],
+          "Stmts": 3
+        }
+      }
+    ]
+  },
+  "SummarySQL": true
+}
+-- golden-3.html --
+
+<details open><summary><strong>Changes in</strong> <code>20261001000000_init.sql</code> · 3 objects: 3 added · 3 statements</summary><p></p>
+<table>
+<tr><th>Object</th><th>Diff</th></tr>
+<tr>
+<td><code>+</code> <code>table "t001"</code></td>
+<td><details><summary><kbd>+6</kbd></summary>
+
+```diff
++CREATE TABLE `t001` (
++  `id` integer NOT NULL,
++  `name` text NOT NULL,
++  `created_at` text NOT NULL,
++  PRIMARY KEY (`id`)
++);
+```
+
+</details></td>
+</tr>
+<tr>
+<td><code>+</code> <code>table "t002"</code></td>
+<td><details><summary><kbd>+6</kbd></summary>
+
+```diff
++CREATE TABLE `t002` (
++  `id` integer NOT NULL,
++  `name` text NOT NULL,
++  `created_at` text NOT NULL,
++  PRIMARY KEY (`id`)
++);
+```
+
+</details></td>
+</tr>
+<tr>
+<td><code>+</code> <code>table "t003"</code></td>
+<td><details><summary><kbd>+6</kbd></summary>
+
+```diff
++CREATE TABLE `t003` (
++  `id` integer NOT NULL,
++  `name` text NOT NULL,
++  `created_at` text NOT NULL,
++  PRIMARY KEY (`id`)
++);
+```
+
+</details></td>
+</tr>
+</table>
+</details>

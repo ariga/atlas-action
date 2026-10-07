@@ -374,11 +374,15 @@ actions:
         type: string
         default: 1s
         label: Wait interval
-        description: Time in seconds between different migrate down attempts.
+        description: |
+          Duration between approval checks, e.g. `30s` or `5m`.
+          Each check re-inspects the target database, so prefer `30s` or more when `wait-timeout` is long.
       wait-timeout:
         type: string
         label: Wait timeout
-        description: Time after which no other retry attempt is made and the action exits.
+        description: |
+          How long to wait for approval, e.g. `30m`.
+          If unset, the action does not wait: it creates the plan, prints its link and fails. Re-run the action after approving.
     outputs:
       current:
         type: string
@@ -395,6 +399,37 @@ actions:
       url:
         type: string
         description: If given, the URL for reviewing the revert plan.
+  - id: migrate/drift
+    name: Migrate Drift
+    description: Detect schema drift between a target database and its migration history
+    inputs:
+      <<: *migrateInputs
+      dev-url:
+        <<: *devURL
+        description: |
+          The URL of the dev-database to compute the expected state on. Required when the migration
+          directory is not stored in the Atlas Registry. For example: `docker://postgres/17/dev`.
+          Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+      url:
+        type: string
+        label: Target database URL
+        description: |
+          The URL of the target database to check for drift. For example: `mysql://root:pass@localhost:3306/prod`.
+      dir:
+        type: string
+        label: Migration directory
+        description: |
+          The URL of the migration directory that defines the expected state. For example: `atlas://dir-name`
+          for cloud based directories or `file://migrations` for local ones.
+      exclude: *inspectExclude
+    outputs:
+      drifted:
+        type: boolean
+        description: Whether drift was detected in any of the checked databases. Either "true" or "false".
+      report:
+        type: string
+        description: |
+          A JSON array of the drift reports, one for each checked database.
   - id: migrate/lint
     description: CI for database schema changes with Atlas
     name: Migrate Lint
@@ -564,6 +599,11 @@ actions:
         description: |
           Automatically generate an approval plan before applying changes. Options are "ALWAYS", "ERROR" or "WARNING".
           Use "ALWAYS" to generate a plan for every apply, or "WARNING" and "ERROR" to generate a plan only based on review policy.
+          With "WARNING" and "ERROR", set the same policy in the `lint { review }` block of the project config. Otherwise,
+          changes that do not require approval are applied with the config policy (default "ALWAYS"), and the step fails.
+          If unset, and the project config requires approval for the changes, the step fails. In this case, set this
+          input (plus `wait-timeout`/`wait-interval`) to create and approve plans during deployment, or re-run the PR's
+          `schema/plan` step.
       tx-mode:
         type: string
         options:
@@ -577,11 +617,15 @@ actions:
         type: string
         default: 1s
         label: Wait interval
-        description: Time in seconds between different apply attempts.
+        description: |
+          Duration between approval checks, e.g. `30s` or `5m`.
+          Each check re-inspects the target database, so prefer `30s` or more when `wait-timeout` is long.
       wait-timeout:
         type: string
         label: Wait timeout
-        description: Time after which no other retry attempt is made and the action exits.
+        description: |
+          How long to wait for approval, e.g. `30m`.
+          If unset, the action does not wait: it creates the plan, prints its link and fails. Re-run the action after approving.
     outputs:
       error:
         description: The error message if the action fails.
@@ -758,3 +802,48 @@ actions:
     name: Script Test
     inputs:
       <<: *testInputs
+  - id: security/scan
+    description: Scan databases for security issues with Atlas
+    name: Security Scan
+    inputs:
+      <<: *commonInputs
+      urls: &urls
+        type: string
+        multiLine: true
+        label: Database URLs
+        description: |
+          URL(s) of the target databases, one per line.
+          For example: `postgres://localhost:5432/app?sslmode=disable`.
+          If not set, Atlas uses the [`url`](https://atlasgo.io/hcl/config#env.url) from the config file.
+          Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+      min-severity:
+        type: string
+        label: Minimum severity
+        description: |
+          The lowest severity to report. For example, `HIGH` reports only the `HIGH`
+          and `CRITICAL` issues.
+        options: [NORMAL, ELEVATED, HIGH, CRITICAL]
+      fail-on:
+        type: string
+        label: Failing severity
+        description: |
+          The lowest severity that fails the action. By default, reported issues do not
+          fail it, and only a database that could not be scanned does.
+        options: [NORMAL, ELEVATED, HIGH, CRITICAL]
+      ignore:
+        type: string
+        multiLine: true
+        label: Ignored CVEs
+        description: |
+          CVE identifier(s) not to report. For example: `CVE-2017-18359`.
+    outputs:
+      count:
+        type: number
+        description: The number of security issues that were reported.
+      failures:
+        type: number
+        description: The number of databases that could not be scanned.
+      report:
+        type: string
+        description: |
+          A JSON report of the scan, containing the issues found in each scanned database.

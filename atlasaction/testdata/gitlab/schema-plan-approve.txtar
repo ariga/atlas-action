@@ -3,7 +3,7 @@ env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-plan-approve
 # No plans found.
 atlas-action --action=schema/plan/approve
 stdout 'No plan URL provided, searching for the pending plan'
-stdout 'No schema plan found'
+stdout 'No pending schema plan found'
 
 # One pending plan.
 atlas-action --action=schema/plan/approve

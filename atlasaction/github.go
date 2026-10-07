@@ -51,7 +51,7 @@ func (a *GitHub) MigrateLint(_ context.Context, r *atlasexec.SummaryReport) {
 	if err := a.addChecks(r); err != nil {
 		a.Errorf("failed to add checks: %v", err)
 	}
-	summary, err := RenderTemplate("migrate-lint.tmpl", r, nil)
+	summary, err := renderLintComment(nil, &LintComment{Report: r}, githubSummaryLimit)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -71,10 +71,10 @@ func (a *GitHub) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
 
 // SchemaPlan implements Reporter.
 func (a *GitHub) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
-	summary, err := RenderTemplate("schema-plan.tmpl", map[string]any{
-		"Plan":         r,
-		"RerunCommand": fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
-	}, nil)
+	summary, err := renderPlanComment(nil, &PlanComment{
+		Plan:         r,
+		RerunCommand: fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
+	}, githubSummaryLimit)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -88,6 +88,26 @@ func (a *GitHub) SchemaLint(_ context.Context, r *SchemaLintReport) {
 		a.Errorf("failed to add checks: %v", err)
 	}
 	summary, err := RenderTemplate("schema-lint.tmpl", r, nil)
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
+
+// SecurityScan implements SecurityScanReporter.
+func (a *GitHub) SecurityScan(_ context.Context, r *atlasexec.SecurityScan) {
+	summary, err := RenderTemplate("security-scan.tmpl", r, nil)
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
+
+// MigrateDrift implements MigrateDriftReporter.
+func (a *GitHub) MigrateDrift(_ context.Context, r []*atlasexec.MigrateDrift) {
+	summary, err := RenderTemplate("migrate-drift.tmpl", r, nil)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
 		return
@@ -237,6 +257,13 @@ type GitHubClient struct {
 	*github.Client
 }
 
+const (
+	// githubCommentLimit is the size limit of a GitHub comment, in characters.
+	githubCommentLimit = 65536
+	// githubSummaryLimit is the size limit of a GitHub step summary, in bytes.
+	githubSummaryLimit = 1 << 20
+)
+
 func NewGitHubClient(repo, baseURL, token string) (*GitHubClient, error) {
 	c, err := github.NewClient(repo,
 		github.WithBaseURL(baseURL),
@@ -301,11 +328,14 @@ func (c *GitHubClient) CommentCopilot(ctx context.Context, pr int, cp *Copilot) 
 
 // CommentLint implements SCMClient.
 func (c *GitHubClient) CommentLint(ctx context.Context, tc *TriggerContext, r *atlasexec.SummaryReport) error {
-	comment, err := RenderTemplate("migrate-lint.tmpl", r, tc)
+	id := tc.Act.GetInput("dir-name")
+	// Leave room for the marker that c.comment appends.
+	limit := githubCommentLimit - len("\n"+commentMarker(id))
+	comment, err := renderLintComment(tc, &LintComment{Report: r}, limit)
 	if err != nil {
 		return err
 	}
-	err = c.upsertComment(ctx, tc.PullRequest, tc.Act.GetInput("dir-name"), comment)
+	err = c.upsertComment(ctx, tc.PullRequest, id, comment)
 	if err != nil {
 		return err
 	}
@@ -330,10 +360,12 @@ func (c *GitHubClient) CommentLint(ctx context.Context, tc *TriggerContext, r *a
 // CommentPlan implements SCMClient.
 func (c *GitHubClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *atlasexec.SchemaPlan) error {
 	// Report the schema plan to the user and add a comment to the PR.
-	comment, err := RenderTemplate("schema-plan.tmpl", map[string]any{
-		"Plan":         p,
-		"RerunCommand": tc.RerunCmd,
-	}, tc)
+	// Leave room for the marker that c.comment appends.
+	limit := githubCommentLimit - len("\n"+commentMarker(p.File.Name))
+	comment, err := renderPlanComment(tc, &PlanComment{
+		Plan:         p,
+		RerunCommand: tc.RerunCmd,
+	}, limit)
 	if err != nil {
 		return err
 	}
@@ -508,4 +540,5 @@ func convertPullRequest(pr *github.PullRequest) *PullRequest {
 
 var _ Action = (*GitHub)(nil)
 var _ Reporter = (*GitHub)(nil)
+var _ MigrateDriftReporter = (*GitHub)(nil)
 var _ SCMClient = (*GitHubClient)(nil)

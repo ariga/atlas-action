@@ -24,6 +24,8 @@ To learn more about the recommended way to build workflows, read our guide on
 {{- end }}
 {{- with action . "migrate/down" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
 {{- end }}
+{{- with action . "migrate/drift" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
 {{- with action . "migrate/lint" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
 {{- end }}
 {{- with action . "migrate/push" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
@@ -45,6 +47,8 @@ To learn more about the recommended way to build workflows, read our guide on
 {{- with action . "schema/push" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
 {{- end }}
 {{- with action . "schema/test" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
+{{- end }}
+{{- with action . "security/scan" }}| [ariga/atlas-action/{{ .ID }}](#{{ printf "ariga/atlas-action/%s" .ID | replace "/" "" }}) | {{ .Description | trimnl | nl2sp }} |
 {{- end }}
 
 ## Examples
@@ -229,6 +233,9 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 Lint migration changes with Atlas
 
+On pull requests, the action comments with the lint results. On GitHub, if the Atlas CLI reports a change summary,
+the comment also lists the changed objects of each file with their diffs and statements.
+
 #### Inputs
 
 All inputs are optional as they may be specified in the Atlas configuration file.
@@ -272,6 +279,49 @@ All inputs are optional as they may be specified in the Atlas configuration file
 {{ template "readme/outputs" . }}
 {{- end }}
 {{- end }}
+{{- with action . "migrate/drift" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Detect schema drift between a target database and its migration history. The action compares the state of
+the database against the state its migration directory defines at the last applied version, and reports the
+objects that diverged from it. Pending migration files are not considered drift. Read more about
+[drift detection](https://atlasgo.io/versioned/drift-detection#migrate-drift).
+
+The expected state is fetched from the Atlas Registry when the migration directory is stored there, e.g.
+`atlas://app`. Otherwise, it is computed by replaying the directory on the dev database given by `dev-url`.
+The action requires a login to Atlas Cloud. It fails when drift is detected, or when a database could not
+be checked.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+#### Usage
+
+The following workflow checks the production database for drift every hour:
+
+```yaml
+name: Drift Detection
+on:
+  schedule:
+    - cron: '0 * * * *'
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{$oc}} secrets.ATLAS_TOKEN {{$cc}}
+      - uses: ariga/atlas-action/migrate/drift@v1
+        with:
+          url: ${{$oc}} secrets.DATABASE_URL {{$cc}}
+          dir: atlas://app
+```
+{{ end }}
 {{- with action . "migrate/test" }}
 ### `ariga/atlas-action/{{ .ID }}`
 
@@ -601,6 +651,9 @@ Push a schema to [Atlas Registry](https://atlasgo.io/registry) with an optional 
 
 Plan a declarative migration for a schema transition.
 
+On pull requests, the action comments with the plan and its lint results. On GitHub, if the Atlas CLI reports a change
+summary, the comment also lists each changed object with its diff and statements.
+
 #### Inputs
 
 {{ template "readme/inputs" . }}
@@ -654,6 +707,38 @@ In case the database URL is subject to change, the `slug` parameter can use to i
           schemas: |-
             auth
             app
+```
+{{ end }}
+{{- with action . "security/scan" }}
+### `ariga/atlas-action/{{ .ID }}`
+
+Scan databases for security issues with Atlas. The scan reports the extensions installed in the
+database that carry known vulnerabilities, as recorded in the Atlas Security Graph. It requires a
+login to Atlas Cloud, on a plan that includes the Security Graph.
+
+The action fails when a database could not be scanned, as that leaves its state unknown. The issues
+it reports do not fail it; set `fail-on` to the severity an issue must reach to fail the action.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+{{ template "readme/inputs" . }}
+#### Outputs
+
+{{ template "readme/outputs" . }}
+#### Usage
+
+The following action scans two databases, reports every issue it finds, and fails the workflow if
+any of them is graded `HIGH` or above.
+
+```yaml
+        uses: ariga/atlas-action/security/scan@v1
+        with:
+          urls: |-
+            postgres://postgres:pass@localhost:5432/app?sslmode=disable
+            postgres://postgres:pass@localhost:5432/reports?sslmode=disable
+          fail-on: HIGH
 ```
 {{ end }}
 ### `ariga/atlas-action/setup`

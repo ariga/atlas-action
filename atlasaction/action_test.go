@@ -33,6 +33,7 @@ import (
 	"ariga.io/atlas-action/internal/cmdapi"
 	"ariga.io/atlas/atlasexec"
 	"ariga.io/atlas/sql/migrate"
+	"ariga.io/atlas/sql/sqlcheck"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rogpeppe/go-internal/diff"
 	"github.com/rogpeppe/go-internal/testscript"
@@ -646,6 +647,7 @@ type mockAtlas struct {
 	migrateSet        func(context.Context, *atlasexec.MigrateSetParams) error
 	migrateRebase     func(context.Context, *atlasexec.MigrateRebaseParams) error
 	migrateLs         func(context.Context, *atlasexec.MigrateLsParams) (string, error)
+	migrateLintError  func(context.Context, *atlasexec.MigrateLintParams) error
 	schemaInspect     func(context.Context, *atlasexec.SchemaInspectParams) (string, error)
 	schemaPush        func(context.Context, *atlasexec.SchemaPushParams) (*atlasexec.SchemaPush, error)
 	schemaPlan        func(context.Context, *atlasexec.SchemaPlanParams) (*atlasexec.SchemaPlan, error)
@@ -660,6 +662,8 @@ type mockAtlas struct {
 	scriptLoop        func(context.Context, *atlasexec.ScriptLoopParams) (*atlasexec.ScriptExec, error)
 	scriptTest        func(context.Context, *atlasexec.ScriptTestParams) (string, error)
 	scriptPush        func(context.Context, *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error)
+	securityScan      func(context.Context, *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error)
+	migrateDriftSlice func(context.Context, *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error)
 }
 
 var _ atlasaction.AtlasExec = (*mockAtlas)(nil)
@@ -717,8 +721,8 @@ func (m *mockAtlas) MigrateApplySlice(context.Context, *atlasexec.MigrateApplyPa
 }
 
 // MigrateLintError implements AtlasExec.
-func (m *mockAtlas) MigrateLintError(context.Context, *atlasexec.MigrateLintParams) error {
-	panic("unimplemented")
+func (m *mockAtlas) MigrateLintError(ctx context.Context, params *atlasexec.MigrateLintParams) error {
+	return m.migrateLintError(ctx, params)
 }
 
 // MigratePush implements AtlasExec.
@@ -813,6 +817,16 @@ func (m *mockAtlas) ScriptTest(ctx context.Context, params *atlasexec.ScriptTest
 // ScriptPush implements AtlasExec.
 func (m *mockAtlas) ScriptPush(ctx context.Context, params *atlasexec.ScriptPushParams) (*atlasexec.ScriptPush, error) {
 	return m.scriptPush(ctx, params)
+}
+
+// SecurityScan implements AtlasExec.
+func (m *mockAtlas) SecurityScan(ctx context.Context, params *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+	return m.securityScan(ctx, params)
+}
+
+// MigrateDriftSlice implements AtlasExec.
+func (m *mockAtlas) MigrateDriftSlice(ctx context.Context, params *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error) {
+	return m.migrateDriftSlice(ctx, params)
 }
 
 func TestMigratePush(t *testing.T) {
@@ -1575,6 +1589,127 @@ func TestMigrateDiff(t *testing.T) {
 	})
 }
 
+func TestMigrateDrift(t *testing.T) {
+	newAct := func(out io.Writer) *mockAction {
+		return &mockAction{
+			inputs: map[string]string{
+				"config":           "file://atlas.hcl",
+				"env":              "prod",
+				"vars":             `{"tenant":"t1"}`,
+				"url":              "postgres://localhost:5432/app",
+				"dir":              "atlas://app",
+				"dev-url":          "docker://postgres/17/dev",
+				"revisions-schema": "atlas",
+				"exclude":          "audit_log\nmonitoring_*",
+			},
+			logger: slog.New(slog.NewTextHandler(out, nil)),
+		}
+	}
+	want := &atlasexec.MigrateDriftParams{
+		ConfigURL:       "file://atlas.hcl",
+		Env:             "prod",
+		Vars:            atlasexec.Vars2{"tenant": "t1"},
+		URL:             "postgres://localhost:5432/app",
+		DirURL:          "atlas://app",
+		DevURL:          "docker://postgres/17/dev",
+		RevisionsSchema: "atlas",
+		Exclude:         []string{"audit_log", "monitoring_*"},
+	}
+	run := func(t *testing.T, act *mockAction, reports []*atlasexec.MigrateDrift, err error) error {
+		t.Helper()
+		a, aerr := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(&mockAtlas{
+			migrateDriftSlice: func(_ context.Context, p *atlasexec.MigrateDriftParams) ([]*atlasexec.MigrateDrift, error) {
+				require.Equal(t, want, p)
+				return reports, err
+			},
+		}))
+		require.NoError(t, aerr)
+		return a.MigrateDrift(context.Background())
+	}
+	drifted := &atlasexec.MigrateDrift{
+		URL:         "postgres://localhost:5432/app",
+		Dir:         "atlas://app",
+		Mode:        "registry",
+		Version:     "20260423120000",
+		Drifted:     true,
+		Fingerprint: "KCdKkeAdYP6336FeduFd3KVw8Z5YBHF2DObTpGGzAsc=",
+		Summary:     &atlasexec.MigrateDriftSummary{Total: 2, Extra: 1, Modified: 1, Types: map[string]int{"table": 2}},
+		Changes: []atlasexec.MigrateDriftChange{
+			{Type: "table", Kind: "extra", Object: `table "audit"`, Cmds: []string{`CREATE TABLE "audit" ("id" integer NOT NULL)`}},
+			{Type: "table", Kind: "modified", Object: `table "users"`, Cmds: []string{`ALTER TABLE "users" ADD COLUMN "nickname" text NULL`}},
+		},
+	}
+	t.Run("no drift", func(t *testing.T) {
+		act := newAct(io.Discard)
+		err := run(t, act, []*atlasexec.MigrateDrift{{URL: "postgres://localhost:5432/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000"}}, nil)
+		require.NoError(t, err)
+		require.Equal(t, "false", act.output["drifted"])
+		require.JSONEq(t, `[{"URL":"postgres://localhost:5432/app","Dir":"atlas://app","Mode":"registry","Version":"20260423120000"}]`, act.output["report"])
+		require.Equal(t, 1, act.summary)
+	})
+	t.Run("drift", func(t *testing.T) {
+		var out bytes.Buffer
+		act := newAct(&out)
+		err := run(t, act, []*atlasexec.MigrateDrift{drifted}, nil)
+		require.EqualError(t, err, "`atlas migrate drift` detected drift in 1 database(s): postgres://localhost:5432/app")
+		require.Equal(t, "true", act.output["drifted"])
+		require.Equal(t, 1, act.summary, "the summary is written before the step fails")
+		require.Contains(t, out.String(), "postgres://localhost:5432/app drifted from the expected state at version 20260423120000 with 2 change(s): 1 extra, 1 modified")
+	})
+	t.Run("multiple targets", func(t *testing.T) {
+		act := newAct(io.Discard)
+		err := run(t, act, []*atlasexec.MigrateDrift{
+			{URL: "postgres://localhost:5433/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000", Cached: true},
+			drifted,
+		}, nil)
+		require.EqualError(t, err, "`atlas migrate drift` detected drift in 1 database(s): postgres://localhost:5432/app")
+		require.Equal(t, "true", act.output["drifted"])
+		require.Equal(t, 1, act.summary)
+	})
+	t.Run("multiple targets drifted", func(t *testing.T) {
+		act := newAct(io.Discard)
+		other := *drifted
+		other.URL = "postgres://localhost:5433/app"
+		err := run(t, act, []*atlasexec.MigrateDrift{drifted, &other}, nil)
+		require.EqualError(t, err, "`atlas migrate drift` detected drift in 2 database(s): postgres://localhost:5432/app, postgres://localhost:5433/app")
+		require.Equal(t, "true", act.output["drifted"])
+	})
+	// A check that could not be completed stops the run and fails the
+	// step. The targets checked before it are reported along with it.
+	t.Run("check failed", func(t *testing.T) {
+		act := newAct(io.Discard)
+		err := run(t, act, nil, &atlasexec.MigrateDriftError{Result: []*atlasexec.MigrateDrift{
+			drifted,
+			{URL: "postgres://localhost:5433/app", Dir: "atlas://app", Error: "no migration history found on the connected database"},
+		}})
+		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\nno migration history found on the connected database")
+		require.Equal(t, "true", act.output["drifted"])
+		require.Equal(t, 1, act.summary)
+		var reports []*atlasexec.MigrateDrift
+		require.NoError(t, json.Unmarshal([]byte(act.output["report"]), &reports))
+		require.Len(t, reports, 2)
+		require.Equal(t, "no migration history found on the connected database", reports[1].Error)
+	})
+	// A database that could not be checked fails the step, even if no drift was detected.
+	t.Run("check failed without drift", func(t *testing.T) {
+		act := newAct(io.Discard)
+		err := run(t, act, nil, &atlasexec.MigrateDriftError{Result: []*atlasexec.MigrateDrift{
+			{URL: "postgres://localhost:5432/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000"},
+			{URL: "postgres://localhost:5433/app", Dir: "atlas://app", Error: "cannot determine the expected state: migration 20260423120000 was partially applied. Run 'atlas migrate status' for details"},
+		}})
+		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\ncannot determine the expected state: migration 20260423120000 was partially applied. Run 'atlas migrate status' for details")
+		require.Equal(t, "false", act.output["drifted"])
+		require.Equal(t, 1, act.summary)
+	})
+	t.Run("error", func(t *testing.T) {
+		act := newAct(io.Discard)
+		err := run(t, act, nil, atlasexec.ErrRequireLogin)
+		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\ncommand requires 'atlas login'")
+		require.Empty(t, act.output)
+		require.Zero(t, act.summary)
+	})
+}
+
 type mockCloudClient struct {
 	hash      string
 	lastInput *cloud.PushSnapshotInput
@@ -2293,6 +2428,134 @@ func TestMigrateLint(t *testing.T) {
 		require.NotEmpty(t, string(c))
 		require.NotEmpty(t, tt.out.String())
 	})
+	t.Run("lint summary - lint error - report not uploaded", func(t *testing.T) {
+		tt := newT(t, nil)
+		tt.env["GITHUB_EVENT_NAME"] = "push"
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		r := destructiveReport()
+		r.ReportError = "unexpected status code: 503"
+		tt.cli = &mockAtlas{migrateLintError: migrateLintReport(t, r, atlasexec.ErrLint)}
+		err := tt.newActs(t).MigrateLint(context.Background())
+		require.EqualError(t, err, "`atlas migrate lint` completed with errors")
+		require.Equal(t, "::warning::`atlas migrate lint` report was not uploaded to Atlas Cloud: unexpected status code: 503\n"+
+			"::error file=testdata/migrations_destructive/20230925192914.sql,line=1,title=destructive changes detected::Dropping table \"t1\" (DS102)%0A%0ADetails: https://atlasgo.io/lint/analyzers#DS102\n", tt.out.String())
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Equal(t, destructiveSummary, string(c))
+		require.Empty(t, must(tt.outputs()))
+	})
+	t.Run("lint summary - no issues - report not uploaded", func(t *testing.T) {
+		tt := newT(t, nil)
+		tt.env["GITHUB_EVENT_NAME"] = "push"
+		tt.setInput("dir", "file://testdata/migrations")
+		tt.setInput("dir-name", "test-dir-slug")
+		r := &atlasexec.SummaryReport{
+			Files:       []*atlasexec.FileReport{{Name: "20230922132634_init.sql"}},
+			ReportError: "unexpected status code: 503",
+		}
+		r.Env.Dir = "testdata/migrations"
+		tt.cli = &mockAtlas{migrateLintError: migrateLintReport(t, r, nil)}
+		require.NoError(t, tt.newActs(t).MigrateLint(context.Background()))
+		require.Equal(t, "::warning::`atlas migrate lint` report was not uploaded to Atlas Cloud: unexpected status code: 503\n"+
+			"`atlas migrate lint` completed successfully, no issues found\n", tt.out.String())
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Equal(t, `<code>atlas migrate lint</code> on <strong>testdata/migrations</strong>
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>1 new migration file detected</td>
+      <td>20230922132634_init.sql</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>No issues found</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+`, string(c))
+		require.Empty(t, must(tt.outputs()))
+	})
+	t.Run("lint summary - lint error - report uploaded", func(t *testing.T) {
+		tt := newT(t, nil)
+		tt.env["GITHUB_EVENT_NAME"] = "push"
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		r := destructiveReport()
+		r.URL = "https://migration-lint-report-url"
+		tt.cli = &mockAtlas{migrateLintError: migrateLintReport(t, r, atlasexec.ErrLint)}
+		err := tt.newActs(t).MigrateLint(context.Background())
+		require.EqualError(t, err, "`atlas migrate lint` completed with errors, see report: https://migration-lint-report-url")
+		require.Equal(t, "::error file=testdata/migrations_destructive/20230925192914.sql,line=1,title=destructive changes detected::Dropping table \"t1\" (DS102)%0A%0ADetails: https://atlasgo.io/lint/analyzers#DS102\n", tt.out.String())
+		c, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		require.Equal(t, `<code>atlas migrate lint</code> on <strong>testdata/migrations_destructive</strong>
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>1 new migration file detected</td>
+      <td>20230925192914.sql</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>ERD and visual diff generated</td>
+      <td><a href="https://migration-lint-report-url#erd" target="_blank">View Visualization</a></td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td>
+      <td>Analyze 20230925192914.sql<br/>1 reports were found in analysis</td>
+      <td><b>Destructive changes detected</b><br/>Dropping table "t1"&nbsp;<a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/></td>
+    </tr><tr><td colspan="4"><div align="center">Read the full linting report on <a href="https://migration-lint-report-url" target="_blank">Atlas Cloud</a></div></td></tr>
+  </tbody>
+</table>
+`, string(c))
+		require.Equal(t, map[string]string{"report-url": "https://migration-lint-report-url"}, must(tt.outputs()))
+	})
+	t.Run("lint comment - lint error - report not uploaded", func(t *testing.T) {
+		tt := newT(t, nil)
+		var comment string
+		ghMock := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			switch path, method := request.URL.Path, request.Method; {
+			case path == "/repos/test-owner/test-repository/issues/0/comments" && method == http.MethodGet,
+				path == "/repos/test-owner/test-repository/pulls/0/files" && method == http.MethodGet:
+				_, err := writer.Write([]byte(`[]`))
+				require.NoError(t, err)
+			case path == "/repos/test-owner/test-repository/issues/0/comments" && method == http.MethodPost:
+				var payload struct{ Body string }
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+				comment = payload.Body
+				writer.WriteHeader(http.StatusCreated)
+			default:
+				writer.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		t.Cleanup(ghMock.Close)
+		tt.env["GITHUB_API_URL"] = ghMock.URL
+		tt.env["GITHUB_REPOSITORY"] = "test-owner/test-repository"
+		tt.setInput("dir", "file://testdata/migrations_destructive")
+		tt.setInput("dir-name", "test-dir-slug")
+		r := destructiveReport()
+		r.ReportError = "unexpected status code: 503"
+		tt.cli = &mockAtlas{migrateLintError: migrateLintReport(t, r, atlasexec.ErrLint)}
+		err := tt.newActs(t).MigrateLint(context.Background())
+		require.EqualError(t, err, "`atlas migrate lint` completed with errors")
+		require.Equal(t, destructiveSummary+"<!-- generated by ariga/atlas-action for test-dir-slug -->", comment)
+	})
 	t.Run("lint summary - with diagnostics file not included in the pull request", func(t *testing.T) {
 		tt := newT(t, nil)
 		var comments []map[string]any
@@ -2634,6 +2897,59 @@ func sqlitedb(t *testing.T) string {
 	require.NoError(t, err)
 	return dbpath
 }
+
+// migrateLintReport returns a MigrateLintError mock that writes the report
+// to the params writer and returns err, as "atlas migrate lint" does.
+func migrateLintReport(t *testing.T, r *atlasexec.SummaryReport, err error) func(context.Context, *atlasexec.MigrateLintParams) error {
+	return func(_ context.Context, p *atlasexec.MigrateLintParams) error {
+		require.True(t, p.Web)
+		require.NoError(t, json.NewEncoder(p.Writer).Encode(r))
+		return err
+	}
+}
+
+// destructiveReport returns a lint report with a destructive change.
+func destructiveReport() *atlasexec.SummaryReport {
+	f := &atlasexec.FileReport{
+		Name:  "20230925192914.sql",
+		Text:  "drop table t1;\n",
+		Error: "destructive changes detected",
+		Reports: []sqlcheck.Report{{
+			Text:        "destructive changes detected",
+			Diagnostics: []sqlcheck.Diagnostic{{Text: `Dropping table "t1"`, Code: "DS102"}},
+		}},
+	}
+	r := &atlasexec.SummaryReport{
+		Steps: []*atlasexec.StepReport{{Name: "Analyze 20230925192914.sql", Text: "1 reports were found in analysis", Result: f}},
+		Files: []*atlasexec.FileReport{f},
+	}
+	r.Env.Dir = "testdata/migrations_destructive"
+	return r
+}
+
+// destructiveSummary is the step summary of destructiveReport without a report URL.
+const destructiveSummary = `<code>atlas migrate lint</code> on <strong>testdata/migrations_destructive</strong>
+<table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Step</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/success.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/success.svg?v=1"/></picture></div></td>
+      <td>1 new migration file detected</td>
+      <td>20230925192914.sql</td>
+    </tr><tr>
+      <td><div align="center"><picture><source media="(prefers-color-scheme: light)" srcset="https://release.ariga.io/images/assets/error.svg?v=1"><img width="20px" height="20px" src="https://release.ariga.io/images/assets/error.svg?v=1"/></picture></div></td>
+      <td>Analyze 20230925192914.sql<br/>1 reports were found in analysis</td>
+      <td><b>Destructive changes detected</b><br/>Dropping table "t1"&nbsp;<a href="https://atlasgo.io/lint/analyzers#DS102" target="_blank">(DS102)</a><br/></td>
+    </tr>
+  </tbody>
+</table>
+`
 
 type test struct {
 	db        string
@@ -3179,7 +3495,7 @@ time=NOW level=INFO msg="Found schema plan: atlas://atlas-action/plans/pr-1-Rl4l
 time=NOW level=INFO msg="No plan URL provided, searching for the pending plan"
 time=NOW level=INFO msg="Schema plan approved successfully: https://gh.atlasgo.cloud/plan/pr-1-Rl4lBdMk"
 time=NOW level=INFO msg="No plan URL provided, searching for the pending plan"
-time=NOW level=INFO msg="No schema plan found"
+time=NOW level=INFO msg="No pending schema plan found. If this commit has schema changes and no approved plan exists, `+"`schema/apply`"+` will fail. Re-run the schema/plan step to create a new plan"
 `, out.String())
 }
 
@@ -3393,9 +3709,13 @@ func TestRenderTemplates(t *testing.T) {
 		Dir: "testdata/templates",
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
 			"render-schema-plan":   renderTemplate[*atlasexec.SchemaPlan],
+			"render-plan-comment":  renderTemplate[*atlasaction.PlanComment],
+			"render-lint-comment":  renderTemplate[*atlasaction.LintComment],
 			"render-lint":          renderTemplate[*atlasexec.SummaryReport],
 			"render-migrate-apply": renderTemplate[*atlasexec.MigrateApply],
 			"render-schema-lint":   renderTemplate[*atlasaction.SchemaLintReport],
+			"render-security-scan": renderTemplate[*atlasexec.SecurityScan],
+			"render-migrate-drift": renderTemplate[[]*atlasexec.MigrateDrift],
 		},
 	})
 }
@@ -3516,6 +3836,16 @@ func (m *mockAtlas) SchemaLint(ctx context.Context, p *atlasexec.SchemaLintParam
 
 // SchemaLint implements atlasaction.Reporter.
 func (m *mockAction) SchemaLint(context.Context, *atlasaction.SchemaLintReport) {
+	m.summary++
+}
+
+// SecurityScan implements atlasaction.SecurityScanReporter.
+func (m *mockAction) SecurityScan(context.Context, *atlasexec.SecurityScan) {
+	m.summary++
+}
+
+// MigrateDrift implements atlasaction.MigrateDriftReporter.
+func (m *mockAction) MigrateDrift(context.Context, []*atlasexec.MigrateDrift) {
 	m.summary++
 }
 
@@ -4085,5 +4415,166 @@ func TestScript(t *testing.T) {
 		err := newActs(t, act, atlas).ScriptPush(context.Background())
 		require.ErrorContains(t, err, "`atlas script push` completed with errors")
 		require.ErrorContains(t, err, "repository not found")
+	})
+}
+
+func TestSecurityScan(t *testing.T) {
+	newActs := func(t *testing.T, act *mockAction, atlas *mockAtlas) *atlasaction.Actions {
+		t.Helper()
+		a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(atlas))
+		require.NoError(t, err)
+		return a
+	}
+	newAct := func() *mockAction {
+		return &mockAction{
+			inputs: map[string]string{
+				"config":       "file://atlas.hcl",
+				"env":          "prod",
+				"urls":         "postgres://localhost:5432/app\npostgres://localhost:5433/reports",
+				"min-severity": "ELEVATED",
+				"fail-on":      "HIGH",
+				"ignore":       "CVE-2017-18359\nCVE-2014-2669",
+			},
+			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		}
+	}
+	t.Run("clean", func(t *testing.T) {
+		var params *atlasexec.SecurityScanParams
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, p *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				params = p
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{{
+					URL:        "postgres://localhost:5432/app",
+					Driver:     "postgres",
+					Version:    "18.0",
+					Extensions: []string{"pgcrypto"},
+				}}}, nil
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "file://atlas.hcl", params.ConfigURL)
+		require.Equal(t, "prod", params.Env)
+		require.Equal(t, []string{"postgres://localhost:5432/app", "postgres://localhost:5433/reports"}, params.URL)
+		require.Equal(t, "ELEVATED", params.MinSeverity)
+		require.Equal(t, "HIGH", params.FailOn)
+		require.Equal(t, []string{"CVE-2017-18359", "CVE-2014-2669"}, params.Ignore)
+		require.Equal(t, "0", act.output["count"])
+		require.Equal(t, "0", act.output["failures"])
+		require.Equal(t, 1, act.summary)
+		require.JSONEq(t,
+			`{"Targets":[{"URL":"postgres://localhost:5432/app","Driver":"postgres","Version":"18.0","Extensions":["pgcrypto"]}],"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}`,
+			act.output["report"])
+	})
+	// Issues that did not reach the failing severity are reported without failing the step.
+	t.Run("issues", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{{
+					URL:        "postgres://localhost:5432/app",
+					Extensions: []string{"postgis"},
+					Vulnerabilities: []*atlasexec.SecurityVulnerability{
+						{Name: "hstore", Version: "1.3", ID: "CVE-2014-2669", Level: "ELEVATED", Severity: "MEDIUM"},
+					},
+				}}}, nil
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "1", act.output["count"])
+	})
+	t.Run("fail-on", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{{
+					URL: "postgres://localhost:5432/app",
+					Vulnerabilities: []*atlasexec.SecurityVulnerability{
+						{Name: "postgis", Version: "2.3.1", ID: "CVE-2017-18359", Level: "HIGH", Severity: "HIGH"},
+						{Name: "hstore", Version: "1.3", ID: "CVE-2014-2669", Level: "ELEVATED", Severity: "MEDIUM"},
+						{Name: "pgcrypto", Version: "1.0", ID: "CVE-2015-0243", Level: "ELEVATED", Severity: "MEDIUM"},
+					},
+				}}}, atlasexec.ErrSecurityScan
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` completed with 3 issue(s): 1 high, 2 elevated, check the annotations for details")
+		require.Equal(t, "3", act.output["count"])
+		require.Equal(t, 1, act.summary, "the summary is written before the step fails")
+	})
+	// A database that could not be scanned fails the step, and the ones that were scanned are still reported.
+	t.Run("unreachable", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{
+					{URL: "postgres://localhost:5432/app", Extensions: []string{"pgcrypto"}},
+					{URL: "postgres://localhost:5433/reports", Error: "connection refused"},
+				}}, atlasexec.ErrSecurityScan
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` could not scan 1 database(s): postgres://localhost:5433/reports")
+		require.Equal(t, "0", act.output["count"])
+		require.Equal(t, "1", act.output["failures"])
+	})
+	// A failing database does not hide the issues found in the ones that were scanned.
+	t.Run("unreachable-with-issues", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{
+					{
+						URL: "postgres://localhost:5432/app",
+						Vulnerabilities: []*atlasexec.SecurityVulnerability{
+							{Name: "postgis", Version: "2.3.1", ID: "CVE-2017-18359", Level: "HIGH", Severity: "HIGH"},
+						},
+					},
+					{URL: "postgres://localhost:5433/reports", Error: "connection refused"},
+				}}, atlasexec.ErrSecurityScan
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` could not scan 1 database(s): postgres://localhost:5433/reports; also reported 1 issue(s): 1 high")
+		require.Equal(t, "1", act.output["count"])
+		require.Equal(t, "1", act.output["failures"])
+	})
+	// The command reports its findings before a later step fails it, e.g. a notify
+	// block. The step fails, but the findings are still reported.
+	t.Run("reported-then-failed", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return &atlasexec.SecurityScan{Targets: []*atlasexec.SecurityScanTarget{{
+					URL: "postgres://localhost:5432/app",
+					Vulnerabilities: []*atlasexec.SecurityVulnerability{
+						{Name: "postgis", Version: "2.3.1", ID: "CVE-2017-18359", Level: "HIGH", Severity: "HIGH"},
+					},
+				}}}, errors.New(`security.notify.http "slack": unexpected status 500`)
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` completed with errors:\nsecurity.notify.http \"slack\": unexpected status 500")
+		require.Equal(t, "1", act.output["count"])
+	})
+	// A client from before the action satisfies AtlasExec without SecurityScan.
+	t.Run("client without security scan", func(t *testing.T) {
+		a, err := atlasaction.New(atlasaction.WithAction(newAct()), atlasaction.WithAtlas(struct{ atlasaction.AtlasExec }{}))
+		require.NoError(t, err)
+		err = a.SecurityScan(context.Background())
+		require.EqualError(t, err, "security scan is not supported by the configured atlas client")
+	})
+	t.Run("error", func(t *testing.T) {
+		act := newAct()
+		atlas := &mockAtlas{
+			securityScan: func(_ context.Context, _ *atlasexec.SecurityScanParams) (*atlasexec.SecurityScan, error) {
+				return nil, atlasexec.ErrRequireLogin
+			},
+		}
+		err := newActs(t, act, atlas).SecurityScan(context.Background())
+		require.EqualError(t, err, "`atlas security scan` completed with errors:\ncommand requires 'atlas login'")
+		require.Empty(t, act.output)
 	})
 }

@@ -9,10 +9,13 @@ parameters:
     type: {{ $input | orbtype }}
     default: {{ if $input.Default }}{{ if eq $input.Type "boolean" }}{{ $input.Default }}{{ else }}'{{ $input.Default }}'{{ end }}{{ else }}{{ if eq $name "working-directory" }}'.'{{ else }}{{ if eq $input.Type "boolean" }}false{{ else }}''{{ end }}{{ end }}{{ end }}
     description: |
-      {{ $input.Description | trimnl }}
+      {{ $input.Description | trimnl | replace "\n" "\n      " }}
 {{- if $input.Options }}
 
     enum:
+      {{- if eq $input.Default "" }}
+      - ''
+      {{- end }}
       {{- range $v := $input.Options }}
       - {{ $v }}
       {{- end }}

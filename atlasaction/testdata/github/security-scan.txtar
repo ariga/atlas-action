@@ -1,0 +1,99 @@
+# Mock the atlas command outputs
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./security-scan
+# Setup the action input variables
+env INPUT_URLS=postgres://localhost:5432/app
+env INPUT_MIN-SEVERITY=ELEVATED
+env INPUT_IGNORE=CVE-2017-18359
+
+atlas-action --action=security/scan
+stdout 'completed successfully, no issues found'
+
+# Issues that reached the failing severity fail the action, and are still reported.
+env INPUT_FAIL-ON=HIGH
+env TEST_EXIT_CODE=1
+! atlas-action --action=security/scan
+stdout '::error::.*completed with 2 issue.s.: 1 high, 1 elevated'
+
+# A database that could not be scanned leaves its state unknown.
+! atlas-action --action=security/scan
+stdout '::error::.*could not scan 1 database'
+
+output output.txt
+summary summary.html
+
+-- security-scan/1/args --
+security scan --url postgres://localhost:5432/app --min-severity ELEVATED --ignore CVE-2017-18359 --format {{ json . }}
+-- security-scan/1/stdout --
+{"Targets":[{"URL":"postgres://localhost:5432/app","Driver":"postgres","Version":"9.3.0","Extensions":["pgcrypto"]}]}
+-- security-scan/2/args --
+security scan --url postgres://localhost:5432/app --min-severity ELEVATED --fail-on HIGH --ignore CVE-2017-18359 --format {{ json . }}
+-- security-scan/2/stdout --
+{"Targets":[{"URL":"postgres://localhost:5432/app","Driver":"postgres","Version":"9.3.0","Extensions":["hstore","postgis"],"Vulnerabilities":[{"Name":"postgis","Version":"2.3.1","ID":"CVE-2017-18359","Level":"HIGH","Severity":"HIGH","Suggestion":"Upgrade extension \"postgis\" to version 2.3.3 or later to resolve CVE-2017-18359"},{"Name":"hstore","Version":"1.3","ID":"CVE-2014-2669","Level":"ELEVATED","Severity":"MEDIUM","Suggestion":"Upgrade the database engine to version 9.3.3 or later to resolve CVE-2014-2669: the fix for extension \"hstore\" ships in engine releases"}]}]}
+-- security-scan/3/args --
+security scan --url postgres://localhost:5432/app --min-severity ELEVATED --fail-on HIGH --ignore CVE-2017-18359 --format {{ json . }}
+-- security-scan/3/stdout --
+{"Targets":[{"URL":"postgres://localhost:5432/app","Driver":"postgres","Error":"connection refused"}]}
+-- summary.html --
+<code>atlas security scan</code> on <strong>1</strong> database
+<h4><code>postgres://localhost:5432/app</code> (postgres 9.3.0)</h4>
+<p>No known vulnerabilities in 1 extension.</p>
+
+<code>atlas security scan</code> on <strong>1</strong> database
+<h4><code>postgres://localhost:5432/app</code> (postgres 9.3.0)</h4>
+<table>
+  <thead>
+    <tr>
+      <th>Extension</th>
+      <th>CVE</th>
+      <th>Severity</th>
+      <th>Remediation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>postgis</code> 2.3.1</td>
+      <td><a href="https://www.cve.org/CVERecord?id=CVE-2017-18359" target="_blank">CVE-2017-18359</a></td>
+      <td>HIGH</td>
+      <td>Upgrade extension "postgis" to version 2.3.3 or later to resolve CVE-2017-18359</td>
+    </tr>
+    <tr>
+      <td><code>hstore</code> 1.3</td>
+      <td><a href="https://www.cve.org/CVERecord?id=CVE-2014-2669" target="_blank">CVE-2014-2669</a></td>
+      <td>ELEVATED</td>
+      <td>Upgrade the database engine to version 9.3.3 or later to resolve CVE-2014-2669: the fix for extension "hstore" ships in engine releases</td>
+    </tr>
+  </tbody>
+</table>
+
+<code>atlas security scan</code> on <strong>1</strong> database
+<h4><code>postgres://localhost:5432/app</code> (postgres)</h4>
+<p>The database could not be scanned, its state is unknown: <code>connection refused</code></p>
+
+-- output.txt --
+report<<_GitHubActionsFileCommandDelimeter_
+{"Targets":[{"URL":"postgres://localhost:5432/app","Driver":"postgres","Version":"9.3.0","Extensions":["pgcrypto"]}],"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}
+_GitHubActionsFileCommandDelimeter_
+count<<_GitHubActionsFileCommandDelimeter_
+0
+_GitHubActionsFileCommandDelimeter_
+failures<<_GitHubActionsFileCommandDelimeter_
+0
+_GitHubActionsFileCommandDelimeter_
+report<<_GitHubActionsFileCommandDelimeter_
+{"Targets":[{"URL":"postgres://localhost:5432/app","Driver":"postgres","Version":"9.3.0","Extensions":["hstore","postgis"],"Vulnerabilities":[{"Name":"postgis","Version":"2.3.1","ID":"CVE-2017-18359","Level":"HIGH","Severity":"HIGH","Suggestion":"Upgrade extension \"postgis\" to version 2.3.3 or later to resolve CVE-2017-18359"},{"Name":"hstore","Version":"1.3","ID":"CVE-2014-2669","Level":"ELEVATED","Severity":"MEDIUM","Suggestion":"Upgrade the database engine to version 9.3.3 or later to resolve CVE-2014-2669: the fix for extension \"hstore\" ships in engine releases"}]}],"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}
+_GitHubActionsFileCommandDelimeter_
+count<<_GitHubActionsFileCommandDelimeter_
+2
+_GitHubActionsFileCommandDelimeter_
+failures<<_GitHubActionsFileCommandDelimeter_
+0
+_GitHubActionsFileCommandDelimeter_
+report<<_GitHubActionsFileCommandDelimeter_
+{"Targets":[{"URL":"postgres://localhost:5432/app","Driver":"postgres","Error":"connection refused"}],"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}
+_GitHubActionsFileCommandDelimeter_
+count<<_GitHubActionsFileCommandDelimeter_
+0
+_GitHubActionsFileCommandDelimeter_
+failures<<_GitHubActionsFileCommandDelimeter_
+1
+_GitHubActionsFileCommandDelimeter_

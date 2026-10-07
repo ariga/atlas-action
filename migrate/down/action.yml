@@ -21,10 +21,14 @@ inputs:
     description: |
       The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
   wait-interval:
-    description: Time in seconds between different migrate down attempts.
+    description: |
+      Duration between approval checks, e.g. `30s` or `5m`.
+      Each check re-inspects the target database, so prefer `30s` or more when `wait-timeout` is long.
     default: "1s"
   wait-timeout:
-    description: Time after which no other retry attempt is made and the action exits.
+    description: |
+      How long to wait for approval, e.g. `30m`.
+      If unset, the action does not wait: it creates the plan, prints its link and fails. Re-run the action after approving.
   working-directory:
     description: Atlas working directory. Default is project root
   config:

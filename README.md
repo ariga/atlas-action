@@ -16,6 +16,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/migrate/hash](#arigaatlas-actionmigratehash)              | Automatically generate a hash of the schema migrations directory, and commit it to the migration directory. |
 | [ariga/atlas-action/migrate/diff](#arigaatlas-actionmigratediff)              | Automatically generate versioned migrations whenever the schema is changed, and commit them to the migration directory. |
 | [ariga/atlas-action/migrate/down](#arigaatlas-actionmigratedown)              | Reverts deployed migration files on a target database                               |
+| [ariga/atlas-action/migrate/drift](#arigaatlas-actionmigratedrift)            | Detect schema drift between a target database and its migration history             |
 | [ariga/atlas-action/migrate/lint](#arigaatlas-actionmigratelint)              | CI for database schema changes with Atlas                                           |
 | [ariga/atlas-action/migrate/push](#arigaatlas-actionmigratepush)              | Push the current version of your migration directory to Atlas Cloud.                |
 | [ariga/atlas-action/migrate/set](#arigaatlas-actionmigrateset)                | Edits the revision table to consider all migrations up to and including the given version to be applied. |
@@ -27,6 +28,7 @@ To learn more about the recommended way to build workflows, read our guide on
 | [ariga/atlas-action/schema/plan/approve](#arigaatlas-actionschemaplanapprove) | Approve a migration plan by its URL                                                 |
 | [ariga/atlas-action/schema/push](#arigaatlas-actionschemapush)                | Push a schema version with an optional tag to Atlas                                 |
 | [ariga/atlas-action/schema/test](#arigaatlas-actionschematest)                | Run schema tests against the desired schema                                         |
+| [ariga/atlas-action/security/scan](#arigaatlas-actionsecurityscan)            | Scan databases for security issues with Atlas                                       |
 
 ## Examples
 
@@ -219,6 +221,9 @@ All inputs are optional as they may be specified in the Atlas configuration file
 
 Lint migration changes with Atlas
 
+On pull requests, the action comments with the lint results. On GitHub, if the Atlas CLI reports a change summary,
+the comment also lists the changed objects of each file with their diffs and statements.
+
 #### Inputs
 
 All inputs are optional as they may be specified in the Atlas configuration file.
@@ -296,8 +301,10 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `to-tag` - The tag to revert to. Mutually exclusive with `amount` and `to-version`.
 * `to-version` - The version to revert to. Mutually exclusive with `amount` and `to-tag`.
 * `url` - The URL of the target database. For example: `mysql://root:pass@localhost:3306/dev`.
-* `wait-interval` - Time in seconds between different migrate down attempts.
-* `wait-timeout` - Time after which no other retry attempt is made and the action exits.
+* `wait-interval` - Duration between approval checks, e.g. `30s` or `5m`.
+  Each check re-inspects the target database, so prefer `30s` or more when `wait-timeout` is long.
+* `wait-timeout` - How long to wait for approval, e.g. `30m`.
+  If unset, the action does not wait: it creates the plan, prints its link and fails. Re-run the action after approving.
 * `working-directory` - Atlas working directory. Default is project root
 * `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
@@ -315,6 +322,66 @@ All inputs are optional as they may be specified in the Atlas configuration file
 * `reverted_count` - The number of migrations that were reverted.
 * `target` - The target version of the database.
 * `url` - If given, the URL for reviewing the revert plan.
+
+### `ariga/atlas-action/migrate/drift`
+
+Detect schema drift between a target database and its migration history. The action compares the state of
+the database against the state its migration directory defines at the last applied version, and reports the
+objects that diverged from it. Pending migration files are not considered drift. Read more about
+[drift detection](https://atlasgo.io/versioned/drift-detection#migrate-drift).
+
+The expected state is fetched from the Atlas Registry when the migration directory is stored there, e.g.
+`atlas://app`. Otherwise, it is computed by replaying the directory on the dev database given by `dev-url`.
+The action requires a login to Atlas Cloud. It fails when drift is detected, or when a database could not
+be checked.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `dir` - The URL of the migration directory that defines the expected state. For example: `atlas://dir-name`
+  for cloud based directories or `file://migrations` for local ones.
+* `exclude` - List of glob patterns used to select which resources to filter in inspection
+  see: https://atlasgo.io/declarative/inspect#exclude-schemas
+* `revisions-schema` - The name of the schema containing the revisions table.
+* `url` - The URL of the target database to check for drift. For example: `mysql://root:pass@localhost:3306/prod`.
+* `working-directory` - Atlas working directory. Default is project root
+* `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
+* `vars` - A JSON object containing variables to be used in the Atlas configuration file.
+  For example, `{"var1": "value1", "var2": "value2"}`.
+* `dev-url` - The URL of the dev-database to compute the expected state on. Required when the migration
+  directory is not stored in the Atlas Registry. For example: `docker://postgres/17/dev`.
+  Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
+
+#### Outputs
+
+* `drifted` - Whether drift was detected in any of the checked databases. Either "true" or "false".
+* `report` - A JSON array of the drift reports, one for each checked database.
+
+#### Usage
+
+The following workflow checks the production database for drift every hour:
+
+```yaml
+name: Drift Detection
+on:
+  schedule:
+    - cron: '0 * * * *'
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: ariga/atlas-action/migrate/drift@v1
+        with:
+          url: ${{ secrets.DATABASE_URL }}
+          dir: atlas://app
+```
 
 ### `ariga/atlas-action/migrate/test`
 
@@ -680,14 +747,21 @@ Apply a declarative migrations to a database.
   see: https://atlasgo.io/declarative/inspect#include-schemas
 * `lint-review` - Automatically generate an approval plan before applying changes. Options are "ALWAYS", "ERROR" or "WARNING".
   Use "ALWAYS" to generate a plan for every apply, or "WARNING" and "ERROR" to generate a plan only based on review policy.
+  With "WARNING" and "ERROR", set the same policy in the `lint { review }` block of the project config. Otherwise,
+  changes that do not require approval are applied with the config policy (default "ALWAYS"), and the step fails.
+  If unset, and the project config requires approval for the changes, the step fails. In this case, set this
+  input (plus `wait-timeout`/`wait-interval`) to create and approve plans during deployment, or re-run the PR's
+  `schema/plan` step.
 * `plan` - The plan to apply. For example, `atlas://<schema>/plans/<id>`.
 * `schema` - List of database schema(s). For example: `public`.
 * `to` - URL(s) of the desired schema state.
 * `tx-mode` - Transaction mode to use. Either "file", "all", or "none".
 * `url` - The URL of the target database to apply changes to.
   For example: `mysql://root:pass@localhost:3306/prod`.
-* `wait-interval` - Time in seconds between different apply attempts.
-* `wait-timeout` - Time after which no other retry attempt is made and the action exits.
+* `wait-interval` - Duration between approval checks, e.g. `30s` or `5m`.
+  Each check re-inspects the target database, so prefer `30s` or more when `wait-timeout` is long.
+* `wait-timeout` - How long to wait for approval, e.g. `30m`.
+  If unset, the action does not wait: it creates the plan, prints its link and fails. Re-run the action after approving.
 * `working-directory` - Atlas working directory. Default is project root
 * `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
   named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
@@ -757,6 +831,9 @@ Push a schema to [Atlas Registry](https://atlasgo.io/registry) with an optional 
 ### `ariga/atlas-action/schema/plan`
 
 Plan a declarative migration for a schema transition.
+
+On pull requests, the action comments with the plan and its lint results. On GitHub, if the Atlas CLI reports a change
+summary, the comment also lists each changed object with its diff and statements.
 
 #### Inputs
 
@@ -869,6 +946,56 @@ In case the database URL is subject to change, the `slug` parameter can use to i
           schemas: |-
             auth
             app
+```
+
+### `ariga/atlas-action/security/scan`
+
+Scan databases for security issues with Atlas. The scan reports the extensions installed in the
+database that carry known vulnerabilities, as recorded in the Atlas Security Graph. It requires a
+login to Atlas Cloud, on a plan that includes the Security Graph.
+
+The action fails when a database could not be scanned, as that leaves its state unknown. The issues
+it reports do not fail it; set `fail-on` to the severity an issue must reach to fail the action.
+
+#### Inputs
+
+All inputs are optional as they may be specified in the Atlas configuration file.
+
+* `fail-on` - The lowest severity that fails the action. By default, reported issues do not
+  fail it, and only a database that could not be scanned does.
+* `ignore` - CVE identifier(s) not to report. For example: `CVE-2017-18359`.
+* `min-severity` - The lowest severity to report. For example, `HIGH` reports only the `HIGH`
+  and `CRITICAL` issues.
+* `urls` - URL(s) of the target databases, one per line.
+  For example: `postgres://localhost:5432/app?sslmode=disable`.
+  If not set, Atlas uses the [`url`](https://atlasgo.io/hcl/config#env.url) from the config file.
+  Read more about [Atlas URLs](https://atlasgo.io/concepts/url).
+* `working-directory` - Atlas working directory. Default is project root
+* `config` - The URL of the Atlas configuration file. By default, Atlas will look for a file
+  named `atlas.hcl` in the current directory. For example, `file://config/atlas.hcl`.
+  Learn more about [Atlas configuration files](https://atlasgo.io/atlas-schema/projects).
+* `env` - The environment to use from the Atlas configuration file. For example, `dev`.
+* `vars` - A JSON object containing variables to be used in the Atlas configuration file.
+  For example, `{"var1": "value1", "var2": "value2"}`.
+
+#### Outputs
+
+* `count` - The number of security issues that were reported.
+* `failures` - The number of databases that could not be scanned.
+* `report` - A JSON report of the scan, containing the issues found in each scanned database.
+
+#### Usage
+
+The following action scans two databases, reports every issue it finds, and fails the workflow if
+any of them is graded `HIGH` or above.
+
+```yaml
+        uses: ariga/atlas-action/security/scan@v1
+        with:
+          urls: |-
+            postgres://postgres:pass@localhost:5432/app?sslmode=disable
+            postgres://postgres:pass@localhost:5432/reports?sslmode=disable
+          fail-on: HIGH
 ```
 
 ### `ariga/atlas-action/setup`

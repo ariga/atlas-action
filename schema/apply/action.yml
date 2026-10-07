@@ -23,6 +23,11 @@ inputs:
     description: |
       Automatically generate an approval plan before applying changes. Options are "ALWAYS", "ERROR" or "WARNING".
       Use "ALWAYS" to generate a plan for every apply, or "WARNING" and "ERROR" to generate a plan only based on review policy.
+      With "WARNING" and "ERROR", set the same policy in the `lint { review }` block of the project config. Otherwise,
+      changes that do not require approval are applied with the config policy (default "ALWAYS"), and the step fails.
+      If unset, and the project config requires approval for the changes, the step fails. In this case, set this
+      input (plus `wait-timeout`/`wait-interval`) to create and approve plans during deployment, or re-run the PR's
+      `schema/plan` step.
   plan:
     description: |
       The plan to apply. For example, `atlas://<schema>/plans/<id>`.
@@ -39,10 +44,14 @@ inputs:
       The URL of the target database to apply changes to.
       For example: `mysql://root:pass@localhost:3306/prod`.
   wait-interval:
-    description: Time in seconds between different apply attempts.
+    description: |
+      Duration between approval checks, e.g. `30s` or `5m`.
+      Each check re-inspects the target database, so prefer `30s` or more when `wait-timeout` is long.
     default: "1s"
   wait-timeout:
-    description: Time after which no other retry attempt is made and the action exits.
+    description: |
+      How long to wait for approval, e.g. `30m`.
+      If unset, the action does not wait: it creates the plan, prints its link and fails. Re-run the action after approving.
   working-directory:
     description: Atlas working directory. Default is project root
   config:
