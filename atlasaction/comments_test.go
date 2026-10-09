@@ -62,7 +62,7 @@ func TestSchemaPlanComment(t *testing.T) {
 	for _, s := range []string{
 		"<details open><summary><strong>Change summary</strong> · 1 object: 1 added · 1 statement</summary><p></p>\n<table>",
 		"<tr><th>Object</th><th>Diff</th><th>Statements</th></tr>",
-		"<td><code>+</code> <code>table \"users\"</code></td>",
+		"<td nowrap><code>+</code> <code>table \"users\"</code></td>",
 		// The line counts of a collapsed diff open it.
 		"<td><details><summary><kbd>+3</kbd></summary>\n\n```diff\n+CREATE TABLE `users` (\n+  `id` integer NOT NULL\n+);\n```\n\n</details></td>",
 		"<td><details><summary>1 statement</summary>\n\n```sql\nCREATE TABLE `users` (\n  `id` integer NOT NULL\n);\n```\n\n</details></td>",
@@ -171,15 +171,15 @@ func TestRenderPlanComment_Changes(t *testing.T) {
 	for _, want := range []string{
 		"<details open><summary><strong>Change summary</strong> · 6 objects: 1 added, 2 modified, 1 renamed, 2 dropped · 9 statements, 2 of them recreate dependent objects</summary>",
 		// Added and dropped objects, and long diffs, open from their line counts.
-		"<td><code>+</code> <code>table \"users\"</code></td>\n<td><details><summary><kbd>+3</kbd></summary>\n\n```diff\n+CREATE TABLE",
-		"<td><code>-</code> <code>view \"old\"</code></td>\n<td><details><summary><kbd>-2</kbd></summary>",
+		"<td nowrap><code>+</code> <code>table \"users\"</code></td>\n<td><details><summary><kbd>+3</kbd></summary>\n\n```diff\n+CREATE TABLE",
+		"<td nowrap><code>-</code> <code>view \"old\"</code></td>\n<td><details><summary><kbd>-2</kbd></summary>",
 		"<td><details><summary><kbd>+1,200</kbd> <kbd>-1,100</kbd></summary>",
 		// Short diffs of modified objects are shown in their rows.
-		"<td><code>~</code> <code>table \"orders\"</code></td>\n<td>\n\n```diff\n   \"id\" int NOT NULL,\n-  \"total\" int NULL\n+  \"total\" bigint NULL\n```\n\n</td>",
-		"<td><code>~</code> <code>table \"clients\"</code></td>\n<td>\n\n```diff\n-CREATE TABLE \"customers\" (\n+CREATE TABLE \"clients\" (\n```\n\n</td>",
+		"<td nowrap><code>~</code> <code>table \"orders\"</code></td>\n<td>\n\n```diff\n   \"id\" int NOT NULL,\n-  \"total\" int NULL\n+  \"total\" bigint NULL\n```\n\n</td>",
+		"<td nowrap><code>~</code> <code>table \"clients\"</code></td>\n<td>\n\n```diff\n-CREATE TABLE \"customers\" (\n+CREATE TABLE \"clients\" (\n```\n\n</td>",
 		// Statements open from their counts.
 		"<td><details><summary>3 statements, 2 recreate dependents</summary>\n\n```sql\nDROP VIEW \"totals\";\nALTER TABLE \"orders\" ALTER COLUMN \"total\" TYPE bigint;\nCREATE VIEW \"totals\" AS SELECT sum(total) FROM orders;\n```\n\n</details></td>",
-		"<tr>\n<td>other statements</td>\n<td></td>\n<td><details><summary>1 statement</summary>\n\n```sql\nSET lock_timeout = '5s';\n```\n\n</details></td>\n</tr>",
+		"<tr>\n<td nowrap>other statements</td>\n<td></td>\n<td><details><summary>1 statement</summary>\n\n```sql\nSET lock_timeout = '5s';\n```\n\n</details></td>\n</tr>",
 	} {
 		require.Contains(t, s, want)
 	}
@@ -195,7 +195,7 @@ func TestRenderPlanComment_Labels(t *testing.T) {
 	p.File.Changes.Objects[0].Object = `operator "@<->#1"`
 	s, err := renderPlanComment(nil, &PlanComment{Plan: p}, githubCommentLimit)
 	require.NoError(t, err)
-	require.Contains(t, s, `<td><code>+</code> <code>operator "@&lt;-&gt;#1"</code></td>`)
+	require.Contains(t, s, `<td nowrap><code>+</code> <code>operator "@&lt;-&gt;#1"</code></td>`)
 	require.Contains(t, s, "<summary><strong>Change summary</strong> · 1 object: 1 added · 1 statement</summary>")
 }
 
@@ -218,7 +218,7 @@ func TestRenderPlanComment_OtherOnly(t *testing.T) {
 	s, err := renderPlanComment(nil, &PlanComment{Plan: p}, githubCommentLimit)
 	require.NoError(t, err)
 	require.Contains(t, s, "<details open><summary><strong>Change summary</strong> · 2 statements</summary>")
-	require.Contains(t, s, "<tr>\n<td>other statements</td>\n<td></td>\n<td><details><summary>2 statements</summary>")
+	require.Contains(t, s, "<tr>\n<td nowrap>other statements</td>\n<td></td>\n<td><details><summary>2 statements</summary>")
 }
 
 func TestRenderPlanComment_Delimiter(t *testing.T) {

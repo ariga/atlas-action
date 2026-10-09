@@ -83,7 +83,7 @@ cmp stdout golden-3.html
 <table>
 <tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
 <tr>
-<td><code>~</code> <code>table "users"</code></td>
+<td nowrap><code>~</code> <code>table "users"</code></td>
 <td>
 
 ```diff
@@ -101,7 +101,7 @@ CREATE UNIQUE INDEX `users_email` ON `users` (`email`);
 </details></td>
 </tr>
 <tr>
-<td><code>~</code> <code>table "orders"</code></td>
+<td nowrap><code>~</code> <code>table "orders"</code></td>
 <td>
 
 ```diff
@@ -123,7 +123,7 @@ CREATE INDEX `orders_status` ON `orders` (`status`);
 </details></td>
 </tr>
 <tr>
-<td><code>+</code> <code>table "order_notes"</code></td>
+<td nowrap><code>+</code> <code>table "order_notes"</code></td>
 <td><details><summary><kbd>+6</kbd></summary>
 
 ```diff
@@ -219,7 +219,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 <table>
 <tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
 <tr>
-<td><code>~</code> <code>table "users"</code></td>
+<td nowrap><code>~</code> <code>table "users"</code></td>
 <td>
 
 ```diff
@@ -233,7 +233,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 <td>1 statement</td>
 </tr>
 <tr>
-<td><code>~</code> <code>table "orders"</code></td>
+<td nowrap><code>~</code> <code>table "orders"</code></td>
 <td>
 
 ```diff
@@ -246,7 +246,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 <td>1 statement</td>
 </tr>
 <tr>
-<td><code>~</code> <code>table "order_events"</code></td>
+<td nowrap><code>~</code> <code>table "order_events"</code></td>
 <td>
 
 ```diff
@@ -260,7 +260,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 <td>1 statement</td>
 </tr>
 <tr>
-<td><code>~</code> <code>table "order_totals"</code></td>
+<td nowrap><code>~</code> <code>table "order_totals"</code></td>
 <td><details><summary><kbd>+24</kbd> <kbd>-24</kbd></summary>
 
 ```diff
@@ -320,7 +320,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 <td>1 statement</td>
 </tr>
 <tr>
-<td><code>-</code> <code>table "exports"</code></td>
+<td nowrap><code>-</code> <code>table "exports"</code></td>
 <td><details><summary><kbd>-4</kbd></summary>
 
 ```diff
@@ -334,7 +334,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 <td>1 statement</td>
 </tr>
 <tr>
-<td><code>+</code> <code>table "order_notes"</code></td>
+<td nowrap><code>+</code> <code>table "order_notes"</code></td>
 <td><details><summary><kbd>+6</kbd></summary>
 
 ```diff
@@ -393,7 +393,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 <table>
 <tr><th>Object</th><th>Diff</th></tr>
 <tr>
-<td><code>+</code> <code>table "t001"</code></td>
+<td nowrap><code>+</code> <code>table "t001"</code></td>
 <td><details><summary><kbd>+6</kbd></summary>
 
 ```diff
@@ -408,7 +408,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 </details></td>
 </tr>
 <tr>
-<td><code>+</code> <code>table "t002"</code></td>
+<td nowrap><code>+</code> <code>table "t002"</code></td>
 <td><details><summary><kbd>+6</kbd></summary>
 
 ```diff
@@ -423,7 +423,7 @@ CREATE TABLE `order_notes` (`id` integer NOT NULL, `order_id` integer NOT NULL, 
 </details></td>
 </tr>
 <tr>
-<td><code>+</code> <code>table "t003"</code></td>
+<td nowrap><code>+</code> <code>table "t003"</code></td>
 <td><details><summary><kbd>+6</kbd></summary>
 
 ```diff

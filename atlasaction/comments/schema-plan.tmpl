@@ -49,7 +49,8 @@
        followed by the statements that change no object. The list is collapsed if it has
        more than 15 objects. The diff of a modified object is shown in its row, unless it
        is long. Otherwise, its line counts open it. The empty paragraph after a summary
-       line keeps an open section from touching it. */ -}}
+       line keeps an open section from touching it. Object cells do not wrap, so an open
+       diff or statement list scrolls the table instead of squeezing them. */ -}}
 {{- define "plan-changes" -}}
 {{- $sql := .SummarySQL }}
 {{- with .Changes }}
@@ -59,14 +60,14 @@
 {{- range $o := .Objects }}
 {{- $d := diffStat $o.Diff }}
 <tr>
-<td><code>{{ changeSign $o.Op }}</code> <code>{{ escape $o.Object }}</code></td>
+<td nowrap><code>{{ changeSign $o.Op }}</code> <code>{{ escape $o.Object }}</code></td>
 <td>{{ with $o.Diff }}{{ if or (eq $o.Op "add" "drop") (gt $d.Lines 20) }}<details><summary>{{ $d.Keycaps }}</summary>{{ codefence "diff" . }}</details>{{ else }}{{ codefence "diff" . }}{{ end }}{{ end }}</td>
 <td>{{ with $o.Stmts }}{{ if $sql }}<details><summary>{{ template "plan-changes/stmts" $o }}</summary>{{ codefence "sql" ($.SQL .) }}</details>{{ else }}{{ template "plan-changes/stmts" $o }}{{ end }}{{ end }}</td>
 </tr>
 {{- end }}
 {{- with .Other }}
 <tr>
-<td>other statements</td>
+<td nowrap>other statements</td>
 <td></td>
 <td>{{ if $sql }}<details><summary>{{ plural (len .) "statement" }}</summary>{{ codefence "sql" ($.SQL .) }}</details>{{ else }}{{ plural (len .) "statement" }}{{ end }}</td>
 </tr>
