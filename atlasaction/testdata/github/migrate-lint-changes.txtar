@@ -39,7 +39,7 @@ migrate lint -w --context {"path":"file://migrations","scmType":"GITHUB"} --dev-
 <table>
 <tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
 <tr>
-<td><code>~</code> <code>table "users"</code></td>
+<td nowrap><code>~</code> <code>table "users"</code></td>
 <td>
 
 ```diff
@@ -58,7 +58,7 @@ ALTER TABLE `users` ADD COLUMN `email` text NULL;
 </details></td>
 </tr>
 <tr>
-<td><code>+</code> <code>table "orders"</code></td>
+<td nowrap><code>+</code> <code>table "orders"</code></td>
 <td><details><summary><kbd>+4</kbd></summary>
 
 ```diff

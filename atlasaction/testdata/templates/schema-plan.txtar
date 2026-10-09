@@ -117,7 +117,7 @@ cmp stdout golden-4.html
 <table>
 <tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
 <tr>
-<td><code>~</code> <code>table "orders"</code></td>
+<td nowrap><code>~</code> <code>table "orders"</code></td>
 <td>
 
 ```diff
@@ -139,7 +139,7 @@ CREATE INDEX "orders_total" ON "orders" ("total");
 </details></td>
 </tr>
 <tr>
-<td><code>+</code> <code>table "open_orders"</code></td>
+<td nowrap><code>+</code> <code>table "open_orders"</code></td>
 <td><details><summary><kbd>+5</kbd></summary>
 
 ```diff
@@ -164,7 +164,7 @@ CREATE TABLE "open_orders" (
 </details></td>
 </tr>
 <tr>
-<td><code>-</code> <code>view "open_orders"</code></td>
+<td nowrap><code>-</code> <code>view "open_orders"</code></td>
 <td><details><summary><kbd>-8</kbd></summary>
 
 ```diff
@@ -360,7 +360,7 @@ gh run rerun 123
 <table>
 <tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
 <tr>
-<td><code>~</code> <code>table "users"</code></td>
+<td nowrap><code>~</code> <code>table "users"</code></td>
 <td>
 
 ```diff
@@ -390,7 +390,7 @@ CREATE INDEX `users_name` ON `users` (`name`);
 </details></td>
 </tr>
 <tr>
-<td>other statements</td>
+<td nowrap>other statements</td>
 <td></td>
 <td><details><summary>2 statements</summary>
 
@@ -473,7 +473,7 @@ gh run rerun 123
 <table>
 <tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
 <tr>
-<td><code>~</code> <code>table "orders"</code></td>
+<td nowrap><code>~</code> <code>table "orders"</code></td>
 <td>
 
 ```diff
@@ -487,7 +487,7 @@ gh run rerun 123
 <td>3 statements</td>
 </tr>
 <tr>
-<td><code>+</code> <code>table "open_orders"</code></td>
+<td nowrap><code>+</code> <code>table "open_orders"</code></td>
 <td><details><summary><kbd>+5</kbd></summary>
 
 ```diff
@@ -502,7 +502,7 @@ gh run rerun 123
 <td>1 statement</td>
 </tr>
 <tr>
-<td><code>-</code> <code>view "open_orders"</code></td>
+<td nowrap><code>-</code> <code>view "open_orders"</code></td>
 <td><details><summary><kbd>-8</kbd></summary>
 
 ```diff

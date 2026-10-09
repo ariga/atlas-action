@@ -71,7 +71,7 @@ schema plan --format {{ json . }} --context {"scmType":"GITHUB"} --name-format r
 <table>
 <tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
 <tr>
-<td><code>+</code> <code>table "1"</code></td>
+<td nowrap><code>+</code> <code>table "1"</code></td>
 <td><details><summary><kbd>+3</kbd></summary>
 
 ```diff
