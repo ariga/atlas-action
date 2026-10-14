@@ -40,10 +40,14 @@ spec:
 $[[ inputs.job_name ]]:
   stage: $[[ inputs.stage ]]
   cache: {{/* cross-pipeline sharing */}}
-    key: atlas-grant-cache
-    paths:
-      - .atlas/
-    policy: pull-push
+    - key: atlas-grant-cache
+      paths:
+        - .atlas/
+      policy: pull-push
+    - key: atlas-bin
+      paths:
+        - .atlas-bin/
+      policy: pull-push
   artifacts: {{/* cross-job sharing */}}
 {{- if .Outputs }}
     reports:
@@ -65,7 +69,11 @@ $[[ inputs.job_name ]]:
       {{- /* cannot cache/artifact non project files */}}
       mkdir -p ~/.atlas
       cp -a $CI_PROJECT_DIR/.atlas/. ~/.atlas/ 2>/dev/null || true
-      curl -sSf https://atlasgo.sh | ATLAS_VERSION="$[[ inputs.atlas-version ]]" sh
+      {{- /* keep the cached binary out of `git add .`; write once so the cache is not re-uploaded */}}
+      mkdir -p $CI_PROJECT_DIR/.atlas-bin
+      [ -f $CI_PROJECT_DIR/.atlas-bin/.gitignore ] || echo '*' > $CI_PROJECT_DIR/.atlas-bin/.gitignore
+      curl -sSf https://atlasgo.sh | ATLAS_VERSION="$[[ inputs.atlas-version ]]" sh -s -- -o $CI_PROJECT_DIR/.atlas-bin/atlas
+      export PATH="$CI_PROJECT_DIR/.atlas-bin:$PATH"
 {{- if ne .ID "monitor/schema" }}
       atlas login --token $[[ inputs.atlas-cloud-token ]] --grant-only
 {{- end }}
