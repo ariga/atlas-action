@@ -38,6 +38,7 @@ type (
 		Inputs      map[string]ActionInput  `yaml:"inputs,omitempty"`
 		Outputs     map[string]ActionOutput `yaml:"outputs,omitempty"`
 		Version     string                  `yaml:"-"` // Injected at runtime, not from YAML
+		Checksums   map[string]string       `yaml:"-"` // SHA256 of the atlas-action binary per platform, injected at runtime
 	}
 	ActionInput struct {
 		Type        string   `yaml:"type"`                  // e.g., "string", "boolean", "number", "enum", etc.

@@ -122,8 +122,9 @@ jobs:
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           RCLONE_S3_NO_CHECK_BUCKET: true
+  # The GitLab templates download the binaries, publish them only once they are on the CDN.
   sync-gitlab:
-    needs: build
+    needs: upload
     uses: ./.github/workflows/cd-sync-gitlab.yaml
     secrets: inherit
   # Run end-to-end test on the published binary.
