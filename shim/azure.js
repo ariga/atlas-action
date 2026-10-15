@@ -42,17 +42,25 @@ if (action === "setup") {
     childProcess.spawnSync("cp", ["-a", cacheDir + "/.", homeAtlas + "/"], { stdio: "inherit" });
   }
 
-  // Install Atlas CLI
+  // Install Atlas CLI into a workspace directory, so a Cache@2 step
+  // with path: $(Pipeline.Workspace)/.atlas-bin can persist the binary.
+  const binDir = path.join(pipelineWorkspace, ".atlas-bin");
+  fs.mkdirSync(binDir, { recursive: true });
   console.log(`##[section]Installing Atlas CLI (version: ${version})`);
   const install = childProcess.spawnSync(
     "sh",
-    ["-c", `curl -sSf https://atlasgo.sh | ATLAS_VERSION="${version}" CI=true sh`],
+    [
+      "-c",
+      `curl -sSf https://atlasgo.sh | ATLAS_VERSION="${version}" CI=true sh -s -- -o "${path.join(binDir, "atlas")}"`
+    ],
     { stdio: "inherit" }
   );
   if (install.status !== 0) {
     console.error("##[error]Failed to install Atlas CLI.");
     process.exit(install.status || 1);
   }
+  process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH}`;
+  process.stdout.write(`##vso[task.prependpath]${binDir}\n`);
 
   // Fetch/refresh the offline grant
   if (token) {

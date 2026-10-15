@@ -45,8 +45,9 @@ steps:
     script: |
       #!/bin/bash
       set -eo pipefail
+      {{- /* persists between builds on the same agent */}}
       curl -sSf https://release.ariga.io/atlas-action/scripts-v{{ .Version }}/setup-atlas.sh \
-        | CI=true sh
+        | CI=true ATLAS_BIN_DIR="$HOME/.atlas-bin" sh
   - name: Run {{ .Name }}
     script: |
       #!/bin/bash

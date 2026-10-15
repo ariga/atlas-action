@@ -17,6 +17,8 @@ Atlas Pro supports [offline access](https://atlasgo.io/cloud/bots#offline-access
 
 Use `action: setup` together with Azure Pipelines' built-in `Cache@2` task to persist the grant across pipeline runs. Because `Cache@2` only caches paths inside `$(Pipeline.Workspace)`, the setup action mirrors `~/.atlas` to and from `$(Pipeline.Workspace)/.atlas` automatically.
 
+The Atlas CLI itself is installed into `$(Pipeline.Workspace)/.atlas-bin`, so a second `Cache@2` step can keep the binary between runs. Because `Cache@2` never overwrites an existing key, the example keys the binary cache by build and restores the most recent entry through `restoreKeys`.
+
 Add `Cache@2` **before** the setup step. Azure Pipelines runs post-job steps in reverse declaration order, so placing `Cache@2` first ensures its save step fires after the setup task's post-job hook has copied `~/.atlas` back into the workspace.
 
 ```yaml
@@ -33,6 +35,13 @@ steps:
     restoreKeys: '"atlas-grant"'
     path: $(Pipeline.Workspace)/.atlas
   displayName: Restore Atlas Grant Cache
+
+- task: Cache@2
+  inputs:
+    key: '"atlas-bin" | "$(Agent.OS)" | "$(Agent.OSArchitecture)" | "$(Build.BuildId)"'
+    restoreKeys: '"atlas-bin" | "$(Agent.OS)" | "$(Agent.OSArchitecture)"'
+    path: $(Pipeline.Workspace)/.atlas-bin
+  displayName: Restore Atlas CLI Cache
 
 - task: AtlasAction@1
   inputs:

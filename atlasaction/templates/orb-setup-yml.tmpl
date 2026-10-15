@@ -19,10 +19,17 @@ steps:
   - restore_cache:
       keys:
         - atlas-grant-cache-
+  - restore_cache:
+      keys:
+        - atlas-bin-v1-{{"{{"}} arch {{"}}"}}-
   - run:
       name: Install Atlas CLI
-      command:
-        curl -sSf https://atlasgo.sh | sh
+      command: |
+        mkdir -p ~/.atlas-bin
+        curl -sSf https://atlasgo.sh | sh -s -- -o ~/.atlas-bin/atlas
+        echo 'export PATH="$HOME/.atlas-bin:$PATH"' >> $BASH_ENV
+        # Caches are immutable, key them by the installed version.
+        ~/.atlas-bin/atlas version > /tmp/atlas-bin-version
       environment:
         ATLAS_VERSION: <<parameters.version>>
   - run:
@@ -53,3 +60,7 @@ steps:
       key: atlas-grant-cache-<< pipeline.id >>
       paths:
         - ~/.atlas
+  - save_cache:
+      key: atlas-bin-v1-{{"{{"}} arch {{"}}"}}-{{"{{"}} checksum "/tmp/atlas-bin-version" {{"}}"}}
+      paths:
+        - ~/.atlas-bin
