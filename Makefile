@@ -117,8 +117,10 @@ manifest: gitlab-manifest orb-manifest
 	go run -tags manifest ./cmd/gen azure-task -t ./.github/azure-devops/action/task.json
 
 .PHONY: gitlab-manifest
-gitlab-manifest:
-	go run -tags manifest ./cmd/gen gitlab-template -o gitlab -v $(VERSION)
+gitlab-manifest: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
+	go run -tags manifest ./cmd/gen gitlab-template -o gitlab -v $(VERSION) \
+		--sha256 linux-amd64=$$(sha256sum $(ATLAS_BIN_LINUX_AMD64) | cut -d' ' -f1) \
+		--sha256 linux-arm64=$$(sha256sum $(ATLAS_BIN_LINUX_ARM64) | cut -d' ' -f1)
 
 .PHONY: orb-manifest
 orb-manifest:

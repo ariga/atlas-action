@@ -8,6 +8,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -65,11 +67,19 @@ func gitlabTemplateCmd() *cobra.Command {
 	var (
 		flags struct {
 			OutputDir, Version string
+			Checksums          map[string]string
 		}
 		cmd = &cobra.Command{
 			Use:   "gitlab-template",
 			Short: "Generate GitLab template files from a manifest",
 			RunE: func(cmd *cobra.Command, args []string) error {
+				// The templates verify the downloaded binary against these,
+				// so refuse to generate templates without them.
+				for _, p := range []string{"linux-amd64", "linux-arm64"} {
+					if b, err := hex.DecodeString(flags.Checksums[p]); err != nil || len(b) != sha256.Size {
+						return fmt.Errorf("missing or invalid --sha256 for %s", p)
+					}
+				}
 				actions, err := atlasaction.ParseManifest()
 				if err != nil {
 					return err
@@ -77,6 +87,7 @@ func gitlabTemplateCmd() *cobra.Command {
 				ver := strings.TrimPrefix(flags.Version, "v")
 				for actionIdx := range actions.Actions {
 					actions.Actions[actionIdx].Version = ver
+					actions.Actions[actionIdx].Checksums = flags.Checksums
 				}
 				return actions.GitLabTemplates(flags.OutputDir)
 			},
@@ -84,6 +95,7 @@ func gitlabTemplateCmd() *cobra.Command {
 	)
 	cmd.Flags().StringVarP(&flags.OutputDir, "output-dir", "o", ".", "The output directory for the generated files")
 	cmd.Flags().StringVarP(&flags.Version, "version", "v", "v1.0.0", "The version of the TeamCity recipes")
+	cmd.Flags().StringToStringVar(&flags.Checksums, "sha256", nil, "The SHA256 of the atlas-action binary per platform, e.g. linux-amd64=<hex>")
 	return cmd
 }
 
