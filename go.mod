@@ -1,6 +1,6 @@
 module ariga.io/atlas-action
 
-go 1.26.6
+go 1.26.9
 
 require (
 	ariga.io/atlas v1.3.1-0.20261004111909-ecbe09128a28
@@ -40,6 +40,6 @@ require (
 	golang.org/x/mod v0.40.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
 )
