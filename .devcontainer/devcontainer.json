@@ -15,6 +15,16 @@
 		},
 		"ghcr.io/ariga/atlas/cli:1": {}
 	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"git.blame.editorDecoration.enabled": true,
+				"git.blame.statusBarItem.enabled": true,
+				"git.detectWorktrees": true,
+				"extensions.autoUpdateDelay": 168
+			}
+		}
+	},
 	"mounts": [
 		{
 			"type": "volume",
