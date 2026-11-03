@@ -950,9 +950,9 @@ In case the database URL is subject to change, the `slug` parameter can use to i
 
 ### `ariga/atlas-action/security/scan`
 
-Scan databases for security issues with Atlas. The scan reports the extensions installed in the
-database that carry known vulnerabilities, as recorded in the Atlas Security Graph. It requires a
-login to Atlas Cloud, on a plan that includes the Security Graph.
+Scan databases for security issues with Atlas. The scan reports the known vulnerabilities of the
+database server version and of the extensions installed in the database, as recorded in the Atlas
+Security Graph. It requires a login to Atlas Cloud, on a plan that includes the Security Graph.
 
 The action fails when a database could not be scanned, as that leaves its state unknown. The issues
 it reports do not fail it; set `fail-on` to the severity an issue must reach to fail the action.

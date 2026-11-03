@@ -6,6 +6,7 @@ env INPUT_MIN-SEVERITY=ELEVATED
 env INPUT_IGNORE=CVE-2017-18359
 
 atlas-action --action=security/scan
+stdout 'postgres://localhost:5432/app: no issues found in the server version and 1 extension.s.'
 stdout 'completed successfully, no issues found'
 
 # Issues that reached the failing severity fail the action, and are still reported.
@@ -17,6 +18,17 @@ stdout '::error::.*completed with 2 issue.s.: 1 high, 1 elevated'
 # A database that could not be scanned leaves its state unknown.
 ! atlas-action --action=security/scan
 stdout '::error::.*could not scan 1 database'
+
+# The database engine itself is vulnerable.
+env INPUT_URLS=clickhouse://localhost:9000
+! atlas-action --action=security/scan
+stdout '::warning::clickhouse://localhost:9000: Engine "clickhouse" version "24.10.4.191" is vulnerable to CVE-2026-116366 \(CRITICAL\)'
+stdout '::error::.*completed with 1 issue.s.: 1 critical'
+
+# A clean database without extensions had its server version checked.
+env TEST_EXIT_CODE=
+atlas-action --action=security/scan
+stdout 'clickhouse://localhost:9000: no issues found in the server version$'
 
 output output.txt
 summary summary.html
@@ -33,17 +45,25 @@ security scan --url postgres://localhost:5432/app --min-severity ELEVATED --fail
 security scan --url postgres://localhost:5432/app --min-severity ELEVATED --fail-on HIGH --ignore CVE-2017-18359 --format {{ json . }}
 -- security-scan/3/stdout --
 {"Targets":[{"URL":"postgres://localhost:5432/app","Driver":"postgres","Error":"connection refused"}]}
+-- security-scan/4/args --
+security scan --url clickhouse://localhost:9000 --min-severity ELEVATED --fail-on HIGH --ignore CVE-2017-18359 --format {{ json . }}
+-- security-scan/4/stdout --
+{"Targets":[{"URL":"clickhouse://localhost:9000","Driver":"clickhouse","Version":"24.10.4.191","Vulnerabilities":[{"Engine":"clickhouse","Version":"24.10.4.191","ID":"CVE-2026-116366","Level":"CRITICAL","Severity":"CRITICAL","Title":"Unauthenticated RCE vulnerability against ClickHouse Server","Suggestion":"Upgrade database engine \"clickhouse\" to version 26.3.62.3 or later to resolve CVE-2026-116366"}]}]}
+-- security-scan/5/args --
+security scan --url clickhouse://localhost:9000 --min-severity ELEVATED --fail-on HIGH --ignore CVE-2017-18359 --format {{ json . }}
+-- security-scan/5/stdout --
+{"Targets":[{"URL":"clickhouse://localhost:9000","Driver":"clickhouse","Version":"26.3.62.3"}]}
 -- summary.html --
 <code>atlas security scan</code> on <strong>1</strong> database
 <h4><code>postgres://localhost:5432/app</code> (postgres 9.3.0)</h4>
-<p>No known vulnerabilities in 1 extension.</p>
+<p>No known vulnerabilities in the server version and 1 extension.</p>
 
 <code>atlas security scan</code> on <strong>1</strong> database
 <h4><code>postgres://localhost:5432/app</code> (postgres 9.3.0)</h4>
 <table>
   <thead>
     <tr>
-      <th>Extension</th>
+      <th>Engine / Extension</th>
       <th>CVE</th>
       <th>Severity</th>
       <th>Remediation</th>
@@ -68,6 +88,31 @@ security scan --url postgres://localhost:5432/app --min-severity ELEVATED --fail
 <code>atlas security scan</code> on <strong>1</strong> database
 <h4><code>postgres://localhost:5432/app</code> (postgres)</h4>
 <p>The database could not be scanned, its state is unknown: <code>connection refused</code></p>
+
+<code>atlas security scan</code> on <strong>1</strong> database
+<h4><code>clickhouse://localhost:9000</code> (clickhouse 24.10.4.191)</h4>
+<table>
+  <thead>
+    <tr>
+      <th>Engine / Extension</th>
+      <th>CVE</th>
+      <th>Severity</th>
+      <th>Remediation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>clickhouse</code> 24.10.4.191</td>
+      <td><a href="https://www.cve.org/CVERecord?id=CVE-2026-116366" target="_blank">CVE-2026-116366</a></td>
+      <td>CRITICAL</td>
+      <td>Upgrade database engine "clickhouse" to version 26.3.62.3 or later to resolve CVE-2026-116366</td>
+    </tr>
+  </tbody>
+</table>
+
+<code>atlas security scan</code> on <strong>1</strong> database
+<h4><code>clickhouse://localhost:9000</code> (clickhouse 26.3.62.3)</h4>
+<p>No known vulnerabilities in the server version.</p>
 
 -- output.txt --
 report<<_GitHubActionsFileCommandDelimeter_
@@ -96,4 +141,22 @@ count<<_GitHubActionsFileCommandDelimeter_
 _GitHubActionsFileCommandDelimeter_
 failures<<_GitHubActionsFileCommandDelimeter_
 1
+_GitHubActionsFileCommandDelimeter_
+report<<_GitHubActionsFileCommandDelimeter_
+{"Targets":[{"URL":"clickhouse://localhost:9000","Driver":"clickhouse","Version":"24.10.4.191","Vulnerabilities":[{"Engine":"clickhouse","Version":"24.10.4.191","ID":"CVE-2026-116366","Level":"CRITICAL","Severity":"CRITICAL","Title":"Unauthenticated RCE vulnerability against ClickHouse Server","Suggestion":"Upgrade database engine \"clickhouse\" to version 26.3.62.3 or later to resolve CVE-2026-116366"}]}],"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}
+_GitHubActionsFileCommandDelimeter_
+count<<_GitHubActionsFileCommandDelimeter_
+1
+_GitHubActionsFileCommandDelimeter_
+failures<<_GitHubActionsFileCommandDelimeter_
+0
+_GitHubActionsFileCommandDelimeter_
+report<<_GitHubActionsFileCommandDelimeter_
+{"Targets":[{"URL":"clickhouse://localhost:9000","Driver":"clickhouse","Version":"26.3.62.3"}],"Start":"0001-01-01T00:00:00Z","End":"0001-01-01T00:00:00Z"}
+_GitHubActionsFileCommandDelimeter_
+count<<_GitHubActionsFileCommandDelimeter_
+0
+_GitHubActionsFileCommandDelimeter_
+failures<<_GitHubActionsFileCommandDelimeter_
+0
 _GitHubActionsFileCommandDelimeter_
