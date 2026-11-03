@@ -4,12 +4,12 @@
 {{- if $t.Error }}
 <p>The database could not be scanned, its state is unknown: <code>{{ $t.Error | html }}</code></p>
 {{- else if not $t.Vulnerabilities }}
-<p>No known vulnerabilities in {{ len $t.Extensions }} extension{{ if ne (len $t.Extensions) 1 }}s{{ end }}.</p>
+<p>No known vulnerabilities in the server version{{ with len $t.Extensions }} and {{ . }} extension{{ if ne . 1 }}s{{ end }}{{ end }}.</p>
 {{- else }}
 <table>
   <thead>
     <tr>
-      <th>Extension</th>
+      <th>Engine / Extension</th>
       <th>CVE</th>
       <th>Severity</th>
       <th>Remediation</th>
@@ -17,7 +17,7 @@
   </thead>
   <tbody>{{ range $v := $t.Vulnerabilities }}
     <tr>
-      <td><code>{{ $v.Name }}</code> {{ $v.Version }}</td>
+      <td><code>{{ or $v.Engine $v.Name }}</code> {{ $v.Version }}</td>
       <td><a href="https://www.cve.org/CVERecord?id={{ $v.ID }}" target="_blank">{{ $v.ID }}</a></td>
       <td>{{ $v.Level }}</td>
       <td>{{ or $v.Suggestion $v.Title }}</td>

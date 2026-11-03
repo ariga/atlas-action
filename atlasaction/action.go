@@ -1748,8 +1748,10 @@ func (a *Actions) SecurityScan(ctx context.Context) error {
 		switch {
 		case t.Error != "":
 			a.Errorf("%s could not be scanned: %s", t.URL, t.Error)
+		case len(t.Vulnerabilities) == 0 && len(t.Extensions) == 0:
+			a.Infof("%s: no issues found in the server version", t.URL)
 		case len(t.Vulnerabilities) == 0:
-			a.Infof("%s: no issues found in %d extension(s)", t.URL, len(t.Extensions))
+			a.Infof("%s: no issues found in the server version and %d extension(s)", t.URL, len(t.Extensions))
 		}
 		for _, v := range t.Vulnerabilities {
 			a.Warningf("%s: %s", t.URL, v.LevelText())
