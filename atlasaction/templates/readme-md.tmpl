@@ -652,7 +652,9 @@ Push a schema to [Atlas Registry](https://atlasgo.io/registry) with an optional 
 Plan a declarative migration for a schema transition.
 
 On pull requests, the action comments with the plan and its lint results. On GitHub, if the Atlas CLI reports a change
-summary, the comment also lists each changed object with its diff and statements.
+summary, the comment also lists each changed object with its diff and statements. Set the `change-summary` input to
+`collapsed` or `hidden` to have reviewers see the migration script first, and `migration-script` to choose whether the
+script starts open.
 
 #### Inputs
 

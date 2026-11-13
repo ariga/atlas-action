@@ -657,6 +657,22 @@ actions:
         label: Plan name
         description: |
           The explicit name of the plan.
+      change-summary:
+        type: string
+        label: Change summary
+        description: |
+          How the plan comment shows the change summary on GitHub. By default, the summary is open (collapsed past
+          15 objects) and the migration script below it is collapsed. Set `collapsed` to collapse the summary and open
+          the migration script, or `hidden` to leave the summary out and show the migration script in its place.
+        options: [collapsed, hidden]
+      migration-script:
+        type: string
+        label: Migration script
+        description: |
+          How the plan comment shows the migration script on GitHub. By default, it is collapsed below the change
+          summary, and open when `change-summary` is set or the comment has no summary. Set `expanded` to always
+          show it open, or `collapsed` to always collapse it.
+        options: [expanded, collapsed]
     outputs:
       link:
         description: Link to the schema plan on Atlas.

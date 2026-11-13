@@ -4,9 +4,9 @@
 <h4>Migration Plan for <a href="{{- .Link | repoLink -}}" target="_blank">{{ $.Plan.Repo }}</a> • <a href="{{- .Link -}}" target="_blank">View on Atlas Cloud</a></h4>
 {{- if $c.Changes }}
 {{- template "plan-changes" $c }}
-{{- with .Migration }}
-<details><summary><strong>Migration script</strong> · {{ plural (len $c.Plan.File.Stmts) "statement" }}, {{ plural (lines .) "line" }}</summary><p></p>{{ codeblock "sql" . }}</details>
-{{- end }}
+{{- template "plan-migration" $c }}
+{{ else if eq $c.MigrationView "collapsed" }}
+{{- template "plan-migration" $c }}
 {{ else }}
 {{- with .Migration }}{{ codeblock "sql" . }}{{- end -}}
 {{- end -}}
@@ -47,14 +47,16 @@
 {{- end -}}
 {{- /* plan-changes lists the changed objects of the plan with their diffs and statements,
        followed by the statements that change no object. The list is collapsed if it has
-       more than 15 objects. The diff of a modified object is shown in its row, unless it
-       is long. Otherwise, its line counts open it. The empty paragraph after a summary
+       more than 15 objects, or if the change-summary input collapses it, which opens the
+       migration script below it instead. The diff of a modified object is shown in its row,
+       unless it is long. Otherwise, its line counts open it. The empty paragraph after a summary
        line keeps an open section from touching it. Object cells do not wrap, so an open
        diff or statement list scrolls the table instead of squeezing them. */ -}}
 {{- define "plan-changes" -}}
 {{- $sql := .SummarySQL }}
+{{- $collapsed := eq .SummaryView "collapsed" }}
 {{- with .Changes }}
-<details{{ if le (len .Objects) 15 }} open{{ end }}><summary><strong>Change summary</strong>{{ with .Objects }} · {{ plural (len .) "object" }}: {{ changeKinds . }}{{ end }} · {{ plural .Stmts "statement" }}{{ with .Dependents }}, {{ num . }} of them recreate dependent objects{{ end }}</summary><p></p>
+<details{{ if and (not $collapsed) (le (len .Objects) 15) }} open{{ end }}><summary><strong>Change summary</strong>{{ with .Objects }} · {{ plural (len .) "object" }}: {{ changeKinds . }}{{ end }} · {{ plural .Stmts "statement" }}{{ with .Dependents }}, {{ num . }} of them recreate dependent objects{{ end }}</summary><p></p>
 <table>
 <tr><th>Object</th><th>Diff</th><th>Statements</th></tr>
 {{- range $o := .Objects }}
@@ -74,6 +76,14 @@
 {{- end }}
 </table>
 </details>
+{{- end }}
+{{- end -}}
+{{- /* plan-migration is the migration script of the plan, in a section that starts open
+       or collapsed. Without a change summary, the script is shown as is, unless the
+       migration-script input collapses it. */ -}}
+{{- define "plan-migration" -}}
+{{- with .Plan.File.Migration }}
+<details{{ if $.MigrationOpen }} open{{ end }}><summary><strong>Migration script</strong> · {{ plural (len $.Plan.File.Stmts) "statement" }}, {{ plural (lines .) "line" }}</summary><p></p>{{ codeblock "sql" . }}</details>
 {{- end }}
 {{- end -}}
 {{- define "plan-changes/stmts" -}}

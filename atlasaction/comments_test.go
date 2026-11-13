@@ -40,7 +40,8 @@ func TestSchemaPlanComment(t *testing.T) {
 	require.NoError(t, err)
 	var (
 		ctx  = context.Background()
-		tc   = &TriggerContext{PullRequest: &PullRequest{Number: 1}}
+		act  = &mockAction{inputs: map[string]string{}}
+		tc   = &TriggerContext{Act: act, PullRequest: &PullRequest{Number: 1}}
 		plan = &atlasexec.SchemaPlan{
 			Repo: "app",
 			File: &atlasexec.SchemaPlanFile{
@@ -87,6 +88,106 @@ func TestSchemaPlanComment(t *testing.T) {
 		} else {
 			require.NotContains(t, body, "<th>Object</th>")
 		}
+	}
+
+	// The change-summary input collapses the summary, or leaves it out.
+	act.inputs["change-summary"] = "collapsed"
+	require.NoError(t, gh.CommentPlan(ctx, tc, plan))
+	require.Contains(t, body, "<details><summary><strong>Change summary</strong> · 1 object: 1 added · 1 statement</summary>")
+	require.Contains(t, body, "<details open><summary><strong>Migration script</strong> · 1 statement, 4 lines</summary>")
+	act.inputs["change-summary"] = "hidden"
+	require.NoError(t, gh.CommentPlan(ctx, tc, plan))
+	require.NotContains(t, body, "Change summary")
+	require.Contains(t, body, render(t, withoutChanges(plan)))
+	// The migration-script input opens or collapses the migration script.
+	act.inputs["change-summary"], act.inputs["migration-script"] = "", "expanded"
+	require.NoError(t, gh.CommentPlan(ctx, tc, plan))
+	require.Contains(t, body, "<details open><summary><strong>Change summary</strong>")
+	require.Contains(t, body, "<details open><summary><strong>Migration script</strong>")
+}
+
+func TestRenderPlanComment_MigrationView(t *testing.T) {
+	const (
+		summaryOpen   = "<details open><summary><strong>Change summary</strong>"
+		summaryClosed = "<details><summary><strong>Change summary</strong>"
+		scriptOpen    = "<details open><summary><strong>Migration script</strong>"
+		scriptClosed  = "<details><summary><strong>Migration script</strong>"
+	)
+	for _, tt := range []struct {
+		summary, migration string
+		want               []string // The sections of the comment, if it has any.
+	}{
+		{"", "", []string{summaryOpen, scriptClosed}},
+		{"", "expanded", []string{summaryOpen, scriptOpen}},
+		{"", "collapsed", []string{summaryOpen, scriptClosed}},
+		{"collapsed", "", []string{summaryClosed, scriptOpen}},
+		{"collapsed", "expanded", []string{summaryClosed, scriptOpen}},
+		{"collapsed", "collapsed", []string{summaryClosed, scriptClosed}},
+		{"hidden", "", nil},
+		{"hidden", "expanded", nil},
+		{"hidden", "collapsed", []string{scriptClosed}},
+	} {
+		t.Run(tt.summary+"/"+tt.migration, func(t *testing.T) {
+			p := changesPlan(1)
+			s, err := renderPlanComment(nil, &PlanComment{Plan: p, SummaryView: tt.summary, MigrationView: tt.migration}, githubCommentLimit)
+			require.NoError(t, err)
+			if tt.want == nil {
+				// The migration script is shown as is, as before the change summary.
+				require.Equal(t, render(t, withoutChanges(p)), s)
+				return
+			}
+			var got []string
+			for _, sec := range []string{summaryOpen, summaryClosed, scriptOpen, scriptClosed} {
+				if strings.Contains(s, sec) {
+					got = append(got, sec)
+				}
+			}
+			require.Equal(t, tt.want, got)
+			require.Contains(t, s, "```sql\n"+strings.Trim(p.File.Migration, "\n")+"\n```")
+		})
+	}
+	// A summary that does not fit is left out, and the migration script stays collapsed.
+	s, err := renderPlanComment(nil, &PlanComment{Plan: changesPlan(300), MigrationView: "collapsed"}, githubCommentLimit)
+	require.NoError(t, err)
+	require.NotContains(t, s, "Change summary")
+	require.Contains(t, s, "</h4>\n"+scriptClosed)
+	require.Contains(t, s, "</details>\n<h4>Atlas lint results</h4>")
+}
+
+func TestRenderPlanComment_SummaryView(t *testing.T) {
+	// Collapsed, even if it lists few objects, and the migration script is open.
+	p := changesPlan(1)
+	c := &PlanComment{Plan: p, SummaryView: summaryCollapsed}
+	s, err := renderPlanComment(nil, c, githubCommentLimit)
+	require.NoError(t, err)
+	require.True(t, c.SummarySQL)
+	require.Contains(t, s, "<details><summary><strong>Change summary</strong> · 1 object: 1 added · 1 statement</summary>")
+	require.Contains(t, s, "<details open><summary><strong>Migration script</strong> · 1 statement, 6 lines</summary>")
+	// Only the open attributes differ from the default comment.
+	d, err := renderPlanComment(nil, &PlanComment{Plan: p}, githubCommentLimit)
+	require.NoError(t, err)
+	require.Equal(t, strings.NewReplacer(
+		"<details open><summary><strong>Change summary", "<details><summary><strong>Change summary",
+		"<details><summary><strong>Migration script", "<details open><summary><strong>Migration script",
+	).Replace(d), s)
+
+	// Over the limit, it is left out as by default, and the migration script is
+	// shown in its place.
+	p = changesPlan(300)
+	c = &PlanComment{Plan: p, SummaryView: summaryCollapsed}
+	s, err = renderPlanComment(nil, c, githubCommentLimit)
+	require.NoError(t, err)
+	require.False(t, c.Summary)
+	require.Equal(t, render(t, withoutChanges(p)), s)
+
+	// Hidden, the comment is the same as without a change summary.
+	for _, n := range []int{1, 20} {
+		p := changesPlan(n)
+		c := &PlanComment{Plan: p, SummaryView: summaryHidden}
+		s, err := renderPlanComment(nil, c, githubCommentLimit)
+		require.NoError(t, err)
+		require.False(t, c.Summary)
+		require.Equal(t, render(t, withoutChanges(p)), s)
 	}
 }
 
