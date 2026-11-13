@@ -1,0 +1,28 @@
+# Mock the atlas command outputs
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-drift
+# Setup the action input variables
+env ATLAS_INPUT_URL=sqlite://file.db
+env ATLAS_INPUT_DIR=file://migrations
+env ATLAS_INPUT_DEV_URL=sqlite://dev?mode=memory
+
+# SQLite and MySQL quote identifiers with backticks, so drift reports carry them.
+env TEST_EXIT_CODE=1
+! atlas-action --action=migrate/drift
+output output.sh
+
+# bash sources $BASH_ENV on start, as CircleCI does before every step. The
+# outputs must come back byte for byte, and nothing in them may run.
+exec bash -c 'printf ''%s\n'' "$ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT" "$ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED"'
+cmp stdout outputs.txt
+! stderr .
+
+-- migrate-drift/1/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
+-- migrate-drift/1/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"d41d8cd98f00","Summary":{"Total":2,"Extra":2,"Types":{"table":2}},"Changes":[{"Type":"table","Kind":"extra","Object":"table `t`","Cmds":["CREATE TABLE `t` (`c` int NULL)"]},{"Type":"table","Kind":"extra","Object":"table `x$(echo INJECTED)`","Cmds":["CREATE TABLE `x$(echo INJECTED)` (`it's` int NULL, `$$` int NULL, `a\"b\\c` int NULL)"]}],"Cached":true}
+-- output.sh --
+export ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT='[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"d41d8cd98f00","Summary":{"Total":2,"Extra":2,"Types":{"table":2}},"Changes":[{"Type":"table","Kind":"extra","Object":"table `t`","Cmds":["CREATE TABLE `t` (`c` int NULL)"]},{"Type":"table","Kind":"extra","Object":"table `x$(echo INJECTED)`","Cmds":["CREATE TABLE `x$(echo INJECTED)` (`it'\''s` int NULL, `$$` int NULL, `a\"b\\c` int NULL)"]}],"Cached":true}]'
+export ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED='true'
+-- outputs.txt --
+[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"d41d8cd98f00","Summary":{"Total":2,"Extra":2,"Types":{"table":2}},"Changes":[{"Type":"table","Kind":"extra","Object":"table `t`","Cmds":["CREATE TABLE `t` (`c` int NULL)"]},{"Type":"table","Kind":"extra","Object":"table `x$(echo INJECTED)`","Cmds":["CREATE TABLE `x$(echo INJECTED)` (`it's` int NULL, `$$` int NULL, `a\"b\\c` int NULL)"]}],"Cached":true}]
+true
