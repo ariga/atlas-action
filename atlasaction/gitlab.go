@@ -60,7 +60,7 @@ func (a *GitLab) SetOutput(name, value string) {
 		}
 		dotEnv = filepath.Join(dir, dotEnv)
 	}
-	err := fprintln(dotEnv, toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
+	err := fprintln(dotEnv, toDotenvVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
 	if err != nil {
 		a.Errorf("failed to write output to file .env: %v", err)
 	}

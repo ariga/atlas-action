@@ -18,9 +18,9 @@ stdout 'found multiple schema plans, please approve or delete the existing plans
 output .env.expected-output
 
 -- .env.expected-output --
-ATLAS_OUTPUT_SCHEMA_PLAN_APPROVE_LINK="https://test.atlasgo.cloud/schemas/123/plans/456"
-ATLAS_OUTPUT_SCHEMA_PLAN_APPROVE_PLAN="atlas://plans/1234"
-ATLAS_OUTPUT_SCHEMA_PLAN_APPROVE_STATUS=""
+ATLAS_OUTPUT_SCHEMA_PLAN_APPROVE_LINK=https://test.atlasgo.cloud/schemas/123/plans/456
+ATLAS_OUTPUT_SCHEMA_PLAN_APPROVE_PLAN=atlas://plans/1234
+ATLAS_OUTPUT_SCHEMA_PLAN_APPROVE_STATUS=
 -- schema-plan-approve/1/args --
 schema plan list --format {{ json . }} --context {"scmType":"GITLAB"} --pending --auto-approve
 

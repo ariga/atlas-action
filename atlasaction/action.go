@@ -2670,6 +2670,62 @@ func toOutputVar(action, output, value string) string {
 	return fmt.Sprintf("%s=%q", toOutputVarName(action, output), value)
 }
 
+// toDotenvVar returns the line that sets the output variable in a GitLab
+// dotenv report: NAME=value, unquoted, because GitLab keeps quotes as part of
+// the value.
+//
+// A later job reads the value only after these expansion passes:
+//
+//  1. Only when a trigger job forwards it to a downstream pipeline
+//     (trigger:forward:pipeline_variables), GitLab expands $NAME, ${NAME} and
+//     %NAME%, with no escape: in $$NAME it expands $NAME (ExpandVariables).
+//  2. GitLab expands $NAME, ${NAME} and %NAME%, and keeps $$, %% and ${} as
+//     they are (Gitlab::Ci::Variables::Collection#expand_value).
+//  3. The runner expands the result again with Go's os.Expand, where $$ becomes
+//     $, and ${} expands to nothing (Variables.ExpandValue in GitLab Runner).
+//
+// So every $ is written as $$, and ${} goes after a $ that comes before a name
+// or "{", and after a % that comes before a name, so that no pass sees a
+// reference. A value read from the database therefore never expands into a
+// CI/CD variable, such as a secret, and comes out of the expansion unchanged.
+//
+// Carriage returns and newlines are written as \r and \n, because a dotenv
+// value cannot span lines. GitLab also trims leading and trailing whitespace.
+// Invalid UTF-8 is replaced, because GitLab reads the whole file in another
+// encoding when it finds any.
+func toDotenvVar(action, output, value string) string {
+	value = strings.ToValidUTF8(value, "\uFFFD")
+	var b strings.Builder
+	b.WriteString(toOutputVarName(action, output))
+	b.WriteByte('=')
+	for i := 0; i < len(value); i++ {
+		var next byte
+		if i+1 < len(value) {
+			next = value[i+1]
+		}
+		switch c := value[i]; {
+		case c == '$' && (isNameStart(next) || next == '{'):
+			b.WriteString("$$${}")
+		case c == '$':
+			b.WriteString("$$")
+		case c == '%' && isNameStart(next):
+			b.WriteString("%${}")
+		case c == '\r':
+			b.WriteString(`\r`)
+		case c == '\n':
+			b.WriteString(`\n`)
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
+// isNameStart reports whether c can start a CI/CD variable name.
+func isNameStart(c byte) bool {
+	return c == '_' || 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
+}
+
 // fprintln writes the given values to the file using fmt.Fprintln.
 func fprintln(name string, val ...any) error {
 	// Write the output to a file.
