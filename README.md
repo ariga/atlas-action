@@ -833,16 +833,24 @@ Push a schema to [Atlas Registry](https://atlasgo.io/registry) with an optional 
 Plan a declarative migration for a schema transition.
 
 On pull requests, the action comments with the plan and its lint results. On GitHub, if the Atlas CLI reports a change
-summary, the comment also lists each changed object with its diff and statements.
+summary, the comment also lists each changed object with its diff and statements. Set the `change-summary` input to
+`collapsed` or `hidden` to have reviewers see the migration script first, and `migration-script` to choose whether the
+script starts open.
 
 #### Inputs
 
+* `change-summary` - How the plan comment shows the change summary on GitHub. By default, the summary is open (collapsed past
+  15 objects) and the migration script below it is collapsed. Set `collapsed` to collapse the summary and open
+  the migration script, or `hidden` to leave the summary out and show the migration script in its place.
 * `exclude` - List of glob patterns used to select which resources to filter in inspection
   see: https://atlasgo.io/declarative/inspect#exclude-schemas
 * `from` - URL(s) of the current schema state. If not provided, Atlas uses the [`url`](https://atlasgo.io/hcl/config#env.url) from the config file.
   If that is also not set, Atlas defaults to the **last known state in the Atlas Registry** (use [`schema.repo`](https://atlasgo.io/hcl/config#env.schema.repo) from the config file).
 * `include` - List of glob patterns used to select which resources to keep in inspection
   see: https://atlasgo.io/declarative/inspect#include-schemas
+* `migration-script` - How the plan comment shows the migration script on GitHub. By default, it is collapsed below the change
+  summary, and open when `change-summary` is set or the comment has no summary. Set `expanded` to always
+  show it open, or `collapsed` to always collapse it.
 * `name` - The explicit name of the plan.
 * `schema` - List of database schema(s). For example: `public`.
 * `schema-name` - The name (slug) of the schema repository in Atlas Registry.

@@ -72,8 +72,10 @@ func (a *GitHub) SchemaApply(_ context.Context, r *atlasexec.SchemaApply) {
 // SchemaPlan implements Reporter.
 func (a *GitHub) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
 	summary, err := renderPlanComment(nil, &PlanComment{
-		Plan:         r,
-		RerunCommand: fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
+		Plan:          r,
+		RerunCommand:  fmt.Sprintf("gh run rerun %s", a.Getenv("GITHUB_RUN_ID")),
+		SummaryView:   a.GetInput("change-summary"),
+		MigrationView: a.GetInput("migration-script"),
 	}, githubSummaryLimit)
 	if err != nil {
 		a.Errorf("failed to create summary: %v", err)
@@ -363,8 +365,10 @@ func (c *GitHubClient) CommentPlan(ctx context.Context, tc *TriggerContext, p *a
 	// Leave room for the marker that c.comment appends.
 	limit := githubCommentLimit - len("\n"+commentMarker(p.File.Name))
 	comment, err := renderPlanComment(tc, &PlanComment{
-		Plan:         p,
-		RerunCommand: tc.RerunCmd,
+		Plan:          p,
+		RerunCommand:  tc.RerunCmd,
+		SummaryView:   tc.Act.GetInput("change-summary"),
+		MigrationView: tc.Act.GetInput("migration-script"),
 	}, limit)
 	if err != nil {
 		return err

@@ -1,0 +1,71 @@
+# Mock atlas command outputs
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./schema-plan
+env GITHUB_RUN_ID=123
+
+# An unknown value fails the action before the plan is created.
+env INPUT_CHANGE-SUMMARY=closed
+! atlas-action --action=schema/plan
+stdout '::error::the input "change-summary" got invalid value "closed", expected "collapsed" or "hidden"'
+! summary
+env INPUT_CHANGE-SUMMARY= INPUT_MIGRATION-SCRIPT=open
+! atlas-action --action=schema/plan
+stdout '::error::the input "migration-script" got invalid value "open", expected "expanded" or "collapsed"'
+! summary
+env INPUT_MIGRATION-SCRIPT=
+
+# A collapsed change summary opens the migration script below it.
+env INPUT_CHANGE-SUMMARY=collapsed
+atlas-action --action=schema/plan
+grep '^<details><summary><strong>Change summary</strong> · 1 object: 1 added · 1 statement</summary>' actions/summary.txt
+grep '^<details open><summary><strong>Migration script</strong> · 1 statement, 4 lines</summary>' actions/summary.txt
+rm actions/summary.txt
+
+# A hidden change summary leaves the migration script in its place.
+env INPUT_CHANGE-SUMMARY=hidden
+atlas-action --action=schema/plan
+! grep 'Change summary' actions/summary.txt
+! grep 'Migration script' actions/summary.txt
+grep '^```sql$' actions/summary.txt
+rm actions/summary.txt
+
+# Without a summary, the migration-script input can still collapse the script.
+env INPUT_MIGRATION-SCRIPT=collapsed
+atlas-action --action=schema/plan
+! grep 'Change summary' actions/summary.txt
+grep '<details><summary><strong>Migration script</strong> · 1 statement, 4 lines</summary>' actions/summary.txt
+
+-- schema-plan/1/args --
+schema plan list --format {{ json . }} --context {"scmType":"GITHUB"} --pending --auto-approve
+
+-- schema-plan/1/stdout --
+[]
+
+-- schema-plan/2/args --
+schema plan --format {{ json . }} --context {"scmType":"GITHUB"} --name-format ref--{{ printf "%.8s" (base64url .FromHash) }} --pending --auto-approve
+
+-- schema-plan/2/stdout --
+{"Repo":"app","Lint":{"Steps":[]},"File":{"Name":"20241010143904","Migration":"-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n","Stmts":[{"Pos":20,"Text":"CREATE TABLE `1` (\n  `c` int NOT NULL\n);"}],"Changes":{"Objects":[{"Type":"table","Op":"add","Object":"table \"1\"","Diff":"+CREATE TABLE `1` (\n+  `c` int NOT NULL\n+);","Stmts":[0]}],"Stmts":1},"URL":"atlas://app/plans/20241010143904","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511","Status":"PENDING"}}
+
+-- schema-plan/3/args --
+schema plan list --format {{ json . }} --context {"scmType":"GITHUB"} --pending --auto-approve
+
+-- schema-plan/3/stdout --
+[]
+
+-- schema-plan/4/args --
+schema plan --format {{ json . }} --context {"scmType":"GITHUB"} --name-format ref--{{ printf "%.8s" (base64url .FromHash) }} --pending --auto-approve
+
+-- schema-plan/4/stdout --
+{"Repo":"app","Lint":{"Steps":[]},"File":{"Name":"20241010143904","Migration":"-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n","Stmts":[{"Pos":20,"Text":"CREATE TABLE `1` (\n  `c` int NOT NULL\n);"}],"Changes":{"Objects":[{"Type":"table","Op":"add","Object":"table \"1\"","Diff":"+CREATE TABLE `1` (\n+  `c` int NOT NULL\n+);","Stmts":[0]}],"Stmts":1},"URL":"atlas://app/plans/20241010143904","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511","Status":"PENDING"}}
+
+-- schema-plan/5/args --
+schema plan list --format {{ json . }} --context {"scmType":"GITHUB"} --pending --auto-approve
+
+-- schema-plan/5/stdout --
+[]
+
+-- schema-plan/6/args --
+schema plan --format {{ json . }} --context {"scmType":"GITHUB"} --name-format ref--{{ printf "%.8s" (base64url .FromHash) }} --pending --auto-approve
+
+-- schema-plan/6/stdout --
+{"Repo":"app","Lint":{"Steps":[]},"File":{"Name":"20241010143904","Migration":"-- Create \"1\" table\nCREATE TABLE `1` (\n  `c` int NOT NULL\n);\n","Stmts":[{"Pos":20,"Text":"CREATE TABLE `1` (\n  `c` int NOT NULL\n);"}],"Changes":{"Objects":[{"Type":"table","Op":"add","Object":"table \"1\"","Diff":"+CREATE TABLE `1` (\n+  `c` int NOT NULL\n+);","Stmts":[0]}],"Stmts":1},"URL":"atlas://app/plans/20241010143904","Link":"http://test.atlasgo.cloud/schemas/141733920769/plans/210453397511","Status":"PENDING"}}

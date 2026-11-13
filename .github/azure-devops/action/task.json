@@ -129,6 +129,16 @@
       "visibleRule": "action == migrate autorebase"
     },
     {
+      "type": "pickList",
+      "options": {
+        "collapsed":"collapsed","hidden":"hidden"
+      },
+      "label": "Change summary",
+      "helpMarkDown": "How the plan comment shows the change summary on GitHub. By default, the summary is open (collapsed past\n15 objects) and the migration script below it is collapsed. Set `collapsed` to collapse the summary and open\nthe migration script, or `hidden` to leave the summary out and show the migration script in its place.\n",
+      "name": "change_summary",
+      "visibleRule": "action == schema plan"
+    },
+    {
       "type": "string",
       "label": "Atlas Cloud token",
       "helpMarkDown": "The token that is used to connect to Atlas Cloud (should be passed as a secret).",
@@ -283,6 +293,16 @@
       "helpMarkDown": "Run only the scripts matching the given regexp.\nFor example, `^purge_.*` will only run scripts that start with `purge_`.\nDefault is to run all scripts.\n",
       "name": "match",
       "visibleRule": "action == script exec || action == script loop || action == script query"
+    },
+    {
+      "type": "pickList",
+      "options": {
+        "expanded":"expanded","collapsed":"collapsed"
+      },
+      "label": "Migration script",
+      "helpMarkDown": "How the plan comment shows the migration script on GitHub. By default, it is collapsed below the change\nsummary, and open when `change-summary` is set or the comment has no summary. Set `expanded` to always\nshow it open, or `collapsed` to always collapse it.\n",
+      "name": "migration_script",
+      "visibleRule": "action == schema plan"
     },
     {
       "type": "pickList",

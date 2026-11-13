@@ -1206,6 +1206,15 @@ func (a *Actions) SchemaTest(ctx context.Context) error {
 
 // SchemaPlan runs the GitHub Action for "ariga/atlas-action/schema/plan"
 func (a *Actions) SchemaPlan(ctx context.Context) error {
+	// Check the inputs before creating the plan, as they are only read when reporting it.
+	for _, in := range []struct{ name, v1, v2 string }{
+		{"change-summary", summaryCollapsed, summaryHidden},
+		{"migration-script", migrationExpanded, migrationCollapsed},
+	} {
+		if v := a.GetInput(in.name); v != "" && v != in.v1 && v != in.v2 {
+			return fmt.Errorf("the input %q got invalid value %q, expected %q or %q", in.name, v, in.v1, in.v2)
+		}
+	}
 	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get the trigger context: %w", err)
@@ -2250,17 +2259,42 @@ func stepIsError(s *atlasexec.StepReport) bool {
 	return s.Error != "" || (s.Result != nil && s.Result.Error != "")
 }
 
+// Values of the change-summary and migration-script inputs of schema/plan. By default,
+// the change summary is open, unless it lists more than 15 objects, and the migration
+// script is collapsed below it. Without a summary, the script is shown as is.
+const (
+	summaryCollapsed   = "collapsed" // The change summary is collapsed, and the migration script open.
+	summaryHidden      = "hidden"    // The comment has no change summary, as on other SCMs.
+	migrationExpanded  = "expanded"  // The migration script is open.
+	migrationCollapsed = "collapsed" // The migration script is collapsed, even without a summary.
+)
+
 // PlanComment is the data of the schema plan comment template.
 type PlanComment struct {
-	Plan         *atlasexec.SchemaPlan
-	RerunCommand string
-	Summary      bool // Add the change summary of the plan, if it has one.
-	SummarySQL   bool // Show the statements of each object in the summary.
+	Plan          *atlasexec.SchemaPlan
+	RerunCommand  string
+	SummaryView   string // The change-summary input: "", "collapsed" or "hidden".
+	MigrationView string // The migration-script input: "", "expanded" or "collapsed".
+	Summary       bool   // Add the change summary of the plan, if it has one.
+	SummarySQL    bool   // Show the statements of each object in the summary.
+}
+
+// MigrationOpen reports if the migration script section starts open: as the
+// migration-script input sets, or if the change-summary input collapses the summary.
+func (c PlanComment) MigrationOpen() bool {
+	switch c.MigrationView {
+	case migrationExpanded:
+		return true
+	case migrationCollapsed:
+		return false
+	default:
+		return c.SummaryView == summaryCollapsed
+	}
 }
 
 // Changes returns the change summary the comment adds, if any.
 func (c PlanComment) Changes() *atlasexec.ChangeSummary {
-	if !c.Summary || c.Plan == nil || c.Plan.File == nil {
+	if !c.Summary || c.SummaryView == summaryHidden || c.Plan == nil || c.Plan.File == nil {
 		return nil
 	}
 	if s := c.Plan.File.Changes; s != nil && len(s.Objects)+len(s.Other) > 0 {
@@ -2276,9 +2310,10 @@ func (c PlanComment) SQL(idx []int) string {
 }
 
 // renderPlanComment renders the schema plan comment with the change summary of the plan,
-// if it has one and the comment fits in limit: first with the statements of each object,
-// then with their counts only. Otherwise, the comment is rendered as before the change
-// summary. Sizes are measured in bytes, which never undercounts the characters GitHub limits.
+// if it has one, it is not hidden, and the comment fits in limit: first with the statements
+// of each object, then with their counts only. Otherwise, the comment is rendered as before
+// the change summary. Sizes are measured in bytes, which never undercounts the characters
+// GitHub limits.
 func renderPlanComment(tc *TriggerContext, c *PlanComment, limit int) (string, error) {
 	for _, sql := range []bool{true, false} {
 		if c.Summary, c.SummarySQL = true, sql; c.Changes() == nil {
