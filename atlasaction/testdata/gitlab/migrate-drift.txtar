@@ -1,0 +1,61 @@
+# Mock the atlas command outputs
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-drift
+# Setup the action input variables
+env ATLAS_INPUT_URL=sqlite://file.db
+env ATLAS_INPUT_DIR=file://migrations
+env ATLAS_INPUT_DEV_URL=sqlite://dev?mode=memory
+
+# No drift.
+atlas-action --action=migrate/drift
+stdout 'sqlite://file.db matches the expected state at version 2'
+output clean.env
+rm project/.env
+
+# Drift fails the job. $ and % are escaped as in toDotenvVar, so GitLab
+# expands no CI/CD variable into the outputs.
+env TEST_EXIT_CODE=1
+! atlas-action --action=migrate/drift
+stdout 'sqlite://file.db drifted from the expected state at version 2'
+output drifted.env
+rm project/.env
+
+# A database that could not be checked.
+! atlas-action --action=migrate/drift
+stdout 'sqlite://file.db could not be checked: no migration history found on the connected database'
+output error.env
+rm project/.env
+
+# The targets of an environment are reported together.
+env ATLAS_INPUT_URL= ATLAS_INPUT_DIR= ATLAS_INPUT_DEV_URL= ATLAS_INPUT_ENV=tenants
+! atlas-action --action=migrate/drift
+stdout 'sqlite://t2.db drifted from the expected state at version 2'
+output tenants.env
+-- migrate-drift/1/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
+-- migrate-drift/1/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true}
+-- migrate-drift/2/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
+-- migrate-drift/2/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"3062373192f2","Summary":{"Total":2,"Extra":2,"Types":{"function":1,"table":1}},"Changes":[{"Type":"function","Kind":"extra","Object":"function \"f\"","Cmds":["CREATE FUNCTION \"f\" (integer) RETURNS integer LANGUAGE sql AS $$ SELECT $1 $$"]},{"Type":"table","Kind":"extra","Object":"table \"t$CI_PROJECT_ID\"","Cmds":["CREATE TABLE \"t$CI_PROJECT_ID\" (\"c%CI_PROJECT_ID%\" int NULL)"]}],"Cached":true}
+-- migrate-drift/3/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
+-- migrate-drift/3/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Error":"no migration history found on the connected database"}
+-- migrate-drift/4/args --
+migrate drift --format {{ json . }} --env tenants
+-- migrate-drift/4/stdout --
+{"URL":"sqlite://t1.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true}
+{"URL":"sqlite://t2.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"H8W7ggzJrh","Summary":{"Total":1,"Extra":1,"Types":{"table":1}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"extra_t\"","Cmds":["CREATE TABLE \"extra_t\" (\"c\" int NULL)"]}],"Cached":true}
+-- clean.env --
+ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT=[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true}]
+ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED=false
+-- drifted.env --
+ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT=[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"3062373192f2","Summary":{"Total":2,"Extra":2,"Types":{"function":1,"table":1}},"Changes":[{"Type":"function","Kind":"extra","Object":"function \"f\"","Cmds":["CREATE FUNCTION \"f\" (integer) RETURNS integer LANGUAGE sql AS $$$$ SELECT $$1 $$$$"]},{"Type":"table","Kind":"extra","Object":"table \"t$$${}CI_PROJECT_ID\"","Cmds":["CREATE TABLE \"t$$${}CI_PROJECT_ID\" (\"c%${}CI_PROJECT_ID%\" int NULL)"]}],"Cached":true}]
+ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED=true
+-- error.env --
+ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT=[{"URL":"sqlite://file.db","Dir":"file://migrations","Error":"no migration history found on the connected database"}]
+ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED=false
+-- tenants.env --
+ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT=[{"URL":"sqlite://t1.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true},{"URL":"sqlite://t2.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"H8W7ggzJrh","Summary":{"Total":1,"Extra":1,"Types":{"table":1}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"extra_t\"","Cmds":["CREATE TABLE \"extra_t\" (\"c\" int NULL)"]}],"Cached":true}]
+ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED=true

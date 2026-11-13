@@ -2,13 +2,17 @@ package atlasaction_test
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 
+	"ariga.io/atlas-action/atlasaction"
 	"ariga.io/atlas-action/internal/gitlab"
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"
@@ -54,6 +58,83 @@ func TestGitlabCI(t *testing.T) {
 			},
 		},
 	})
+}
+
+// A later job must read each output exactly as the action wrote it, and a
+// value from the database must never expand into a CI/CD variable.
+func TestGitlabDotenvOutputs(t *testing.T) {
+	// Variable names can be lowercase or start with "_".
+	vars := map[string]string{"CI_PROJECT_ID": "88837927", "SECRET": "s3cr3t", "db_password": "pw", "_x": "x"}
+	for _, tt := range []struct{ in, want string }{
+		{in: ""}, {in: "true"}, {in: `"quoted"`}, {in: `{"a":"x\"y\\z"}`}, {in: "Xin chào"},
+		{in: "t$CI_PROJECT_ID"}, {in: "x${CI_PROJECT_ID}y"}, {in: "x%CI_PROJECT_ID%y"},
+		{in: "%SECRET%"}, {in: "%db_password%"}, {in: "$_x"}, {in: "$$SECRET"},
+		{in: "$$ SELECT $1 $$"}, {in: "$body$ x $body$"}, {in: "$"}, {in: "a$"}, {in: "$$$"},
+		{in: "${}"}, {in: "$${}"}, {in: "$%SECRET%"},
+		{in: "%"}, {in: "%%"}, {in: "100%"}, {in: "a%20b"}, {in: "%_x%"}, {in: "%$SECRET"}, {in: "%%SECRET%%"},
+		// A dotenv value cannot span lines, and GitLab reads only UTF-8.
+		{in: "a\r\nb", want: `a\r\nb`}, {in: "caf\xe9", want: "caf\uFFFD"},
+	} {
+		if tt.want == "" {
+			tt.want = tt.in
+		}
+		dir := t.TempDir()
+		env := map[string]string{"CI_PROJECT_DIR": dir, "ATLAS_ACTION_COMMAND": "migrate/drift"}
+		atlasaction.NewGitlab(func(k string) string { return env[k] }, io.Discard).SetOutput("report", tt.in)
+		for _, forwarded := range []bool{false, true} {
+			got := readDotenv(t, filepath.Join(dir, ".env"), vars, forwarded)
+			require.Equal(t, tt.want, got["ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT"], "%q, forwarded: %t", tt.in, forwarded)
+		}
+	}
+}
+
+var (
+	// railsVarRef is Gitlab::Ci::Variables::Collection::Item::VARIABLES_REGEXP.
+	railsVarRef = regexp.MustCompile(`\$\$|%%|\$([a-zA-Z_][a-zA-Z0-9_]*)|\$\{([a-zA-Z_][a-zA-Z0-9_]*)?\}|%([a-zA-Z_][a-zA-Z0-9_]*)%`)
+	// rubyStrip is what Ruby's String#strip removes: ASCII whitespace and NUL.
+	rubyStrip = " \t\n\v\f\r\x00"
+	// forwardVarRef is ExpandVariables::VARIABLES_REGEXP, which has no escape.
+	forwardVarRef = regexp.MustCompile(`\$([a-zA-Z_][a-zA-Z0-9_]*)|\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}|%([a-zA-Z_][a-zA-Z0-9_]*)%`)
+)
+
+// readDotenv returns the variables a later job reads from a dotenv report,
+// following GitLab's parser and the expansion passes after it:
+//   - Ci::ParseDotenvArtifactService: split at the first "=", trim spaces.
+//   - If forwarded to a downstream pipeline (trigger:forward:pipeline_variables),
+//     ExpandVariables.expand: defined references expand, others are removed.
+//   - Gitlab::Ci::Variables::Collection#expand_value with keep_undefined:
+//     defined references expand, "$$" and "%%" are kept.
+//   - GitLab Runner Variables.ExpandValue: os.Expand, where "$$" is "$" and
+//     shell special parameters and unknown names are empty.
+func readDotenv(t *testing.T, name string, vars map[string]string, forwarded bool) map[string]string {
+	b, err := os.ReadFile(name)
+	require.NoError(t, err)
+	got := make(map[string]string)
+	for _, l := range strings.Split(strings.TrimSuffix(string(b), "\n"), "\n") {
+		k, v, ok := strings.Cut(l, "=")
+		require.True(t, ok, l)
+		v = strings.Trim(v, rubyStrip)
+		if forwarded {
+			v = forwardVarRef.ReplaceAllStringFunc(v, func(ref string) string {
+				m := forwardVarRef.FindStringSubmatch(ref)
+				return vars[m[1]+m[2]+m[3]]
+			})
+		}
+		v = railsVarRef.ReplaceAllStringFunc(v, func(ref string) string {
+			m := railsVarRef.FindStringSubmatch(ref)
+			if x, ok := vars[m[1]+m[2]+m[3]]; ok {
+				return x
+			}
+			return ref
+		})
+		got[strings.Trim(k, rubyStrip)] = os.Expand(v, func(k string) string {
+			if k == "$" {
+				return k
+			}
+			return vars[k]
+		})
+	}
+	return got
 }
 
 func mockClientHandler(dir, token string) http.Handler {
