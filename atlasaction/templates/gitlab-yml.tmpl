@@ -53,8 +53,10 @@ $[[ inputs.job_name ]]:
     reports:
       dotenv: .env
 {{- end }}
+    {{- /* only the grant: artifacts can be downloaded, and the cache keeps the schema state */}}
     paths:
-      - .atlas/
+      - .atlas/token.db
+      - .atlas/release.json
     expire_in: 1 day
   before_script:
     - |
