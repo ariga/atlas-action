@@ -2761,6 +2761,18 @@ func isNameStart(c byte) bool {
 	return c == '_' || 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
 }
 
+// toShellExport returns a shell command that exports the output variable,
+// for files that a shell later sources: `export NAME='value'`.
+//
+// Inside single quotes the shell runs and expands nothing, so sourcing the
+// line restores the value byte for byte, newlines included. A single quote
+// cannot appear inside single quotes, so each one ends the quoted text, adds
+// an escaped quote and starts a new quoted text.
+func toShellExport(action, output, value string) string {
+	return fmt.Sprintf("export %s='%s'", toOutputVarName(action, output),
+		strings.ReplaceAll(value, "'", `'\''`))
+}
+
 // fprintln writes the given values to the file using fmt.Fprintln.
 func fprintln(name string, val ...any) error {
 	// Write the output to a file.

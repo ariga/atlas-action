@@ -113,8 +113,7 @@ func (a *Bitbucket) SetOutput(name, value string) {
 		return
 	}
 	outputs := filepath.Join(dir, "outputs.sh")
-	err := fprintln(outputs,
-		"export", toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
+	err := fprintln(outputs, toShellExport(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
 	if err != nil {
 		a.Errorf("failed to write output to file %s: %v", outputs, err)
 	}

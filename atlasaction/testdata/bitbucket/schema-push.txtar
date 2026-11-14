@@ -14,12 +14,12 @@ atlas-action --action=schema/push
 exec cat .atlas-action/outputs.sh
 output outputs.sh
 -- outputs.sh --
-export ATLAS_OUTPUT_SCHEMA_PUSH_LINK="https://test.atlas.ariga/schemas/12345"
-export ATLAS_OUTPUT_SCHEMA_PUSH_SLUG="test-repo"
-export ATLAS_OUTPUT_SCHEMA_PUSH_URL="atlas://schema/12345"
-export ATLAS_OUTPUT_SCHEMA_PUSH_LINK="https://test.atlas.ariga/schemas/12345"
-export ATLAS_OUTPUT_SCHEMA_PUSH_SLUG="test-repo"
-export ATLAS_OUTPUT_SCHEMA_PUSH_URL="atlas://schema/12345"
+export ATLAS_OUTPUT_SCHEMA_PUSH_LINK='https://test.atlas.ariga/schemas/12345'
+export ATLAS_OUTPUT_SCHEMA_PUSH_SLUG='test-repo'
+export ATLAS_OUTPUT_SCHEMA_PUSH_URL='atlas://schema/12345'
+export ATLAS_OUTPUT_SCHEMA_PUSH_LINK='https://test.atlas.ariga/schemas/12345'
+export ATLAS_OUTPUT_SCHEMA_PUSH_SLUG='test-repo'
+export ATLAS_OUTPUT_SCHEMA_PUSH_URL='atlas://schema/12345'
 -- schema-push/1/args --
 schema push --format {{ json . }} --env test --context {"scmType":"BITBUCKET"} --tag latest
 
