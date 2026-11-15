@@ -78,6 +78,8 @@ var (
 		"orbparam":      orbParamName,
 		"orbtype":       orbParamType,
 		"needGitHubEnv": needGitHubEnv,
+		// The path the GitLab action writes the drift JUnit report to.
+		"junitDriftReport": func() string { return junitDriftReport },
 		"dockers": func() []DockerURL {
 			return []DockerURL{
 				{Label: "MySQL", Driver: "mysql"},

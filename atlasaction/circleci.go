@@ -23,7 +23,7 @@ var _ Action = (*CircleCI)(nil)
 
 // NewCircleCI returns a new CircleCI.
 func NewCircleCI(getenv func(string) string, w io.Writer) *CircleCI {
-	return &CircleCI{getenv: getenv, coloredLogger: &coloredLogger{w}}
+	return &CircleCI{getenv: getenv, coloredLogger: &coloredLogger{w: w}}
 }
 
 // GetType implements the Action interface.

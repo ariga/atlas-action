@@ -10,6 +10,7 @@ atlas-action --action=migrate/drift
 stdout 'sqlite://file.db matches the expected state at version 2'
 output clean.env
 rm project/.env
+cmp project/.atlas-action/migrate-drift.junit.xml clean.junit.xml
 
 # Drift fails the job. $ and % are escaped as in toDotenvVar, so GitLab
 # expands no CI/CD variable into the outputs.
@@ -18,18 +19,29 @@ env TEST_EXIT_CODE=1
 stdout 'sqlite://file.db drifted from the expected state at version 2'
 output drifted.env
 rm project/.env
+cmp project/.atlas-action/migrate-drift.junit.xml drifted.junit.xml
 
-# A database that could not be checked.
+# A database that could not be checked is an error in the JUnit report.
 ! atlas-action --action=migrate/drift
 stdout 'sqlite://file.db could not be checked: no migration history found on the connected database'
 output error.env
 rm project/.env
+cmp project/.atlas-action/migrate-drift.junit.xml error.junit.xml
 
 # The targets of an environment are reported together.
 env ATLAS_INPUT_URL= ATLAS_INPUT_DIR= ATLAS_INPUT_DEV_URL= ATLAS_INPUT_ENV=tenants
 ! atlas-action --action=migrate/drift
 stdout 'sqlite://t2.db drifted from the expected state at version 2'
 output tenants.env
+rm project/.env
+cmp project/.atlas-action/migrate-drift.junit.xml tenants.junit.xml
+
+# Text from the database is escaped, and characters XML does not allow are
+# replaced: one of them would make GitLab drop the whole report. The last line
+# names the drifted database along with the one that could not be checked.
+! atlas-action --action=migrate/drift
+stdout '^`atlas migrate drift` detected drift in 1 database.s.: sqlite://a<b>&c.db; could not check 1 database.s.: sqlite://t3.db$'
+cmp project/.atlas-action/migrate-drift.junit.xml escaped.junit.xml
 -- migrate-drift/1/args --
 migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
 -- migrate-drift/1/stdout --
@@ -59,3 +71,45 @@ ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED=false
 -- tenants.env --
 ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT=[{"URL":"sqlite://t1.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true},{"URL":"sqlite://t2.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"H8W7ggzJrh","Summary":{"Total":1,"Extra":1,"Types":{"table":1}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"extra_t\"","Cmds":["CREATE TABLE \"extra_t\" (\"c\" int NULL)"]}],"Cached":true}]
 ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED=true
+-- migrate-drift/5/args --
+migrate drift --format {{ json . }} --env tenants
+-- migrate-drift/5/stdout --
+{"URL":"sqlite://a<b>&c.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"Zk2b","Summary":{"Total":1,"Extra":1,"Types":{"table":1}},"Changes":[{"Type":"table","Kind":"extra","Object":"table \"t\u001b[31m]]>`$CI_PROJECT_ID`\"","Cmds":["CREATE TABLE \"t\u001b[31m]]>`$CI_PROJECT_ID`\" (\n  \"c\" int NULL\n)"]}],"Cached":true}
+{"URL":"sqlite://t3.db","Error":"connect: \u0000 <bad> host\r\nretry"}
+-- clean.junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift">
+  <testcase name="sqlite://file.db" classname="file://migrations"></testcase>
+</testsuite>
+-- drifted.junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift">
+  <testcase name="sqlite://file.db" classname="file://migrations">
+    <failure>sqlite://file.db drifted from the expected state at version 2 with 2 change(s): 2 extra&#xA;&#xA;The database diverged from the expected state as if the following were executed:&#xA;  -- extra function &#34;f&#34;:&#xA;    -&gt; CREATE FUNCTION &#34;f&#34; (integer) RETURNS integer LANGUAGE sql AS $$ SELECT $1 $$;&#xA;  -- extra table &#34;t$CI_PROJECT_ID&#34;:&#xA;    -&gt; CREATE TABLE &#34;t$CI_PROJECT_ID&#34; (&#34;c%CI_PROJECT_ID%&#34; int NULL);</failure>
+  </testcase>
+</testsuite>
+-- error.junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift">
+  <testcase name="sqlite://file.db" classname="file://migrations">
+    <error>sqlite://file.db could not be checked: no migration history found on the connected database</error>
+  </testcase>
+</testsuite>
+-- tenants.junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift">
+  <testcase name="sqlite://t1.db" classname="file://migrations"></testcase>
+  <testcase name="sqlite://t2.db" classname="file://migrations">
+    <failure>sqlite://t2.db drifted from the expected state at version 2 with 1 change(s): 1 extra&#xA;&#xA;The database diverged from the expected state as if the following were executed:&#xA;  -- extra table &#34;extra_t&#34;:&#xA;    -&gt; CREATE TABLE &#34;extra_t&#34; (&#34;c&#34; int NULL);</failure>
+  </testcase>
+</testsuite>
+-- escaped.junit.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift">
+  <testcase name="sqlite://a&lt;b&gt;&amp;c.db" classname="file://migrations">
+    <failure>sqlite://a&lt;b&gt;&amp;c.db drifted from the expected state at version 2 with 1 change(s): 1 extra&#xA;&#xA;The database diverged from the expected state as if the following were executed:&#xA;  -- extra table &#34;t�[31m]]&gt;`$CI_PROJECT_ID`&#34;:&#xA;    -&gt; CREATE TABLE &#34;t�[31m]]&gt;`$CI_PROJECT_ID`&#34; (&#xA;        &#34;c&#34; int NULL&#xA;       );</failure>
+  </testcase>
+  <testcase name="sqlite://t3.db" classname="">
+    <error>sqlite://t3.db could not be checked: connect: � &lt;bad&gt; host&#xD;&#xA;retry</error>
+  </testcase>
+</testsuite>
