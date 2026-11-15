@@ -1,6 +1,7 @@
 package atlasaction_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -36,6 +37,7 @@ func TestGitlabCI(t *testing.T) {
 			e.Setenv("CI_PROJECT_ID", "1")
 			e.Setenv("GITLAB_CI", "true")
 			e.Setenv("GITLAB_TOKEN", "token")
+			e.Setenv("NO_COLOR", "1") // The scripts match the log without colors.
 			return nil
 		},
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
@@ -58,6 +60,17 @@ func TestGitlabCI(t *testing.T) {
 			},
 		},
 	})
+}
+
+// GitLab shows the colors of a job log, which has no terminal. NO_COLOR turns
+// them off.
+func TestGitlabColors(t *testing.T) {
+	var out bytes.Buffer
+	atlasaction.NewGitlab(func(string) string { return "" }, &out).Warningf("%s drifted", "t2")
+	require.Equal(t, "\x1b[33mt2 drifted\x1b[0m\n", out.String())
+	out.Reset()
+	atlasaction.NewGitlab(func(k string) string { return map[string]string{"NO_COLOR": "1"}[k] }, &out).Warningf("%s drifted", "t2")
+	require.Equal(t, "t2 drifted\n", out.String())
 }
 
 // A later job must read each output exactly as the action wrote it, and a

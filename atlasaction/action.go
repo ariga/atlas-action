@@ -981,10 +981,13 @@ func (a *Actions) MigrateDrift(ctx context.Context) error {
 		RevisionsSchema: a.GetInput("revisions-schema"),
 		Exclude:         a.GetArrayInput("exclude"),
 	})
-	// A check that could not be completed stops the run. The targets
-	// checked before it are reported along with the failed one.
+	// A check that could not be completed fails the run, but the CLI checks the
+	// other targets: their reports come with the error.
 	if derr, ok := errors.AsType[*atlasexec.MigrateDriftError](err); ok {
 		reports = derr.Result
+		if derr.Stderr != "" {
+			a.Errorf("%s", derr.Stderr) // Output of the CLI that no report holds.
+		}
 	} else if err != nil {
 		return fmt.Errorf("`atlas migrate drift` completed with errors:\n%s", err)
 	}
@@ -993,21 +996,17 @@ func (a *Actions) MigrateDrift(ctx context.Context) error {
 		return fmt.Errorf("failed to marshal the drift report: %w", jsonErr)
 	}
 	a.SetOutput("report", string(report))
-	var drifted []string // URLs of the drifted databases.
+	var drifted, failed []string // URLs of the drifted databases and of those that could not be checked.
 	for _, r := range reports {
 		switch {
 		case r.Error != "":
+			failed = append(failed, r.URL)
 			a.Errorf("%s could not be checked: %s", r.URL, r.Error)
 		case r.Drifted:
 			drifted = append(drifted, r.URL)
-			a.Warningf("%s drifted from the expected state at version %s with %s", r.URL, r.Version, driftChanges(r.Summary))
-			for _, ch := range r.Changes {
-				a.Infof("  -- %s %s:", ch.Kind, ch.Object)
-				for _, cmd := range ch.Cmds {
-					// As the CLI prints them, statements over multiple
-					// lines are aligned with their first line.
-					a.Infof("    -> %s;", strings.ReplaceAll(cmd, "\n", "\n       "))
-				}
+			a.Warningf("%s", driftHeader(r))
+			for _, l := range driftLines(r) {
+				a.Infof("%s", l)
 			}
 		default:
 			a.Infof("%s matches the expected state at version %s", r.URL, r.Version)
@@ -1017,12 +1016,17 @@ func (a *Actions) MigrateDrift(ctx context.Context) error {
 	if r, ok := a.Action.(MigrateDriftReporter); ok {
 		r.MigrateDrift(ctx, reports)
 	}
-	// A database that could not be checked leaves its state unknown.
-	if err != nil {
-		return fmt.Errorf("`atlas migrate drift` completed with errors:\n%s", err)
-	}
+	// The last line names every database to look at. One that could not be
+	// checked leaves its state unknown.
+	var problems []string
 	if len(drifted) > 0 {
-		return fmt.Errorf("`atlas migrate drift` detected drift in %d database(s): %s", len(drifted), strings.Join(drifted, ", "))
+		problems = append(problems, fmt.Sprintf("detected drift in %d database(s): %s", len(drifted), strings.Join(drifted, ", ")))
+	}
+	if len(failed) > 0 {
+		problems = append(problems, fmt.Sprintf("could not check %d database(s): %s", len(failed), strings.Join(failed, ", ")))
+	}
+	if len(problems) > 0 {
+		return fmt.Errorf("`atlas migrate drift` %s", strings.Join(problems, "; "))
 	}
 	a.Infof("`atlas migrate drift` completed successfully, no drift detected")
 	return nil
@@ -2241,6 +2245,24 @@ func driftChanges(s *atlasexec.MigrateDriftSummary) string {
 	return fmt.Sprintf("%d change(s): %s", s.Total, strings.Join(kinds, ", "))
 }
 
+// driftHeader returns the line a drifted database is reported with.
+func driftHeader(r *atlasexec.MigrateDrift) string {
+	return fmt.Sprintf("%s drifted from the expected state at version %s with %s", r.URL, r.Version, driftChanges(r.Summary))
+}
+
+// driftLines returns the changes of a drifted database, as the CLI prints them.
+func driftLines(r *atlasexec.MigrateDrift) []string {
+	var lines []string
+	for _, ch := range r.Changes {
+		lines = append(lines, fmt.Sprintf("  -- %s %s:", ch.Kind, ch.Object))
+		for _, cmd := range ch.Cmds {
+			// Statements over multiple lines are aligned with their first line.
+			lines = append(lines, fmt.Sprintf("    -> %s;", strings.ReplaceAll(cmd, "\n", "\n       ")))
+		}
+	}
+	return lines
+}
+
 func filterIssues(steps []*atlasexec.StepReport) []*atlasexec.StepReport {
 	result := make([]*atlasexec.StepReport, 0, len(steps))
 	for _, s := range steps {
@@ -2806,21 +2828,37 @@ func generateRandomHash() string {
 
 type coloredLogger struct {
 	w io.Writer
+	// colors turns the colors on for a CI that shows them in its log, although
+	// the job has no terminal for the color package to detect.
+	colors bool
 }
 
 // Infof implements the Logger interface.
 func (l *coloredLogger) Infof(msg string, args ...any) {
-	fmt.Fprint(l.w, color.CyanString(msg, args...)+"\n")
+	l.printf(color.FgCyan, msg, args...)
 }
 
 // Warningf implements the Logger interface.
 func (l *coloredLogger) Warningf(msg string, args ...any) {
-	fmt.Fprint(l.w, color.YellowString(msg, args...)+"\n")
+	l.printf(color.FgYellow, msg, args...)
 }
 
 // Errorf implements the Logger interface.
 func (l *coloredLogger) Errorf(msg string, args ...any) {
-	fmt.Fprint(l.w, color.RedString(msg, args...)+"\n")
+	l.printf(color.FgRed, msg, args...)
+}
+
+// printf writes the message in the color, as the <Color>String functions of
+// the color package do.
+func (l *coloredLogger) printf(attr color.Attribute, msg string, args ...any) {
+	c := color.New(attr)
+	if l.colors {
+		c.EnableColor()
+	}
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
+	fmt.Fprintln(l.w, c.Sprint(msg))
 }
 
 // Fatalf implements the Logger interface.

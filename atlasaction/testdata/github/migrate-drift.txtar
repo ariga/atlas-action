@@ -22,7 +22,7 @@ stdout '::error::`atlas migrate drift` detected drift in 1 database.s.: sqlite:/
 # A database that could not be checked leaves its state unknown.
 ! atlas-action --action=migrate/drift
 stdout '::error::sqlite://file.db could not be checked: no migration history found on the connected database'
-stdout '::error::`atlas migrate drift` completed with errors:%0Ano migration history found on the connected database'
+stdout '::error::`atlas migrate drift` could not check 1 database.s.: sqlite://file.db'
 
 # The targets of an environment are reported one by one. A drifted target fails the action.
 env INPUT_URL= INPUT_DIR= INPUT_DEV-URL= INPUT_EXCLUDE= INPUT_ENV=tenants

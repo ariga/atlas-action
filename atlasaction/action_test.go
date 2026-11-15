@@ -1674,15 +1674,15 @@ func TestMigrateDrift(t *testing.T) {
 		require.EqualError(t, err, "`atlas migrate drift` detected drift in 2 database(s): postgres://localhost:5432/app, postgres://localhost:5433/app")
 		require.Equal(t, "true", act.output["drifted"])
 	})
-	// A check that could not be completed stops the run and fails the
-	// step. The targets checked before it are reported along with it.
+	// A check that could not be completed fails the step, and the last line
+	// names the drifted databases along with those that could not be checked.
 	t.Run("check failed", func(t *testing.T) {
 		act := newAct(io.Discard)
 		err := run(t, act, nil, &atlasexec.MigrateDriftError{Result: []*atlasexec.MigrateDrift{
 			drifted,
 			{URL: "postgres://localhost:5433/app", Dir: "atlas://app", Error: "no migration history found on the connected database"},
 		}})
-		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\nno migration history found on the connected database")
+		require.EqualError(t, err, "`atlas migrate drift` detected drift in 1 database(s): postgres://localhost:5432/app; could not check 1 database(s): postgres://localhost:5433/app")
 		require.Equal(t, "true", act.output["drifted"])
 		require.Equal(t, 1, act.summary)
 		var reports []*atlasexec.MigrateDrift
@@ -1691,13 +1691,17 @@ func TestMigrateDrift(t *testing.T) {
 		require.Equal(t, "no migration history found on the connected database", reports[1].Error)
 	})
 	// A database that could not be checked fails the step, even if no drift was detected.
+	// Output of the CLI that no report holds is logged.
 	t.Run("check failed without drift", func(t *testing.T) {
-		act := newAct(io.Discard)
+		var out bytes.Buffer
+		act := newAct(&out)
 		err := run(t, act, nil, &atlasexec.MigrateDriftError{Result: []*atlasexec.MigrateDrift{
 			{URL: "postgres://localhost:5432/app", Dir: "atlas://app", Mode: "registry", Version: "20260423120000"},
 			{URL: "postgres://localhost:5433/app", Dir: "atlas://app", Error: "cannot determine the expected state: migration 20260423120000 was partially applied. Run 'atlas migrate status' for details"},
-		}})
-		require.EqualError(t, err, "`atlas migrate drift` completed with errors:\ncannot determine the expected state: migration 20260423120000 was partially applied. Run 'atlas migrate status' for details")
+		}, Stderr: "Error: the CLI said more"})
+		require.EqualError(t, err, "`atlas migrate drift` could not check 1 database(s): postgres://localhost:5433/app")
+		require.Contains(t, out.String(), "postgres://localhost:5433/app could not be checked: cannot determine the expected state")
+		require.Contains(t, out.String(), "Error: the CLI said more")
 		require.Equal(t, "false", act.output["drifted"])
 		require.Equal(t, 1, act.summary)
 	})

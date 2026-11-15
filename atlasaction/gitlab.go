@@ -6,6 +6,7 @@ package atlasaction
 
 import (
 	"context"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
@@ -26,7 +27,9 @@ type GitLab struct {
 
 // NewGitlab returns a new Action for Gitlab CI.
 func NewGitlab(getenv func(string) string, w io.Writer) *GitLab {
-	return &GitLab{getenv: getenv, coloredLogger: &coloredLogger{w}}
+	// GitLab shows the colors of a job log. NO_COLOR turns them off, as
+	// https://no-color.org asks.
+	return &GitLab{getenv: getenv, coloredLogger: &coloredLogger{w: w, colors: getenv("NO_COLOR") == ""}}
 }
 
 // GetType implements the Action interface.
@@ -64,6 +67,65 @@ func (a *GitLab) SetOutput(name, value string) {
 	if err != nil {
 		a.Errorf("failed to write output to file .env: %v", err)
 	}
+}
+
+// junitDriftReport is the JUnit report of migrate/drift, relative to the project
+// directory. The template uploads it as artifacts:reports:junit.
+const junitDriftReport = ".atlas-action/migrate-drift.junit.xml"
+
+// MigrateDrift implements MigrateDriftReporter. It writes a JUnit report with a
+// test case per checked database, shown in the Tests tab of the pipeline.
+func (a *GitLab) MigrateDrift(_ context.Context, reports []*atlasexec.MigrateDrift) {
+	name := filepath.Join(a.getenv("CI_PROJECT_DIR"), junitDriftReport)
+	if err := writeDriftJUnit(name, reports); err != nil {
+		a.Errorf("failed to write the JUnit report: %v", err)
+	}
+}
+
+type (
+	// junitSuite is a JUnit test suite, with the elements and attributes
+	// GitLab reads. See https://docs.gitlab.com/ci/testing/unit_test_reports/.
+	junitSuite struct {
+		XMLName xml.Name    `xml:"testsuite"`
+		Name    string      `xml:"name,attr"`
+		Cases   []junitCase `xml:"testcase"`
+	}
+	// junitCase is a test case. encoding/xml escapes its text and replaces the
+	// characters XML does not allow, such as the ANSI escape, with U+FFFD: one of
+	// them would fail the parsing of the whole report.
+	junitCase struct {
+		Name      string `xml:"name,attr"`
+		Classname string `xml:"classname,attr"`
+		Failure   string `xml:"failure,omitempty"`
+		Error     string `xml:"error,omitempty"`
+	}
+)
+
+// writeDriftJUnit writes the drift reports to the named file as a JUnit test
+// suite. A drifted database is a failure, and one that could not be checked is
+// an error, which GitLab lists separately and keeps out of the failure history.
+func writeDriftJUnit(name string, reports []*atlasexec.MigrateDrift) error {
+	s := &junitSuite{Name: "atlas migrate drift"}
+	for _, r := range reports {
+		c := junitCase{Name: r.URL, Classname: r.Dir}
+		switch {
+		case r.Error != "":
+			c.Error = fmt.Sprintf("%s could not be checked: %s", r.URL, r.Error)
+		case r.Drifted:
+			// As the GitHub summary says, the statements describe the drift; they are not to be run.
+			lines := []string{driftHeader(r), "", "The database diverged from the expected state as if the following were executed:"}
+			c.Failure = strings.Join(append(lines, driftLines(r)...), "\n")
+		}
+		s.Cases = append(s.Cases, c)
+	}
+	b, err := xml.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(name), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(name, append([]byte(xml.Header), append(b, '\n')...), 0644)
 }
 
 // GetTriggerContext implements the Action interface.
@@ -219,4 +281,5 @@ func (c *GitLabClient) comment(ctx context.Context, pr *PullRequest, id, comment
 }
 
 var _ Action = (*GitLab)(nil)
+var _ MigrateDriftReporter = (*GitLab)(nil)
 var _ SCMClient = (*GitLabClient)(nil)
