@@ -162,6 +162,33 @@ pipelines:
 </Tabs>
 {{ end -}}
 
+{{- define "usage/bitbucket/migrate/drift" }}
+**Check the production database for drift on a schedule**
+
+Define a custom pipeline, then schedule it in **Pipelines** > **Schedules** > **New schedule**:
+```yaml
+image: atlassian/default-image:3
+pipelines:
+  custom:
+    drift-check:
+      - step:
+          name: "{{ .Description }}"
+          script:
+            - name: "{{ .Name }}"
+              pipe: docker://arigaio/atlas-action:master
+              variables:
+                ATLAS_ACTION: "{{ .ID }}" # Required
+                ATLAS_TOKEN: ${ATLAS_TOKEN}
+                {{ inputvar "url" }}: ${DATABASE_URL}
+                {{ inputvar "dir" }}: "atlas://my-project"
+```
+
+The step fails when drift is detected, or when a database could not be checked. Each checked database is a
+test in the **Tests** tab of the step, and a drifted one shows the changes. The pipe writes the JUnit reports
+to `.atlas-action/test-results/`, where Bitbucket finds them with no configuration.
+
+{{ end -}}
+
 {{- define "usage/bitbucket/schema/plan" }}
 <Tabs
 defaultValue="mysql"

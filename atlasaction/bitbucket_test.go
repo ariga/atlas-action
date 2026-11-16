@@ -43,7 +43,7 @@ func TestBitbucketSourcedOutputs(t *testing.T) {
 func TestBitbucketPipe(t *testing.T) {
 	var (
 		actions = "actions"
-		outputs = filepath.Join("outputs.sh")
+		outputs = filepath.Join(".atlas-action", "outputs.sh")
 	)
 	wd, err := os.Getwd()
 	require.NoError(t, err)
