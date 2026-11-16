@@ -49,8 +49,7 @@ func (a *CircleCI) GetInput(name string) string {
 // SetOutput implements the Action interface.
 func (a *CircleCI) SetOutput(name, value string) {
 	if bashEnv := a.getenv("BASH_ENV"); bashEnv != "" {
-		err := fprintln(bashEnv,
-			"export", toOutputVar(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
+		err := fprintln(bashEnv, toShellExport(a.getenv("ATLAS_ACTION_COMMAND"), name, value))
 		if err != nil {
 			a.Fatalf("failed to write output to file %s: %v", bashEnv, err)
 		}

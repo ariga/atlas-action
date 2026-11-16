@@ -26,4 +26,4 @@ migrate lint -w --context {"repo":"foo/bar","path":"file://testdata/migrations",
 export FOO=bar
 -- output.sh --
 export FOO=bar
-export ATLAS_OUTPUT_MIGRATE_LINT_REPORT_URL="https://migration-lint-report-url"
+export ATLAS_OUTPUT_MIGRATE_LINT_REPORT_URL='https://migration-lint-report-url'

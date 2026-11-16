@@ -2720,13 +2720,6 @@ func toOutputVarName(action, output string) string {
 	return "ATLAS_OUTPUT_" + toEnvName(action+"_"+output)
 }
 
-// toOutputVar converts the given values to an output variable.
-// The action and output are used to create the output variable name with the format:
-// ATLAS_OUTPUT_<ACTION>_<OUTPUT>="<value>"
-func toOutputVar(action, output, value string) string {
-	return fmt.Sprintf("%s=%q", toOutputVarName(action, output), value)
-}
-
 // toDotenvVar returns the line that sets the output variable in a GitLab
 // dotenv report: NAME=value, unquoted, because GitLab keeps quotes as part of
 // the value.
@@ -2781,6 +2774,18 @@ func toDotenvVar(action, output, value string) string {
 // isNameStart reports whether c can start a CI/CD variable name.
 func isNameStart(c byte) bool {
 	return c == '_' || 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
+}
+
+// toShellExport returns a shell command that exports the output variable,
+// for files that a shell later sources: `export NAME='value'`.
+//
+// Inside single quotes the shell runs and expands nothing, so sourcing the
+// line restores the value byte for byte, newlines included. A single quote
+// cannot appear inside single quotes, so each one ends the quoted text, adds
+// an escaped quote and starts a new quoted text.
+func toShellExport(action, output, value string) string {
+	return fmt.Sprintf("export %s='%s'", toOutputVarName(action, output),
+		strings.ReplaceAll(value, "'", `'\''`))
 }
 
 // fprintln writes the given values to the file using fmt.Fprintln.
