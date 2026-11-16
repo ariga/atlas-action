@@ -78,26 +78,26 @@ migrate drift --format {{ json . }} --env tenants
 {"URL":"sqlite://t3.db","Error":"connect: \u0000 <bad> host\r\nretry"}
 -- clean.junit.xml --
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="atlas migrate drift">
+<testsuite name="atlas migrate drift" tests="1" failures="0" errors="0">
   <testcase name="sqlite://file.db" classname="file://migrations"></testcase>
 </testsuite>
 -- drifted.junit.xml --
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="atlas migrate drift">
+<testsuite name="atlas migrate drift" tests="1" failures="1" errors="0">
   <testcase name="sqlite://file.db" classname="file://migrations">
     <failure>sqlite://file.db drifted from the expected state at version 2 with 2 change(s): 2 extra&#xA;&#xA;The database diverged from the expected state as if the following were executed:&#xA;  -- extra function &#34;f&#34;:&#xA;    -&gt; CREATE FUNCTION &#34;f&#34; (integer) RETURNS integer LANGUAGE sql AS $$ SELECT $1 $$;&#xA;  -- extra table &#34;t$CI_PROJECT_ID&#34;:&#xA;    -&gt; CREATE TABLE &#34;t$CI_PROJECT_ID&#34; (&#34;c%CI_PROJECT_ID%&#34; int NULL);</failure>
   </testcase>
 </testsuite>
 -- error.junit.xml --
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="atlas migrate drift">
+<testsuite name="atlas migrate drift" tests="1" failures="0" errors="1">
   <testcase name="sqlite://file.db" classname="file://migrations">
     <error>sqlite://file.db could not be checked: no migration history found on the connected database</error>
   </testcase>
 </testsuite>
 -- tenants.junit.xml --
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="atlas migrate drift">
+<testsuite name="atlas migrate drift" tests="2" failures="1" errors="0">
   <testcase name="sqlite://t1.db" classname="file://migrations"></testcase>
   <testcase name="sqlite://t2.db" classname="file://migrations">
     <failure>sqlite://t2.db drifted from the expected state at version 2 with 1 change(s): 1 extra&#xA;&#xA;The database diverged from the expected state as if the following were executed:&#xA;  -- extra table &#34;extra_t&#34;:&#xA;    -&gt; CREATE TABLE &#34;extra_t&#34; (&#34;c&#34; int NULL);</failure>
@@ -105,7 +105,7 @@ migrate drift --format {{ json . }} --env tenants
 </testsuite>
 -- escaped.junit.xml --
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="atlas migrate drift">
+<testsuite name="atlas migrate drift" tests="2" failures="1" errors="1">
   <testcase name="sqlite://a&lt;b&gt;&amp;c.db" classname="file://migrations">
     <failure>sqlite://a&lt;b&gt;&amp;c.db drifted from the expected state at version 2 with 1 change(s): 1 extra&#xA;&#xA;The database diverged from the expected state as if the following were executed:&#xA;  -- extra table &#34;t�[31m]]&gt;`$CI_PROJECT_ID`&#34;:&#xA;    -&gt; CREATE TABLE &#34;t�[31m]]&gt;`$CI_PROJECT_ID`&#34; (&#xA;        &#34;c&#34; int NULL&#xA;       );</failure>
   </testcase>

@@ -1,0 +1,105 @@
+# Mock the atlas command outputs
+env ATLAS_PATH=$MOCK_ATLAS TEST_BATCH=./migrate-drift
+# Setup the action input variables
+env ATLAS_INPUT_URL=sqlite://file.db
+env ATLAS_INPUT_DIR=file://migrations
+env ATLAS_INPUT_DEV_URL=sqlite://dev?mode=memory
+
+# No drift. The JUnit report goes under a test-results directory, where
+# Bitbucket Pipelines looks for the reports it shows in the Tests tab.
+atlas-action --action=migrate/drift
+stdout 'sqlite://file.db matches the expected state at version 2'
+output clean.sh
+cmp .atlas-action/test-results/migrate-drift.xml clean.xml
+rm .atlas-action
+
+# Drift fails the step. SQLite and MySQL quote identifiers with backticks.
+env TEST_EXIT_CODE=1
+! atlas-action --action=migrate/drift
+stdout 'sqlite://file.db drifted from the expected state at version 2'
+output drifted.sh
+cmp .atlas-action/test-results/migrate-drift.xml drifted.xml
+rm .atlas-action
+
+# A database that could not be checked is an error in the JUnit report.
+! atlas-action --action=migrate/drift
+stdout 'sqlite://file.db could not be checked: no migration history found on the connected database'
+cmp .atlas-action/test-results/migrate-drift.xml error.xml
+rm .atlas-action
+
+# The targets of an environment are reported together.
+env ATLAS_INPUT_URL= ATLAS_INPUT_DIR= ATLAS_INPUT_DEV_URL= ATLAS_INPUT_ENV=tenants
+! atlas-action --action=migrate/drift
+stdout '^`atlas migrate drift` detected drift in 1 database.s.: sqlite://t2.db; could not check 1 database.s.: sqlite://t3.db$'
+cmp .atlas-action/test-results/migrate-drift.xml tenants.xml
+
+# A second pipe in the same step writes its own report, and keeps the first.
+env ATLAS_INPUT_ENV= ATLAS_INPUT_URL=sqlite://other.db ATLAS_INPUT_DIR=file://migrations
+env TEST_EXIT_CODE=0
+atlas-action --action=migrate/drift
+cmp .atlas-action/test-results/migrate-drift.xml tenants.xml
+cmp .atlas-action/test-results/migrate-drift-2.xml other.xml
+
+-- migrate-drift/1/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
+-- migrate-drift/1/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true}
+-- migrate-drift/2/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
+-- migrate-drift/2/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"d41d8cd98f00","Summary":{"Total":1,"Extra":1,"Types":{"table":1}},"Changes":[{"Type":"table","Kind":"extra","Object":"table `x$(echo INJECTED)`","Cmds":["CREATE TABLE `x$(echo INJECTED)` (`it's` int NULL)"]}],"Cached":true}
+-- migrate-drift/3/args --
+migrate drift --format {{ json . }} --url sqlite://file.db --dir file://migrations --dev-url sqlite://dev?mode=memory
+-- migrate-drift/3/stdout --
+{"URL":"sqlite://file.db","Dir":"file://migrations","Error":"no migration history found on the connected database"}
+-- migrate-drift/4/args --
+migrate drift --format {{ json . }} --env tenants
+-- migrate-drift/4/stdout --
+{"URL":"sqlite://t1.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true}
+{"URL":"sqlite://t2.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"H8W7ggzJrh","Summary":{"Total":1,"Extra":1,"Types":{"table":1}},"Changes":[{"Type":"table","Kind":"extra","Object":"table `extra_t`","Cmds":["CREATE TABLE `extra_t` (`c` int NULL)"]}],"Cached":true}
+{"URL":"sqlite://t3.db","Dir":"file://migrations","Error":"no migration history found on the connected database"}
+-- migrate-drift/5/args --
+migrate drift --format {{ json . }} --url sqlite://other.db --dir file://migrations
+-- migrate-drift/5/stdout --
+{"URL":"sqlite://other.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true}
+-- clean.sh --
+export ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT='[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Cached":true}]'
+export ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED='false'
+-- drifted.sh --
+export ATLAS_OUTPUT_MIGRATE_DRIFT_REPORT='[{"URL":"sqlite://file.db","Dir":"file://migrations","Mode":"local","Version":"2","Drifted":true,"Fingerprint":"d41d8cd98f00","Summary":{"Total":1,"Extra":1,"Types":{"table":1}},"Changes":[{"Type":"table","Kind":"extra","Object":"table `x$(echo INJECTED)`","Cmds":["CREATE TABLE `x$(echo INJECTED)` (`it'\''s` int NULL)"]}],"Cached":true}]'
+export ATLAS_OUTPUT_MIGRATE_DRIFT_DRIFTED='true'
+-- clean.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift" tests="1" failures="0" errors="0">
+  <testcase name="sqlite://file.db" classname="file://migrations"></testcase>
+</testsuite>
+-- drifted.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift" tests="1" failures="1" errors="0">
+  <testcase name="sqlite://file.db" classname="file://migrations">
+    <failure>sqlite://file.db drifted from the expected state at version 2 with 1 change(s): 1 extra&#xA;&#xA;The database diverged from the expected state as if the following were executed:&#xA;  -- extra table `x$(echo INJECTED)`:&#xA;    -&gt; CREATE TABLE `x$(echo INJECTED)` (`it&#39;s` int NULL);</failure>
+  </testcase>
+</testsuite>
+-- error.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift" tests="1" failures="0" errors="1">
+  <testcase name="sqlite://file.db" classname="file://migrations">
+    <error>sqlite://file.db could not be checked: no migration history found on the connected database</error>
+  </testcase>
+</testsuite>
+-- tenants.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift" tests="3" failures="1" errors="1">
+  <testcase name="sqlite://t1.db" classname="file://migrations"></testcase>
+  <testcase name="sqlite://t2.db" classname="file://migrations">
+    <failure>sqlite://t2.db drifted from the expected state at version 2 with 1 change(s): 1 extra&#xA;&#xA;The database diverged from the expected state as if the following were executed:&#xA;  -- extra table `extra_t`:&#xA;    -&gt; CREATE TABLE `extra_t` (`c` int NULL);</failure>
+  </testcase>
+  <testcase name="sqlite://t3.db" classname="file://migrations">
+    <error>sqlite://t3.db could not be checked: no migration history found on the connected database</error>
+  </testcase>
+</testsuite>
+-- other.xml --
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="atlas migrate drift" tests="1" failures="0" errors="0">
+  <testcase name="sqlite://other.db" classname="file://migrations"></testcase>
+</testsuite>

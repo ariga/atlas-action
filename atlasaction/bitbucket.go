@@ -214,6 +214,29 @@ func (a *Bitbucket) MigrateLint(ctx context.Context, r *atlasexec.SummaryReport)
 func (a *Bitbucket) SchemaApply(context.Context, *atlasexec.SchemaApply) {
 }
 
+// bitbucketTestResults holds the JUnit reports of migrate/drift, relative to the
+// clone directory. Bitbucket Pipelines looks for reports under directories named
+// test-results, and shows them in the Tests tab of the step.
+const bitbucketTestResults = ".atlas-action/test-results"
+
+// MigrateDrift implements MigrateDriftReporter. It writes a JUnit report with a
+// test case per checked database. Each run writes its own file, the first
+// migrate-drift.xml and the next ones migrate-drift-2.xml and so on, so the
+// Tests tab shows every pipe of the step.
+func (a *Bitbucket) MigrateDrift(_ context.Context, reports []*atlasexec.MigrateDrift) {
+	dir := filepath.Join(a.getenv("BITBUCKET_CLONE_DIR"), bitbucketTestResults)
+	name := filepath.Join(dir, "migrate-drift.xml")
+	for i := 2; ; i++ {
+		if _, err := os.Stat(name); err != nil {
+			break // Not there, or the write fails and reports why.
+		}
+		name = filepath.Join(dir, fmt.Sprintf("migrate-drift-%d.xml", i))
+	}
+	if err := writeDriftJUnit(name, reports); err != nil {
+		a.Errorf("failed to write the JUnit report: %v", err)
+	}
+}
+
 // SchemaPlan implements Reporter.
 func (a *Bitbucket) SchemaPlan(ctx context.Context, r *atlasexec.SchemaPlan) {
 	if l := r.Lint; l != nil {

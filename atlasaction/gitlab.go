@@ -85,10 +85,15 @@ func (a *GitLab) MigrateDrift(_ context.Context, reports []*atlasexec.MigrateDri
 type (
 	// junitSuite is a JUnit test suite, with the elements and attributes
 	// GitLab reads. See https://docs.gitlab.com/ci/testing/unit_test_reports/.
+	// Bitbucket Pipelines takes the counts from the tests, failures and errors
+	// attributes, and shows no test of a suite without them.
 	junitSuite struct {
-		XMLName xml.Name    `xml:"testsuite"`
-		Name    string      `xml:"name,attr"`
-		Cases   []junitCase `xml:"testcase"`
+		XMLName  xml.Name    `xml:"testsuite"`
+		Name     string      `xml:"name,attr"`
+		Tests    int         `xml:"tests,attr"`
+		Failures int         `xml:"failures,attr"`
+		Errors   int         `xml:"errors,attr"`
+		Cases    []junitCase `xml:"testcase"`
 	}
 	// junitCase is a test case. encoding/xml escapes its text and replaces the
 	// characters XML does not allow, such as the ANSI escape, with U+FFFD: one of
@@ -105,13 +110,15 @@ type (
 // suite. A drifted database is a failure, and one that could not be checked is
 // an error, which GitLab lists separately and keeps out of the failure history.
 func writeDriftJUnit(name string, reports []*atlasexec.MigrateDrift) error {
-	s := &junitSuite{Name: "atlas migrate drift"}
+	s := &junitSuite{Name: "atlas migrate drift", Tests: len(reports)}
 	for _, r := range reports {
 		c := junitCase{Name: r.URL, Classname: r.Dir}
 		switch {
 		case r.Error != "":
+			s.Errors++
 			c.Error = fmt.Sprintf("%s could not be checked: %s", r.URL, r.Error)
 		case r.Drifted:
+			s.Failures++
 			// As the GitHub summary says, the statements describe the drift; they are not to be run.
 			lines := []string{driftHeader(r), "", "The database diverged from the expected state as if the following were executed:"}
 			c.Failure = strings.Join(append(lines, driftLines(r)...), "\n")
