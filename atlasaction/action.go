@@ -2663,13 +2663,6 @@ func toOutputVarName(action, output string) string {
 	return "ATLAS_OUTPUT_" + toEnvName(action+"_"+output)
 }
 
-// toOutputVar converts the given values to an output variable.
-// The action and output are used to create the output variable name with the format:
-// ATLAS_OUTPUT_<ACTION>_<OUTPUT>="<value>"
-func toOutputVar(action, output, value string) string {
-	return fmt.Sprintf("%s=%q", toOutputVarName(action, output), value)
-}
-
 // toDotenvVar returns the line that sets the output variable in a GitLab
 // dotenv report: NAME=value, unquoted, because GitLab keeps quotes as part of
 // the value.
