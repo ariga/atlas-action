@@ -1,0 +1,77 @@
+name: Docker Continuous Integration
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'LICENSE'
+      - 'Makefile'
+      - 'scripts/setup-atlas.sh'
+      - '.github/workflows/ci-docker.yaml'
+  # The image installs packages from Alpine edge and the latest atlas CLI at
+  # build time, so build it weekly to catch upstream breakage before a release.
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: build (${{ matrix.arch }})
+    # Same runner and QEMU setup as the release build in cd.yaml.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOCKER_BUILD_RECORD_UPLOAD: false
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      - name: Set up QEMU
+        if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Check Dockerfile
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          call: check
+      - name: Build atlas-action binary
+        run: make atlas-action-linux-${{ matrix.arch }}
+        env:
+          CGO_ENABLED: 0
+      # No build cache on purpose: the job must re-run `apk add` and the
+      # atlas installer to catch broken package pins or install scripts.
+      - name: Build image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: atlas-action:ci
+      # Under QEMU a binary of the wrong architecture still runs, so check it.
+      - name: Check binary architecture
+        run: |
+          id=$(docker create --platform linux/${{ matrix.arch }} atlas-action:ci)
+          docker cp "$id:/usr/local/bin/atlas-action" image-atlas-action
+          docker rm "$id"
+          chmod u+r image-atlas-action
+          go version -m image-atlas-action | grep "GOARCH=${{ matrix.arch }}$"
+      # atlas-action detects the CI environment before it parses --version,
+      # so forward GITHUB_ACTIONS from the runner into the container.
+      - name: Smoke test image
+        run: |
+          docker run --rm --platform linux/${{ matrix.arch }} --entrypoint atlas atlas-action:ci version
+          docker run --rm --platform linux/${{ matrix.arch }} --env GITHUB_ACTIONS atlas-action:ci --version
