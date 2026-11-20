@@ -8,7 +8,7 @@ ARG ALPINE_VERSION="3.24"
 FROM alpine:${ALPINE_VERSION}
 COPY LICENSE README.md /
 COPY --chmod=001 ./scripts/setup-atlas.sh /usr/local/bin/setup-atlas
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 COPY --chmod=001 ./atlas-action-linux-${TARGETARCH} /usr/local/bin/atlas-action
 RUN apk add --update --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
   'curl>=8.23.0-r0' 'libcurl>=8.23.0-r0' 'zlib>=1.4-r0' \
