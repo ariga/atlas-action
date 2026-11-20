@@ -11,7 +11,8 @@ COPY --chmod=001 ./scripts/setup-atlas.sh /usr/local/bin/setup-atlas
 ARG TARGETARCH
 COPY --chmod=001 ./atlas-action-linux-${TARGETARCH} /usr/local/bin/atlas-action
 RUN apk add --update --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-  'curl>=8.23.0-r0' 'libcurl>=8.23.0-r0' 'zlib>=1.3.2-r1'
+  'curl>=8.23.0-r0' 'libcurl>=8.23.0-r0' 'zlib>=1.4-r0' \
+  'libcrypto3>=3.5.9-r1' 'libssl3>=3.5.9-r1' 'musl>=1.2.6-r6' 'musl-utils>=1.2.6-r6'
 RUN setup-atlas && rm -rf /root/.atlas /tmp/*
 WORKDIR /root
 VOLUME /root/.atlas
