@@ -6,6 +6,7 @@ on:
       - '.dockerignore'
       - 'LICENSE'
       - 'Makefile'
+      - 'VERSION.txt'
       - 'scripts/setup-atlas.sh'
       - '.github/workflows/ci-docker.yaml'
   # The image installs packages from Alpine edge and the latest atlas CLI at
