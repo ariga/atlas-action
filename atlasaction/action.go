@@ -1587,7 +1587,12 @@ You can approve the plan by visiting: %s`, f.Name, f.Link)
 				p.DryRun = true
 			},
 		))
-		if err != nil {
+		switch {
+		case err != nil && strings.Contains(err.Error(), "The current state is synced with the desired state, no changes to be made"):
+			// Nothing to do.
+			a.Infof("The current state is synced with the desired state, no changes to be made")
+			return nil, nil
+		case err != nil:
 			return nil, fmt.Errorf("failed to plan schema changes: %w", err)
 		}
 		if plan.Lint == nil {

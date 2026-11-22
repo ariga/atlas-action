@@ -422,6 +422,25 @@ You can approve the plan by visiting: https://a8m.atlasgo.cloud/schemas/1/plans/
 		)
 	})
 
+	for _, review := range []string{"WARNING", "ERROR"} {
+		t.Run("synced database with lint review = '"+review+"'", func(t *testing.T) {
+			tt := setup(t)
+			tt.setInput("lint-review", review)
+			tt.setInput("to", "atlas://example")
+			db, err := sql.Open("sqlite3", tt.db)
+			require.NoError(t, err)
+			_, err = db.Exec("CREATE TABLE t1 (id int NULL)")
+			require.NoError(t, err)
+			require.NoError(t, db.Close())
+			// There is nothing to plan, approve or apply.
+			require.NoError(t, tt.newActs(t).SchemaApply(context.Background()))
+			require.Contains(t, tt.out.String(), "The current state is synced with the desired state, no changes to be made")
+			out, err := tt.outputs()
+			require.NoError(t, err)
+			require.Empty(t, out)
+		})
+	}
+
 	t.Run("generating an approval plan based on review policy with lint review = 'ERROR'", func(t *testing.T) {
 		tt := setup(t)
 		tt.setInput("lint-review", "ERROR")
