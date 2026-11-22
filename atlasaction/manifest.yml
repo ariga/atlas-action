@@ -689,9 +689,11 @@ actions:
         type: string
         label: Plan URL
         description: |
-          The URL of the plan to be approved. For example, `atlas://<schema>/plans/<id>`.
-          If not provided, Atlas will search the registry for a plan corresponding to the given schema transition and approve it
-          (typically, this plan is created during the PR stage). If multiple plans are found, an error will be thrown.
+          The URL of the plan to approve, for example `atlas://<schema>/plans/<name>`.
+          If not set, the action searches the registry for the pending plan of the schema transition and approves it,
+          typically the plan that `schema/plan` created in the pull request. It skips the plans named
+          `commit-<commit>-<random>`, which `schema/apply` creates for a deployment outside a pull request.
+          If several plans are found, the action fails.
     outputs:
       link:
         type: string

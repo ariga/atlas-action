@@ -671,6 +671,11 @@ script starts open.
 
 Approve a declarative migration plan.
 
+Without the `plan` input, the action approves the pending plan of the schema transition, typically the plan that
+`schema/plan` created in the pull request. It skips the plans named `commit-<commit>-<random>`, which `schema/apply`
+creates for a deployment outside a pull request, so that re-running such a deployment while it waits for its plan
+does not approve the plan.
+
 #### Inputs
 
 {{ template "readme/inputs" . }}
