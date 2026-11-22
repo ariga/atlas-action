@@ -6,6 +6,7 @@ package atlasaction
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -78,6 +79,11 @@ type (
 	MigrateDriftReporter interface {
 		// MigrateDrift reports the checks of a run, one per target database.
 		MigrateDrift(context.Context, []*atlasexec.MigrateDrift)
+	}
+	// PlanApprovalReporter is implemented by the actions that report the plan
+	// that schema/apply stopped on, as the plan was not approved.
+	PlanApprovalReporter interface {
+		PlanApproval(context.Context, *PlanApproval)
 	}
 	// SCMClient contains methods for interacting with SCM platforms (GitHub, Gitlab etc...).
 	SCMClient interface {
@@ -234,6 +240,12 @@ type (
 	// Copilot contains both the prompt and the response from Atlas Copilot.
 	Copilot struct {
 		Session, Prompt, Response string
+	}
+	// PlanApproval is a plan that schema/apply stopped on, as it was not approved.
+	PlanApproval struct {
+		Plan         *atlasexec.SchemaPlan // The plan. It has its lint report if this deployment created it.
+		Origin       string                // How the plan was created, as its name tells, if it does. e.g. "in pull request #1".
+		RerunCommand string                // The command that re-runs the deployment, if any.
 	}
 )
 
@@ -1409,8 +1421,8 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to approve the schema plan: %w", err)
 	}
-	// Successfully approved the plan.
-	a.Infof("Schema plan approved successfully: %s", result.Link)
+	// Successfully approved the plan. Plans that are not in Atlas Cloud have no link.
+	a.Infof("Schema plan approved successfully: %s", cmp.Or(result.Link, result.URL))
 	a.SetOutput("link", result.Link)
 	a.SetOutput("plan", result.URL)
 	a.SetOutput("status", result.Status)
@@ -1484,10 +1496,16 @@ func (a *Actions) schemaApplyWithApproval(ctx context.Context) ([]*atlasexec.Sch
 	if u.Scheme == "atlas" {
 		repo = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 	}
-	// Wait for the schema plan to be approved and apply the changes.
-	printed := false
-	waitAndApplyPlan := func(f *atlasexec.SchemaPlanFile) ([]*atlasexec.SchemaApply, error) {
-		if err := a.waitingForApproval(func() (bool, error) {
+	// Wait for the schema plan to be approved and apply the changes. Without the
+	// wait-timeout input, the plan is checked once, and applying a plan that is
+	// not approved fails.
+	waitAndApplyPlan := func(plan *atlasexec.SchemaPlan, origin string) ([]*atlasexec.SchemaApply, error) {
+		var (
+			f       = plan.File
+			printed bool
+		)
+		a.SetOutput("plan", f.URL)
+		err := a.waitingForApproval(func() (bool, error) {
 			plans, err := a.Atlas.SchemaPlanList(ctx, a.schemaPlanListParams(
 				func(p *atlasexec.SchemaPlanListParams) {
 					p.From = a.GetArrayInput("url")
@@ -1500,29 +1518,47 @@ func (a *Actions) schemaApplyWithApproval(ctx context.Context) ([]*atlasexec.Sch
 			}
 			// Check the created plan exists and is approved.
 			var cloudPlan *atlasexec.SchemaPlanFile
-			for _, plan := range plans {
-				if plan.URL == f.URL {
-					cloudPlan = &plan
+			for _, p := range plans {
+				if p.URL == f.URL {
+					cloudPlan = &p
 					break
 				}
 			}
 			if cloudPlan == nil {
 				return false, errors.New("schema plan not found")
 			}
-			if cloudPlan.Status == "APPROVED" {
+			if f.Status = cloudPlan.Status; f.Status == "APPROVED" {
 				return true, nil
 			}
 			if !printed {
 				printed = true
-				a.Warningf("Schema plan is pending approval, review here: %s", f.Link)
+				if f.Link != "" {
+					a.Warningf("Schema plan %q is pending approval, review here: %s", f.Name, f.Link)
+				} else {
+					a.Warningf("Schema plan %q is pending approval, approve it with: %s", f.Name, approveCommand(f))
+				}
 			}
 			return false, nil
-		}); err != nil {
-			if err == ErrApprovalTimeout {
-				return nil, fmt.Errorf(
-					`the schema plan %q was not approved within the specified waiting period. Please review the plan and re-run the action.
-You can approve the plan by visiting: %s`, f.Name, f.Link)
+		})
+		if f.Status != "" {
+			a.SetOutput("plan-status", f.Status)
+		}
+		// The deployment stops before the plan is approved.
+		if (err == nil && f.Status != "APPROVED") || errors.Is(err, ErrApprovalTimeout) {
+			if r, ok := a.Action.(PlanApprovalReporter); ok {
+				r.PlanApproval(ctx, &PlanApproval{Plan: plan, Origin: origin, RerunCommand: tc.RerunCmd})
 			}
+		}
+		switch {
+		case errors.Is(err, ErrApprovalTimeout) && f.Link != "":
+			return nil, fmt.Errorf(
+				`the schema plan %q was not approved within the specified waiting period. Please review the plan and re-run the action.
+You can approve the plan by visiting: %s`, f.Name, f.Link)
+		case errors.Is(err, ErrApprovalTimeout):
+			return nil, fmt.Errorf(
+				`the schema plan %q was not approved within the specified waiting period. Please review the plan and re-run the action.
+You can approve the plan by running: %s`, f.Name, approveCommand(f))
+		case err != nil:
 			return nil, err
 		}
 		return a.Atlas.SchemaApplySlice(ctx, a.schemaApplyParams(
@@ -1557,7 +1593,8 @@ You can approve the plan by visiting: %s`, f.Name, f.Link)
 			}
 			return nil, fmt.Errorf("failed to create schema plan: %w", err)
 		}
-		return waitAndApplyPlan(plan.File)
+		a.Infof("Created schema plan %q for this deployment: %s", plan.File.Name, plan.File.URL)
+		return waitAndApplyPlan(plan, "by schema/apply for this deployment")
 	}
 	// Check existing plans and decide to create a new plan.
 	review := a.GetInput("lint-review")
@@ -1610,10 +1647,42 @@ You can approve the plan by visiting: %s`, f.Name, f.Link)
 		}
 		return createApprovalPlan()
 	case len(plans) == 1:
-		return waitAndApplyPlan(&plans[0])
+		f := &plans[0]
+		origin := planOrigin(f.Name)
+		if origin != "" {
+			a.Infof("Found schema plan %q, created %s: %s", f.Name, origin, f.URL)
+		} else {
+			a.Infof("Found schema plan %q: %s", f.Name, f.URL)
+		}
+		return waitAndApplyPlan(&atlasexec.SchemaPlan{File: f}, origin)
 	default:
 		return nil, errors.New("unexpected state")
 	}
+}
+
+// rePRPlan matches the name that schema/plan gives the plans it creates in a pull request,
+// "pr-<number>-<hash>", unless its name input sets another name.
+var rePRPlan = regexp.MustCompile(`^pr-(\d+)-`)
+
+// planOrigin returns how the plan was created as its name tells, or an empty string if
+// the name tells nothing. A plan named after a pull request may come from schema/plan, or
+// from schema/apply in a deployment that runs in the pull request.
+func planOrigin(name string) string {
+	switch m := rePRPlan.FindStringSubmatch(name); {
+	case isDeployPlan(name):
+		return "by schema/apply for a deployment"
+	case m != nil:
+		return "in pull request #" + m[1]
+	case strings.HasPrefix(name, "ref-"):
+		return "by schema/plan outside a pull request"
+	default:
+		return ""
+	}
+}
+
+// approveCommand returns the Atlas CLI command that approves the plan.
+func approveCommand(f *atlasexec.SchemaPlanFile) string {
+	return "atlas schema plan approve --url " + f.URL
 }
 
 // ScriptExec runs the Action for "ariga/atlas-action/script/exec"
@@ -2737,6 +2806,7 @@ func RenderTemplate(name string, data any, tc *TriggerContext) (string, error) {
 					}
 					return &PlanComment{}
 				},
+				"approveCommand": approveCommand,
 			}).
 			ParseFS(comments, "comments/*"),
 	)

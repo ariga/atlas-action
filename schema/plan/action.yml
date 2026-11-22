@@ -60,7 +60,7 @@ inputs:
       Read more about [dev-databases](https://atlasgo.io/concepts/dev-database).
 outputs:
   link:
-    description: Link to the schema plan on Atlas.
+    description: Link to the schema plan on Atlas Cloud. Empty if the plan is not in Atlas Cloud.
   plan:
     description: The plan to be applied or generated. (e.g. `atlas://<schema>/plans/<id>`)
   status:

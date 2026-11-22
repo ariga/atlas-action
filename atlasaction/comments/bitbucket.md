@@ -10,7 +10,11 @@
 ### Atlas detected changes to the desired schema
 
 {{ with .File -}}
+{{ if .Link -}}
 #### Migration Plan for [{{ $.Repo }}]({{- .Link | repoLink -}}) • [View on Atlas Cloud]({{- .Link -}})
+{{- else -}}
+#### Migration Plan{{ with $.Repo }} for `{{ . }}`{{ end }}{{ with .URL }} • `{{ . }}`{{ end }}
+{{- end }}
 {{- with .Migration -}}{{- codeblock "sql" . -}}{{- end }}
 {{- end -}}
 #### Atlas lint results

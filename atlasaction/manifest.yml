@@ -629,6 +629,12 @@ actions:
     outputs:
       error:
         description: The error message if the action fails.
+      plan:
+        description: |
+          With `lint-review`, the plan that the action applies or waits for, e.g. `atlas://<schema>/plans/<name>`.
+      plan-status:
+        description: |
+          With `lint-review`, the last known status of the `plan` output. For example, `PENDING` or `APPROVED`.
   - id: schema/lint
     description: Lint database schema with Atlas
     name: Schema Lint
@@ -675,7 +681,7 @@ actions:
         options: [expanded, collapsed]
     outputs:
       link:
-        description: Link to the schema plan on Atlas.
+        description: Link to the schema plan on Atlas Cloud. Empty if the plan is not in Atlas Cloud.
       plan:
         description: The plan to be applied or generated. (e.g. `atlas://<schema>/plans/<id>`)
       status:
@@ -697,7 +703,7 @@ actions:
     outputs:
       link:
         type: string
-        description: Link to the schema plan on Atlas.
+        description: Link to the schema plan on Atlas Cloud. Empty if the plan is not in Atlas Cloud.
       plan:
         type: string
         description: The plan to be applied or generated. (e.g. `atlas://<schema>/plans/<id>`)
