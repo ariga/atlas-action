@@ -347,12 +347,45 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 		tt.cloudServer = httpMock
 		return tt
 	}
+	summary := func(t *testing.T, tt *test) string {
+		t.Helper()
+		b, err := os.ReadFile(tt.env["GITHUB_STEP_SUMMARY"])
+		require.NoError(t, err)
+		return string(b)
+	}
+	const pending = "Schema Plan Pending Approval"
 
 	t.Run("generate an approval plan on every schema changes", func(t *testing.T) {
 		tt := setup(t)
+		// A deployment on push, which names the plan after the commit.
+		tt.env["GITHUB_EVENT_NAME"] = "push"
+		tt.env["GITHUB_SHA"] = "c0ffee1234567890"
+		tt.env["GITHUB_RUN_ID"] = "42"
 		tt.setInput("lint-review", "ALWAYS")
 		tt.setInput("to", "atlas://example")
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "cannot apply a migration plan in a PENDING state")
+		out, err := tt.outputs()
+		require.NoError(t, err)
+		plan := out["plan"]
+		require.Regexp(t, `^atlas://example/plans/commit-c0ffee12-[0-9a-f]{8}$`, plan)
+		require.Equal(t, "PENDING", out["plan-status"])
+		name := strings.TrimPrefix(plan, "atlas://example/plans/")
+		require.Contains(t, tt.out.String(), fmt.Sprintf("Created schema plan %q for this deployment: %s", name, plan))
+		require.Contains(t, tt.out.String(), fmt.Sprintf("::warning::Schema plan %q is pending approval, review here: https://a8m.atlasgo.cloud/schemas/1/plans/1", name))
+		s := summary(t, tt)
+		for _, want := range []string{
+			pending,
+			"<td>Plan Name</td>\n    <td><code>" + name + "</code></td>",
+			"<td>Created</td>\n    <td>by schema/apply for this deployment</td>",
+			`<td><a href="https://a8m.atlasgo.cloud/schemas/1/plans/1" target="_blank"><code>` + plan + "</code></a></td>",
+			"<td>Plan Status</td>\n    <td>PENDING</td>",
+			"CREATE TABLE `t1`",
+			"<h4>Atlas lint results</h4>",
+			"```bash\natlas schema plan approve --url " + plan + "\n```",
+			"```bash\ngh run rerun 42\n```",
+		} {
+			require.Contains(t, s, want)
+		}
 	})
 
 	t.Run("generating an approval plan that have an existing pending plan", func(t *testing.T) {
@@ -362,6 +395,15 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 		tt.cloud.AddPlan("pr-0-r1cgcsfo", "example", "PENDING", "R1cGcSfo1oWYK4dz+7WvgCtE/QppFo9lKFEqEDzoS4o=", "IILaNACeZkEfb09c0HSdi5lPLLrWf4PAo/KtDcMUxsk=")
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "cannot apply a migration plan in a PENDING state")
 		require.ErrorContains(t, tt.newActs(t).SchemaApply(context.Background()), "atlas schema plan approve --url atlas://repo/schema/example/plans/pr-0-r1cgcsfo")
+		require.Contains(t, tt.out.String(), `Found schema plan "pr-0-r1cgcsfo", created in pull request #0: atlas://repo/schema/example/plans/pr-0-r1cgcsfo`)
+		out, err := tt.outputs()
+		require.NoError(t, err)
+		require.Equal(t, "atlas://repo/schema/example/plans/pr-0-r1cgcsfo", out["plan"])
+		require.Equal(t, "PENDING", out["plan-status"])
+		s := summary(t, tt)
+		require.Contains(t, s, "<td>Created</td>\n    <td>in pull request #0</td>")
+		// Lint results are reported when the plan is created.
+		require.NotContains(t, s, "Atlas lint results")
 	})
 
 	t.Run("generating an approval plan when having > 1 pending plan", func(t *testing.T) {
@@ -407,6 +449,33 @@ func TestSchemaApplyWithApproval(t *testing.T) {
 		tt.setInput("wait-interval", "1s")
 		tt.cloud.ApproveAllPlanAfter(t, time.Second*2)
 		require.NoError(t, tt.newActs(t).SchemaApply(context.Background()))
+		out, err := tt.outputs()
+		require.NoError(t, err)
+		require.Equal(t, "APPROVED", out["plan-status"])
+		require.NotContains(t, summary(t, tt), pending)
+	})
+
+	t.Run("approval plan without a link", func(t *testing.T) {
+		tt := setup(t)
+		tt.cloud.WithoutLinks()
+		tt.setInput("lint-review", "ALWAYS")
+		tt.setInput("to", "atlas://example")
+		tt.setInput("wait-timeout", "1s")
+		err := tt.newActs(t).SchemaApply(context.Background())
+		require.Error(t, err)
+		out, err2 := tt.outputs()
+		require.NoError(t, err2)
+		plan := out["plan"]
+		require.Equal(t, "PENDING", out["plan-status"])
+		name := strings.TrimPrefix(plan, "atlas://example/plans/")
+		require.EqualError(t, err, fmt.Sprintf(`the schema plan %q was not approved within the specified waiting period. Please review the plan and re-run the action.
+You can approve the plan by running: atlas schema plan approve --url %s`, name, plan))
+		require.Contains(t, tt.out.String(), fmt.Sprintf("::warning::Schema plan %q is pending approval, approve it with: atlas schema plan approve --url %s", name, plan))
+		s := summary(t, tt)
+		require.Contains(t, s, "<td>Plan URL</td>\n    <td><code>"+plan+"</code></td>")
+		require.Contains(t, s, "Approve the plan by running:\n\n```bash\natlas schema plan approve --url "+plan+"\n```")
+		require.NotContains(t, s, "Atlas Cloud")
+		require.NotContains(t, s, `href=""`)
 	})
 
 	t.Run("generating an approval plan and reaching wait timeout", func(t *testing.T) {
@@ -472,6 +541,7 @@ type (
 		planCount           int
 		schemaCount         int
 		approveAllPlanAfter time.Duration
+		noLinks             bool
 
 		mu sync.Mutex
 	}
@@ -519,6 +589,9 @@ func (m *mockAtlasCloud) AddPlanWithMigration(name, schemaSlug, status, fromHash
 	defer m.mu.Unlock()
 	m.planCount++
 	link := fmt.Sprintf("https://a8m.atlasgo.cloud/schemas/%d/plans/%d", m.schemaCount, m.planCount)
+	if m.noLinks {
+		link = ""
+	}
 	url := fmt.Sprintf("atlas://repo/schema/%s/plans/%s", schemaSlug, name)
 	plan := Plan{
 		ID:         m.planCount,
@@ -534,6 +607,14 @@ func (m *mockAtlasCloud) AddPlanWithMigration(name, schemaSlug, status, fromHash
 	m.plans[name] = plan
 	hash := fmt.Sprintf("%s-%s", fromHash, toHash)
 	m.planFromHashes[hash] = append(m.planFromHashes[hash], plan)
+}
+
+// WithoutLinks leaves out the links of the plans, as for a
+// schema repository that is not in Atlas Cloud.
+func (m *mockAtlasCloud) WithoutLinks() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.noLinks = true
 }
 
 func (m *mockAtlasCloud) ApproveAllPlanAfter(t *testing.T, after time.Duration) {
@@ -618,6 +699,9 @@ func (m *mockAtlasCloud) Start(t *testing.T, token string) *httptest.Server {
 			}
 			m.planCount++
 			link := fmt.Sprintf("https://a8m.atlasgo.cloud/schemas/%d/plans/%d", schema.ID, m.planCount)
+			if m.noLinks {
+				link = ""
+			}
 			url := fmt.Sprintf("atlas://%s/plans/%s", input.SchemaSlug, input.Name)
 			plan := Plan{
 				ID:         m.planCount,

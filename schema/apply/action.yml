@@ -73,6 +73,12 @@ inputs:
 outputs:
   error:
     description: The error message if the action fails.
+  plan:
+    description: |
+      With `lint-review`, the plan that the action applies or waits for, e.g. `atlas://<schema>/plans/<name>`.
+  plan-status:
+    description: |
+      With `lint-review`, the last known status of the `plan` output. For example, `PENDING` or `APPROVED`.
 runs:
   using: node24
   main: index.js

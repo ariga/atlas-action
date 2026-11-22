@@ -1,0 +1,55 @@
+{{- /* schema-apply-approval is the summary of a deployment that stopped on a plan,
+       as the plan was not approved. It shows the plan, and how to approve it. */ -}}
+{{- with .Plan.File -}}
+<h2>{{ assetsImage "warning.svg" | image "22px" }} Schema Plan Pending Approval</h2>
+<p>The deployment stopped before applying the plan below, as the plan is not approved.</p>
+<table>
+  <tr>
+    <td>Plan Name</td>
+    <td><code>{{ .Name }}</code></td>
+  </tr>
+  {{- with $.Origin }}
+  <tr>
+    <td>Created</td>
+    <td>{{ . }}</td>
+  </tr>
+  {{- end }}
+  <tr>
+    <td>Plan URL</td>
+    <td>
+      {{- $planURL := printf "<code>%s</code>" .URL -}}
+      {{- with .Link -}}
+        {{- . | link $planURL -}}
+      {{- else -}}
+        {{- $planURL -}}
+      {{- end -}}
+    </td>
+  </tr>
+  {{- with .Status }}
+  <tr>
+    <td>Plan Status</td>
+    <td>{{ . }}</td>
+  </tr>
+  {{- end }}
+</table>
+{{- with .Migration }}{{ . | codeblock "sql" | details "📄 View SQL Statements" }}{{ end }}
+{{- if $.Plan.Lint }}
+<h4>Atlas lint results</h4>
+{{- template "schema-lint" $ }}
+{{- end }}
+<h4>Approve the plan</h4>
+
+{{ with .Link }}Review the plan on <a href="{{ . }}" target="_blank">Atlas Cloud</a> and approve it there, or run:{{ else }}Approve the plan by running:{{ end }}
+
+```bash
+{{ approveCommand . }}
+```
+{{- with $.RerunCommand }}
+
+Then re-run the deployment:
+
+```bash
+{{ . }}
+```
+{{- end }}
+{{- end }}

@@ -775,6 +775,8 @@ Apply a declarative migrations to a database.
 #### Outputs
 
 * `error` - The error message if the action fails.
+* `plan` - With `lint-review`, the plan that the action applies or waits for, e.g. `atlas://<schema>/plans/<name>`.
+* `plan-status` - With `lint-review`, the last known status of the `plan` output. For example, `PENDING` or `APPROVED`.
 
 ### `ariga/atlas-action/schema/lint`
 
@@ -870,7 +872,7 @@ script starts open.
 
 #### Outputs
 
-* `link` - Link to the schema plan on Atlas.
+* `link` - Link to the schema plan on Atlas Cloud. Empty if the plan is not in Atlas Cloud.
 * `plan` - The plan to be applied or generated. (e.g. `atlas://<schema>/plans/<id>`)
 * `status` - The status of the plan. For example, `PENDING` or `APPROVED`.
 
@@ -915,7 +917,7 @@ does not approve the plan.
 
 #### Outputs
 
-* `link` - Link to the schema plan on Atlas.
+* `link` - Link to the schema plan on Atlas Cloud. Empty if the plan is not in Atlas Cloud.
 * `plan` - The plan to be applied or generated. (e.g. `atlas://<schema>/plans/<id>`)
 * `status` - The status of the plan. (e.g, `PENDING`, `APPROVED`)
 

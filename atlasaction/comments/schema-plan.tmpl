@@ -1,7 +1,11 @@
 <h3>Atlas detected changes to the desired schema</h3>
 {{- $c := planComment . }}
 {{- with .Plan.File }}
+{{- if .Link }}
 <h4>Migration Plan for <a href="{{- .Link | repoLink -}}" target="_blank">{{ $.Plan.Repo }}</a> • <a href="{{- .Link -}}" target="_blank">View on Atlas Cloud</a></h4>
+{{- else }}{{/* A plan that is not in Atlas Cloud has no page to link to. */}}
+<h4>Migration Plan{{ with $.Plan.Repo }} for <code>{{ . }}</code>{{ end }}{{ with .URL }} • <code>{{ . }}</code>{{ end }}</h4>
+{{- end }}
 {{- if $c.Changes }}
 {{- template "plan-changes" $c }}
 {{- template "plan-migration" $c }}

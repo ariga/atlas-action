@@ -84,6 +84,16 @@ func (a *GitHub) SchemaPlan(_ context.Context, r *atlasexec.SchemaPlan) {
 	a.AddStepSummary(summary)
 }
 
+// PlanApproval implements PlanApprovalReporter.
+func (a *GitHub) PlanApproval(_ context.Context, r *PlanApproval) {
+	summary, err := RenderTemplate("schema-apply-approval.tmpl", r, nil)
+	if err != nil {
+		a.Errorf("failed to create summary: %v", err)
+		return
+	}
+	a.AddStepSummary(summary)
+}
+
 // SchemaLint implements Reporter.
 func (a *GitHub) SchemaLint(_ context.Context, r *SchemaLintReport) {
 	if err := a.addChecksSchemaLint(r); err != nil {
@@ -545,4 +555,5 @@ func convertPullRequest(pr *github.PullRequest) *PullRequest {
 var _ Action = (*GitHub)(nil)
 var _ Reporter = (*GitHub)(nil)
 var _ MigrateDriftReporter = (*GitHub)(nil)
+var _ PlanApprovalReporter = (*GitHub)(nil)
 var _ SCMClient = (*GitHubClient)(nil)

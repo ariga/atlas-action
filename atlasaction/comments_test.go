@@ -330,6 +330,46 @@ func TestRenderPlanComment_Delimiter(t *testing.T) {
 	require.Contains(t, s, "```sql\n"+p.File.Stmts[1].Text+"\nGO\n```")
 }
 
+func TestRenderPlanComment_NoLink(t *testing.T) {
+	// A plan that is not in Atlas Cloud has no link: the header shows its repository and URL instead.
+	const header = "<h4>Migration Plan for <code>app</code> • <code>atlas://app/plans/20260930120000</code></h4>"
+	p := changesPlan(1)
+	p.File.Link = ""
+	s, err := renderPlanComment(nil, &PlanComment{Plan: p}, githubCommentLimit)
+	require.NoError(t, err)
+	require.Contains(t, s, "</h3>\n"+header+"\n<details open><summary><strong>Change summary</strong>")
+	require.NotContains(t, s, "Atlas Cloud")
+	require.NotContains(t, s, `href=""`)
+	require.Contains(t, s, `atlas schema plan pull --url "atlas://app/plans/20260930120000"`)
+	// Otherwise, the comment is the same as with a link.
+	p.File.Link = "https://test.atlasgo.cloud/schemas/1/plans/2"
+	linked, err := renderPlanComment(nil, &PlanComment{Plan: p}, githubCommentLimit)
+	require.NoError(t, err)
+	require.Equal(t, strings.Replace(linked, `<h4>Migration Plan for <a href="https://test.atlasgo.cloud/schemas/1" target="_blank">app</a> • `+
+		`<a href="https://test.atlasgo.cloud/schemas/1/plans/2" target="_blank">View on Atlas Cloud</a></h4>`, header, 1), s)
+	// Without a repository name, only the URL is shown.
+	p.File.Link, p.Repo = "", ""
+	s, err = renderPlanComment(nil, &PlanComment{Plan: p}, githubCommentLimit)
+	require.NoError(t, err)
+	require.Contains(t, s, "<h4>Migration Plan • <code>atlas://app/plans/20260930120000</code></h4>")
+}
+
+func TestPlanApprovalSummary(t *testing.T) {
+	// The sections of the summary that have nothing to show are left out.
+	p := &PlanApproval{Plan: &atlasexec.SchemaPlan{File: &atlasexec.SchemaPlanFile{
+		Name:   "pr-1-Rl4lBdMk",
+		URL:    "atlas://app/plans/pr-1-Rl4lBdMk",
+		Status: "PENDING",
+	}}}
+	s, err := RenderTemplate("schema-apply-approval.tmpl", p, nil)
+	require.NoError(t, err)
+	for _, section := range []string{"<td>Created</td>", "View SQL Statements", "Atlas lint results", "re-run", "Atlas Cloud", "href"} {
+		require.NotContains(t, s, section)
+	}
+	require.Contains(t, s, "<td>Plan URL</td>\n    <td><code>atlas://app/plans/pr-1-Rl4lBdMk</code></td>")
+	require.True(t, strings.HasSuffix(s, "Approve the plan by running:\n\n```bash\natlas schema plan approve --url atlas://app/plans/pr-1-Rl4lBdMk\n```\n"), s)
+}
+
 func TestFence(t *testing.T) {
 	// Same as a code block for code without a fence line.
 	require.Equal(t, "```sql\nSELECT '```' AS a;\n```", fence("sql", "\nSELECT '```' AS a;\n"))
