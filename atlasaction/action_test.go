@@ -3501,6 +3501,100 @@ time=NOW level=INFO msg="Schema plan approved successfully: https://gh.atlasgo.c
 time=NOW level=INFO msg="No plan URL provided, searching for the pending plan"
 time=NOW level=INFO msg="No pending schema plan found. If this commit has schema changes and no approved plan exists, `+"`schema/apply`"+` will fail. Re-run the schema/plan step to create a new plan"
 `, out.String())
+
+	// Without the plan input, plans named as deployment plans are skipped.
+	const (
+		deployPlan = "commit-c0ffee12-0f9e8d7c" // Created by schema/apply.
+		prPlan     = "pr-2-3RRRcLHF"
+		refPlan    = "ref-c0ffee12-ufnTS7Nr"
+	)
+	planURL := func(name string) string { return "atlas://app/plans/" + name }
+	for _, tt := range []struct {
+		name     string
+		plan     string   // The plan input.
+		pending  []string // The pending plans of the transition.
+		listErr  error    // The error of listing them.
+		approved string   // The approved plan, if any.
+		err, log string   // The error and a log line, if any.
+	}{
+		{
+			name:     "deploy plan",
+			pending:  []string{deployPlan, prPlan},
+			approved: prPlan,
+			log:      "Skipping schema plan atlas://app/plans/commit-c0ffee12-0f9e8d7c: by its name, schema/apply created it for a deployment, so it is approved only through the plan input",
+		},
+		{
+			name:    "only a deploy plan",
+			pending: []string{deployPlan},
+			log:     `No schema plan was approved. To approve one of the plans above, approve it in Atlas Cloud or with \"atlas schema plan approve --url <plan>\", or set the plan input to its URL`,
+		},
+		{
+			name:     "plan created outside a pull request",
+			pending:  []string{refPlan},
+			approved: refPlan,
+		},
+		{
+			name:     "plan input",
+			plan:     planURL(deployPlan),
+			approved: deployPlan,
+		},
+		{
+			name:    "schema repository not created yet",
+			listErr: errors.New("Error: schema \"app\" was not found\n"),
+			log:     `No schema plan to approve: the schema repository \"app\" was not found. On the first merge of a new project, the schema/push step creates it`,
+		},
+		{
+			name:    "database schema not found",
+			listErr: errors.New("Error: postgres: schema \"public\" was not found\n"),
+			err:     "failed to list schema plans: Error: postgres: schema \"public\" was not found\n",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var (
+				approved []string
+				out      = &bytes.Buffer{}
+			)
+			m := &mockAtlas{
+				schemaPlanList: func(_ context.Context, p *atlasexec.SchemaPlanListParams) ([]atlasexec.SchemaPlanFile, error) {
+					require.True(t, p.Pending)
+					var files []atlasexec.SchemaPlanFile
+					for _, n := range tt.pending {
+						files = append(files, atlasexec.SchemaPlanFile{Name: n, URL: planURL(n), Status: "PENDING"})
+					}
+					return files, tt.listErr
+				},
+				schemaPlanApprove: func(_ context.Context, p *atlasexec.SchemaPlanApproveParams) (*atlasexec.SchemaPlanApprove, error) {
+					approved = append(approved, p.URL)
+					return &atlasexec.SchemaPlanApprove{URL: p.URL, Status: "APPROVED"}, nil
+				},
+			}
+			act := &mockAction{
+				inputs: map[string]string{"config": "file://atlas.hcl", "env": "test", "plan": tt.plan},
+				logger: slog.New(slog.NewTextHandler(out, nil)),
+				trigger: &atlasaction.TriggerContext{
+					SCMType: atlasexec.SCMTypeGithub,
+					Branch:  "master",
+					Commit:  "c0ffee1234",
+				},
+			}
+			a, err := atlasaction.New(atlasaction.WithAction(act), atlasaction.WithAtlas(m))
+			require.NoError(t, err)
+			err = a.SchemaPlanApprove(context.Background())
+			if tt.err != "" {
+				require.EqualError(t, err, tt.err)
+			} else {
+				require.NoError(t, err)
+			}
+			if tt.approved != "" {
+				require.Equal(t, []string{planURL(tt.approved)}, approved)
+				require.Equal(t, planURL(tt.approved), act.output["plan"])
+			} else {
+				require.Empty(t, approved)
+				require.Empty(t, act.output)
+			}
+			require.Contains(t, out.String(), tt.log)
+		})
+	}
 }
 
 type (

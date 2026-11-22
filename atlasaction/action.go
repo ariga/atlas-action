@@ -1350,7 +1350,7 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 	}
 	if params.URL == "" {
 		a.Infof("No plan URL provided, searching for the pending plan")
-		switch planFiles, err := a.Atlas.SchemaPlanList(ctx, &atlasexec.SchemaPlanListParams{
+		planFiles, err := a.Atlas.SchemaPlanList(ctx, &atlasexec.SchemaPlanListParams{
 			Context:   tc.GetRunContext(),
 			ConfigURL: params.ConfigURL,
 			Env:       params.Env,
@@ -1363,17 +1363,43 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 			From:      a.GetArrayInput("from"),
 			To:        a.GetArrayInput("to"),
 			Pending:   true,
-		}); {
-		case err != nil:
+		})
+		if err != nil {
+			// On the first merge of a new project, the schema repository does not exist yet.
+			// The schema/push step that follows creates it, so there is nothing to approve.
+			if m := reRepoNotFound.FindStringSubmatch(err.Error()); m != nil {
+				a.Warningf("No schema plan to approve: the schema repository %q was not found. "+
+					"On the first merge of a new project, the schema/push step creates it", m[1])
+				return nil
+			}
 			return fmt.Errorf("failed to list schema plans: %w", err)
-		case len(planFiles) == 1:
-			params.URL = planFiles[0].URL
-		case len(planFiles) == 0:
+		}
+		if len(planFiles) == 0 {
 			a.Infof("No pending schema plan found. If this commit has schema changes and no approved plan exists, " +
 				"`schema/apply` will fail. Re-run the schema/plan step to create a new plan")
 			return nil
+		}
+		// A plan that schema/apply created for a deployment must be approved on purpose: in Atlas
+		// Cloud, or with `atlas schema plan approve` for a repository in another registry, such as
+		// GHCR. Approving it here would let a re-run of the deployment approve its own plan.
+		plans := make([]atlasexec.SchemaPlanFile, 0, len(planFiles))
+		for _, f := range planFiles {
+			if isDeployPlan(f.Name) {
+				a.Warningf("Skipping schema plan %s: by its name, schema/apply created it for a deployment, "+
+					"so it is approved only through the plan input", f.URL)
+				continue
+			}
+			plans = append(plans, f)
+		}
+		switch len(plans) {
+		case 0:
+			a.Warningf("No schema plan was approved. To approve one of the plans above, approve it in Atlas Cloud " +
+				"or with \"atlas schema plan approve --url <plan>\", or set the plan input to its URL")
+			return nil
+		case 1:
+			params.URL = plans[0].URL
 		default:
-			for _, f := range planFiles {
+			for _, f := range plans {
 				a.Infof("Found schema plan: %s", f.URL)
 			}
 			return fmt.Errorf("found multiple schema plans, please approve or delete the existing plans")
@@ -1389,6 +1415,19 @@ func (a *Actions) SchemaPlanApprove(ctx context.Context) error {
 	a.SetOutput("plan", result.URL)
 	a.SetOutput("status", result.Status)
 	return nil
+}
+
+// reRepoNotFound matches the error of listing the plans of a schema repository that does
+// not exist. Unlike the error of inspecting a database schema that does not exist, such as
+// `postgres: schema "public" was not found`, it is the whole line.
+var reRepoNotFound = regexp.MustCompile(`(?m)^(?:Error: )?schema "([^"]+)" was not found$`)
+
+// isDeployPlan reports whether the plan has the name that schema/apply gives the plans it
+// creates for a deployment outside a pull request, "commit-<commit>-<random>", when the
+// lint-review input requires an approval. Plans are told apart by their names alone, and
+// the ones it creates in a pull request, "pr-<number>-<random>", look like schema/plan's.
+func isDeployPlan(name string) bool {
+	return strings.HasPrefix(name, "commit-")
 }
 
 // SchemaApply runs the GitHub Action for "ariga/atlas-action/schema/apply"
