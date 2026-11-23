@@ -458,7 +458,7 @@ func (r *restacker) changesDir(ctx context.Context, parent, c string) (bool, err
 
 // sumAt returns the atlas.sum of the migration directory at the given commit, or nil if it has none.
 func (r *restacker) sumAt(ctx context.Context, c string) (migrate.HashFile, error) {
-	ok, err := r.gitTest(ctx, "cat-file", "-e", c+":"+r.sumPath)
+	ok, err := r.gitTest(ctx, "rev-parse", "--quiet", "--verify", c+":"+r.sumPath)
 	if err != nil || !ok {
 		return nil, err
 	}
@@ -562,7 +562,14 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 		if !extendsSum(ps, cs) {
 			return "", fmt.Errorf("its migrations are not on top of the ones of %s after `atlas migrate rebase`", parentName)
 		}
-		r.Infof("#%d (%s): moved %s on top of %s", l.Number, l.Branch, strings.Join(own, ", "), parentName)
+		moved := slices.Clone(own)
+		// The files keep their order, after the ones of the parent.
+		if added := cs[len(ps):]; len(added) == len(own) {
+			for i := range moved {
+				moved[i] = fmt.Sprintf("%s to %s", own[i], added[i].N)
+			}
+		}
+		r.Infof("#%d (%s): renamed %s, to place them on top of %s", l.Number, l.Branch, strings.Join(moved, ", "), parentName)
 	}
 	if _, err := r.git(ctx, "add", "--all", "--", r.dir); err != nil {
 		return "", fmt.Errorf("failed to stage changes: %w", err)

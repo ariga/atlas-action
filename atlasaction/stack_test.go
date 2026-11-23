@@ -61,6 +61,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Equal(t, []string{"C: add c1", botMessage}, r.log("B", "C"))
 		require.Contains(t, logs, "#1 (A): migrations conflict with main")
 		require.Contains(t, logs, "#1 (A): replaying 2 commit(s) onto main")
+		require.Regexp(t, `#1 \(A\): renamed 20260102000000_a1.sql to \d{14}_a1.sql, 20260102000100_a2.sql to \d{14}_a2.sql, to place them on top of main`, logs)
 
 		// A second run has nothing to do.
 		tips := r.tips("A", "B", "C")
@@ -287,6 +288,35 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Equal(t, []string{"A: app.txt"}, r.log("main", "A"), "A has no migrations to move")
 		require.Equal(t, []string{"B: add b1", botMessage}, r.log("A", "B"))
 		require.Equal(t, []string{"init", "m1", "b1"}, r.names("B"))
+	})
+
+	t.Run("NoMigrationsOnTrunk", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.checkout("main")
+		r.git(r.dev, "rm", "--quiet", "-r", r.dir)
+		r.git(r.dev, "commit", "--quiet", "--message", "main: no migrations")
+		r.push("main")
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.push("A", "B")
+		s := r.stack(9, "main", "A", "B")
+		// The trunk moves, and still has no migrations.
+		r.file("main", "app.txt", "main\n")
+		r.push("main")
+		act, logs, err := r.run("main", "", s, nil)
+		require.NoError(t, err, logs)
+		require.Equal(t, "false", act.output["rebased"])
+		require.Contains(t, logs, "Migrations of all the pull requests are up to date")
+		// The first migration lands on the trunk, while the stack adds the first ones too.
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		act, logs, err = r.run("main", "", s, nil)
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("main", "A", "B")
+		require.Equal(t, []string{"m1", "a1", "b1"}, r.names("B"))
 	})
 
 	t.Run("Clock", func(t *testing.T) {

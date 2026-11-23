@@ -558,8 +558,8 @@ jobs:
 
 > **Note**
 >
-> * The action rewrites the branches of the stack. Fetch them before you continue working on them,
->   for example with `gh stack sync`.
+> * The action rewrites the branches of the stack. Update your local branches before you continue
+>   working on them, for example with `git pull --rebase`.
 > * With `GITHUB_TOKEN` instead of a personal access token, the pushes start no `push` workflows, and the
 >   `pull_request` workflows they start wait for approval.
 > * A pull request whose own commits change files in `.github/workflows` can be pushed only with a token
