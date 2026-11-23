@@ -102,6 +102,14 @@ type (
 		// CommentSchemaLint comments on the pull request with the schema lint report.
 		CommentSchemaLint(context.Context, *TriggerContext, *SchemaLintReport) error
 	}
+	// StackClient is implemented by the SCM clients that support stacked pull requests.
+	StackClient interface {
+		// OpenPullRequests returns the open pull requests whose head is the given branch
+		// (if not empty), and whose base is the given branch (if not empty).
+		OpenPullRequests(_ context.Context, head, base string) ([]*PullRequest, error)
+		// Stack returns the stack of pull requests with the given number.
+		Stack(context.Context, int) (*Stack, error)
+	}
 	Logger interface {
 		// Infof logs an info message.
 		Infof(string, ...interface{})
@@ -206,6 +214,7 @@ type (
 		DefaultBranch string                    // DefaultBranch is the default branch of the repository.
 		Branch        string                    // Current Branch name.
 		Commit        string                    // Commit SHA.
+		Before        string                    // Commit SHA the branch pointed to before the push that triggered the action, if known.
 		Actor         *Actor                    // Actor is the user who triggered the action.
 		RerunCmd      string                    // RerunCmd is the command to rerun the action.
 
@@ -226,6 +235,29 @@ type (
 		Body   string // Body (description) of the pull request.
 		Commit string // Latest commit SHA.
 		Ref    string
+		Base   string // Base branch of the pull request, if known.
+		Stack  int    // Number of the stack the pull request belongs to, or 0 if it is not stacked.
+	}
+	// Stack is a stack of pull requests: a chain of pull requests in the same repository,
+	// where the bottom one targets the stack base (its trunk), and each of the others
+	// targets the head branch of the pull request below it.
+	Stack struct {
+		Number int          // Number of the stack.
+		Open   bool         // Whether the stack is open. A stack closes when all its pull requests merged.
+		Base   string       // Base branch of the stack, its trunk.
+		Layers []StackLayer // Pull requests of the stack, from the bottom to the top.
+	}
+	// StackLayer is a pull request in a stack.
+	StackLayer struct {
+		Number int    // Pull request number.
+		Branch string // Head branch of the pull request.
+		Commit string // Head commit of the pull request.
+		Base   string // Base branch of the pull request.
+		// BaseCommit is the base branch commit the SCM last compared the
+		// pull request with. It may lag behind the base branch.
+		BaseCommit string
+		Open       bool // Whether the pull request is open.
+		Merged     bool // Whether the pull request was merged.
 	}
 	// Comment holds the comment information.
 	Comment struct {
@@ -737,6 +769,13 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	tc, err := a.GetTriggerContext(ctx)
 	if err != nil {
 		return err
+	}
+	if a.GetBoolInput("stack") {
+		// Restack the stacked pull requests of the branch, or the stacks that target it.
+		// Otherwise, rebase the branch onto the base branch, as without the input.
+		if done, err := a.migrateAutoRebaseStacks(ctx, tc); err != nil || done {
+			return err
+		}
 	}
 	var (
 		remote     = a.GetInputDefault("remote", "origin")

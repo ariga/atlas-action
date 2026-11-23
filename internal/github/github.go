@@ -8,9 +8,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,9 +52,42 @@ type (
 		Body   string
 		Commit string
 		Ref    string
+		Base   string // Base branch of the pull request.
+		Stack  int    // Number of the stack the pull request belongs to, or 0 if it is not stacked.
+	}
+	// Stack is a stack of pull requests: a chain of pull requests in the same repository,
+	// where the bottom one targets the stack base (its trunk) and each of the others
+	// targets the head branch of the pull request below it.
+	Stack struct {
+		Number int  `json:"number"`
+		Open   bool `json:"open"`
+		Base   struct {
+			Ref string `json:"ref"`
+		} `json:"base"`
+		// PullRequests of the stack, from the bottom to the top.
+		PullRequests []StackPullRequest `json:"pull_requests"`
+	}
+	// StackPullRequest is a pull request in a stack.
+	StackPullRequest struct {
+		Number   int     `json:"number"`
+		State    string  `json:"state"` // Either "open" or "closed".
+		Draft    bool    `json:"draft"`
+		MergedAt *string `json:"merged_at"`
+		Head     struct {
+			Ref string `json:"ref"`
+			SHA string `json:"sha"`
+		} `json:"head"`
+		// Base of the pull request. SHA is the base branch commit GitHub last
+		// compared the pull request with, so it may lag behind the branch.
+		Base struct {
+			Ref string `json:"ref"`
+			SHA string `json:"sha"`
+		} `json:"base"`
 	}
 	// TriggerEvent is the structure of the GitHub trigger event.
 	TriggerEvent struct {
+		// Only in case of a 'push' event. The commit the ref pointed to before the push.
+		Before string `mapstructure:"before"`
 		// Only in case of an 'issue_comment' event.
 		Comment struct {
 			Body string `mapstructure:"body"`
@@ -383,16 +420,111 @@ type pullRequest struct {
 		Ref string `json:"ref"`
 		SHA string `json:"sha"`
 	} `json:"head"`
+	Base struct {
+		Ref string `json:"ref"`
+	} `json:"base"`
+	// Stack is set only when the pull request belongs to a stack.
+	Stack *struct {
+		Number int `json:"number"`
+	} `json:"stack"`
 }
 
 func (p pullRequest) PullRequest() *PullRequest {
-	return &PullRequest{
+	pr := &PullRequest{
 		Number: p.Number,
 		URL:    p.URL,
 		Body:   p.Body,
 		Commit: p.Head.SHA,
 		Ref:    p.Head.Ref,
+		Base:   p.Base.Ref,
 	}
+	if p.Stack != nil {
+		pr.Stack = p.Stack.Number
+	}
+	return pr
+}
+
+// ErrNotFound is returned when the GitHub API responds with 404 Not Found.
+var ErrNotFound = errors.New("github: not found")
+
+const (
+	// stackAPIVersion is the REST API version that documents the endpoints of stacked pull requests.
+	stackAPIVersion = "2026-03-10"
+	// maxPages caps the number of pages a listing reads.
+	maxPages = 100
+)
+
+// OpenPullRequests returns the open pull requests of the repository whose head is the
+// given branch (if not empty) and whose base is the given branch (if not empty).
+func (c *Client) OpenPullRequests(ctx context.Context, head, base string) ([]*PullRequest, error) {
+	q := url.Values{"state": {"open"}, "per_page": {"100"}}
+	if head != "" {
+		owner, _, err := c.ownerRepo()
+		if err != nil {
+			return nil, err
+		}
+		q.Set("head", owner+":"+head)
+	}
+	if base != "" {
+		q.Set("base", base)
+	}
+	var prs []*PullRequest
+	for page := 1; ; page++ {
+		if page > maxPages {
+			return nil, fmt.Errorf("github: more than %d pages of open pull requests", maxPages)
+		}
+		q.Set("page", strconv.Itoa(page))
+		var resp []pullRequest
+		if err := c.get(ctx, fmt.Sprintf("/repos/%s/pulls?%s", c.repo, q.Encode()), nil, &resp); err != nil {
+			return nil, err
+		}
+		for _, p := range resp {
+			prs = append(prs, p.PullRequest())
+		}
+		if len(resp) < 100 {
+			return prs, nil
+		}
+	}
+}
+
+// Stack returns the stack of pull requests with the given number.
+func (c *Client) Stack(ctx context.Context, number int) (*Stack, error) {
+	var s Stack
+	h := http.Header{"X-Github-Api-Version": {stackAPIVersion}}
+	if err := c.get(ctx, fmt.Sprintf("/repos/%s/stacks/%d", c.repo, number), h, &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+// get sends a GET request to the given path of the API and decodes the JSON response into v.
+func (c *Client) get(ctx context.Context, path string, h http.Header, v any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	maps.Copy(req.Header, h)
+	res, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error calling GitHub API: %w", err)
+	}
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("reading response body: %w", err)
+	}
+	switch res.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return fmt.Errorf("%w: GET %s", ErrNotFound, path)
+	default:
+		return fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	if err := json.Unmarshal(b, v); err != nil {
+		return fmt.Errorf("unmarshalling response body: %w", err)
+	}
+	return nil
 }
 
 // PullRequest returns information about a pull request.
