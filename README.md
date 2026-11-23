@@ -448,7 +448,7 @@ Automatically resolves `atlas.sum` conflicts and rebases the migration directory
 > 
 > Users should set the `migrate/lint` action to ensure no logical conflicts occur after this action.
 > 
-> After the rebase is done and a commit is pushed by the action, no other workflows will be triggered unless the action is running with a personal access token (PAT).
+> After the rebase is done and a commit is pushed by the action, no `push` workflows are triggered, and the `pull_request` workflows wait for approval, unless the action is running with a personal access token (PAT).
 >```
 >   - uses: actions/checkout@v4
 >     with:
@@ -656,10 +656,11 @@ jobs:
 >
 > * The action rewrites the branches of the stack. Update your local branches before you continue
 >   working on them, for example with `git pull --rebase`.
-> * With `GITHUB_TOKEN` instead of a personal access token, the pushes start no `push` workflows, and the
->   `pull_request` workflows they start wait for approval.
-> * A pull request whose own commits change files in `.github/workflows` can be pushed only with a token
->   that is allowed to update workflows.
+> * The action pushes with the token of `actions/checkout`. With the default `GITHUB_TOKEN`, the pushes
+>   start no `push` workflows, and the `pull_request` workflows they start wait for approval.
+> * A token without the `workflow` scope, like `GITHUB_TOKEN`, cannot push a restack that creates a new
+>   version of a workflow file. This happens when a pull request changes a workflow file that also
+>   changed below it.
 ### `ariga/atlas-action/migrate/hash`
 
 Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.
