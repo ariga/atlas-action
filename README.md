@@ -465,6 +465,7 @@ All inputs are optional
 * `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
 * `remote` - The remote to fetch from. Defaults to `origin`.
 * `force-rebase` - When true, skip the merge step and rebase whenever there are dev-only migrations (e.g. out-of-order workflow after merging base and running apply with exec-order non-linear). Default is false.
+* `stack` - When true, restack GitHub stacked pull requests whose migrations conflict: rebase each pull request onto the one below it, from the bottom of the stack up, place only the migration files each pull request adds on top of the ones below it, and push all the branches of the stack at once. Pull requests that are not stacked are rebased as without this input. GitHub only, and cannot be used with `base-sha` or `force-rebase`. Default is false. See [Stacked pull requests](#stacked-pull-requests).
 * `working-directory` - Atlas working directory. Default is project root
 
 #### Outputs
@@ -588,6 +589,77 @@ jobs:
           url: mysql://root:root@localhost:3306/app
           version: ${{ steps.rebase.outputs.latest_version }}
 ```
+
+#### Stacked pull requests
+
+In a [stack of pull requests](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs),
+each pull request targets the branch of the one below it, and every migration that lands on the stack's
+base branch (its trunk), or on a lower branch, makes the `atlas.sum` files of the branches above it conflict.
+GitHub's **Rebase stack** cannot resolve these conflicts, and when a pull request merges, GitHub retargets
+the pull request above it but leaves it conflicted. With `stack: true`, the action restacks such stacks:
+
+* It runs on a push to a branch of a stack, and restacks that stack, or on a push to a branch that stacks
+  target, such as `main`, and restacks each open stack that targets it.
+* Like `gh stack rebase`, it rebases each open pull request onto the one below it, from the bottom of the
+  stack up. It moves only the migration files each pull request adds on top of the ones below it, with
+  `atlas migrate rebase`, and adds one commit per pull request, which later runs amend.
+* Like `gh stack push`, it pushes all the restacked branches at once, with `--force-with-lease`. If a pull
+  request conflicts in other files, or edits migration files of the pull request below it, nothing is
+  pushed, and the run fails with the files to resolve with `gh stack rebase`.
+* It does nothing when the migrations of the stack do not conflict, even if the stack is not linear, so
+  GitHub's **Rebase stack** can rebase it.
+* Pull requests that are not stacked are rebased as without the input.
+
+```yaml
+name: Restack Atlas Migrations
+on:
+  # Run on every push, as pull request workflows do not run while a pull request
+  # has conflicts, and stacks need a restack when the branch they target moves.
+  push:
+# Restacks must not overlap. Push events carry no stack number to key on,
+# so all the runs share one group, and wait in line instead of canceling each other.
+concurrency:
+  group: atlas-autorebase
+  queue: max
+jobs:
+  migrate-auto-rebase:
+    permissions:
+      # Allow pushing the restacked branches.
+      contents: write
+      # Allow reading the pull requests and their stacks.
+      pull-requests: read
+    runs-on: ubuntu-latest
+    steps:
+    - uses: ariga/setup-atlas@v0
+      with:
+        cloud-token: ${{ secrets.ATLAS_TOKEN }}
+    - uses: actions/checkout@v4
+      with:
+        # Use personal access token to trigger workflows after the branches are pushed by the action.
+        token: ${{ secrets.PAT }}
+        # Need to fetch the branch history for rebase.
+        fetch-depth: 0
+    # Skip the step below if your CI is already configured with a Git account.
+    - name: config git to commit changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+    - uses: ariga/atlas-action/migrate/autorebase@v1
+      with:
+        dir: file://migrations
+        stack: true
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+```
+
+> **Note**
+>
+> * The action rewrites the branches of the stack. Fetch them before you continue working on them,
+>   for example with `gh stack sync`.
+> * With `GITHUB_TOKEN` instead of a personal access token, the pushes start no `push` workflows, and the
+>   `pull_request` workflows they start wait for approval.
+> * A pull request whose own commits change files in `.github/workflows` can be pushed only with a token
+>   that is allowed to update workflows.
 ### `ariga/atlas-action/migrate/hash`
 
 Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.

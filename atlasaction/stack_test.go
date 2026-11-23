@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -337,8 +338,9 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		tips := r.tips("A", "B")
 		act, logs, err := r.run("main", "", s, racer)
 		require.True(t, raced)
-		require.ErrorContains(t, err, "failed to push A (", logs)
-		require.ErrorContains(t, err, "nothing was pushed")
+		require.NoError(t, err, logs)
+		require.Contains(t, logs, "Stack #6 changed while it was restacked, nothing was pushed")
+		require.Contains(t, logs, "(stale info)")
 		require.Equal(t, "false", act.output["rebased"])
 		require.Equal(t, tips[0], r.tip("A"), "the push is atomic")
 		// The next run restacks the branch with the new commit.
@@ -810,3 +812,28 @@ func (s *stackSCM) Stack(_ context.Context, n int) (*atlasaction.Stack, error) {
 }
 
 var _ atlasaction.StackClient = (*stackSCM)(nil)
+
+func TestGitHubTriggerContextBefore(t *testing.T) {
+	event := filepath.Join(t.TempDir(), "event.json")
+	for _, tt := range []struct {
+		name, event, payload, want string
+	}{
+		{name: "Push", event: "push", payload: `{"before":"35f82a7a3a0aee6352956853ca57756256499558","forced":true}`, want: "35f82a7a3a0aee6352956853ca57756256499558"},
+		{name: "NewBranch", event: "push", payload: `{"before":"0000000000000000000000000000000000000000"}`},
+		{name: "PullRequest", event: "pull_request", payload: `{"before":"35f82a7a3a0aee6352956853ca57756256499558","pull_request":{"number":1}}`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, os.WriteFile(event, []byte(tt.payload), 0644))
+			env := map[string]string{
+				"GITHUB_EVENT_PATH": event,
+				"GITHUB_EVENT_NAME": tt.event,
+				"GITHUB_REF_NAME":   "A",
+				"GITHUB_REPOSITORY": "owner/repo",
+			}
+			tc, err := atlasaction.NewGitHub(func(k string) string { return env[k] }, io.Discard).GetTriggerContext(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, "A", tc.Branch)
+			require.Equal(t, tt.want, tc.Before)
+		})
+	}
+}

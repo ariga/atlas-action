@@ -385,7 +385,7 @@ open:
 			return nil, fmt.Errorf("#%d (%s): %w. %s", l.Number, l.Branch, err, stackHint)
 		}
 	}
-	return layers, r.push(ctx, layers)
+	return layers, r.push(ctx, s, layers)
 }
 
 // firstConflict returns the index of the lowest layer whose migration directory does not
@@ -736,7 +736,7 @@ func (r *restacker) fetch(ctx context.Context, base string, merged *StackLayer, 
 }
 
 // push pushes the restacked branches at once, if the remote branches did not move since they were fetched.
-func (r *restacker) push(ctx context.Context, layers []*layerState) error {
+func (r *restacker) push(ctx context.Context, s *Stack, layers []*layerState) error {
 	var (
 		leases, refs, names []string
 	)
@@ -752,12 +752,21 @@ func (r *restacker) push(ctx context.Context, layers []*layerState) error {
 		r.Infof("Nothing to push")
 		return nil
 	}
-	args := append(append([]string{"push", "--quiet", "--atomic"}, leases...), r.remote)
-	if _, err := r.git(ctx, append(args, refs...)...); err != nil {
+	args := append(append([]string{"push", "--atomic"}, leases...), r.remote)
+	cmd := r.CmdExecutor(ctx, "git", append(args, refs...)...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
 		for _, l := range layers {
 			l.new = l.old
 		}
-		return fmt.Errorf("failed to push %s, a branch may have changed since it was fetched (nothing was pushed): %w", strings.Join(names, ", "), err)
+		// A branch was pushed after it was fetched. The workflow run of that
+		// push, or the next one, restacks the stack with the new commits.
+		if strings.Contains(stderr.String(), "(stale info)") {
+			r.Warningf("Stack #%d changed while it was restacked, nothing was pushed:\n%s", s.Number, strings.TrimSpace(stderr.String()))
+			return nil
+		}
+		return fmt.Errorf("failed to push %s (nothing was pushed): %w: %s", strings.Join(names, ", "), err, strings.TrimSpace(stderr.String()))
 	}
 	r.Infof("Pushed %s", strings.Join(names, ", "))
 	return nil
