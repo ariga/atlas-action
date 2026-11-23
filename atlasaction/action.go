@@ -109,6 +109,9 @@ type (
 		OpenPullRequests(_ context.Context, head, base string) ([]*PullRequest, error)
 		// Stack returns the stack of pull requests with the given number.
 		Stack(context.Context, int) (*Stack, error)
+		// ForcePushes returns the head commits of each pull request before and after
+		// each force-push of its branch, and fails if the history is not complete.
+		ForcePushes(_ context.Context, numbers []int) (map[int][]string, error)
 	}
 	Logger interface {
 		// Infof logs an info message.
@@ -771,12 +774,13 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 		return err
 	}
 	if a.GetBoolInput("stack") {
-		// Restack the stacked pull requests of the branch, or the stacks that target it.
-		// Otherwise, rebase the branch onto the base branch, as without the input.
-		if done, err := a.migrateAutoRebaseStacks(ctx, tc); err != nil || done {
-			return err
-		}
+		return a.migrateAutoRebaseStacks(ctx, tc)
 	}
+	return a.migrateAutoRebaseBranch(ctx, tc)
+}
+
+// migrateAutoRebaseBranch rebases the migration files of the branch onto the base branch.
+func (a *Actions) migrateAutoRebaseBranch(ctx context.Context, tc *TriggerContext) error {
 	var (
 		remote     = a.GetInputDefault("remote", "origin")
 		currBranch = tc.Branch

@@ -131,3 +131,64 @@ func TestStack(t *testing.T) {
 	_, err = client.Stack(context.Background(), 5)
 	require.ErrorIs(t, err, ErrNotFound)
 }
+
+func TestForcePushes(t *testing.T) {
+	var (
+		body string
+		resp string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/graphql", r.URL.Path)
+		var req struct {
+			Query     string            `json:"query"`
+			Variables map[string]string `json:"variables"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+		require.Equal(t, map[string]string{"owner": "owner", "name": "repo"}, req.Variables)
+		body = req.Query
+		_, err := w.Write([]byte(resp))
+		require.NoError(t, err)
+	}))
+	defer srv.Close()
+	client, err := NewClient("owner/repo", WithBaseURL(srv.URL))
+	require.NoError(t, err)
+
+	resp = `{"data":{"repository":{
+		"pr2":{"timelineItems":{"pageInfo":{"hasPreviousPage":false},"nodes":[
+			{"beforeCommit":{"oid":"bc7fcca"},"afterCommit":{"oid":"00d2a4e"}},
+			{"beforeCommit":{"oid":"00d2a4e"},"afterCommit":{"oid":"35f82a7"}}
+		]}},
+		"pr3":{"timelineItems":{"pageInfo":{"hasPreviousPage":false},"nodes":[]}}
+	}}}`
+	pushes, err := client.ForcePushes(context.Background(), []int{2, 3})
+	require.NoError(t, err)
+	require.Equal(t, map[int][]string{2: {"bc7fcca", "00d2a4e", "00d2a4e", "35f82a7"}, 3: {}}, pushes)
+	require.Contains(t, body, "pr2: pullRequest(number: 2) { timelineItems(itemTypes: [HEAD_REF_FORCE_PUSHED_EVENT], last: 100)")
+	require.Contains(t, body, "pr3: pullRequest(number: 3)")
+
+	// The history must be complete.
+	resp = `{"data":{"repository":{"pr2":{"timelineItems":{"pageInfo":{"hasPreviousPage":true},"nodes":[]}}}}}`
+	_, err = client.ForcePushes(context.Background(), []int{2})
+	require.EqualError(t, err, "github: pull request #2 has more force-pushes than can be read")
+	resp = `{"data":{"repository":{"pr2":{"timelineItems":{"pageInfo":{"hasPreviousPage":false},"nodes":[{"beforeCommit":null,"afterCommit":{"oid":"00d2a4e"}}]}}}}}`
+	_, err = client.ForcePushes(context.Background(), []int{2})
+	require.EqualError(t, err, "github: a force-push of pull request #2 has no commits")
+	resp = `{"data":{"repository":{"pr2":null}},"errors":[{"message":"Could not resolve to a PullRequest with the number of 2."}]}`
+	_, err = client.ForcePushes(context.Background(), []int{2})
+	require.EqualError(t, err, "github: querying force-pushes: Could not resolve to a PullRequest with the number of 2.")
+}
+
+func TestGraphQLURL(t *testing.T) {
+	for base, want := range map[string]string{
+		"https://api.github.com":             "https://api.github.com/graphql",
+		"https://api.github.com/":            "https://api.github.com/graphql",
+		"https://ghe.example.com/api/v3":     "https://ghe.example.com/api/graphql",
+		"https://ghe.example.com/api/v3/":    "https://ghe.example.com/api/graphql",
+		"https://example.ghe.com/api/github": "https://example.ghe.com/api/github/graphql",
+	} {
+		c, err := NewClient("owner/repo", WithBaseURL(base))
+		require.NoError(t, err)
+		require.Equal(t, want, c.graphQLURL(), base)
+	}
+}

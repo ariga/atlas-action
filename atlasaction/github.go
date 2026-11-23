@@ -322,6 +322,11 @@ func (c *GitHubClient) OpenPullRequests(ctx context.Context, head, base string) 
 	return r, nil
 }
 
+// ForcePushes implements StackClient.
+func (c *GitHubClient) ForcePushes(ctx context.Context, numbers []int) (map[int][]string, error) {
+	return c.Client.ForcePushes(ctx, numbers)
+}
+
 // Stack implements StackClient.
 func (c *GitHubClient) Stack(ctx context.Context, number int) (*Stack, error) {
 	s, err := c.Client.Stack(ctx, number)

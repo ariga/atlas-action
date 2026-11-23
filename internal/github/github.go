@@ -497,6 +497,102 @@ func (c *Client) Stack(ctx context.Context, number int) (*Stack, error) {
 	return &s, nil
 }
 
+// ForcePushes returns the head commits of each pull request before and after each
+// force-push of its branch, oldest first, as recorded in the timeline of the pull request.
+// It fails if a timeline does not hold the full history, as callers rely on it to tell
+// a branch that was rewritten from one that only moved forward.
+func (c *Client) ForcePushes(ctx context.Context, numbers []int) (map[int][]string, error) {
+	owner, name, err := c.ownerRepo()
+	if err != nil {
+		return nil, err
+	}
+	var q strings.Builder
+	q.WriteString("query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {")
+	for _, n := range numbers {
+		fmt.Fprintf(&q, " pr%d: pullRequest(number: %d) { timelineItems(itemTypes: [HEAD_REF_FORCE_PUSHED_EVENT], last: 100) {"+
+			" pageInfo { hasPreviousPage } nodes { ... on HeadRefForcePushedEvent { beforeCommit { oid } afterCommit { oid } } } } }", n, n)
+	}
+	q.WriteString(" } }")
+	b, err := json.Marshal(map[string]any{
+		"query":     q.String(),
+		"variables": map[string]string{"owner": owner, "name": name},
+	})
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.graphQLURL(), bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling GitHub API: %w", err)
+	}
+	defer res.Body.Close()
+	if b, err = io.ReadAll(res.Body); err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	type commit struct {
+		OID string `json:"oid"`
+	}
+	var resp struct {
+		Data struct {
+			Repository map[string]*struct {
+				TimelineItems struct {
+					PageInfo struct {
+						HasPreviousPage bool `json:"hasPreviousPage"`
+					} `json:"pageInfo"`
+					Nodes []struct {
+						Before *commit `json:"beforeCommit"`
+						After  *commit `json:"afterCommit"`
+					} `json:"nodes"`
+				} `json:"timelineItems"`
+			} `json:"repository"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(b, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshalling response body: %w", err)
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("github: querying force-pushes: %s", resp.Errors[0].Message)
+	}
+	pushes := make(map[int][]string, len(numbers))
+	for _, n := range numbers {
+		pr := resp.Data.Repository[fmt.Sprintf("pr%d", n)]
+		switch {
+		case pr == nil:
+			return nil, fmt.Errorf("github: pull request #%d not found", n)
+		case pr.TimelineItems.PageInfo.HasPreviousPage:
+			return nil, fmt.Errorf("github: pull request #%d has more force-pushes than can be read", n)
+		}
+		heads := []string{}
+		for _, e := range pr.TimelineItems.Nodes {
+			if e.Before == nil || e.After == nil || e.Before.OID == "" || e.After.OID == "" {
+				return nil, fmt.Errorf("github: a force-push of pull request #%d has no commits", n)
+			}
+			heads = append(heads, e.Before.OID, e.After.OID)
+		}
+		pushes[n] = heads
+	}
+	return pushes, nil
+}
+
+// graphQLURL returns the URL of the GraphQL API, next to the REST API.
+func (c *Client) graphQLURL() string {
+	// GitHub Enterprise Server serves the REST API under /api/v3, and the GraphQL API under /api/graphql.
+	if base, ok := strings.CutSuffix(strings.TrimSuffix(c.baseURL, "/"), "/api/v3"); ok {
+		return base + "/api/graphql"
+	}
+	return strings.TrimSuffix(c.baseURL, "/") + "/graphql"
+}
+
 // get sends a GET request to the given path of the API and decodes the JSON response into v.
 func (c *Client) get(ctx context.Context, path string, h http.Header, v any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
