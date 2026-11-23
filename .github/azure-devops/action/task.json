@@ -392,6 +392,13 @@
       "visibleRule": "action == monitor schema"
     },
     {
+      "type": "boolean",
+      "label": "Stacked pull requests",
+      "helpMarkDown": "When true, restack GitHub stacked pull requests whose migrations conflict: rebase each pull request onto the one below it, from the bottom of the stack up, place only the migration files each pull request adds on top of the ones below it, and push all the branches of the stack at once. Pull requests that are not stacked are rebased as without this input. GitHub only, and cannot be used with `base-sha` or `force-rebase`.\n",
+      "name": "stack",
+      "visibleRule": "action == migrate autorebase"
+    },
+    {
       "type": "string",
       "label": "Tag",
       "helpMarkDown": "The tag of migrations to used as base for linting. By default, the `latest` tag is used.\n",
