@@ -975,7 +975,7 @@ func (r *restacker) restackLayer(ctx context.Context, l, below *layerState, pare
 			return "", err
 		}
 		args := []string{"commit", "--quiet", "--message", r.message}
-		// Amend the commit of an earlier run instead of piling up commits.
+		// Amend the commit of an earlier run, so each layer keeps a single commit of the action.
 		if subject, err := r.git(ctx, "log", "-1", "--format=%s", "HEAD"); err == nil && subject == r.message && head != parent {
 			args = []string{"commit", "--quiet", "--amend", "--no-edit"}
 		}

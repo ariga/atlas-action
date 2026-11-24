@@ -80,7 +80,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Equal(t, "false", act.output["rebased"])
 		require.Equal(t, tips, r.tips("A", "B", "C"))
 
-		// The trunk moves again: the commits of the earlier run are amended, not piled up.
+		// The trunk moves again, and the commits of the earlier run are amended.
 		r.migration("main", "20260106000000", "m2")
 		r.push("main")
 		act, logs, err = r.run(s, run{branch: "B"})
