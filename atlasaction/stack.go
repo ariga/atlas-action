@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"os"
 	"os/exec"
@@ -51,6 +52,16 @@ type (
 		message string // Message of the commits that fix the migration directory.
 		now     func() time.Time
 		sleep   func(context.Context, time.Duration) error
+		// last is the latest migration file this run moved, as the files moved for the
+		// next stacks must get later versions, even if they do not share a parent.
+		last string
+		// moved holds the heads the branches had before this run restacked them,
+		// for the stacks that are based on them.
+		moved map[string]string
+		// basePRs caches the open pull request of each base branch, or 0 if it has none.
+		basePRs map[string]int
+		// noActivity reports whether the activity of the branches cannot be read in this run.
+		noActivity bool
 	}
 	// layerState is the state of a layer while its stack is restacked.
 	layerState struct {
@@ -65,14 +76,18 @@ type (
 		commit   string // The fork point.
 		upstream string // The upstream to replay the commits after the fork point from.
 		trusted  bool   // Whether the fork point is known to be exact.
+		reason   string // Why the fork point is not trusted, if known.
 	}
 )
 
-// migrateAutoRebaseStacks restacks the stack of the branch the action runs on, or the stacks
-// that target the branch. A pull request of the branch that is not stacked and targets the
-// base branch is rebased onto it first, as without the "stack" input.
+// migrateAutoRebaseStacks restacks the stack of the branch the action runs on, and the stacks
+// that target the branch. A pull request of the branch that is not stacked and targets the base
+// branch is rebased onto it first, as without the "stack" input.
 func (a *Actions) migrateAutoRebaseStacks(ctx context.Context, tc *TriggerContext) error {
-	if a.GetInput("base-sha") != "" || a.GetBoolInput("force-rebase") {
+	if t := a.GetType(); t != atlasexec.TriggerTypeGithubAction {
+		return fmt.Errorf(`the "stack" input is supported only on GitHub Actions, not on %s`, t)
+	}
+	if strings.TrimSpace(a.GetInput("base-sha")) != "" || a.GetBoolInput("force-rebase") {
 		return errors.New(`the "stack" input cannot be used with "base-sha" or "force-rebase"`)
 	}
 	var sc StackClient
@@ -92,33 +107,36 @@ func (a *Actions) migrateAutoRebaseStacks(ctx context.Context, tc *TriggerContex
 		return errors.New("failed to determine the branch the action runs on")
 	}
 	tc = func(c TriggerContext) *TriggerContext { c.Branch = branch; return &c }(*tc)
-	stacks, single, err := a.branchStacks(ctx, sc, tc)
+	stacks, single, lookupErr, err := a.branchStacks(ctx, sc, tc)
 	if err != nil {
 		return err
 	}
+	var branchErr error
 	if single {
-		if err := a.migrateAutoRebaseBranch(ctx, tc); err != nil {
-			return err
-		}
-		if len(stacks) == 0 {
-			return nil
+		if branchErr = a.migrateAutoRebaseBranch(ctx, tc); branchErr != nil && len(stacks) > 0 {
+			a.Warningf("failed to rebase %q, restacking the stacks that target it: %v", tc.Branch, branchErr)
 		}
 	}
 	if len(stacks) == 0 {
-		a.SetOutput("rebased", "false")
-		return nil
+		if !single {
+			a.SetOutput("rebased", "false")
+		}
+		return errors.Join(branchErr, lookupErr)
 	}
 	r, err := a.newRestacker(ctx, tc, sc)
 	if err != nil {
-		return err
+		return errors.Join(branchErr, lookupErr, err)
+	}
+	if branchErr != nil {
+		// Leave the merge that the failed rebase may have left in progress.
+		if err := r.discard(ctx); err != nil {
+			return errors.Join(branchErr, lookupErr, err)
+		}
 	}
 	pushed, current, err := r.run(ctx, stacks)
 	// Keep the output of the rebase of the branch, unless the stacks were pushed.
-	if pushed || !single {
+	if pushed || !single || branchErr != nil {
 		a.SetOutput("rebased", strconv.FormatBool(pushed))
-	}
-	if err != nil {
-		return err
 	}
 	if current != "" {
 		if latest, err := a.Atlas.MigrateLs(ctx, &atlasexec.MigrateLsParams{
@@ -131,17 +149,18 @@ func (a *Actions) migrateAutoRebaseStacks(ctx context.Context, tc *TriggerContex
 			a.SetOutput("latest_version", strings.TrimSpace(latest))
 		}
 	}
-	return nil
+	return errors.Join(branchErr, lookupErr, err)
 }
 
-// branchStacks returns the stacks to restack for the branch: its own stack, if one of its open
-// pull requests is stacked, or else the open stacks that target the branch. single reports whether
-// the branch has an open pull request that is not stacked and targets the base branch, which is
-// rebased onto it as without the "stack" input.
-func (a *Actions) branchStacks(ctx context.Context, sc StackClient, tc *TriggerContext) (stacks []*Stack, single bool, _ error) {
+// branchStacks returns the stacks to restack for the branch: its own stack, if one of its open pull
+// requests is stacked, and the open stacks that target the branch. single reports whether the branch
+// has an open pull request that is not stacked and targets the base branch, which is rebased onto it
+// as without the "stack" input. Failed lookups of stacks are returned in lookupErr, and do not stop
+// the others.
+func (a *Actions) branchStacks(ctx context.Context, sc StackClient, tc *TriggerContext) (stacks []*Stack, single bool, lookupErr, _ error) {
 	prs, err := sc.OpenPullRequests(ctx, tc.Branch, "")
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to list the open pull requests of %q: %w", tc.Branch, err)
+		return nil, false, nil, fmt.Errorf("failed to list the open pull requests of %q: %w", tc.Branch, err)
 	}
 	var nums []int
 	for _, pr := range prs {
@@ -149,46 +168,90 @@ func (a *Actions) branchStacks(ctx context.Context, sc StackClient, tc *TriggerC
 			nums = append(nums, pr.Stack)
 		}
 	}
-	switch len(nums) {
-	case 0:
-	case 1:
-		s, err := sc.Stack(ctx, nums[0])
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to get stack #%d: %w", nums[0], err)
-		}
-		return []*Stack{s}, false, nil
-	default:
+	if len(nums) > 1 {
 		slices.Sort(nums)
-		return nil, false, fmt.Errorf("branch %q belongs to more than one stack (%s), restack them manually", tc.Branch, stackNumbers(nums))
+		return nil, false, nil, fmt.Errorf("branch %q belongs to more than one stack (%s), restack them manually", tc.Branch, stackNumbers(nums))
 	}
-	if len(prs) > 0 {
-		base := a.GetInputDefault("base-branch", tc.DefaultBranch)
-		single = base == "" || slices.ContainsFunc(prs, func(pr *PullRequest) bool { return pr.Base == base })
-		if !single {
-			a.Infof("Pull request #%d of %q targets %q and is not stacked", prs[0].Number, tc.Branch, prs[0].Base)
-		}
-	}
-	// The branch may be the trunk of stacks, like main, or a long-lived branch.
-	if prs, err = sc.OpenPullRequests(ctx, "", tc.Branch); err != nil {
-		return nil, false, fmt.Errorf("failed to list the open pull requests that target %q: %w", tc.Branch, err)
-	}
-	for _, pr := range prs {
-		if pr.Stack == 0 || slices.ContainsFunc(stacks, func(s *Stack) bool { return s.Number == pr.Stack }) {
-			continue
-		}
-		s, err := sc.Stack(ctx, pr.Stack)
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to get stack #%d: %w", pr.Stack, err)
-		}
-		if s.Open && s.Base == tc.Branch {
+	var errs []error
+	if len(nums) == 1 {
+		switch s, err := sc.Stack(ctx, nums[0]); {
+		case err != nil:
+			errs = append(errs, fmt.Errorf("failed to get stack #%d: %w", nums[0], err))
+		case s == nil:
+			// The pull request was unstacked after it was listed.
+			a.Warningf("Stack #%d of %q was not found, skipping it", nums[0], tc.Branch)
+			nums = nil
+		default:
 			stacks = append(stacks, s)
 		}
 	}
-	if len(stacks) == 0 && !single {
+	if len(nums) == 0 && len(prs) > 0 {
+		switch base := a.GetInputDefault("base-branch", tc.DefaultBranch); {
+		case base == "":
+			a.Warningf(`Pull request #%d of %q is not stacked, set the "base-branch" input to rebase it`, prs[0].Number, tc.Branch)
+		case slices.ContainsFunc(prs, func(pr *PullRequest) bool { return pr.Base == base }):
+			single = true
+		default:
+			a.Infof("Pull request #%d of %q targets %q and is not stacked", prs[0].Number, tc.Branch, prs[0].Base)
+		}
+	}
+	// The branch may be the trunk of stacks, like main, a long-lived branch, or a branch of a stack.
+	seen := make(map[int]bool)
+	for _, s := range stacks {
+		seen[s.Number] = true
+	}
+	more, err := a.targetStacks(ctx, sc, tc.Branch, seen)
+	if le := (*listError)(nil); errors.As(err, &le) {
+		return nil, false, nil, err
+	}
+	stacks = append(stacks, more...)
+	if len(stacks) == 0 && !single && err == nil && len(errs) == 0 {
 		a.Infof("No stacks target %q, nothing to restack", tc.Branch)
 	}
+	return stacks, single, errors.Join(append(errs, err)...), nil
+}
+
+// listError is returned when the pull requests that target a branch cannot be listed.
+type listError struct{ error }
+
+func (e *listError) Unwrap() error { return e.error }
+
+// targetStacks returns the open stacks that target the branch and are not seen yet, sorted by their
+// numbers, and marks them as seen. It skips the stacks that are not found, unless none of them is.
+func (a *Actions) targetStacks(ctx context.Context, sc StackClient, branch string, seen map[int]bool) ([]*Stack, error) {
+	prs, err := sc.OpenPullRequests(ctx, "", branch)
+	if err != nil {
+		return nil, &listError{fmt.Errorf("failed to list the open pull requests that target %q: %w", branch, err)}
+	}
+	var (
+		stacks  []*Stack
+		errs    []error
+		missing []int
+		lookups int
+	)
+	for _, pr := range prs {
+		if pr.Stack == 0 || seen[pr.Stack] {
+			continue
+		}
+		seen[pr.Stack] = true
+		lookups++
+		switch s, err := sc.Stack(ctx, pr.Stack); {
+		case err != nil:
+			errs = append(errs, fmt.Errorf("failed to get stack #%d: %w", pr.Stack, err))
+		case s == nil:
+			// The pull request was unstacked after it was listed.
+			a.Warningf("Stack #%d of pull request #%d was not found, skipping it", pr.Stack, pr.Number)
+			missing = append(missing, pr.Stack)
+		case s.Open && s.Base == branch:
+			stacks = append(stacks, s)
+		}
+	}
+	if len(missing) > 0 && len(missing) == lookups {
+		slices.Sort(missing)
+		errs = append(errs, fmt.Errorf("none of the stacks of the pull requests that target %q was found (%s)", branch, stackNumbers(missing)))
+	}
 	slices.SortFunc(stacks, func(a, b *Stack) int { return a.Number - b.Number })
-	return stacks, single, nil
+	return stacks, errors.Join(errs...)
 }
 
 func (a *Actions) newRestacker(ctx context.Context, tc *TriggerContext, sc StackClient) (*restacker, error) {
@@ -208,6 +271,8 @@ func (a *Actions) newRestacker(ctx context.Context, tc *TriggerContext, sc Stack
 		dirURL:  u.String(),
 		dir:     filepath.Join(u.Host, u.Path),
 		atlas:   u.Query().Get("format") == "" || u.Query().Get("format") == formatAtlas,
+		moved:   make(map[string]string),
+		basePRs: make(map[string]int),
 		now:     time.Now,
 		sleep: func(ctx context.Context, d time.Duration) error {
 			t := time.NewTimer(d)
@@ -330,19 +395,33 @@ func (r *restacker) run(ctx context.Context, stacks []*Stack) (pushed bool, curr
 		}
 	}()
 	var errs []error
+	seen := make(map[int]bool)
 	for _, s := range stacks {
+		seen[s.Number] = true
+	}
+	// The list grows with the stacks based on the branches that are restacked.
+	for i := 0; i < len(stacks); i++ {
+		s := stacks[i]
 		layers, err := r.restack(ctx, s)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("stack #%d: %w", s.Number, err))
 			continue
 		}
 		for _, l := range layers {
-			if l.old != l.new {
-				pushed = true
-				if l.Branch == r.branch {
-					current = l.new
-				}
+			if l.old == l.new {
+				continue
 			}
+			pushed = true
+			if l.Branch == r.branch {
+				current = l.new
+			}
+			r.moved[l.Branch] = l.old
+			// Stacks based on the branch, like a stack based on a branch of another stack.
+			more, err := r.targetStacks(ctx, r.sc, l.Branch, seen)
+			if err != nil {
+				errs = append(errs, err)
+			}
+			stacks = append(stacks, more...)
 		}
 	}
 	return pushed, current, errors.Join(append(errs, finish())...)
@@ -386,13 +465,27 @@ open:
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve the base branch %q: %w", s.Base, err)
 	}
-	history := r.forcePushes(ctx, merged, layers)
+	// The branches below the layers, by the numbers of their pull requests.
+	branches := make(map[int]string)
+	if merged != nil {
+		branches[merged.Number] = merged.Branch
+	}
+	for _, l := range layers[:len(layers)-1] {
+		branches[l.Number] = l.Branch
+	}
+	switch n, err := r.basePR(ctx, s.Base); {
+	case err != nil:
+		return nil, err
+	case n != 0:
+		branches[n] = s.Base
+	}
+	history := r.histories(ctx, branches)
 	for i, l := range layers {
 		var below *layerState
 		if i > 0 {
 			below = layers[i-1]
 		}
-		if l.fork, err = r.forkPoint(ctx, l, below, merged, trunk, history); err != nil {
+		if l.fork, err = r.forkPoint(ctx, s, l, below, merged, trunk, history); err != nil {
 			return nil, err
 		}
 	}
@@ -409,7 +502,7 @@ open:
 		}
 		if below != nil && below.old == below.new {
 			// The layer below was not restacked, so this one needs it only if its migrations conflict.
-			ok, err := r.extends(ctx, parent, l.old)
+			ok, err := r.upToDate(ctx, parent, l)
 			if err != nil {
 				return nil, err
 			}
@@ -419,7 +512,11 @@ open:
 			}
 		}
 		if !l.fork.trusted {
-			return nil, fmt.Errorf("#%d (%s): cannot find the commit of %s it was built on. %s", l.Number, l.Branch, belowName(s.Base, below, merged), stackHint)
+			reason := l.fork.reason
+			if reason == "" {
+				reason = fmt.Sprintf("cannot find the commit of %s it was built on", belowName(s.Base, below, merged))
+			}
+			return nil, fmt.Errorf("#%d (%s): %s. %s", l.Number, l.Branch, reason, stackHint)
 		}
 		if l.new, err = r.restackLayer(ctx, l, below, parent, parentName); err != nil {
 			// Discard the changes of the failed layer, before the next stack is restacked.
@@ -447,17 +544,65 @@ func belowName(base string, below *layerState, merged *StackLayer) string {
 	}
 }
 
-// forcePushes returns the heads the layers had before and after each force-push of
-// their branches, or nil if GitHub cannot tell. Without it, a fork point is trusted
-// only if it is a head the layer below had.
-func (r *restacker) forcePushes(ctx context.Context, merged *StackLayer, layers []*layerState) map[int][]string {
-	var nums []int
-	if merged != nil {
-		nums = append(nums, merged.Number)
+// basePR returns the number of an open pull request of the base branch, or 0 if it has none.
+// Such a base branch may be rewritten, like the branches of a stack.
+func (r *restacker) basePR(ctx context.Context, base string) (int, error) {
+	if n, ok := r.basePRs[base]; ok {
+		return n, nil
 	}
-	for _, l := range layers[:len(layers)-1] {
-		nums = append(nums, l.Number)
+	prs, err := r.sc.OpenPullRequests(ctx, base, "")
+	if err != nil {
+		return 0, fmt.Errorf("failed to list the open pull requests of the base branch %q: %w", base, err)
 	}
+	n := 0
+	// The oldest pull request has the longest history.
+	for _, pr := range prs {
+		if n == 0 || pr.Number < n {
+			n = pr.Number
+		}
+	}
+	r.basePRs[base] = n
+	return n, nil
+}
+
+// histories returns the heads the branches of the given pull requests had, by the numbers of the pull
+// requests. It reads them from the activity of the repository, which GitHub records since the creation
+// of the branch, or else from the force-pushes of the pull request, which GitHub records only since it
+// was opened. The pull requests whose history cannot be read are left out.
+func (r *restacker) histories(ctx context.Context, branches map[int]string) map[int][]string {
+	var (
+		history = make(map[int][]string, len(branches))
+		rest    []int // Pull requests whose branch activity cannot be read in full.
+	)
+	for _, n := range slices.Sorted(maps.Keys(branches)) {
+		if r.noActivity {
+			rest = append(rest, n)
+			continue
+		}
+		heads, complete, err := r.sc.BranchHeads(ctx, branches[n])
+		switch {
+		case err != nil:
+			// The activity is not available, like on older versions of GitHub Enterprise Server.
+			r.Warningf("failed to read the activity of branch %q, using the force-pushes of the pull requests: %v", branches[n], err)
+			r.noActivity = true
+			rest = append(rest, n)
+		case !complete:
+			r.Infof("The activity of branch %q does not go back to its creation, using the force-pushes of #%d", branches[n], n)
+			rest = append(rest, n)
+		default:
+			history[n] = heads
+		}
+	}
+	for n, h := range r.forcePushes(ctx, rest) {
+		history[n] = h
+	}
+	return history
+}
+
+// forcePushes returns the heads the given pull requests had before and after each
+// force-push of their branches, since they were opened. The pull requests whose
+// history GitHub cannot tell are left out.
+func (r *restacker) forcePushes(ctx context.Context, nums []int) map[int][]string {
 	if len(nums) == 0 {
 		return map[int][]string{}
 	}
@@ -466,58 +611,87 @@ func (r *restacker) forcePushes(ctx context.Context, merged *StackLayer, layers 
 		r.Warningf("failed to get the force-pushes of the pull requests: %v", err)
 		return nil
 	}
+	for _, n := range nums {
+		if _, ok := pushes[n]; !ok {
+			r.Warningf("failed to get the force-pushes of pull request #%d", n)
+		}
+	}
 	return pushes
 }
 
-// forkPoint returns where the own commits of the layer start: the newest merge-base of the
-// layer with the heads the layer below it had. For the bottom layer, these are the trunk and
-// the heads of the merged pull request below it, if any. For the others, the head the layer
-// below has, the heads it had before and after each force-push, the head it had before the
-// push that triggered the run, and the head GitHub last compared the pull request with.
+// forkPoint returns where the own commits of the layer start: the newest merge-base of the layer
+// with the heads the branch below it had. For the bottom layer, these are the trunk, the heads of
+// the merged pull request below it, if any, and the heads of the trunk, if it has a pull request of
+// its own. For the others, the head the layer below has, the heads its branch had, the head it had
+// before the push that triggered the run, and the head GitHub last compared the pull request with.
 //
-// Every head a branch had is either recorded by a force-push, or is an ancestor of a later
-// head, so with the full force-push history the fork point is exact. Without it, the fork point
-// is trusted only if it is one of the known heads, because a merge-base below the heads cannot
-// tell commits the layer below rewrote or dropped from the own commits of the layer. Like
-// `gh stack rebase`, the restack never replays the commits of the layer below into the layer.
-func (r *restacker) forkPoint(ctx context.Context, l, below *layerState, merged *StackLayer, trunk string, history map[int][]string) (*fork, error) {
+// The activity of a branch records every head it had since it was created, so with it the fork
+// point is exact. The force-pushes of a pull request record the heads its branch had only since the
+// pull request was opened, and every other head is an ancestor of a later one, so with them the fork
+// point is exact unless the branch was rewritten before its pull request was opened. Without either,
+// the fork point is not trusted, as it cannot tell commits the branch below rewrote or dropped from
+// the own commits of the layer. Like `gh stack rebase`, the restack never replays the commits of the
+// branch below into the layer, and commits the branch below had only locally are the layer's own.
+func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerState, merged *StackLayer, trunk string, history map[int][]string) (*fork, error) {
 	var (
 		f     = &fork{}
 		tips  []string
-		known = true // Whether the force-push history of the layer below is known.
+		lower []string // Heads of the branches below, before this run restacked them.
+		skip  string   // Head of the branch below, whose patches the replay skips.
+		known = true   // Whether the force-push history of the branches below is known.
+		hist  = func(n int) {
+			h, ok := history[n]
+			tips, known = append(tips, h...), known && ok
+		}
 	)
 	switch {
 	case below != nil:
-		tips = append(tips, below.old)
+		tips, lower, skip = append(tips, below.old), append(lower, below.old), below.old
 		if r.tc.Before != "" && r.branch == below.Branch && r.tc.Commit == below.old {
 			tips = append(tips, r.tc.Before)
 		}
 		if l.BaseCommit != "" && l.Base == below.Branch {
 			tips = append(tips, l.BaseCommit)
 		}
-		h, ok := history[below.Number]
-		tips, known = append(tips, h...), ok
-	case merged != nil:
-		if head, err := r.git(ctx, "rev-parse", "--verify", "--quiet", r.mergedRef(merged)+"^{commit}"); err == nil {
-			tips = append(tips, head)
+		hist(below.Number)
+	default:
+		if merged != nil {
+			if head, err := r.git(ctx, "rev-parse", "--verify", "--quiet", r.mergedRef(merged)+"^{commit}"); err == nil {
+				tips, lower = append(tips, head), append(lower, head)
+			}
+			hist(merged.Number)
 		}
-		h, ok := history[merged.Number]
-		tips, known = append(tips, h...), ok
-	}
-	if below == nil {
-		// The trunk only moves forward, but the layer may hold commits of the
-		// merged pull request below it, that are not in the trunk.
+		// A trunk without a pull request only moves forward, but the layer may hold
+		// commits of the merged pull request below it, that are not in the trunk.
 		mb, err := r.git(ctx, "merge-base", trunk, l.old)
 		if err != nil {
 			return nil, err
 		}
-		f.commit, f.upstream, f.trusted = mb, trunk, known
+		f.commit, f.upstream = mb, trunk
+		n, err := r.basePR(ctx, s.Base)
+		if err != nil {
+			return nil, err
+		}
+		if n != 0 {
+			// The trunk is the branch of a pull request, that may be rewritten.
+			start := trunk
+			if old, ok := r.moved[s.Base]; ok {
+				start = old
+				tips, lower, skip = append(tips, old), append(lower, old), old
+			}
+			if r.tc.Before != "" && r.branch == s.Base && r.tc.Commit == start {
+				tips = append(tips, r.tc.Before)
+			}
+			if l.BaseCommit != "" && l.Base == s.Base {
+				tips = append(tips, l.BaseCommit)
+			}
+			hist(n)
+		}
 	}
 	for _, t := range tips {
 		// The head may not exist locally, if the layer does not have it.
 		mb, err := r.git(ctx, "merge-base", t, l.old)
 		if err != nil || mb == f.commit {
-			f.trusted = f.trusted || mb == t && mb == f.commit
 			continue
 		}
 		if f.commit != "" {
@@ -525,16 +699,74 @@ func (r *restacker) forkPoint(ctx context.Context, l, below *layerState, merged 
 				continue
 			}
 		}
-		// Replaying from a head of the layer below also skips the commits it has the patches of.
-		f.commit, f.upstream, f.trusted = mb, mb, known || mb == t
-		if below != nil && t == below.old {
-			f.upstream = below.old
+		// Replaying from a head of the branch below also skips the commits it has the patches of.
+		f.commit, f.upstream = mb, mb
+		if t == skip {
+			f.upstream = skip
 		}
 	}
 	if f.commit == "" {
 		return nil, fmt.Errorf("#%d (%s): no commit in common with %s", l.Number, l.Branch, belowName("", below, merged))
 	}
+	if f.trusted = known; !known || len(lower) == 0 {
+		return f, nil
+	}
+	// A migration file that the layer and the branch below both added since the fork point means
+	// that the layer has commits the branch below had before it was rewritten, which GitHub did
+	// not record, like before its pull request was opened when its activity cannot be read.
+	files, err := r.addedByBoth(ctx, f.commit, l.old, lower)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) > 0 {
+		f.trusted = false
+		f.reason = fmt.Sprintf("cannot tell its commits from the ones of %s, as both add %s with different contents",
+			belowName(s.Base, below, merged), strings.Join(files, ", "))
+	}
 	return f, nil
+}
+
+// addedByBoth returns the migration files that the commit c added since the fork point,
+// and that one of the given heads has with other contents.
+func (r *restacker) addedByBoth(ctx context.Context, fork, c string, heads []string) ([]string, error) {
+	out, err := r.gitRaw(ctx, "diff", "--name-only", "-z", "--no-renames", "--diff-filter=A", fork, c, "--", r.sqlSpec())
+	if err != nil {
+		return nil, err
+	}
+	added := splitNUL(out)
+	if len(added) == 0 {
+		return nil, nil
+	}
+	blobs, err := r.blobs(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for _, h := range heads {
+		hblobs, err := r.blobs(ctx, h)
+		if err != nil {
+			return nil, err
+		}
+		for _, name := range added {
+			name = path.Base(name)
+			if b, ok := hblobs[name]; ok && b != blobs[name] && !slices.Contains(files, name) {
+				files = append(files, name)
+			}
+		}
+	}
+	slices.Sort(files)
+	return files, nil
+}
+
+// splitNUL splits the NUL-terminated output of a git command.
+func splitNUL(b []byte) []string {
+	var s []string
+	for _, e := range bytes.Split(b, []byte{0}) {
+		if len(e) > 0 {
+			s = append(s, string(e))
+		}
+	}
+	return s
 }
 
 // firstConflict returns the index of the lowest layer whose migration directory does not
@@ -549,7 +781,7 @@ func (r *restacker) firstConflict(ctx context.Context, base, trunk string, layer
 		if i > 0 {
 			parent, parentName = layers[i-1].old, fmt.Sprintf("#%d (%s)", layers[i-1].Number, layers[i-1].Branch)
 		}
-		ok, err := r.extends(ctx, parent, l.old)
+		ok, err := r.upToDate(ctx, parent, l)
 		if err != nil {
 			return 0, err
 		}
@@ -576,29 +808,74 @@ func (r *restacker) firstConflict(ctx context.Context, base, trunk string, layer
 	return -1, nil
 }
 
-// extends reports whether the migration directory of the commit c extends the
-// directory of the commit parent, meaning its atlas.sum starts with all the lines
-// of the parent's atlas.sum.
-func (r *restacker) extends(ctx context.Context, parent, c string) (bool, error) {
+// upToDate reports whether the migrations of the layer are on top of the ones of the parent commit:
+// its atlas.sum starts with all the files of the parent's, and the files it adds have later versions.
+// Atlas chains the hashes of the files, so a layer that edits a migration file of the parent has other
+// hashes for the files from it on. Such a layer is up to date, as long as the migrations of the parent
+// did not change since the layer was built on it.
+func (r *restacker) upToDate(ctx context.Context, parent string, l *layerState) (bool, error) {
 	ps, err := r.sumAt(ctx, parent)
 	if err != nil {
 		return false, err
 	}
-	cs, err := r.sumAt(ctx, c)
+	cs, err := r.sumAt(ctx, l.old)
 	if err != nil {
 		return false, err
 	}
-	return extendsSum(ps, cs), nil
+	switch {
+	case !r.onTop(ps, cs, false):
+		return false, nil
+	case r.onTop(ps, cs, true):
+		return true, nil
+	default:
+		return r.gitTest(ctx, "diff", "--quiet", l.fork.commit, parent, "--", r.sqlSpec(), r.sumSpec())
+	}
 }
 
-// extendsSum reports whether the hash file c starts with all the files of p.
-func extendsSum(p, c migrate.HashFile) bool {
-	return len(p) <= len(c) && slices.Equal(p, c[:len(p)])
+// onTop reports whether the hash file c starts with all the files of p, with the same hashes
+// if requested, and whether none of the files it adds has the version of a file of p. Atlas
+// orders the files by name, but rejects a directory with two files of the same version.
+func (r *restacker) onTop(p, c migrate.HashFile, hashes bool) bool {
+	if len(p) > len(c) {
+		return false
+	}
+	for i := range p {
+		if p[i].N != c[i].N || hashes && p[i].H != c[i].H {
+			return false
+		}
+	}
+	if !r.atlas {
+		return true
+	}
+	return !slices.ContainsFunc(c[len(p):], func(f struct{ N, H string }) bool {
+		return slices.ContainsFunc(p, func(pf struct{ N, H string }) bool { return fileVersion(pf.N) == fileVersion(f.N) })
+	})
+}
+
+// fileVersion returns the version of a migration file in the Atlas format.
+func fileVersion(name string) string {
+	v, _, _ := strings.Cut(strings.TrimSuffix(name, ".sql"), "_")
+	return v
+}
+
+// compareVersions compares two versions that are numbers, and reports whether they are.
+func compareVersions(a, b string) (int, bool) {
+	digits := func(s string) bool {
+		return s != "" && strings.IndexFunc(s, func(r rune) bool { return r < '0' || r > '9' }) < 0
+	}
+	if !digits(a) || !digits(b) {
+		return 0, false
+	}
+	a, b = strings.TrimLeft(a, "0"), strings.TrimLeft(b, "0")
+	if c := len(a) - len(b); c != 0 {
+		return c, true
+	}
+	return strings.Compare(a, b), true
 }
 
 // sumAt returns the atlas.sum of the migration directory at the given commit, or nil if it has none.
 func (r *restacker) sumAt(ctx context.Context, c string) (migrate.HashFile, error) {
-	name := path.Join(r.rel, migrate.HashFileName)
+	name := r.sumPath()
 	ok, err := r.gitTest(ctx, "rev-parse", "--quiet", "--verify", c+":"+name)
 	if err != nil || !ok {
 		return nil, err
@@ -621,15 +898,22 @@ func (r *restacker) restackLayer(ctx context.Context, l, below *layerState, pare
 	if err != nil {
 		return "", err
 	}
+	if err := r.checkMerges(ctx, l); err != nil {
+		return "", err
+	}
 	r.Infof("#%d (%s): replaying %s commit(s) onto %s (%s)", l.Number, l.Branch, commits, parentName, short(parent))
 	if _, err := r.git(ctx, "-c", "merge."+sumMergeDriver+".name=atlas-action", "-c", "merge."+sumMergeDriver+".driver=true",
 		"rebase", "--quiet", "--onto", parent, l.fork.upstream, l.old); err != nil {
-		files, _ := r.git(ctx, "diff", "--name-only", "--diff-filter=U")
+		out, _ := r.gitRaw(ctx, "diff", "--name-only", "-z", "--diff-filter=U")
 		if _, aerr := r.git(ctx, "rebase", "--abort"); aerr != nil {
 			err = errors.Join(err, aerr)
 		}
-		if files != "" {
-			return "", fmt.Errorf("conflicts with %s in %s", parentName, strings.Join(strings.Fields(files), ", "))
+		if files := splitNUL(out); len(files) > 0 {
+			msg := fmt.Sprintf("conflicts with %s in %s", parentName, strings.Join(files, ", "))
+			if slices.ContainsFunc(files, func(f string) bool { return path.Base(f) == migrate.HashFileName && f != r.sumPath() }) {
+				msg += fmt.Sprintf(". Restacks resolve only %s, and not the %s files of other migration directories", r.sumPath(), migrate.HashFileName)
+			}
+			return "", errors.New(msg)
 		}
 		return "", fmt.Errorf("failed to replay its commits onto %s: %w", parentName, err)
 	}
@@ -644,24 +928,31 @@ func (r *restacker) restackLayer(ctx context.Context, l, below *layerState, pare
 	if err != nil {
 		return "", err
 	}
-	if !extendsSum(ps, cs) {
-		own, err := r.ownFiles(ctx, parent, parentName, ps, cs)
+	if !r.onTop(ps, cs, true) {
+		own, err := r.ownFiles(ctx, l, parent, parentName, ps, cs)
 		if err != nil {
 			return "", err
 		}
 		if err := r.waitClock(ctx, ps, parentName, below != nil && below.stamped); err != nil {
 			return "", err
 		}
-		if err := r.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: r.dirURL, Files: own}); err != nil {
+		files, err := r.renameDuplicates(ctx, own, cs)
+		if err != nil {
+			return "", err
+		}
+		if err := r.Atlas.MigrateRebase(ctx, &atlasexec.MigrateRebaseParams{DirURL: r.dirURL, Files: files}); err != nil {
 			return "", fmt.Errorf("failed to rebase migrations: %w", err)
 		}
 		if cs, err = r.sumFile(); err != nil {
 			return "", err
 		}
-		if !extendsSum(ps, cs) {
+		if !r.onTop(ps, cs, true) {
 			return "", fmt.Errorf("its migrations are not on top of the ones of %s after `atlas migrate rebase`", parentName)
 		}
 		l.stamped = true
+		if latest := cs[len(cs)-1].N; r.last == "" || versionAfter(latest, r.last) {
+			r.last = latest
+		}
 		moved := slices.Clone(own)
 		// The files keep their order, after the ones of the parent.
 		if added := cs[len(ps):]; len(added) == len(own) {
@@ -695,18 +986,88 @@ func (r *restacker) restackLayer(ctx context.Context, l, below *layerState, pare
 	return r.git(ctx, "rev-parse", "HEAD")
 }
 
+// renameDuplicates gives the own files that have the version of another file a temporary version,
+// as Atlas cannot read a directory with two files of the same version, and returns the new names of
+// the own files. `atlas migrate rebase` then moves them on top, like the others.
+func (r *restacker) renameDuplicates(ctx context.Context, own []string, cs migrate.HashFile) ([]string, error) {
+	files := slices.Clone(own)
+	if !r.atlas {
+		return files, nil
+	}
+	// Files per version, including the ones excluded from atlas.sum.
+	count := make(map[string]int, len(cs))
+	for _, f := range cs {
+		count[fileVersion(f.N)]++
+	}
+	for _, name := range own {
+		if !slices.ContainsFunc(cs, func(f struct{ N, H string }) bool { return f.N == name }) {
+			count[fileVersion(name)]++
+		}
+	}
+	renamed := false
+	for i, name := range own {
+		v := fileVersion(name)
+		if count[v] < 2 {
+			continue
+		}
+		next := v + "0"
+		for count[next] > 0 {
+			next += "0"
+		}
+		count[v]--
+		count[next]++
+		files[i] = next + strings.TrimPrefix(name, v)
+		if err := os.Rename(filepath.Join(r.dir, name), filepath.Join(r.dir, files[i])); err != nil {
+			return nil, err
+		}
+		renamed = true
+	}
+	if renamed {
+		if err := r.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{DirURL: r.dirURL}); err != nil {
+			return nil, fmt.Errorf("failed to run `atlas migrate hash`: %w", err)
+		}
+	}
+	return files, nil
+}
+
+// checkMerges fails if a merge commit that the restack replays has changes of its own, as
+// a rebase drops merge commits, and replays only the commits they merged.
+func (r *restacker) checkMerges(ctx context.Context, l *layerState) error {
+	out, err := r.git(ctx, "rev-list", "--merges", l.fork.upstream+".."+l.old)
+	if err != nil {
+		return err
+	}
+	for _, m := range strings.Fields(out) {
+		// The changes of a merge commit, compared with merging its parents again.
+		b, err := r.gitRaw(ctx, "show", "--remerge-diff", "--format=", "--name-only", "-z", m)
+		if err != nil {
+			return fmt.Errorf("failed to check merge commit %s, which a restack drops (git 2.36 or later is required): %w", short(m), err)
+		}
+		files := slices.DeleteFunc(splitNUL(b), func(f string) bool { return f == r.sumPath() })
+		if len(files) > 0 {
+			return fmt.Errorf("merge commit %s has changes of its own in %s, which a restack drops", short(m), strings.Join(files, ", "))
+		}
+	}
+	return nil
+}
+
 // reSumIgnore matches the directive that excludes a migration file from atlas.sum.
 var reSumIgnore = regexp.MustCompile(`(?m)^--\s*atlas:sum\s+ignore\s*$`)
 
 // ownFiles returns the migration files the layer adds on top of the parent, and fails if
 // the layer edits, removes or duplicates the parent's migration files, as these cannot be
-// fixed by moving the layer's files.
-func (r *restacker) ownFiles(ctx context.Context, parent, parentName string, ps, cs migrate.HashFile) ([]string, error) {
+// fixed by moving the layer's files. A file is a duplicate if the restack created it: it
+// has the contents of a file of the parent, unlike the files the layer had before.
+func (r *restacker) ownFiles(ctx context.Context, l *layerState, parent, parentName string, ps, cs migrate.HashFile) ([]string, error) {
 	ptree, err := r.blobs(ctx, parent)
 	if err != nil {
 		return nil, err
 	}
 	ctree, err := r.blobs(ctx, "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	otree, err := r.blobs(ctx, l.old)
 	if err != nil {
 		return nil, err
 	}
@@ -724,8 +1085,18 @@ func (r *restacker) ownFiles(ctx context.Context, parent, parentName string, ps,
 			edited = append(edited, f.N)
 		}
 	}
+	count := func(tree map[string]string, blob string) (n int) {
+		for _, b := range tree {
+			if b == blob {
+				n++
+			}
+		}
+		return n
+	}
 	add := func(name string) {
-		if n := blobName(pblobs, ctree[name]); n != "" {
+		b := ctree[name]
+		// A layer may have copies of its own, like a migration it adds again, but the restack must not add any.
+		if n := blobName(pblobs, b); n != "" && count(ctree, b) > count(otree, b) {
 			dups = append(dups, fmt.Sprintf("%s (same as %s)", name, n))
 		} else {
 			own = append(own, name)
@@ -807,23 +1178,36 @@ func (r *restacker) blobs(ctx context.Context, c string) (map[string]string, err
 // that this run wrote are waited for as long as needed, as they run ahead of the clock by one
 // second per file. Others are waited for up to maxClockWait.
 func (r *restacker) waitClock(ctx context.Context, ps migrate.HashFile, parentName string, stamped bool) error {
-	if len(ps) == 0 {
+	var (
+		now  = r.now()
+		wait time.Duration
+		of   = parentName
+	)
+	if len(ps) > 0 {
+		latest := ps[len(ps)-1].N
+		if t, ok := versionTime(latest); ok {
+			if wait = t.Sub(now); wait > maxClockWait && !stamped {
+				return fmt.Errorf("the latest migration of %s, %s, is versioned %s ahead of the clock", parentName, latest, wait.Round(time.Second))
+			}
+		}
+	}
+	// Files moved for other stacks in this run, which may land before this one.
+	if t, ok := versionTime(r.last); ok && t.Sub(now) > wait {
+		wait, of = t.Sub(now), "the stacks restacked in this run"
+	}
+	if wait <= 0 {
 		return nil
 	}
-	latest := ps[len(ps)-1].N
-	t, ok := versionTime(latest)
-	if !ok {
-		return nil
-	}
-	wait := t.Sub(r.now())
-	switch {
-	case wait <= 0:
-		return nil
-	case wait > maxClockWait && !stamped:
-		return fmt.Errorf("the latest migration of %s, %s, is versioned %s ahead of the clock", parentName, latest, wait.Round(time.Second))
-	}
-	r.Infof("Waiting %s for the clock to pass the latest migration version of %s", wait.Round(time.Millisecond), parentName)
+	r.Infof("Waiting %s for the clock to pass the latest migration version of %s", wait.Round(time.Millisecond), of)
 	return r.sleep(ctx, wait)
+}
+
+// versionAfter reports whether the migration file a has a later version than b.
+func versionAfter(a, b string) bool {
+	if c, ok := compareVersions(fileVersion(a), fileVersion(b)); ok {
+		return c > 0
+	}
+	return a > b
 }
 
 // versionTime returns the earliest time whose version, in the 20060102150405 format, sorts
@@ -973,6 +1357,19 @@ func (r *restacker) installMergeDriver(ctx context.Context) (func() error, error
 	}, nil
 }
 
+// discard aborts a merge in progress, and discards the changes in the working tree.
+func (r *restacker) discard(ctx context.Context) error {
+	if _, err := r.git(ctx, "rev-parse", "--verify", "--quiet", "MERGE_HEAD"); err == nil {
+		if _, err := r.git(ctx, "merge", "--abort"); err != nil {
+			return err
+		}
+	}
+	if _, err := r.git(ctx, "reset", "--quiet", "--hard"); err != nil {
+		return err
+	}
+	return r.clean(ctx)
+}
+
 // clean removes the migration files that git does not track, which a failed restack may leave.
 // The migration directory had none when the run started.
 func (r *restacker) clean(ctx context.Context) error {
@@ -983,6 +1380,11 @@ func (r *restacker) clean(ctx context.Context) error {
 // sqlSpec returns the pathspec of the migration files.
 func (r *restacker) sqlSpec() string {
 	return ":(top,glob)" + path.Join(r.rel, "*.sql")
+}
+
+// sumPath returns the path of the atlas.sum file, relative to the repository root.
+func (r *restacker) sumPath() string {
+	return path.Join(r.rel, migrate.HashFileName)
 }
 
 // sumSpec returns the pathspec of the atlas.sum file.

@@ -6,6 +6,7 @@ package atlasaction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -327,9 +328,17 @@ func (c *GitHubClient) ForcePushes(ctx context.Context, numbers []int) (map[int]
 	return c.Client.ForcePushes(ctx, numbers)
 }
 
+// BranchHeads implements StackClient.
+func (c *GitHubClient) BranchHeads(ctx context.Context, branch string) ([]string, bool, error) {
+	return c.Client.BranchHeads(ctx, branch)
+}
+
 // Stack implements StackClient.
 func (c *GitHubClient) Stack(ctx context.Context, number int) (*Stack, error) {
 	s, err := c.Client.Stack(ctx, number)
+	if errors.Is(err, github.ErrNotFound) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

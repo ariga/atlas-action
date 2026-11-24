@@ -85,6 +85,46 @@ func TestWaitClock(t *testing.T) {
 	// Far ahead, but written by this run.
 	require.NoError(t, r.waitClock(context.Background(), sum("20261124000000_a.sql"), "#1 (A)", true))
 	require.Equal(t, []time.Duration{37*time.Minute + time.Second}, slept)
+	// Behind the clock, but this run wrote a later version for another stack.
+	slept, r.last = nil, "20261123232310_x.sql"
+	require.NoError(t, r.waitClock(context.Background(), sum("20261123232259_a.sql"), "main", false))
+	require.Equal(t, []time.Duration{11 * time.Second}, slept)
+	// Both are ahead, and the later one is waited for.
+	slept = nil
+	require.NoError(t, r.waitClock(context.Background(), sum("20261123232320_a.sql"), "main", false))
+	require.Equal(t, []time.Duration{21 * time.Second}, slept)
+}
+
+func TestVersions(t *testing.T) {
+	r := &restacker{atlas: true}
+	sum := func(names ...string) migrate.HashFile {
+		hf := make(migrate.HashFile, len(names))
+		for i, n := range names {
+			hf[i].N, hf[i].H = n, "h"+n
+		}
+		return hf
+	}
+	p := sum("1_a.sql", "20260105000000_x1.sql")
+	require.True(t, r.onTop(p, p, true))
+	require.True(t, r.onTop(p, sum("1_a.sql", "20260105000000_x1.sql", "20260105000001_y1.sql"), true))
+	// The same version as a file of the parent.
+	require.False(t, r.onTop(p, sum("1_a.sql", "20260105000000_x1.sql", "20260105000000_y1.sql"), true))
+	// Atlas orders the files by name, so a version that sorts after the others is on top.
+	require.True(t, r.onTop(sum("1_a.sql", "20_b.sql"), sum("1_a.sql", "20_b.sql", "3_c.sql"), true))
+	// Other hashes.
+	c := sum("1_a.sql", "20260105000000_x1.sql", "20260106000000_y1.sql")
+	c[1].H = "edited"
+	require.False(t, r.onTop(p, c, true))
+	require.True(t, r.onTop(p, c, false))
+	require.False(t, r.onTop(p, sum("1_a.sql"), false))
+	// Other directory formats.
+	r.atlas = false
+	require.True(t, r.onTop(p, sum("1_a.sql", "20260105000000_x1.sql", "20260105000000_y1.sql"), true))
+
+	require.True(t, versionAfter("20261123222860_a.sql", "20261123222859_b.sql"))
+	require.True(t, versionAfter("10_a.sql", "9_b.sql"))
+	require.False(t, versionAfter("9_a.sql", "10_b.sql"))
+	require.False(t, versionAfter("1_b.sql", "1_a.sql"))
 }
 
 func TestGitCommand(t *testing.T) {

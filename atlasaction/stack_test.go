@@ -6,11 +6,14 @@ package atlasaction_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -108,16 +111,21 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 
 	t.Run("LowerLayerPushed", func(t *testing.T) {
 		for _, tt := range []struct {
-			name      string
-			branch    string // The branch the action runs on.
-			before    bool   // Whether the action knows the previous head of A from the push.
-			base      bool   // Whether GitHub reports the previous head of A as the base of B.
-			history   bool   // Whether the force-pushes of A are known.
-			wantError string
+			name       string
+			branch     string // The branch the action runs on.
+			before     bool   // Whether the action knows the previous head of A from the push.
+			base       bool   // Whether GitHub reports the previous head of A as the base of B.
+			history    bool   // Whether the history of A is known.
+			noTimeline bool   // Whether only the activity of the branch of A is known.
+			wantError  string
 		}{
-			{name: "PushEvent", branch: "A", before: true},
-			{name: "BaseCommit", branch: "C", base: true},
+			{name: "PushEvent", branch: "A", before: true, history: true},
 			{name: "History", branch: "C", history: true},
+			// The force-pushes of A cannot be read, but the activity of its branch can.
+			{name: "Activity", branch: "C", history: true, noTimeline: true},
+			// Without the history, the heads A is known to have had cannot tell whether
+			// it dropped commits that B has, so the fork point is not trusted.
+			{name: "NoHistory", branch: "A", before: true, base: true, wantError: "#2 (B): cannot find the commit of #1 (A) it was built on. Nothing was pushed"},
 			{name: "Unknown", branch: "C", wantError: "#2 (B): cannot find the commit of #1 (A) it was built on. Nothing was pushed"},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
@@ -138,7 +146,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				if !tt.base {
 					s.Layers[1].BaseCommit = ""
 				}
-				o := run{branch: tt.branch, noHistory: !tt.history}
+				o := run{branch: tt.branch, noHistory: !tt.history, noTimeline: tt.noTimeline}
 				if tt.before {
 					o.before = before
 				}
@@ -321,12 +329,12 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				wantError: "#2 (B): it edits migration files of #1 (A)",
 			},
 			{
+				// A copy the pull request made itself is its own migration.
 				name: "Copy",
 				change: func(r *stackRepo) {
 					r.file("B", "migrations/20260103000001_copy.sql", "CREATE TABLE a1 (id int);\n")
 					r.hash("B")
 				},
-				wantError: "#2 (B): it has copies of migration files of #1 (A): 20260103000001_copy.sql (same as 20260102000000_a1.sql)",
 			},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
@@ -348,6 +356,12 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 
 				tips := r.tips("A", "B")
 				act, logs, err := r.run(s, run{branch: "A", before: before})
+				if tt.wantError == "" {
+					require.NoError(t, err, logs)
+					require.Equal(t, "true", act.output["rebased"])
+					r.requireStack("main", "A", "B")
+					return
+				}
 				require.ErrorContains(t, err, tt.wantError, logs)
 				require.ErrorContains(t, err, "Nothing was pushed. Restack it locally with `gh stack rebase`")
 				require.Equal(t, "false", act.output["rebased"])
@@ -693,12 +707,485 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Equal(t, tips[1:], r.tips("B", "C"))
 	})
 
+	t.Run("RewrittenBeforeOpened", func(t *testing.T) {
+		for _, tt := range []struct {
+			name      string
+			rewrite   func(*stackRepo)
+			want      []string // Migrations of B with the activity of A.
+			wantError string   // Regular expression of the error when the activity of A does not go back that far.
+		}{
+			{
+				// a1 is amended in place, as in `git commit --amend`.
+				name: "Amended",
+				rewrite: func(r *stackRepo) {
+					r.checkout("A")
+					r.git(r.dev, "reset", "--quiet", "--hard", "main")
+					r.migrationSQL("A", "20260102000000", "a1", "CREATE TABLE a1 (id bigint);\n")
+				},
+				want:      []string{"init", "m1", "a1", "b1"},
+				wantError: `#2 \(B\): cannot tell its commits from the ones of #1 \(A\), as both add 20260102000000_a1\.sql with different contents\. Nothing was pushed`,
+			},
+			{
+				// A is rebased onto the trunk, and a1 is moved on top of the trunk's migrations.
+				name: "Renamed",
+				rewrite: func(r *stackRepo) {
+					r.migration("main", "20260101000100", "m0")
+					r.push("main")
+					r.checkout("A")
+					r.git(r.dev, "reset", "--quiet", "--hard", "main")
+					r.migration("A", "20260102000100", "a1")
+				},
+				want:      []string{"init", "m0", "m1", "a1", "b1"},
+				wantError: `#2 \(B\): it has copies of migration files of #1 \(A\): 20260102000000_a1\.sql \(same as \d{14}_a1\.sql\)\. Nothing was pushed`,
+			},
+			{
+				// A drops a migration that B was built on. Only the activity of A tells.
+				name: "Rewound",
+				rewrite: func(r *stackRepo) {
+					r.checkout("A")
+					r.git(r.dev, "reset", "--quiet", "--hard", "HEAD~1")
+				},
+				want: []string{"init", "m1", "a1", "b1"},
+			},
+		} {
+			for _, activity := range []string{"", "partial"} {
+				if activity != "" && tt.wantError == "" {
+					continue
+				}
+				t.Run(tt.name+"/Activity="+cmp.Or(activity, "full"), func(t *testing.T) {
+					r := newStackRepo(t)
+					r.branch("A", "main")
+					r.migration("A", "20260102000000", "a1")
+					if tt.name == "Rewound" {
+						r.migration("A", "20260102000100", "bad")
+					}
+					r.branch("B", "A")
+					r.migration("B", "20260103000000", "b1")
+					r.push("A", "B")
+					// A is rewritten before the pull requests are opened, which only the activity of its branch records.
+					tt.rewrite(r)
+					r.forcePush("A")
+					s := r.stack(15, "main", "A", "B")
+					r.migration("main", "20260105000000", "m1")
+					r.push("main")
+					tips := r.tips("A", "B")
+					act, logs, err := r.run(s, run{branch: "main", activity: activity})
+					if activity == "partial" {
+						require.Error(t, err, logs)
+						require.Regexp(t, tt.wantError, err.Error())
+						require.Contains(t, logs, `The activity of branch \"A\" does not go back to its creation, using the force-pushes of #1`)
+						require.Equal(t, "false", act.output["rebased"])
+						require.Equal(t, tips, r.tips("A", "B"), "nothing is pushed")
+						return
+					}
+					require.NoError(t, err, logs)
+					require.Equal(t, "true", act.output["rebased"])
+					r.requireStack("main", "A", "B")
+					require.Equal(t, tt.want, r.names("B"))
+					require.Equal(t, []string{"B: add b1", botMessage}, r.log("A", "B"), "the old commits of A are not replayed")
+				})
+			}
+		}
+	})
+
+	t.Run("ActivityNotAvailable", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.branch("C", "B")
+		r.migration("C", "20260104000000", "c1")
+		r.push("A", "B", "C")
+		s := r.stack(22, "main", "A", "B", "C")
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		// The force-pushes of the pull requests are used, and the activity is tried only once.
+		_, logs, err := r.run(s, run{branch: "main", activity: "none"})
+		require.NoError(t, err, logs)
+		r.requireStack("main", "A", "B", "C")
+		require.Equal(t, 1, strings.Count(logs, "failed to read the activity of branch"), logs)
+	})
+
+	t.Run("RewoundBelow", func(t *testing.T) {
+		for _, history := range []bool{true, false} {
+			t.Run(fmt.Sprint("History=", history), func(t *testing.T) {
+				r := newStackRepo(t)
+				r.branch("A", "main")
+				r.migration("A", "20260102000000", "a1")
+				r.migration("A", "20260102000100", "bad")
+				r.branch("B", "A")
+				r.migration("B", "20260103000000", "b1")
+				r.push("A", "B")
+				s := r.stack(16, "main", "A", "B")
+				// A drops its last commit, and B is not restacked. GitHub compares B with the new head of A.
+				r.checkout("A")
+				r.git(r.dev, "reset", "--quiet", "--hard", "HEAD~1")
+				r.forcePush("A")
+				s.Layers[1].BaseCommit = r.tip("A")
+				r.migration("main", "20260105000000", "m1")
+				r.push("main")
+				tips := r.tips("A", "B")
+				act, logs, err := r.run(s, run{branch: "main", noHistory: !history})
+				if !history {
+					require.ErrorContains(t, err, "#2 (B): cannot find the commit of #1 (A) it was built on. Nothing was pushed", logs)
+					require.Equal(t, "false", act.output["rebased"])
+					require.Equal(t, tips, r.tips("A", "B"))
+					return
+				}
+				require.NoError(t, err, logs)
+				r.requireStack("main", "A", "B")
+				require.Equal(t, []string{"init", "m1", "a1", "b1"}, r.names("B"), "the dropped migration is not brought back")
+			})
+		}
+	})
+
+	t.Run("UnreadableHistory", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.branch("C", "B")
+		r.migration("C", "20260104000000", "c1")
+		r.branch("D", "C")
+		r.migration("D", "20260104000100", "d1")
+		r.push("A", "B", "C", "D")
+		s := r.stack(7, "main", "A", "B", "C", "D")
+		// A is amended after B was built on it, and lands.
+		r.amend("A", "A: add a1 (amended)")
+		r.forcePush("A")
+		r.land(s, 0)
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		// The history of #3 cannot be read, which stops only the restack that needs it.
+		tips := r.tips("B", "C", "D")
+		_, logs, err := r.run(s, run{branch: "main", unreadable: []int{3}})
+		require.ErrorContains(t, err, "stack #7: #4 (D): cannot find the commit of #3 (C) it was built on. Nothing was pushed", logs)
+		require.NotContains(t, err.Error(), "#2 (B)")
+		require.Contains(t, logs, "failed to get the force-pushes of pull request #3")
+		require.Equal(t, tips, r.tips("B", "C", "D"))
+		// Once it can be read, the stack is restacked from the history of the merged #1.
+		act, logs, err := r.run(s, run{branch: "main"})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("main", "B", "C", "D")
+		require.Equal(t, []string{"B: add b1", botMessage}, r.log("main", "B"))
+	})
+
+	t.Run("SameVersion", func(t *testing.T) {
+		// Y is restacked in the same second as X, which then lands.
+		r := newStackRepo(t)
+		r.branch("Y", "main")
+		r.migration("Y", "20260105000000", "y1")
+		r.push("Y")
+		s := r.stack(12, "main", "Y")
+		r.migration("main", "20260105000000", "x1")
+		r.push("main")
+		act, logs, err := r.run(s, run{branch: "main"})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("main", "Y")
+		require.Equal(t, []string{"init", "x1", "y1"}, r.names("Y"))
+		require.Greater(t, r.versions("Y")[2], "20260105000000")
+
+		// A branch that already has the trunk's migration, and its own of the same version.
+		r2 := newStackRepo(t)
+		r2.migration("main", "20260105000000", "x1")
+		r2.push("main")
+		r2.branch("Y", "main")
+		r2.migration("Y", "20260105000000", "y1")
+		r2.push("Y")
+		s2 := r2.stack(12, "main", "Y")
+		act, logs, err = r2.run(s2, run{branch: "main"})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		require.Contains(t, logs, "#1 (Y): migrations conflict with main")
+		r2.requireStack("main", "Y")
+	})
+
+	t.Run("MergeInLayer", func(t *testing.T) {
+		for _, tt := range []struct {
+			name      string
+			own       bool   // Whether the merge commit has changes of its own.
+			wantError string // Regular expression.
+		}{
+			{name: "Clean"},
+			{name: "OwnChanges", own: true, wantError: `#1 \(A\): merge commit [0-9a-f]{7} has changes of its own in fix\.txt, which a restack drops\. Nothing was pushed`},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				r := newStackRepo(t)
+				r.file("main", "app.txt", "v1\n")
+				r.push("main")
+				r.branch("A", "main")
+				r.migration("A", "20260102000000", "a1")
+				r.push("A")
+				s := r.stack(17, "main", "A")
+				r.file("main", "app.txt", "v2\n")
+				r.push("main")
+				// The developer merges the trunk into A.
+				r.checkout("A")
+				r.git(r.dev, "merge", "--quiet", "--no-ff", "--no-commit", "main")
+				if tt.own {
+					require.NoError(t, os.WriteFile(filepath.Join(r.dev, "fix.txt"), []byte("fix\n"), 0644))
+					r.git(r.dev, "add", "fix.txt")
+				}
+				r.git(r.dev, "commit", "--quiet", "--message", "Merge main into A")
+				r.push("A")
+				r.migration("main", "20260105000000", "m1")
+				r.push("main")
+				tips := r.tips("A")
+				act, logs, err := r.run(s, run{branch: "main"})
+				if tt.wantError != "" {
+					require.Error(t, err, logs)
+					require.Regexp(t, tt.wantError, err.Error())
+					require.Equal(t, "false", act.output["rebased"])
+					require.Equal(t, tips, r.tips("A"))
+					return
+				}
+				require.NoError(t, err, logs)
+				r.requireStack("main", "A")
+				require.Equal(t, "v2", r.gitOut(r.origin, "show", "A:app.txt"))
+			})
+		}
+	})
+
+	t.Run("TrunkWithPullRequestConflict", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.file("main", "app.txt", "base\n")
+		r.push("main")
+		r.branch("develop", "main")
+		r.file("develop", "app.txt", "develop\n")
+		r.branch("A", "develop")
+		r.migration("A", "20260102000000", "a1")
+		r.push("develop", "A")
+		s := r.stack(14, "develop", "A")
+		r.file("main", "app.txt", "main\n")
+		r.push("main")
+		r.migration("develop", "20260105000000", "d1")
+		r.push("develop")
+		// The pull request of develop conflicts with main in other files, which does not stop the stack.
+		act, logs, err := r.run(s, run{branch: "develop", prs: []*atlasaction.PullRequest{{Number: 99, Ref: "develop", Base: "main"}}})
+		require.ErrorContains(t, err, "conflict found in files other than migrations/atlas.sum", logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("develop", "A")
+		require.Empty(t, r.gitOut(r.ci, "status", "--porcelain"))
+		require.Equal(t, "develop", r.gitOut(r.ci, "symbolic-ref", "--short", "HEAD"))
+	})
+
+	t.Run("ReAdded", func(t *testing.T) {
+		// A pull request adds a migration with the contents of an earlier one.
+		r := newStackRepo(t)
+		r.migrationSQL("main", "20260101000100", "add_email", "ALTER TABLE init ADD COLUMN email text;\n")
+		r.migrationSQL("main", "20260101000200", "drop_email", "ALTER TABLE init DROP COLUMN email;\n")
+		r.push("main")
+		r.branch("A", "main")
+		r.migrationSQL("A", "20260102000000", "readd_email", "ALTER TABLE init ADD COLUMN email text;\n")
+		r.push("A")
+		s := r.stack(18, "main", "A")
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		_, logs, err := r.run(s, run{branch: "main"})
+		require.NoError(t, err, logs)
+		r.requireStack("main", "A")
+		require.Equal(t, []string{"init", "add_email", "drop_email", "m1", "readd_email"}, r.names("A"))
+
+		// Empty drafts have the same contents.
+		r2 := newStackRepo(t)
+		r2.branch("A", "main")
+		r2.migrationSQL("A", "20260102000000", "draft_a", "")
+		r2.branch("B", "A")
+		r2.migrationSQL("B", "20260103000000", "draft_b", "")
+		r2.push("A", "B")
+		s2 := r2.stack(18, "main", "A", "B")
+		r2.migration("main", "20260105000000", "m1")
+		r2.push("main")
+		_, logs, err = r2.run(s2, run{branch: "main"})
+		require.NoError(t, err, logs)
+		r2.requireStack("main", "A", "B")
+	})
+
+	t.Run("EditsBelow", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.file("B", "migrations/20260102000000_a1.sql", "CREATE TABLE a1 (id int, c int);\n")
+		r.hash("B")
+		r.push("A", "B")
+		s := r.stack(19, "main", "A", "B")
+		tips := r.tips("A", "B")
+		// Nothing moved, so the stack does not need a restack.
+		for _, branch := range []string{"B", "A"} {
+			act, logs, err := r.run(s, run{branch: branch})
+			require.NoError(t, err, logs)
+			require.Equal(t, "false", act.output["rebased"])
+			require.Contains(t, logs, "Migrations of all the pull requests are up to date")
+		}
+		r.file("main", "other.txt", "main\n")
+		r.push("main")
+		act, logs, err := r.run(s, run{branch: "main"})
+		require.NoError(t, err, logs)
+		require.Equal(t, "false", act.output["rebased"])
+		require.Equal(t, tips, r.tips("A", "B"))
+		// The trunk gets a migration, and B cannot be restacked without its edit of a1.
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		_, logs, err = r.run(s, run{branch: "main"})
+		require.ErrorContains(t, err, "#2 (B): ", logs)
+		require.ErrorContains(t, err, "Nothing was pushed")
+		require.Equal(t, tips[1], r.tip("B"))
+	})
+
+	t.Run("LookupErrors", func(t *testing.T) {
+		r := newStackRepo(t)
+		for _, b := range []string{"X", "Y", "Z"} {
+			r.branch(b, "main")
+			r.migration(b, "20260102000000", strings.ToLower(b)+"1")
+		}
+		r.push("X", "Y", "Z")
+		stacks := []*atlasaction.Stack{
+			r.stackAt(11, 1, "main", "X"),
+			r.stackAt(12, 2, "main", "Y"),
+			r.stackAt(13, 3, "main", "Z"),
+		}
+		// #12 is unstacked after the pull requests were listed.
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		tips := r.tips("Y")
+		act, logs, err := r.run(nil, run{branch: "main", stacks: stacks, unstacked: []int{12}})
+		require.NoError(t, err, logs)
+		require.Contains(t, logs, "Stack #12 of pull request #2 was not found, skipping it")
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("main", "X")
+		r.requireStack("main", "Z")
+		require.Equal(t, tips, r.tips("Y"))
+		// Stacks restacked in one run get different versions, as either may land first.
+		require.Greater(t, r.versions("Z")[2], r.versions("X")[2])
+		// The lookup of #12 fails, and the other stacks are still restacked.
+		r.migration("main", "20260106000000", "m2")
+		r.push("main")
+		act, logs, err = r.run(nil, run{branch: "main", stacks: stacks, stackErrs: map[int]error{12: errors.New("502 Bad Gateway")}})
+		require.ErrorContains(t, err, "failed to get stack #12: 502 Bad Gateway", logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("main", "X")
+		r.requireStack("main", "Z")
+		require.Equal(t, tips, r.tips("Y"))
+		// No stack is found.
+		_, logs, err = r.run(nil, run{branch: "main", stacks: stacks, unstacked: []int{11, 12, 13}})
+		require.ErrorContains(t, err, "none of the stacks of the pull requests that target \"main\" was found (#11, #12, #13)", logs)
+	})
+
+	t.Run("StackOnStack", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.branch("auth", "main")
+		r.migration("auth", "20260102000000", "auth1")
+		r.branch("api", "auth")
+		r.migration("api", "20260103000000", "api1")
+		r.branch("ui", "auth")
+		r.migration("ui", "20260104000000", "ui1")
+		r.push("auth", "api", "ui")
+		stacks := []*atlasaction.Stack{
+			r.stackAt(5, 1, "main", "auth", "api"),
+			r.stackAt(9, 11, "auth", "ui"), // Based on a branch of the stack above.
+		}
+		// A migration pushed to auth restacks both stacks.
+		before := r.tip("auth")
+		r.migration("auth", "20260102000100", "auth2")
+		r.push("auth")
+		act, logs, err := r.run(nil, run{branch: "auth", before: before, stacks: stacks})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("main", "auth", "api")
+		r.requireStack("auth", "ui")
+		// A migration on main restacks auth, and then ui onto the new auth.
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		act, logs, err = r.run(nil, run{branch: "main", stacks: stacks})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("main", "auth", "api")
+		r.requireStack("auth", "ui")
+		require.Equal(t, []string{"init", "m1", "auth1", "auth2", "ui1"}, r.names("ui"))
+		require.Equal(t, []string{"ui: add ui1", botMessage}, r.log("auth", "ui"), "the old commits of auth are not replayed")
+		// auth gets a migration, squashed into its last commit, and its push restacks the stacks on it.
+		before = r.tip("auth")
+		r.git(r.dev, "fetch", "--quiet", "origin")
+		r.git(r.dev, "checkout", "--quiet", "-B", "auth", "origin/auth")
+		r.migration("auth", time.Now().UTC().Add(2*time.Second).Format("20060102150405"), "auth3")
+		r.git(r.dev, "reset", "--quiet", "--soft", "HEAD~2")
+		r.git(r.dev, "commit", "--quiet", "--message", "auth: squashed")
+		r.forcePush("auth")
+		// Without the force-pushes of auth, its old commits cannot be told from the ones of ui.
+		tips := r.tips("api", "ui")
+		_, logs, err = r.run(nil, run{branch: "auth", stacks: stacks, unreadable: []int{1}})
+		require.ErrorContains(t, err, "stack #9: #11 (ui): cannot find the commit of auth it was built on. Nothing was pushed", logs)
+		require.ErrorContains(t, err, "stack #5: #2 (api): cannot find the commit of #1 (auth) it was built on. Nothing was pushed")
+		require.Equal(t, tips, r.tips("api", "ui"))
+		_, logs, err = r.run(nil, run{branch: "auth", before: before, stacks: stacks})
+		require.NoError(t, err, logs)
+		r.requireStack("main", "auth", "api")
+		r.requireStack("auth", "ui")
+		require.Equal(t, []string{"ui: add ui1", botMessage}, r.log("auth", "ui"), "the old commits of auth are not replayed")
+		require.Equal(t, []string{"api: add api1", botMessage}, r.log("auth", "api"))
+	})
+
+	t.Run("TwoDirectories", func(t *testing.T) {
+		r := newStackRepo(t)
+		other := func(branch, version, name string) {
+			r.checkout(branch)
+			dir := filepath.Join(r.dev, "other")
+			require.NoError(t, os.MkdirAll(dir, 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, version+"_"+name+".sql"), []byte("CREATE TABLE "+name+" (id int);\n"), 0644))
+			r.atlas(r.dev, "migrate", "hash", "--dir", "file://other")
+			r.git(r.dev, "add", "--all")
+			r.git(r.dev, "commit", "--quiet", "--message", branch+": add "+name)
+		}
+		other("main", "20260101000000", "o0")
+		r.push("main")
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		other("A", "20260102000000", "oa1")
+		r.push("A")
+		s := r.stack(20, "main", "A")
+		r.migration("main", "20260105000000", "m1")
+		other("main", "20260105000000", "o1")
+		r.push("main")
+		_, logs, err := r.run(s, run{branch: "main"})
+		require.ErrorContains(t, err, "#1 (A): conflicts with main in other/atlas.sum. Restacks resolve only migrations/atlas.sum, and not the atlas.sum files of other migration directories", logs)
+	})
+
+	t.Run("ConflictNames", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		r.push("A")
+		s := r.stack(21, "main", "A")
+		for _, b := range []string{"A", "main"} {
+			r.checkout(b)
+			for _, name := range []string{"release notes.md", "café.txt"} {
+				require.NoError(t, os.WriteFile(filepath.Join(r.dev, name), []byte(b+"\n"), 0644))
+			}
+			r.git(r.dev, "add", "--all")
+			r.git(r.dev, "commit", "--quiet", "--message", b+": notes")
+		}
+		r.migration("main", "20260105000000", "m1")
+		r.push("main", "A")
+		_, logs, err := r.run(s, run{branch: "main"})
+		require.ErrorContains(t, err, "#1 (A): conflicts with main in café.txt, release notes.md. Nothing was pushed", logs)
+	})
+
 	t.Run("Errors", func(t *testing.T) {
 		r := newStackRepo(t)
 		r.branch("A", "main")
 		r.push("A")
 		s := r.stack(1, "main", "A")
 		other := &atlasaction.Stack{Number: 2, Open: true, Base: "main", Layers: []atlasaction.StackLayer{{Number: 9, Branch: "A", Base: "main", Open: true}}}
+		for _, ci := range []atlasexec.TriggerType{atlasexec.TriggerTypeCircleCIOrb, atlasexec.TriggerTypeAzureDevOps, atlasexec.TriggerTypeGitlab} {
+			_, _, err := r.run(s, run{branch: "A", ci: ci})
+			require.EqualError(t, err, fmt.Sprintf(`the "stack" input is supported only on GitHub Actions, not on %s`, ci))
+		}
 		_, _, err := r.run(nil, run{branch: "A", stacks: []*atlasaction.Stack{s, other}})
 		require.EqualError(t, err, `branch "A" belongs to more than one stack (#1, #2), restack them manually`)
 
@@ -706,6 +1193,9 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.EqualError(t, err, `the "stack" input cannot be used with "base-sha" or "force-rebase"`)
 		_, _, err = r.run(s, run{branch: "A", inputs: map[string]string{"force-rebase": "true"}})
 		require.EqualError(t, err, `the "stack" input cannot be used with "base-sha" or "force-rebase"`)
+		// A blank input is not set, as without the "stack" input.
+		_, logs, err := r.run(s, run{branch: "A", inputs: map[string]string{"base-sha": " \n"}})
+		require.NoError(t, err, logs)
 		_, _, err = r.run(s, run{branch: "", scm: func(*stackSCM) atlasaction.SCMClient { return nil }})
 		require.EqualError(t, err, `the "stack" input is supported only for repositories hosted on GitHub`)
 		_, _, err = r.run(s, run{branch: "A", scm: func(*stackSCM) atlasaction.SCMClient { return &mockSCM{} }})
@@ -726,6 +1216,36 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		_, _, err = r.run(s, run{branch: "A"})
 		require.ErrorContains(t, err, "restacking requires the full git history, set `fetch-depth: 0` in actions/checkout")
 	})
+}
+
+func TestGitHubClientStacks(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/owner/repo/stacks/4":
+			_, _ = w.Write([]byte(`{"number":4,"open":true,"base":{"ref":"main"},"pull_requests":[` +
+				`{"number":1,"state":"closed","merged_at":"2026-11-23T20:10:58Z","head":{"ref":"a","sha":"a1"},"base":{"ref":"main","sha":"m1"}},` +
+				`{"number":2,"state":"open","merged_at":null,"head":{"ref":"b","sha":"b1"},"base":{"ref":"main","sha":"m2"}}]}`))
+		case "/repos/owner/repo/stacks/6":
+			w.WriteHeader(http.StatusBadGateway)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+	c, err := atlasaction.NewGitHubClient("owner/repo", srv.URL, "token")
+	require.NoError(t, err)
+	s, err := c.Stack(context.Background(), 4)
+	require.NoError(t, err)
+	require.Equal(t, &atlasaction.Stack{Number: 4, Open: true, Base: "main", Layers: []atlasaction.StackLayer{
+		{Number: 1, Branch: "a", Commit: "a1", Base: "main", BaseCommit: "m1", Merged: true},
+		{Number: 2, Branch: "b", Commit: "b1", Base: "main", BaseCommit: "m2", Open: true},
+	}}, s)
+	// A stack that is not found is nil.
+	s, err = c.Stack(context.Background(), 5)
+	require.NoError(t, err)
+	require.Nil(t, s)
+	_, err = c.Stack(context.Background(), 6)
+	require.ErrorContains(t, err, "unexpected status code 502")
 }
 
 func TestGitHubTriggerContextBefore(t *testing.T) {
@@ -762,15 +1282,29 @@ type (
 		origin  string
 		dev, ci string
 		ciLink  string // Symbolic link to the clone of the action, to run it from.
+		// Number of entries in the reflog of each branch when its pull request
+		// was opened, as GitHub records the force-pushes only from then on.
+		opened map[string]int
 	}
 	// stackSCM is a GitHub client that serves stacks of pull requests. It reads the
 	// force-pushes of their branches from the reflog of the remote.
 	stackSCM struct {
 		mockSCM
-		origin     string
-		prs        []*atlasaction.PullRequest
-		stacks     []*atlasaction.Stack
-		historyErr error
+		origin      string
+		opened      map[string]int
+		prs         []*atlasaction.PullRequest
+		stacks      []*atlasaction.Stack
+		historyErr  error
+		activityErr error         // Error of reading the activity of any branch.
+		partial     bool          // Whether the activity of the branches does not go back to their creation.
+		noHistory   []int         // Pull requests whose force-pushes and branch activity cannot be read.
+		stackErrs   map[int]error // Errors of the stack lookups.
+		unstacked   []int         // Stacks that are not found.
+	}
+	// otherCI is an action that runs on a CI platform other than GitHub Actions.
+	otherCI struct {
+		*mockAction
+		ci atlasexec.TriggerType
 	}
 	// run configures a run of the action, on a push to the branch.
 	run struct {
@@ -779,11 +1313,20 @@ type (
 		commit    string // Head of the branch after the push, the head of the branch by default.
 		stacks    []*atlasaction.Stack
 		prs       []*atlasaction.PullRequest
-		noHistory bool // Whether the force-pushes of the pull requests are unknown.
-		inputs    map[string]string
-		exec      func(context.Context, string, ...string) *exec.Cmd
-		wd        string // Working directory, relative to the clone.
-		scm       func(*stackSCM) atlasaction.SCMClient
+		noHistory bool // Whether the history of the branches is unknown: their activity, and the force-pushes of their pull requests.
+		// activity is "none" if the activity of the branches cannot be read, and "partial"
+		// if it does not go back to their creation, like after a retention period.
+		activity   string
+		noTimeline bool // Whether the force-pushes of the pull requests cannot be read.
+		// Pull requests whose force-pushes cannot be read, while the others can.
+		unreadable []int
+		stackErrs  map[int]error         // Errors of the stack lookups.
+		unstacked  []int                 // Stacks that are unstacked after their pull requests were listed.
+		ci         atlasexec.TriggerType // The CI platform the action runs on, GitHub Actions by default.
+		inputs     map[string]string
+		exec       func(context.Context, string, ...string) *exec.Cmd
+		wd         string // Working directory, relative to the clone.
+		scm        func(*stackSCM) atlasaction.SCMClient
 	}
 )
 
@@ -798,6 +1341,7 @@ func newStackRepo(t *testing.T, dir ...string) *stackRepo {
 		origin: filepath.Join(root, "origin.git"),
 		dev:    filepath.Join(root, "dev"),
 		ci:     filepath.Join(root, "ci"),
+		opened: make(map[string]int),
 	}
 	if len(dir) > 0 && dir[0] != "" {
 		r.dir = dir[0]
@@ -1018,9 +1562,16 @@ func (r *stackRepo) requireStack(base string, branches ...string) {
 
 // stack returns a stack of the given branches, from the bottom up, as GitHub reports it.
 func (r *stackRepo) stack(n int, base string, branches ...string) *atlasaction.Stack {
+	return r.stackAt(n, 1, base, branches...)
+}
+
+// stackAt returns a stack of the given branches, whose pull requests are numbered from first.
+// Their pull requests are opened now.
+func (r *stackRepo) stackAt(n, first int, base string, branches ...string) *atlasaction.Stack {
 	s := &atlasaction.Stack{Number: n, Open: true, Base: base}
 	for i, b := range branches {
-		l := atlasaction.StackLayer{Number: i + 1, Branch: b, Commit: r.tip(b), Base: base, Open: true}
+		r.opened[b] = len(strings.Fields(r.gitOut(r.origin, "reflog", "show", "--format=%H", "refs/heads/"+b)))
+		l := atlasaction.StackLayer{Number: first + i, Branch: b, Commit: r.tip(b), Base: base, Open: true}
 		if i > 0 {
 			l.Base = branches[i-1]
 		}
@@ -1037,13 +1588,25 @@ func (r *stackRepo) stack(n int, base string, branches ...string) *atlasaction.S
 // run runs the action on a push to the branch, in the clone of the action.
 func (r *stackRepo) run(s *atlasaction.Stack, o run) (*mockAction, string, error) {
 	r.t.Helper()
-	scm := &stackSCM{origin: r.origin, prs: o.prs, stacks: o.stacks}
+	scm := &stackSCM{
+		origin:    r.origin,
+		opened:    r.opened,
+		prs:       o.prs,
+		stacks:    o.stacks,
+		noHistory: o.unreadable,
+		stackErrs: o.stackErrs,
+		unstacked: o.unstacked,
+	}
 	if s != nil {
 		scm.stacks = append(scm.stacks, s)
 	}
-	if o.noHistory {
+	if o.noHistory || o.noTimeline {
 		scm.historyErr = errors.New("history is not available")
 	}
+	if o.noHistory || o.activity == "none" {
+		scm.activityErr = errors.New("activity is not available")
+	}
+	scm.partial = o.activity == "partial"
 	branch := strings.TrimPrefix(o.branch, "refs/heads/")
 	// Check out the branch, as actions/checkout does with fetch-depth: 0.
 	r.git(r.ci, "fetch", "--quiet", "--prune", "--force", "--tags", "origin", "+refs/heads/*:refs/remotes/origin/*")
@@ -1089,8 +1652,12 @@ func (r *stackRepo) run(s *atlasaction.Stack, o run) (*mockAction, string, error
 	if run == nil {
 		run = exec.CommandContext
 	}
+	var action atlasaction.Action = act
+	if o.ci != "" {
+		action = &otherCI{mockAction: act, ci: o.ci}
+	}
 	acts, err := atlasaction.New(
-		atlasaction.WithAction(act),
+		atlasaction.WithAction(action),
 		atlasaction.WithAtlas(cli),
 		atlasaction.WithCmdExecutor(run),
 	)
@@ -1116,28 +1683,80 @@ func (s *stackSCM) OpenPullRequests(_ context.Context, head, base string) ([]*at
 
 // Stack implements atlasaction.StackClient.
 func (s *stackSCM) Stack(_ context.Context, n int) (*atlasaction.Stack, error) {
+	if err := s.stackErrs[n]; err != nil {
+		return nil, err
+	}
+	if slices.Contains(s.unstacked, n) {
+		return nil, nil
+	}
 	for _, st := range s.stacks {
 		if st.Number == n {
 			return st, nil
 		}
 	}
-	return nil, fmt.Errorf("stack #%d not found", n)
+	return nil, nil
 }
 
-// ForcePushes implements atlasaction.StackClient.
+// GetType implements atlasaction.Action.
+func (o *otherCI) GetType() atlasexec.TriggerType {
+	return o.ci
+}
+
+// BranchHeads implements atlasaction.StackClient. Like the activity of a GitHub repository,
+// it reports every head the branch had since it was created, from the reflog of the remote.
+func (s *stackSCM) BranchHeads(_ context.Context, branch string) ([]string, bool, error) {
+	if s.activityErr != nil {
+		return nil, false, s.activityErr
+	}
+	for _, n := range s.noHistory {
+		if s.branchOf(n) == branch {
+			return nil, false, fmt.Errorf("activity of %q is not available", branch)
+		}
+	}
+	out, err := exec.Command("git", "-C", s.origin, "reflog", "show", "--format=%H", "refs/heads/"+branch).Output()
+	if err != nil {
+		return nil, false, err
+	}
+	heads := slices.Compact(strings.Fields(string(out)))
+	if s.partial {
+		// Only the last change is still recorded.
+		heads = heads[:min(2, len(heads))]
+	}
+	return heads, !s.partial, nil
+}
+
+// branchOf returns the head branch of the pull request.
+func (s *stackSCM) branchOf(n int) string {
+	var branch string
+	for _, pr := range s.prs {
+		if pr.Number == n {
+			branch = pr.Ref
+		}
+	}
+	for _, st := range s.stacks {
+		for _, l := range st.Layers {
+			if l.Number == n {
+				branch = l.Branch
+			}
+		}
+	}
+	return branch
+}
+
+// ForcePushes implements atlasaction.StackClient. Like GitHub, it reports only
+// the force-pushes since the pull request was opened.
 func (s *stackSCM) ForcePushes(_ context.Context, nums []int) (map[int][]string, error) {
 	if s.historyErr != nil {
 		return nil, s.historyErr
 	}
 	pushes := make(map[int][]string)
 	for _, n := range nums {
-		var branch string
-		for _, st := range s.stacks {
-			for _, l := range st.Layers {
-				if l.Number == n {
-					branch = l.Branch
-				}
-			}
+		if slices.Contains(s.noHistory, n) {
+			continue
+		}
+		branch := s.branchOf(n)
+		if branch == "" {
+			continue
 		}
 		// The reflog lists the heads of the branch, newest first.
 		out, err := exec.Command("git", "-C", s.origin, "reflog", "show", "--format=%H", "refs/heads/"+branch).Output()
@@ -1147,7 +1766,7 @@ func (s *stackSCM) ForcePushes(_ context.Context, nums []int) (map[int][]string,
 		heads := strings.Fields(string(out))
 		slices.Reverse(heads)
 		pushes[n] = []string{}
-		for i := 1; i < len(heads); i++ {
+		for i := max(1, s.opened[branch]); i < len(heads); i++ {
 			if err := exec.Command("git", "-C", s.origin, "merge-base", "--is-ancestor", heads[i-1], heads[i]).Run(); err != nil {
 				pushes[n] = append(pushes[n], heads[i-1], heads[i])
 			}

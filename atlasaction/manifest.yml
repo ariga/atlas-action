@@ -255,8 +255,9 @@ actions:
         type: boolean
         label: Stacked pull requests
         description: |
-          When true, restack GitHub stacked pull requests whose migrations conflict: rebase each pull request onto the one below it, from the bottom of the stack up, place only the migration files each pull request adds on top of the ones below it, and push all the branches of the stack at once. A pull request that is not stacked, and targets the base branch, is rebased as without this input. GitHub only, and cannot be used with `base-sha` or `force-rebase`.
+          When true, restack GitHub stacked pull requests whose migrations conflict: rebase each pull request onto the one below it, from the bottom of the stack up, place only the migration files each pull request adds on top of the ones below it, and push all the branches of the stack at once. A pull request that is not stacked, and targets the base branch, is rebased as without this input. GitHub Actions only, and cannot be used with `base-sha` or `force-rebase`.
         default: false
+        githubActionsOnly: true
     outputs:
       rebased:
         type: string

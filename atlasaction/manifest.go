@@ -48,6 +48,9 @@ type (
 		Required    bool     `yaml:"required,omitempty"`    // Is this input required?
 		Label       string   `yaml:"label,omitempty"`       // Label for the input field
 		Description string   `yaml:"description,omitempty"` // Markdown description of the input
+		// GitHubActionsOnly reports whether the input is available only on GitHub Actions,
+		// and is left out of the templates and docs of the other CI platforms.
+		GitHubActionsOnly bool `yaml:"githubActionsOnly,omitempty"`
 	}
 	ActionOutput struct {
 		Type        string `yaml:"type,omitempty"` // e.g., "string", "boolean", "number", etc.
@@ -190,7 +193,19 @@ func (a ActionsManifest) GitHubManifests(path string) error {
 	return nil
 }
 
+// otherCI returns the manifest without the inputs that are available only on GitHub Actions.
+func (a ActionsManifest) otherCI() ActionsManifest {
+	acts := make([]ActionSpec, len(a.Actions))
+	for i, act := range a.Actions {
+		act.Inputs = maps.Clone(act.Inputs)
+		maps.DeleteFunc(act.Inputs, func(_ string, in ActionInput) bool { return in.GitHubActionsOnly })
+		acts[i] = act
+	}
+	return ActionsManifest{Actions: acts}
+}
+
 func (a ActionsManifest) GitLabTemplates(path string) error {
+	a = a.otherCI()
 	write := func(a ActionSpec) error {
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return fmt.Errorf("creating directory %s: %w", path, err)
@@ -248,6 +263,7 @@ func needGitHubEnv(id string) bool {
 
 // OrbTemplates writes the actions and setup command to the given path as CircleCI orb command YAML files.
 func (a ActionsManifest) OrbTemplates(path string) error {
+	a = a.otherCI()
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return fmt.Errorf("creating directory %s: %w", path, err)
 	}
@@ -288,6 +304,7 @@ func (a ActionsManifest) OrbTemplates(path string) error {
 
 // TeamCityTemplates writes the actions to the given path as TeamCity build configuration templates.
 func (a ActionsManifest) TeamCityTemplates(path string) error {
+	a = a.otherCI()
 	write := func(a ActionSpec) error {
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return fmt.Errorf("creating directory %s: %w", path, err)
@@ -315,11 +332,13 @@ func (a ActionsManifest) TeamCityTemplates(path string) error {
 // It creates a file with the given path and writes the action data using the
 // "azure-task-json.tmpl" template.
 func (a ActionsManifest) AzureTaskJSON(w io.Writer) error {
-	return templates.ExecuteTemplate(w, "task-json.tmpl", a)
+	return templates.ExecuteTemplate(w, "task-json.tmpl", a.otherCI())
 }
 
 // MarkdownDocs writes the actions to the given path as Markdown documentation files.
+// MarkdownDocs writes the docs of the CI platforms other than GitHub Actions.
 func (a ActionsManifest) MarkdownDocs(path string) error {
+	a = a.otherCI()
 	write := func(doc string) error {
 		f, err := os.OpenFile(filepath.Join(path, doc), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 		if err != nil {

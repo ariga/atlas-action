@@ -107,11 +107,16 @@ type (
 		// OpenPullRequests returns the open pull requests whose head is the given branch
 		// (if not empty), and whose base is the given branch (if not empty).
 		OpenPullRequests(_ context.Context, head, base string) ([]*PullRequest, error)
-		// Stack returns the stack of pull requests with the given number.
+		// Stack returns the stack of pull requests with the given number, or nil if there is none.
 		Stack(context.Context, int) (*Stack, error)
-		// ForcePushes returns the head commits of each pull request before and after
-		// each force-push of its branch, and fails if the history is not complete.
+		// ForcePushes returns the head commits of each pull request before and after each
+		// force-push of its branch, since the pull request was opened. Pull requests whose
+		// history cannot be read in full are left out.
 		ForcePushes(_ context.Context, numbers []int) (map[int][]string, error)
+		// BranchHeads returns the commits the branch pointed to before and after each of its
+		// changes that the SCM recorded, even before a pull request was opened for it, and
+		// whether the record goes back to the creation of the branch.
+		BranchHeads(_ context.Context, branch string) (heads []string, complete bool, _ error)
 	}
 	Logger interface {
 		// Infof logs an info message.

@@ -465,7 +465,7 @@ All inputs are optional
 * `dir` - The URL of the migration directory to rebase on. By default: `file://migrations`.
 * `remote` - The remote to fetch from. Defaults to `origin`.
 * `force-rebase` - When true, skip the merge step and rebase whenever there are dev-only migrations (e.g. out-of-order workflow after merging base and running apply with exec-order non-linear). Default is false.
-* `stack` - When true, restack GitHub stacked pull requests whose migrations conflict: rebase each pull request onto the one below it, from the bottom of the stack up, place only the migration files each pull request adds on top of the ones below it, and push all the branches of the stack at once. A pull request that is not stacked, and targets the base branch, is rebased as without this input. GitHub only, and cannot be used with `base-sha` or `force-rebase`. Default is false. See [Stacked pull requests](#stacked-pull-requests).
+* `stack` - When true, restack GitHub stacked pull requests whose migrations conflict: rebase each pull request onto the one below it, from the bottom of the stack up, place only the migration files each pull request adds on top of the ones below it, and push all the branches of the stack at once. A pull request that is not stacked, and targets the base branch, is rebased as without this input. GitHub Actions only, and cannot be used with `base-sha` or `force-rebase`. Default is false. See [Stacked pull requests](#stacked-pull-requests).
 * `working-directory` - Atlas working directory. Default is project root
 
 #### Outputs
@@ -599,22 +599,24 @@ A stack with conflicts needs a manual restack before it can merge, and when a pu
 retargets the pull request above it, but leaves it conflicted. With `stack: true`, the action restacks such
 stacks:
 
-* It runs on a push to a branch of a stack, and restacks that stack, or on a push to a branch that stacks
-  target, such as `main`, and restacks each open stack that targets it.
+* It runs on a push to a branch of a stack, and restacks that stack. It also restacks each open stack that
+  targets the pushed branch, such as `main` or a branch of another stack, and each stack that targets a
+  branch it restacked.
 * Like `gh stack rebase`, it rebases each open pull request onto the one below it, from the bottom of the
   stack up, and replays only the commits of the pull request. It tells them from the commits of the pull
-  request below it with the heads that pull request had, including the ones before and after each of its
-  force-pushes, which it reads from GitHub. It moves only the migration files each pull request adds on
+  request below it with the heads the branch below it had, which it reads from the activity of the
+  repository on GitHub. It moves only the migration files each pull request adds on
   top of the ones below it, with `atlas migrate rebase`, and adds one commit per pull request, which later
   runs amend.
 * Like `gh stack push`, it pushes all the restacked branches at once, with `--force-with-lease`. If a pull
-  request conflicts in other files, edits migration files of the pull request below it, or its commits
-  cannot be told apart, nothing is pushed, and the run fails with the reason, to resolve with
-  `gh stack rebase`.
+  request conflicts in other files, has a merge commit with changes of its own (which a rebase drops),
+  edits migration files of the pull request below it that changed since, or its commits cannot be told
+  apart, nothing is pushed, and the run fails with the reason, to resolve with `gh stack rebase`.
 * It does nothing when the migrations of the stack do not conflict, even if the stack is not linear, so
   GitHub's **Rebase stack** can rebase it, which keeps the approvals.
 * A pull request that is not stacked, and targets the base branch, is rebased as without the input.
   Branches without pull requests, and pull requests that target other branches, are left as they are.
+* It runs only on GitHub Actions.
 
 ```yaml
 name: Restack Atlas Migrations
@@ -668,6 +670,13 @@ jobs:
 >   version of a workflow file. This happens when a pull request changes a workflow file that also
 >   changed below it.
 > * Like any push, a restack removes the pull requests it pushes from the merge queue.
+> * Reading the activity of the repository requires the `contents: read` permission, which `contents: write`
+>   includes. If the activity of a branch does not go back to its creation, or cannot be read, the action
+>   falls back to the force-pushes of its pull request, which GitHub records only after the pull request is
+>   opened. A branch rewritten before then may not be told apart from the branches above it, so restack them
+>   locally with `gh stack rebase`. The action refuses when it finds such commits, but it cannot find all.
+> * A restack resolves only the `atlas.sum` file of the `dir` input. If the stack and the branch it targets
+>   both change another migration directory, restack it locally.
 ### `ariga/atlas-action/migrate/hash`
 
 Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.
