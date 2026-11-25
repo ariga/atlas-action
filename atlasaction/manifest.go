@@ -335,7 +335,6 @@ func (a ActionsManifest) AzureTaskJSON(w io.Writer) error {
 	return templates.ExecuteTemplate(w, "task-json.tmpl", a.otherCI())
 }
 
-// MarkdownDocs writes the actions to the given path as Markdown documentation files.
 // MarkdownDocs writes the docs of the CI platforms other than GitHub Actions.
 func (a ActionsManifest) MarkdownDocs(path string) error {
 	a = a.otherCI()

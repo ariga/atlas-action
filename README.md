@@ -609,8 +609,10 @@ stacks:
   `atlas migrate rebase`, and adds one commit per pull request, which later runs amend.
 * Like `gh stack push`, it pushes all the restacked branches at once, with `--force-with-lease`. If a pull
   request conflicts in other files, has a merge commit with changes of its own (which a rebase drops),
-  edits migration files of the pull request below it that changed since, or its commits cannot be told
-  apart, nothing is pushed, and the run fails with the reason. Resolve it locally with `gh stack rebase`.
+  edits migration files of the pull request below it that changed since, has commits the pull request below
+  it no longer has (they may have been dropped there, or moved up, like when a branch is split into a stack),
+  or its commits cannot be told apart, nothing is pushed, and the run fails with the reason. Resolve it
+  locally with `gh stack rebase`.
 * It does nothing when the migrations of the stack do not conflict, even if the stack is not linear, so
   GitHub's **Rebase stack** can rebase it, which keeps the approvals.
 * A pull request that is not stacked, and targets the base branch, is rebased as without the input.
@@ -620,11 +622,13 @@ stacks:
 ```yaml
 name: Restack Atlas Migrations
 on:
-  # Run on every push, as pull request workflows do not run while a pull request
-  # has conflicts, and stacks need a restack when the branch they target moves.
+  # Run on every push to a branch, as pull request workflows do not run while a pull
+  # request has conflicts, and stacks need a restack when the branch they target moves.
   push:
-# Restacks must not overlap. Push events carry no stack number to key on,
-# so all the runs share one group, and wait in line instead of canceling each other.
+    branches: ['**']
+# Restacks must not overlap. Push events carry no stack number to key on, so all the runs
+# share one group, and wait in line instead of canceling each other. As the runs are handled
+# one at a time, restacks lag behind when pushes come faster than a run finishes.
 concurrency:
   group: atlas-autorebase
   queue: max

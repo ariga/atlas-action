@@ -126,7 +126,6 @@ func TestStack(t *testing.T) {
 	require.Equal(t, "a93be79", s.PullRequests[0].Head.SHA)
 	require.Equal(t, "b03752c", s.PullRequests[0].Base.SHA)
 	require.Nil(t, s.PullRequests[1].MergedAt)
-	require.True(t, s.PullRequests[1].Draft)
 	require.Equal(t, "t0-b", s.PullRequests[1].Head.Ref)
 
 	_, err = client.Stack(context.Background(), 5)

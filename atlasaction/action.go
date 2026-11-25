@@ -259,7 +259,6 @@ type (
 	StackLayer struct {
 		Number int    // Pull request number.
 		Branch string // Head branch of the pull request.
-		Commit string // Head commit of the pull request.
 		Base   string // Base branch of the pull request.
 		// BaseCommit is the base branch commit the SCM last compared the
 		// pull request with. It may lag behind the base branch.

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"ariga.io/atlas-action/internal/github"
 	"ariga.io/atlas/atlasexec"
 	"ariga.io/atlas/sql/migrate"
 )
@@ -60,6 +61,9 @@ type (
 		moved map[string]string
 		// basePRs caches the open pull request of each base branch, or 0 if it has none.
 		basePRs map[string]int
+		// history caches the heads the branch of each pull request had, by its number, for the
+		// stacks that share the branch, like the trunk of several stacks. It is nil if unknown.
+		history map[int][]string
 		// noActivity reports whether the activity of the branches cannot be read in this run.
 		noActivity bool
 	}
@@ -273,6 +277,7 @@ func (a *Actions) newRestacker(ctx context.Context, tc *TriggerContext, sc Stack
 		atlas:   u.Query().Get("format") == "" || u.Query().Get("format") == formatAtlas,
 		moved:   make(map[string]string),
 		basePRs: make(map[string]int),
+		history: make(map[int][]string),
 		now:     time.Now,
 		sleep: func(ctx context.Context, d time.Duration) error {
 			t := time.NewTimer(d)
@@ -457,6 +462,12 @@ open:
 		r.Infof("Stack #%d has no open pull requests, nothing to restack", s.Number)
 		return nil, nil
 	}
+	// The layers are rebased in the order GitHub lists them, from the bottom up.
+	for i, l := range layers[1:] {
+		if below := layers[i]; l.Base != below.Branch {
+			return nil, fmt.Errorf("pull request #%d targets %q, not the branch of #%d (%s) listed below it", l.Number, l.Base, below.Number, below.Branch)
+		}
+	}
 	r.Infof("Stack #%d: %s", s.Number, describeStack(s.Base, layers))
 	if err := r.fetch(ctx, s.Base, merged, layers); err != nil {
 		return nil, err
@@ -507,17 +518,6 @@ open:
 		if i > 0 {
 			below = layers[i-1]
 			parent, parentName = below.new, fmt.Sprintf("#%d (%s)", below.Number, below.Branch)
-		}
-		if below != nil && below.old == below.new {
-			// The layer below was not restacked, so this one needs it only if its migrations conflict.
-			ok, err := r.upToDate(ctx, parent, l)
-			if err != nil {
-				return nil, err
-			}
-			if ok {
-				r.Infof("#%d (%s): migrations are up to date with %s", l.Number, l.Branch, parentName)
-				continue
-			}
 		}
 		if !l.fork.trusted {
 			reason := l.fork.reason
@@ -580,20 +580,32 @@ func (r *restacker) basePR(ctx context.Context, base string) (int, error) {
 func (r *restacker) histories(ctx context.Context, branches map[int]string) map[int][]string {
 	var (
 		history = make(map[int][]string, len(branches))
+		read    []int // Pull requests whose history is not cached.
 		rest    []int // Pull requests whose branch activity cannot be read in full.
 	)
 	for _, n := range slices.Sorted(maps.Keys(branches)) {
+		if h, ok := r.history[n]; ok {
+			if h != nil {
+				history[n] = h
+			}
+			continue
+		}
+		read = append(read, n)
 		if r.noActivity {
 			rest = append(rest, n)
 			continue
 		}
 		heads, complete, err := r.sc.BranchHeads(ctx, branches[n])
 		switch {
-		case err != nil:
+		case errors.Is(err, github.ErrNotFound):
 			// The activity is not available, like on older versions of GitHub Enterprise Server.
 			r.Warningf("failed to read the activity of branch %q, using the force-pushes of the pull requests: %v", branches[n], err)
 			r.noActivity = true
 			rest = append(rest, n)
+		case err != nil:
+			// Like a rate limit. The force-pushes may lack heads that the activity has, and lead to
+			// another restack, so the history is left unknown, and a later run reads it again.
+			r.Warningf("failed to read the activity of branch %q: %v", branches[n], err)
 		case !complete:
 			r.Infof("The activity of branch %q does not go back to its creation, using the force-pushes of #%d", branches[n], n)
 			rest = append(rest, n)
@@ -603,6 +615,13 @@ func (r *restacker) histories(ctx context.Context, branches map[int]string) map[
 	}
 	for n, h := range r.forcePushes(ctx, rest) {
 		history[n] = h
+	}
+	for _, n := range read {
+		h, ok := history[n]
+		if ok && h == nil {
+			h = []string{} // Known, without heads.
+		}
+		r.history[n] = h
 	}
 	return history
 }
@@ -630,20 +649,24 @@ func (r *restacker) forcePushes(ctx context.Context, nums []int) map[int][]strin
 // forkPoint returns where the own commits of the layer start: the newest merge-base of the layer
 // with the heads the branch below it had. For the bottom layer, these are the trunk, the heads of
 // the merged pull request below it, if any, the head the trunk had before the push that triggered
-// the run, and the heads of the trunk, if it has a pull request of its own. For the others, the head the layer below has, the heads its branch had, the head it had
-// before the push that triggered the run, and the head GitHub last compared the pull request with.
+// the run, and the heads of the trunk, if it has a pull request of its own. For the others, the
+// head the layer below has, the heads its branch had, the head it had before the push that
+// triggered the run, and the head GitHub last compared the pull request with.
 //
 // The activity of a branch records every head it had since it was created, so with it the fork
 // point is exact. The force-pushes of a pull request record the heads its branch had only since the
 // pull request was opened, and every other head is an ancestor of a later one, so with them the fork
 // point is exact unless the branch was rewritten before its pull request was opened. Without either,
 // the fork point is not trusted, as it cannot tell commits the branch below rewrote or dropped from
-// the own commits of the layer. Like `gh stack rebase`, the restack never replays the commits of the
-// branch below into the layer, and commits the branch below had only locally are the layer's own.
+// the own commits of the layer. Like `gh stack rebase`, the restack does not replay the commits of
+// the branch below into the layer, but it refuses when the branch below no longer has some of them
+// in any form, as they may have been moved to the layer, like when a branch is split into a stack.
+// Commits the branch below had only locally are the layer's own.
 func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerState, merged *StackLayer, trunk string, history map[int][]string) (*fork, error) {
 	var (
 		f     = &fork{}
 		tips  []string
+		now   []string // Heads the branches below have now.
 		lower []string // Heads of the branches below, before this run restacked them.
 		skip  string   // Head of the branch below, whose patches the replay skips.
 		known = true   // Whether the force-push history of the branches below is known.
@@ -655,6 +678,7 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 	switch {
 	case below != nil:
 		tips, lower, skip = append(tips, below.old), append(lower, below.old), below.old
+		now = append(now, below.old)
 		if r.tc.Before != "" && r.branch == below.Branch && r.tc.Commit == below.old {
 			tips = append(tips, r.tc.Before)
 		}
@@ -663,9 +687,10 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 		}
 		hist(below.Number)
 	default:
+		now = append(now, trunk)
 		if merged != nil {
 			if head, err := r.git(ctx, "rev-parse", "--verify", "--quiet", r.mergedRef(merged)+"^{commit}"); err == nil {
-				tips, lower = append(tips, head), append(lower, head)
+				tips, lower, now = append(tips, head), append(lower, head), append(now, head)
 			}
 			hist(merged.Number)
 		}
@@ -718,6 +743,16 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 	if f.commit == "" {
 		return nil, fmt.Errorf("#%d (%s): no commit in common with %s", l.Number, l.Branch, belowName("", below, merged))
 	}
+	// The branch below dropped these commits, or they were moved to the layer. Git cannot tell which.
+	dropped, err := r.dropped(ctx, f.commit, now)
+	if err != nil {
+		return nil, err
+	}
+	if len(dropped) > 0 {
+		f.reason = fmt.Sprintf("it has commits that %s no longer has, which a restack would drop: %s",
+			belowName(s.Base, below, merged), strings.Join(dropped, ", "))
+		return f, nil
+	}
 	if f.trusted = known; !known || len(lower) == 0 {
 		return f, nil
 	}
@@ -734,6 +769,65 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 			belowName(s.Base, below, merged), strings.Join(files, ", "))
 	}
 	return f, nil
+}
+
+// dropped returns the commits up to the fork point that none of the given heads has, nor a counterpart
+// of: a commit with the same patch, like after a rebase, or with the same subject, like after an amend,
+// or the same contents of the files it changes, like after a squash. The commits of the action and the
+// changes of atlas.sum are left out, as each restack rewrites them.
+func (r *restacker) dropped(ctx context.Context, fork string, heads []string) ([]string, error) {
+	out, err := r.git(ctx, append([]string{"log", "--no-merges", "--format=%H %s", fork, "--not"}, heads...)...)
+	if err != nil || out == "" {
+		return nil, err
+	}
+	patches := make(map[string]bool) // Commits whose patch a head has.
+	for _, h := range heads {
+		c, err := r.git(ctx, "cherry", h, fork)
+		if err != nil {
+			return nil, err
+		}
+		for _, l := range strings.Split(c, "\n") {
+			if sha, ok := strings.CutPrefix(l, "- "); ok {
+				patches[sha] = true
+			}
+		}
+	}
+	s, err := r.git(ctx, append(append([]string{"log", "--no-merges", "--format=%s"}, heads...), "--not", fork)...)
+	if err != nil {
+		return nil, err
+	}
+	subjects := make(map[string]bool) // Subjects of the commits the heads have since the fork point.
+	for _, l := range strings.Split(s, "\n") {
+		subjects[l] = l != ""
+	}
+	var lost []string
+	for _, l := range strings.Split(out, "\n") {
+		c, subject, _ := strings.Cut(l, " ")
+		if patches[c] || subjects[subject] || subject == r.message {
+			continue
+		}
+		b, err := r.gitRaw(ctx, "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "--no-renames", "--root", c)
+		if err != nil {
+			return nil, err
+		}
+		var specs []string
+		for _, f := range splitNUL(b) {
+			if f != r.sumPath() {
+				specs = append(specs, ":(top,literal)"+f)
+			}
+		}
+		// Whether a head has the files the commit changes as they are at the fork point.
+		kept := len(specs) == 0
+		for i := 0; !kept && i < len(heads); i++ {
+			if kept, err = r.gitTest(ctx, append([]string{"diff", "--quiet", fork, heads[i], "--"}, specs...)...); err != nil {
+				return nil, err
+			}
+		}
+		if !kept {
+			lost = append(lost, fmt.Sprintf("%s (%s)", short(c), subject))
+		}
+	}
+	return lost, nil
 }
 
 // addedByBoth returns the migration files that the commit c added since the fork point,

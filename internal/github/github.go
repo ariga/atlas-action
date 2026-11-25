@@ -73,7 +73,6 @@ type (
 	StackPullRequest struct {
 		Number   int     `json:"number"`
 		State    string  `json:"state"` // Either "open" or "closed".
-		Draft    bool    `json:"draft"`
 		MergedAt *string `json:"merged_at"`
 		Head     struct {
 			Ref string `json:"ref"`

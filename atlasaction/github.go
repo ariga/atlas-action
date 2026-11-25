@@ -347,7 +347,6 @@ func (c *GitHubClient) Stack(ctx context.Context, number int) (*Stack, error) {
 		r.Layers = append(r.Layers, StackLayer{
 			Number:     pr.Number,
 			Branch:     pr.Head.Ref,
-			Commit:     pr.Head.SHA,
 			Base:       pr.Base.Ref,
 			BaseCommit: pr.Base.SHA,
 			Open:       pr.State == "open",
