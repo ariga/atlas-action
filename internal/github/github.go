@@ -607,22 +607,6 @@ func (c *Client) forcePushPage(ctx context.Context, owner, name string, numbers 
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.graphQLURL(), bytes.NewReader(b))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	res, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error calling GitHub API: %w", err)
-	}
-	defer res.Body.Close()
-	if b, err = io.ReadAll(res.Body); err != nil {
-		return nil, fmt.Errorf("reading response body: %w", err)
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
-	}
 	var resp struct {
 		Data struct {
 			Repository map[string]*forcePushes `json:"repository"`
@@ -631,8 +615,8 @@ func (c *Client) forcePushPage(ctx context.Context, owner, name string, numbers 
 			Message string `json:"message"`
 		} `json:"errors"`
 	}
-	if err := json.Unmarshal(b, &resp); err != nil {
-		return nil, fmt.Errorf("unmarshalling response body: %w", err)
+	if _, err := c.do(ctx, http.MethodPost, c.graphQLURL(), b, nil, &resp); err != nil {
+		return nil, err
 	}
 	// A pull request that cannot be read is null, with an error. Others are still reported.
 	if resp.Data.Repository == nil {
@@ -655,19 +639,25 @@ func (c *Client) graphQLURL() string {
 
 // get sends a GET request to the given path of the API and decodes the JSON response into v.
 func (c *Client) get(ctx context.Context, path string, h http.Header, v any) error {
-	_, err := c.getURL(ctx, c.baseURL+path, h, v)
+	_, err := c.do(ctx, http.MethodGet, c.baseURL+path, nil, h, v)
 	return err
 }
 
-// getURL sends a GET request to the given URL of the API, decodes the JSON response into v,
-// and returns the headers of the response.
-func (c *Client) getURL(ctx context.Context, u string, h http.Header, v any) (http.Header, error) {
-	path := strings.TrimPrefix(u, c.baseURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+// do sends a request to the given URL of the API, with the JSON body if not nil, decodes
+// the JSON response into v, and returns the headers of the response.
+func (c *Client) do(ctx context.Context, method, u string, body []byte, h http.Header, v any) (http.Header, error) {
+	var r io.Reader
+	if body != nil {
+		r = bytes.NewReader(body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, u, r)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	maps.Copy(req.Header, h)
 	res, err := c.client.Do(req)
 	if err != nil {
@@ -681,7 +671,7 @@ func (c *Client) getURL(ctx context.Context, u string, h http.Header, v any) (ht
 	switch res.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
-		return nil, fmt.Errorf("%w: GET %s", ErrNotFound, path)
+		return nil, fmt.Errorf("%w: %s %s", ErrNotFound, method, strings.TrimPrefix(u, c.baseURL))
 	default:
 		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
@@ -733,7 +723,7 @@ func (c *Client) BranchHeads(ctx context.Context, branch string) (heads []string
 			After  string `json:"after"`
 			Type   string `json:"activity_type"`
 		}
-		h, err := c.getURL(ctx, next, nil, &acts)
+		h, err := c.do(ctx, http.MethodGet, next, nil, nil, &acts)
 		if err != nil {
 			return nil, false, err
 		}

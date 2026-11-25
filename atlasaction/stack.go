@@ -465,6 +465,14 @@ open:
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve the base branch %q: %w", s.Base, err)
 	}
+	// Most runs find nothing to restack, and need neither the history of the branches nor the fork points.
+	switch ok, err := r.allOnTop(ctx, trunk, layers); {
+	case err != nil:
+		return nil, err
+	case ok:
+		r.Infof("Migrations of all the pull requests are up to date, nothing to restack")
+		return layers, nil
+	}
 	// The branches below the layers, by the numbers of their pull requests.
 	branches := make(map[int]string)
 	if merged != nil {
@@ -621,8 +629,8 @@ func (r *restacker) forcePushes(ctx context.Context, nums []int) map[int][]strin
 
 // forkPoint returns where the own commits of the layer start: the newest merge-base of the layer
 // with the heads the branch below it had. For the bottom layer, these are the trunk, the heads of
-// the merged pull request below it, if any, and the heads of the trunk, if it has a pull request of
-// its own. For the others, the head the layer below has, the heads its branch had, the head it had
+// the merged pull request below it, if any, the head the trunk had before the push that triggered
+// the run, and the heads of the trunk, if it has a pull request of its own. For the others, the head the layer below has, the heads its branch had, the head it had
 // before the push that triggered the run, and the head GitHub last compared the pull request with.
 //
 // The activity of a branch records every head it had since it was created, so with it the fork
@@ -661,27 +669,29 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 			}
 			hist(merged.Number)
 		}
-		// A trunk without a pull request only moves forward, but the layer may hold
-		// commits of the merged pull request below it, that are not in the trunk.
+		// A trunk without a pull request is expected to only move forward, but the layer may
+		// hold commits of the merged pull request below it, that are not in the trunk.
 		mb, err := r.git(ctx, "merge-base", trunk, l.old)
 		if err != nil {
 			return nil, err
 		}
 		f.commit, f.upstream = mb, trunk
+		// The head the trunk had before this run restacked it, as a branch of another stack.
+		start := trunk
+		if old, ok := r.moved[s.Base]; ok {
+			start = old
+			tips, lower, skip = append(tips, old), append(lower, old), old
+		}
+		// The push that triggered the run may have rewritten the trunk, even one without a pull request.
+		if r.tc.Before != "" && r.branch == s.Base && r.tc.Commit == start {
+			tips = append(tips, r.tc.Before)
+		}
 		n, err := r.basePR(ctx, s.Base)
 		if err != nil {
 			return nil, err
 		}
 		if n != 0 {
 			// The trunk is the branch of a pull request, that may be rewritten.
-			start := trunk
-			if old, ok := r.moved[s.Base]; ok {
-				start = old
-				tips, lower, skip = append(tips, old), append(lower, old), old
-			}
-			if r.tc.Before != "" && r.branch == s.Base && r.tc.Commit == start {
-				tips = append(tips, r.tc.Before)
-			}
 			if l.BaseCommit != "" && l.Base == s.Base {
 				tips = append(tips, l.BaseCommit)
 			}
@@ -806,6 +816,27 @@ func (r *restacker) firstConflict(ctx context.Context, base, trunk string, layer
 		r.Infof("Migrations of all the pull requests are up to date, nothing to restack")
 	}
 	return -1, nil
+}
+
+// allOnTop reports whether the migrations of each layer are on top of the ones of the layer below
+// it, or of the trunk, with the same hashes. Then firstConflict finds no conflict either.
+func (r *restacker) allOnTop(ctx context.Context, trunk string, layers []*layerState) (bool, error) {
+	parent := trunk
+	for _, l := range layers {
+		ps, err := r.sumAt(ctx, parent)
+		if err != nil {
+			return false, err
+		}
+		cs, err := r.sumAt(ctx, l.old)
+		if err != nil {
+			return false, err
+		}
+		if !r.onTop(ps, cs, true) {
+			return false, nil
+		}
+		parent = l.old
+	}
+	return true, nil
 }
 
 // upToDate reports whether the migrations of the layer are on top of the ones of the parent commit:
@@ -1154,10 +1185,11 @@ func blobName(blobs map[string]string, blob string) string {
 
 // blobs returns the blob of each file in the migration directory at the given commit.
 func (r *restacker) blobs(ctx context.Context, c string) (map[string]string, error) {
-	out, err := r.gitRaw(ctx, "ls-tree", "-z", "--full-tree", c, "--", r.rel+"/")
-	if r.rel == "." {
-		out, err = r.gitRaw(ctx, "ls-tree", "-z", "--full-tree", c)
+	args := []string{"ls-tree", "-z", "--full-tree", c}
+	if r.rel != "." {
+		args = append(args, "--", r.rel+"/")
 	}
+	out, err := r.gitRaw(ctx, args...)
 	if err != nil {
 		return nil, err
 	}

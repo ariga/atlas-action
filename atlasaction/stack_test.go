@@ -67,13 +67,15 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Contains(t, logs, "#1 (A): replaying 2 commit(s) onto main")
 		require.Regexp(t, `#1 \(A\): renamed 20260102000000_a1.sql to \d{14}_a1.sql, 20260102000100_a2.sql to \d{14}_a2.sql, to place them on top of main`, logs)
 
-		// A second run has nothing to do.
+		// A second run has nothing to do, and does not read the history of the branches.
 		tips := r.tips("A", "B", "C")
-		act, logs, err = r.run(s, run{branch: "main"})
+		var scm *stackSCM
+		act, logs, err = r.run(s, run{branch: "main", scm: func(s *stackSCM) atlasaction.SCMClient { scm = s; return s }})
 		require.NoError(t, err, logs)
 		require.Equal(t, "false", act.output["rebased"])
 		require.Equal(t, tips, r.tips("A", "B", "C"))
 		require.Contains(t, logs, "Migrations of all the pull requests are up to date")
+		require.Zero(t, scm.reads)
 		// Also when it runs on a branch of the stack, as after its own push with a PAT.
 		act, logs, err = r.run(s, run{branch: "B"})
 		require.NoError(t, err, logs)
@@ -556,6 +558,34 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Contains(t, logs, "No conflict found when merging main into develop", "develop is rebased onto main")
 		require.Equal(t, "true", act.output["rebased"])
 		r.requireStack("develop", "A")
+	})
+
+	t.Run("TrunkRewritten", func(t *testing.T) {
+		// develop has no pull request, and its commit adds two files.
+		r := newStackRepo(t)
+		r.branch("develop", "main")
+		r.file("develop", "x.txt", "x\n")
+		r.file("develop", "y.txt", "y\n")
+		r.git(r.dev, "reset", "--quiet", "--soft", "main")
+		r.git(r.dev, "commit", "--quiet", "--message", "develop: add x and y")
+		r.branch("A", "develop")
+		r.migration("A", "20260102000000", "a1")
+		r.push("develop", "A")
+		s := r.stack(15, "develop", "A")
+		// develop is rewritten: its commit no longer adds y.txt, and it gets a migration.
+		before := r.tip("develop")
+		r.checkout("develop")
+		r.git(r.dev, "reset", "--quiet", "--hard", "main")
+		r.file("develop", "x.txt", "x\n")
+		r.migration("develop", time.Now().UTC().Format("20060102150405"), "d1")
+		r.forcePush("develop")
+
+		act, logs, err := r.run(s, run{branch: "develop", before: before})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("develop", "A")
+		require.Equal(t, []string{"A: add a1", botMessage}, r.log("develop", "A"), "the old commit of develop is not replayed")
+		require.NotContains(t, strings.Fields(r.gitOut(r.origin, "ls-tree", "--name-only", "A")), "y.txt")
 	})
 
 	t.Run("NotStacked", func(t *testing.T) {
@@ -1298,6 +1328,7 @@ type (
 		activityErr error         // Error of reading the activity of any branch.
 		partial     bool          // Whether the activity of the branches does not go back to their creation.
 		noHistory   []int         // Pull requests whose force-pushes and branch activity cannot be read.
+		reads       int           // Number of the reads of the activity of branches and the force-pushes of pull requests.
 		stackErrs   map[int]error // Errors of the stack lookups.
 		unstacked   []int         // Stacks that are not found.
 	}
@@ -1705,6 +1736,7 @@ func (o *otherCI) GetType() atlasexec.TriggerType {
 // BranchHeads implements atlasaction.StackClient. Like the activity of a GitHub repository,
 // it reports every head the branch had since it was created, from the reflog of the remote.
 func (s *stackSCM) BranchHeads(_ context.Context, branch string) ([]string, bool, error) {
+	s.reads++
 	if s.activityErr != nil {
 		return nil, false, s.activityErr
 	}
@@ -1746,6 +1778,7 @@ func (s *stackSCM) branchOf(n int) string {
 // ForcePushes implements atlasaction.StackClient. Like GitHub, it reports only
 // the force-pushes since the pull request was opened.
 func (s *stackSCM) ForcePushes(_ context.Context, nums []int) (map[int][]string, error) {
+	s.reads++
 	if s.historyErr != nil {
 		return nil, s.historyErr
 	}
