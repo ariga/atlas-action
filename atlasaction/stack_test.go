@@ -2528,6 +2528,25 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				want: []string{"R__view.sql", "V1__init.sql", "V3__a.sql", "atlas.sum"}},
 			{name: "FlywayTrunkAddsRepeatable", format: "flyway", trunk: []string{"V1__init.sql", "R__view.sql"}, layer: "V3__a.sql", move: "R__other.sql",
 				want: []string{"R__other.sql", "R__view.sql", "V1__init.sql", "V3__a.sql", "atlas.sum"}},
+			// Flyway versions separate their parts with dots or underscores, and compare their numbers.
+			{name: "FlywaySubVersion", format: "flyway", trunk: []string{"V2__init.sql"}, layer: "V2_1__a.sql"},
+			{name: "FlywayDateVersion", format: "flyway", trunk: []string{"V2026_01_01__init.sql"}, layer: "V2026_01_02__a.sql"},
+			{name: "FlywaySortedVersions", format: "flyway", trunk: []string{"V2__init.sql"}, layer: "V2_2__a.sql", move: "V2_1__m.sql",
+				want: []string{"V2_1__m.sql", "V2_2__a.sql", "V2__init.sql", "atlas.sum"}},
+			{name: "FlywaySameVersion", format: "flyway", trunk: []string{"V2__init.sql"}, layer: "V2_1__a.sql", move: "V2.1__m.sql",
+				wantError: "#1 (A): its migrations must be moved on top of the ones of main, which `atlas migrate rebase` supports only for the \"atlas\" format"},
+			// Flyway drops the trailing zero parts of a version: V2.0 and V2_0 are V2.
+			{name: "FlywayTrailingZeroDot", format: "flyway", trunk: []string{"V1__init.sql"}, layer: "V2.0__a.sql", move: "V2__m.sql",
+				wantError: "#1 (A): its migrations must be moved on top of the ones of main, which `atlas migrate rebase` supports only for the \"atlas\" format"},
+			{name: "FlywayTrailingZeroUnderscore", format: "flyway", trunk: []string{"V1__init.sql"}, layer: "V2_0__a.sql", move: "V2__m.sql",
+				wantError: "#1 (A): its migrations must be moved on top of the ones of main, which `atlas migrate rebase` supports only for the \"atlas\" format"},
+			// Flyway also reads the files of subdirectories.
+			{name: "FlywaySubdirRepeatable", format: "flyway", trunk: []string{"V1__init.sql", "views/R__view.sql"}, layer: "V3__a.sql", move: "views/R__view.sql", moveSQL: "SELECT 2;\n",
+				want: []string{"V1__init.sql", "V3__a.sql", "atlas.sum", "views"}},
+			{name: "FlywayDigitSubdir", format: "flyway", trunk: []string{"V1__init.sql", "v2/R__view.sql"}, layer: "V3__a.sql", move: "V2__m.sql",
+				want: []string{"V1__init.sql", "V2__m.sql", "V3__a.sql", "atlas.sum", "v2"}},
+			// golang-migrate reads only the files at the top of the directory.
+			{name: "GolangMigrateSubdirUntouched", format: "golang-migrate", trunk: []string{"1_init.up.sql", "seeds/x.sql"}, layer: "2_a.up.sql", move: "seeds/x.sql", moveSQL: "SELECT 2;\n"},
 			{name: "FlywayBothEditRepeatables", format: "flyway", trunk: []string{"V1__init.sql", "R__a.sql", "R__b.sql"}, layer: "R__a.sql", layerSQL: "SELECT 2;\n", move: "R__b.sql", moveSQL: "SELECT 3;\n",
 				want: []string{"R__a.sql", "R__b.sql", "V1__init.sql", "atlas.sum"}},
 		} {
@@ -2568,6 +2587,93 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 					r.git("", "clone", "--quiet", "--branch", "A", r.origin, dir)
 					r.atlas(dir, "migrate", "validate", "--dir", "file://"+r.dir+"?format="+tt.format)
 				}
+			})
+		}
+	})
+
+	t.Run("FlywayAtRoot", func(t *testing.T) {
+		r := newStackRepo(t, ".")
+		r.checkout("main")
+		r.git(r.dev, "rm", "--quiet", "20260101000000_init.sql", "atlas.sum")
+		r.git(r.dev, "commit", "--quiet", "--message", "rm")
+		r.formatFile("main", "flyway", "V1__init.sql")
+		r.formatFile("main", "flyway", "R__view.sql")
+		r.push("main")
+		r.branch("A", "main")
+		r.formatFile("A", "flyway", "V3__a.sql")
+		r.push("A")
+		s := r.stack(67, "main", "A")
+		r.formatFile("main", "flyway", "R__view.sql", "SELECT 2;\n")
+		r.push("main")
+		act, logs, err := r.run(s, run{branch: "main", inputs: map[string]string{"dir": "file://.?format=flyway"}})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		require.Equal(t, []string{"R__view.sql", "V1__init.sql", "V3__a.sql", "atlas.sum"}, strings.Fields(r.gitOut(r.origin, "ls-tree", "--name-only", "A")))
+	})
+
+	t.Run("RemovedBelow", func(t *testing.T) {
+		for _, tt := range []struct {
+			name      string
+			reword    bool // Whether A is also rewritten, and stays open.
+			rewind    bool // Whether A drops a2 by a rewrite instead of a new commit.
+			land      bool // Whether A lands before the restack.
+			wantError string
+		}{
+			// A removes a2 with a new commit, and lands while the run of the push waits in the queue.
+			{name: "ThenLanded", land: true},
+			// A is reworded and removes a2 with a new commit: B is not built on the head A has.
+			{name: "Reworded", reword: true},
+			// A drops a2 by a rewrite and lands. Without the activity, nothing tells B's a2 from its own commits, and
+			// the quick check finds B up to date: nothing is pushed, like the full check, which refuses.
+			{name: "RewoundThenLanded", rewind: true, land: true, wantError: "-"},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				r := newStackRepo(t)
+				r.branch("A", "main")
+				r.migration("A", "20260102000000", "a1")
+				r.migration("A", "20260102000100", "a2")
+				r.branch("B", "A")
+				r.migration("B", "20260103000000", "b1")
+				r.push("A", "B")
+				s := r.stack(68, "main", "A", "B")
+				before := r.tip("A")
+				r.checkout("A")
+				switch {
+				case tt.rewind:
+					r.git(r.dev, "reset", "--quiet", "--hard", "HEAD~1")
+					r.amend("A", "A: add a1 (reworded)")
+				case tt.reword:
+					a2 := r.gitOut(r.dev, "rev-parse", "HEAD")
+					r.git(r.dev, "reset", "--quiet", "--hard", "HEAD~2")
+					r.git(r.dev, "cherry-pick", a2+"~1")
+					r.amend("A", "A: add a1 (reworded)")
+					r.git(r.dev, "cherry-pick", a2)
+					fallthrough
+				default:
+					r.git(r.dev, "rm", "--quiet", r.dir+"/20260102000100_a2.sql")
+					r.hash("A")
+				}
+				r.forcePush("A")
+				o := run{branch: "A", before: before}
+				if tt.land {
+					r.land(s)
+					o = run{branch: "main"}
+				}
+				tips := r.tips("B")
+				act, logs, err := r.run(s, o)
+				switch tt.wantError {
+				case "":
+				case "-":
+					require.Equal(t, tips, r.tips("B"), "nothing is pushed", logs)
+					return
+				default:
+					require.ErrorContains(t, err, tt.wantError, logs)
+					require.Equal(t, tips, r.tips("B"))
+					return
+				}
+				require.NoError(t, err, logs)
+				require.Equal(t, "true", act.output["rebased"], "B no longer has a2, which conflicts with A or main")
+				require.Equal(t, []string{"init", "a1", "b1"}, r.names("B"))
 			})
 		}
 	})
@@ -2670,6 +2776,94 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Equal(t, tips, r.tips("A", "B"))
 		_, serr := os.Stat(marker)
 		require.ErrorIs(t, serr, os.ErrNotExist, "the head did not run as a command")
+	})
+
+	t.Run("SameSubjectSplit", func(t *testing.T) {
+		for _, amend := range []bool{false, true} {
+			t.Run(fmt.Sprint("Amend=", amend), func(t *testing.T) {
+				r := newStackRepo(t)
+				fix := func(content string) {
+					r.checkout("A")
+					require.NoError(t, os.WriteFile(filepath.Join(r.dev, "app.txt"), []byte(content), 0644))
+					r.git(r.dev, "add", "--all")
+					r.git(r.dev, "commit", "--quiet", "--message", "fix")
+				}
+				r.branch("A", "main")
+				r.migration("A", "20260102000000", "a1")
+				fix("v1\n")
+				fix("v2\n")
+				r.branch("B", "A")
+				r.migration("B", "20260103000000", "b1")
+				r.push("A", "B")
+				s := r.stack(65, "main", "A", "B")
+				before := r.tip("A")
+				// The second fix moves up to B, which has it: A drops it, and may amend the first one, with the same subject.
+				r.checkout("A")
+				r.git(r.dev, "reset", "--quiet", "--hard", "HEAD~1")
+				if amend {
+					require.NoError(t, os.WriteFile(filepath.Join(r.dev, "app.txt"), []byte("v1b\n"), 0644))
+					r.git(r.dev, "commit", "--quiet", "--all", "--amend", "--no-edit")
+				}
+				r.forcePush("A")
+				r.migration("main", "20260105000000", "m1")
+				r.push("main")
+				tips := r.tips("A", "B")
+				_, logs, err := r.run(s, run{branch: "A", before: before})
+				require.ErrorContains(t, err, "#2 (B): it has commits that #1 (A) no longer has", logs)
+				require.Equal(t, tips, r.tips("A", "B"), "B keeps the fix A dropped")
+				require.Equal(t, "v2", r.gitOut(r.origin, "show", "B:app.txt"))
+			})
+		}
+	})
+
+	t.Run("SquashedBelow", func(t *testing.T) {
+		for _, tt := range []struct {
+			name    string
+			subject string // Subject of the second commit of A.
+			moved   bool   // Whether a later commit of A moved a1 to another version, like an earlier restack.
+		}{
+			{name: "OtherSubject", subject: "A: add column c"},
+			{name: "SameSubject", subject: "A: add a1"},
+			{name: "MovedBefore", moved: true},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				r := newStackRepo(t)
+				r.branch("A", "main")
+				r.migration("A", "20260102000000", "a1")
+				sql := "CREATE TABLE a1 (id int);\n"
+				if tt.moved {
+					r.git(r.dev, "mv", r.dir+"/20260102000000_a1.sql", r.dir+"/20260102000100_a1.sql")
+					r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+					r.git(r.dev, "add", "--all")
+					r.git(r.dev, "commit", "--quiet", "--message", botMessage)
+				} else {
+					sql = "CREATE TABLE a1 (id int, c int);\n"
+					r.migrationSQL("A", "20260102000000", "a1", sql)
+					r.amend("A", tt.subject)
+				}
+				r.branch("B", "A")
+				r.migration("B", "20260103000000", "b1")
+				r.push("A", "B")
+				s := r.stack(66, "main", "A", "B")
+				before := r.tip("A")
+				r.migration("main", "20260105000000", "m1")
+				r.push("main")
+				// The developer squashes A onto main, with a1 moved on top, as atlas migrate rebase does.
+				r.git(r.dev, "fetch", "--quiet", "origin")
+				r.checkout("A")
+				r.git(r.dev, "reset", "--quiet", "--hard", "origin/main")
+				require.NoError(t, os.WriteFile(filepath.Join(r.dev, r.dir, "20260106000000_a1.sql"), []byte(sql), 0644))
+				r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+				r.git(r.dev, "add", "--all")
+				r.git(r.dev, "commit", "--quiet", "--message", "A: add a1 (squashed)")
+				r.forcePush("A")
+				act, logs, err := r.run(s, run{branch: "A", before: before})
+				require.NoError(t, err, logs)
+				require.Equal(t, "true", act.output["rebased"])
+				r.requireStack("main", "A", "B")
+				require.Equal(t, []string{"B: add b1", botMessage}, r.log("A", "B"))
+			})
+		}
 	})
 
 	t.Run("Errors", func(t *testing.T) {
@@ -2959,6 +3153,7 @@ func (r *stackRepo) formatFile(branch, format, name string, sql ...string) {
 	if len(sql) > 0 {
 		content = sql[0]
 	}
+	require.NoError(r.t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0755))
 	require.NoError(r.t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0644))
 	r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir+"?format="+format)
 	r.git(r.dev, "add", "--all")

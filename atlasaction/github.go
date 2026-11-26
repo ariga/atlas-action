@@ -330,12 +330,7 @@ func (c *GitHubClient) BranchHistory(ctx context.Context, branch string) (*Branc
 	if err != nil {
 		return nil, err
 	}
-	return &BranchHistory{Heads: h.Heads, Created: h.Created, Rewritten: h.Rewritten}, nil
-}
-
-// ForcePushes implements StackClient.
-func (c *GitHubClient) ForcePushes(ctx context.Context, branch string) ([]string, error) {
-	return c.Client.ForcePushes(ctx, branch)
+	return (*BranchHistory)(h), nil
 }
 
 // Stack implements StackClient.

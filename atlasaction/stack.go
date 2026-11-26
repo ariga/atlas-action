@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"maps"
 	"net/url"
 	"os"
 	"os/exec"
@@ -26,6 +25,7 @@ import (
 	"ariga.io/atlas-action/internal/github"
 	"ariga.io/atlas/atlasexec"
 	"ariga.io/atlas/sql/migrate"
+	"ariga.io/atlas/sql/sqltool"
 )
 
 const (
@@ -53,6 +53,7 @@ type (
 		dir     string // Migration directory, relative to the working directory.
 		rel     string // Migration directory, relative to the repository root.
 		atlas   bool   // Whether the directory has the default Atlas format.
+		flyway  bool   // Whether the directory has the Flyway format.
 		message string // Message of the commits that fix the migration directory.
 		now     func() time.Time
 		sleep   func(context.Context, time.Duration) error
@@ -277,6 +278,7 @@ func (a *Actions) newRestacker(ctx context.Context, tc *TriggerContext, sc Stack
 		dirURL:   u.String(),
 		dir:      filepath.Join(u.Host, u.Path),
 		atlas:    u.Query().Get("format") == "" || u.Query().Get("format") == formatAtlas,
+		flyway:   u.Query().Get("format") == "flyway",
 		moved:    make(map[string]string),
 		hasPR:    make(map[string]bool),
 		history:  make(map[string]*BranchHistory),
@@ -469,7 +471,7 @@ open:
 		return nil, fmt.Errorf("failed to resolve the base branch %q: %w", s.Base, err)
 	}
 	// Most runs find nothing to restack, and need neither the history of the branches nor the fork points.
-	switch ok, err := r.allOnTop(ctx, trunk, layers); {
+	switch ok, err := r.allOnTop(ctx, trunk, merged, layers); {
 	case err != nil:
 		return nil, err
 	case ok:
@@ -706,7 +708,7 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 		if err != nil {
 			return nil, err
 		}
-		for _, h := range strings.Fields(out) {
+		for h := range strings.FieldsSeq(out) {
 			if h == f.commit {
 				continue
 			}
@@ -902,26 +904,24 @@ func (r *restacker) dropped(ctx context.Context, fork string, heads []string, tr
 		}
 		// An amend keeps the subject and the files, but may move the migration files to other versions.
 		amended := false
-		for _, h := range subjects[subject] {
+		for i, h := range subjects[subject] {
 			hfiles, err := r.changedFiles(ctx, h)
 			if err != nil {
 				return nil, err
 			}
 			if amended = slices.Equal(r.unversioned(files), r.unversioned(hfiles)); amended {
+				// A commit of the heads stands in for one commit only.
+				subjects[subject] = slices.Delete(subjects[subject], i, i+1)
 				break
 			}
 		}
 		if amended {
 			continue
 		}
-		specs := make([]string, len(files))
-		for i, f := range files {
-			specs[i] = ":(top,literal)" + f
-		}
 		// Whether a head has the files the commit changes as they are at the fork point.
-		kept := len(specs) == 0
+		kept := len(files) == 0
 		for i := 0; !kept && i < len(heads); i++ {
-			if kept, err = r.gitTest(ctx, append([]string{"diff-tree", "-r", "--quiet", fork, heads[i], "--"}, specs...)...); err != nil {
+			if kept, err = r.kept(ctx, fork, heads[i], files); err != nil {
 				return nil, err
 			}
 		}
@@ -930,6 +930,44 @@ func (r *restacker) dropped(ctx context.Context, fork string, heads []string, tr
 		}
 	}
 	return lost, nil
+}
+
+// kept reports whether the head has the files as they are at the fork point. The migration files may have other
+// versions in the head, like after a restack, or a squash that moved them on top.
+func (r *restacker) kept(ctx context.Context, fork, head string, files []string) (bool, error) {
+	fb, err := r.blobs(ctx, fork)
+	if err != nil {
+		return false, err
+	}
+	hb, err := r.blobs(ctx, head)
+	if err != nil {
+		return false, err
+	}
+	// The blobs of the migration files with the given name, whatever their versions.
+	named := func(blobs map[string]string, name string) []string {
+		var bs []string
+		for n, b := range blobs {
+			if r.unversioned([]string{path.Join(r.rel, n)})[0] == name {
+				bs = append(bs, b)
+			}
+		}
+		slices.Sort(bs)
+		return bs
+	}
+	var specs []string
+	for _, f := range files {
+		if !r.migrationFile(f) {
+			specs = append(specs, ":(top,literal)"+f)
+			continue
+		}
+		if name := r.unversioned([]string{f})[0]; !slices.Equal(named(fb, name), named(hb, name)) {
+			return false, nil
+		}
+	}
+	if len(specs) == 0 {
+		return true, nil
+	}
+	return r.gitTest(ctx, append([]string{"diff-tree", "-r", "--quiet", fork, head, "--"}, specs...)...)
 }
 
 // changedFiles returns the files the commit changes, other than atlas.sum.
@@ -1000,9 +1038,9 @@ func (r *restacker) firstConflict(ctx context.Context, base, trunk string, layer
 
 // allOnTop reports whether the migrations of each layer are on top of the ones of the layer below
 // it, or of the trunk, with the same hashes. Then firstConflict finds no conflict either.
-func (r *restacker) allOnTop(ctx context.Context, trunk string, layers []*layerState) (bool, error) {
+func (r *restacker) allOnTop(ctx context.Context, trunk string, merged *StackLayer, layers []*layerState) (bool, error) {
 	parent := trunk
-	for _, l := range layers {
+	for i, l := range layers {
 		ps, err := r.sumAt(ctx, parent)
 		if err != nil {
 			return false, err
@@ -1014,12 +1052,30 @@ func (r *restacker) allOnTop(ctx context.Context, trunk string, layers []*layerS
 		if !r.onTop(ps, cs, true) {
 			return false, nil
 		}
+		// Only the trunk is known to move forward without the history. The layer must have the head of the branch below,
+		// which may have been rewritten since the layer was built on it.
+		if i > 0 {
+			if linear, err := r.gitTest(ctx, "merge-base", "--is-ancestor", parent, l.old); err != nil || !linear {
+				return false, err
+			}
+		}
 		mb, err := r.git(ctx, "merge-base", parent, l.old)
 		if err != nil {
 			return false, nil
 		}
 		if stale, err := r.stale(ctx, mb, parent, ps, cs); err != nil || stale {
 			return false, err
+		}
+		if i == 0 && merged != nil {
+			// The trunk may have only a copy of the merged pull request below, like after a squash merge, without the
+			// migrations its head removed. Only the files on top of the trunk are compared with the ones it was built on.
+			mb, err := r.git(ctx, "merge-base", r.mergedRef(merged), l.old)
+			if err != nil {
+				return false, nil
+			}
+			if stale, err := r.stale(ctx, mb, mb, ps, cs); err != nil || stale {
+				return false, err
+			}
 		}
 		parent = l.old
 	}
@@ -1064,7 +1120,7 @@ func (r *restacker) onTop(p, c migrate.HashFile, hashes bool) bool {
 		}
 	}
 	return !slices.ContainsFunc(c[len(p):], func(f struct{ N, H string }) bool {
-		return slices.ContainsFunc(p, func(pf struct{ N, H string }) bool { return fileVersion(pf.N) == fileVersion(f.N) })
+		return slices.ContainsFunc(p, func(pf struct{ N, H string }) bool { return r.version(pf.N) == r.version(f.N) })
 	})
 }
 
@@ -1084,18 +1140,16 @@ func (r *restacker) stale(ctx context.Context, base, parent string, ps, cs migra
 	case r.atlas:
 		return false, nil
 	}
-	bb, err := r.blobs(ctx, base)
+	spec := r.sqlSpec()
+	if r.flyway {
+		// Flyway also reads the files in subdirectories.
+		spec = ":(top,glob)" + path.Join(r.rel, "**", "*.sql")
+	}
+	out, err := r.gitRaw(ctx, "diff-tree", "-r", "--name-only", "-z", "--no-renames", base, parent, "--", spec)
 	if err != nil {
 		return false, err
 	}
-	pb, err := r.blobs(ctx, parent)
-	if err != nil {
-		return false, err
-	}
-	versioned := func(name, _ string) bool { return !unversioned(name) }
-	maps.DeleteFunc(bb, versioned)
-	maps.DeleteFunc(pb, versioned)
-	return !maps.Equal(bb, pb), nil
+	return slices.ContainsFunc(splitNUL(out), versionless), nil
 }
 
 // versioned leaves out the files of other formats that have no version, like the repeatable migrations of Flyway
@@ -1104,12 +1158,31 @@ func (r *restacker) versioned(hf migrate.HashFile) migrate.HashFile {
 	if r.atlas {
 		return hf
 	}
-	return slices.DeleteFunc(hf, func(f struct{ N, H string }) bool { return unversioned(f.N) })
+	return slices.DeleteFunc(hf, func(f struct{ N, H string }) bool { return versionless(f.N) })
 }
 
-// unversioned reports whether the name is of a migration file without a version, like R__name.sql in Flyway.
-func unversioned(name string) bool {
-	return path.Ext(name) == ".sql" && !strings.ContainsAny(fileVersion(name), "0123456789")
+// versionless reports whether the name is of a migration file without a version, like R__name.sql in Flyway.
+func versionless(name string) bool {
+	return path.Ext(name) == ".sql" && !strings.ContainsAny(fileVersion(path.Base(name)), "0123456789")
+}
+
+// version returns the version of a migration file, as the format of the directory reads it. Flyway compares the
+// numbers of the parts of a version, separated by dots or underscores, so V2_1, V2.1 and V2.01 have one version.
+func (r *restacker) version(name string) string {
+	if !r.flyway {
+		return fileVersion(name)
+	}
+	parts := strings.FieldsFunc(sqltool.FlywayFile{LocalFile: migrate.NewLocalFile(name, nil)}.Version(), func(c rune) bool { return c == '.' || c == '_' })
+	for i, p := range parts {
+		if n, err := strconv.Atoi(p); err == nil {
+			parts[i] = strconv.Itoa(n)
+		}
+	}
+	// Flyway also drops the trailing zero parts, so V2 and V2.0 have one version.
+	for len(parts) > 1 && parts[len(parts)-1] == "0" {
+		parts = parts[:len(parts)-1]
+	}
+	return strings.Join(parts, ".")
 }
 
 // fileVersion returns the version of a migration file in the Atlas format.
@@ -1343,17 +1416,12 @@ func (r *restacker) ownFiles(ctx context.Context, l *layerState, parent, parentN
 	if err != nil {
 		return nil, err
 	}
-	// Blobs of the parent's migration files, which the layer must not copy.
-	pblobs := make(map[string]string, len(ps))
-	for _, f := range ps {
-		pblobs[f.N] = ptree[f.N]
-	}
 	var own, edited, removed, dups []string
 	for _, f := range ps {
 		switch b, ok := ctree[f.N]; {
 		case !ok:
 			removed = append(removed, f.N)
-		case b != pblobs[f.N]:
+		case b != ptree[f.N]:
 			edited = append(edited, f.N)
 		}
 	}
@@ -1367,9 +1435,10 @@ func (r *restacker) ownFiles(ctx context.Context, l *layerState, parent, parentN
 	}
 	add := func(name string) {
 		b := ctree[name]
-		// A layer may have copies of its own, like a migration it adds again, but the restack must not add any.
-		if n := blobName(pblobs, b); n != "" && count(ctree, b) > count(otree, b) {
-			dups = append(dups, fmt.Sprintf("%s (same as %s)", name, n))
+		// A layer may have copies of its own, like a migration it adds again, but the restack must not add any
+		// copy of the parent's migration files.
+		if i := slices.IndexFunc(ps, func(f struct{ N, H string }) bool { return ptree[f.N] == b }); i >= 0 && count(ctree, b) > count(otree, b) {
+			dups = append(dups, fmt.Sprintf("%s (same as %s)", name, ps[i].N))
 		} else {
 			own = append(own, name)
 		}
@@ -1393,18 +1462,6 @@ func (r *restacker) ownFiles(ctx context.Context, l *layerState, parent, parentN
 	}
 	slices.Sort(own)
 	return own, nil
-}
-
-// blobName returns the name of the file with the given blob, the first in sorted order
-// if several files have it, or an empty string if none has it.
-func blobName(blobs map[string]string, blob string) string {
-	var name string
-	for n, b := range blobs {
-		if b == blob && (name == "" || n < name) {
-			name = n
-		}
-	}
-	return name
 }
 
 // blobs returns the blob of each file in the migration directory at the given commit.
