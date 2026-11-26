@@ -88,9 +88,14 @@ func TestOnTop(t *testing.T) {
 	require.False(t, r.onTop(p, c, true))
 	require.True(t, r.onTop(p, c, false))
 	require.False(t, r.onTop(p, sum("1_a.sql"), false))
-	// Other directory formats.
+	// Other directory formats cannot have two files of a version either, and their files without a version,
+	// like the repeatable migrations of Flyway, are left out of the sums.
 	r.atlas = false
-	require.True(t, r.onTop(p, sum("1_a.sql", "20260105000000_x1.sql", "20260105000000_y1.sql"), true))
+	require.False(t, r.onTop(p, sum("1_a.sql", "20260105000000_x1.sql", "20260105000000_y1.sql"), true))
+	require.False(t, r.onTop(sum("V1__a.sql", "V2__m.sql"), sum("V1__a.sql", "V2__m.sql", "V2__z.sql"), true))
+	require.Equal(t, sum("V1__a.sql", "V2__m.sql"), r.versioned(sum("V1__a.sql", "V2__m.sql", "R__a.sql", "R__b.sql")))
+	r.atlas = true
+	require.Equal(t, sum("1_a.sql", "R__a.sql"), r.versioned(sum("1_a.sql", "R__a.sql")))
 }
 
 func TestGitCommand(t *testing.T) {

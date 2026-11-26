@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -466,22 +465,18 @@ func (c *Client) OpenPullRequests(ctx context.Context, head, base string) ([]*Pu
 		q.Set("base", base)
 	}
 	var prs []*PullRequest
-	for page := 1; ; page++ {
-		if page > maxPages {
-			return nil, fmt.Errorf("github: more than %d pages of open pull requests", maxPages)
-		}
-		q.Set("page", strconv.Itoa(page))
-		var resp []pullRequest
-		if err := c.get(ctx, fmt.Sprintf("/repos/%s/pulls?%s", c.repo, q.Encode()), nil, &resp); err != nil {
-			return nil, err
-		}
-		for _, p := range resp {
+	more, err := pages(ctx, c, fmt.Sprintf("%s/repos/%s/pulls?%s", c.baseURL, c.repo, q.Encode()), maxPages, func(page []pullRequest) {
+		for _, p := range page {
 			prs = append(prs, p.PullRequest())
 		}
-		if len(resp) < 100 {
-			return prs, nil
-		}
+	})
+	switch {
+	case err != nil:
+		return nil, err
+	case more:
+		return nil, fmt.Errorf("github: more than %d pages of open pull requests", maxPages)
 	}
+	return prs, nil
 }
 
 // Stack returns the stack of pull requests with the given number. The error wraps
@@ -489,16 +484,10 @@ func (c *Client) OpenPullRequests(ctx context.Context, head, base string) ([]*Pu
 func (c *Client) Stack(ctx context.Context, number int) (*Stack, error) {
 	var s Stack
 	h := http.Header{"X-Github-Api-Version": {stackAPIVersion}}
-	if err := c.get(ctx, fmt.Sprintf("/repos/%s/stacks/%d", c.repo, number), h, &s); err != nil {
+	if _, err := c.getURL(ctx, fmt.Sprintf("%s/repos/%s/stacks/%d", c.baseURL, c.repo, number), h, &s); err != nil {
 		return nil, err
 	}
 	return &s, nil
-}
-
-// get sends a GET request to the given path of the API and decodes the JSON response into v.
-func (c *Client) get(ctx context.Context, path string, h http.Header, v any) error {
-	_, err := c.getURL(ctx, c.baseURL+path, h, v)
-	return err
 }
 
 // getURL sends a GET request to the given URL of the API, decodes the JSON
@@ -550,6 +539,26 @@ func (c *Client) nextPage(h http.Header) (string, error) {
 	return "", nil
 }
 
+// pages reads the pages of a listing from the given URL, following the Link header of each response, and
+// passes the items of each page to add. It stops after max pages, and reports whether more pages are left.
+func pages[T any](ctx context.Context, c *Client, u string, max int, add func([]T)) (more bool, err error) {
+	for n := 0; u != ""; n++ {
+		if n == max {
+			return true, nil
+		}
+		var items []T
+		h, err := c.getURL(ctx, u, nil, &items)
+		if err != nil {
+			return false, err
+		}
+		add(items)
+		if u, err = c.nextPage(h); err != nil {
+			return false, err
+		}
+	}
+	return false, nil
+}
+
 // maxActivityPages caps the number of pages of activities read for a branch.
 const maxActivityPages = 30
 
@@ -589,24 +598,15 @@ func (c *Client) activity(ctx context.Context, branch, typ string) (*BranchHisto
 		q.Set("activity_type", typ)
 	}
 	var (
-		next = fmt.Sprintf("%s/repos/%s/activity?%s", c.baseURL, c.repo, q.Encode())
 		seen = make(map[string]bool)
 		h    = &BranchHistory{}
 		last string // Type of the oldest activity read.
 	)
-	for page := 0; next != ""; page++ {
-		if page == maxActivityPages {
-			return h, nil
-		}
-		var acts []struct {
-			Before string `json:"before"`
-			After  string `json:"after"`
-			Type   string `json:"activity_type"`
-		}
-		hdr, err := c.getURL(ctx, next, nil, &acts)
-		if err != nil {
-			return nil, err
-		}
+	more, err := pages(ctx, c, fmt.Sprintf("%s/repos/%s/activity?%s", c.baseURL, c.repo, q.Encode()), maxActivityPages, func(acts []struct {
+		Before string `json:"before"`
+		After  string `json:"after"`
+		Type   string `json:"activity_type"`
+	}) {
 		for _, a := range acts {
 			// The creation and deletion of a branch have no commit on one side.
 			for _, sha := range []string{a.After, a.Before} {
@@ -618,11 +618,11 @@ func (c *Client) activity(ctx context.Context, branch, typ string) (*BranchHisto
 			h.Rewritten = h.Rewritten || a.Type == "force_push" || a.Type == "branch_deletion"
 			last = a.Type
 		}
-		if next, err = c.nextPage(hdr); err != nil {
-			return nil, err
-		}
+	})
+	if err != nil {
+		return nil, err
 	}
-	h.Created = last == "branch_creation"
+	h.Created = !more && last == "branch_creation"
 	return h, nil
 }
 

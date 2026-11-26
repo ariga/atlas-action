@@ -513,11 +513,12 @@ GitHub rebases the pull requests above it, but a rebase cannot resolve conflicti
   `atlas migrate rebase`, and adds one commit per pull request, which later runs amend while it is the last
   commit of the branch.
 * Like `gh stack push`, it pushes all the restacked branches at once, with `--force-with-lease`. If a pull
-  request conflicts in other files, has a merge commit with changes of its own or with more than two parents
-  (which a rebase drops), edits migration files of the pull request below it once that pull request's migrations
-  change, has commits the pull request below it no longer has (they may have been dropped there, or moved up,
-  like when a branch is split into a stack), or its commits cannot be told apart, nothing is pushed, and the run
-  fails with the reason. Resolve it locally with `gh stack rebase`.
+  request does not target the branch of the pull request below it (or the base of the stack, for the bottom one),
+  conflicts in other files, has a merge commit with changes of its own or with more than two parents (which a
+  rebase drops), edits migration files of the pull request below it once that pull request's migrations change,
+  has commits the pull request below it no longer has (they may have been dropped there, or moved up, like when a
+  branch is split into a stack), or its commits cannot be told apart, nothing is pushed, and the run fails with
+  the reason. Resolve it locally with `gh stack rebase`.
 * It does nothing when the migrations of the stack do not conflict, even if the stack is not linear, and
   leaves the rebase to GitHub, which can rebase the stack from the pull request.
 * A pull request that is not stacked, and targets the base branch, is rebased as without the input.
@@ -590,10 +591,11 @@ jobs:
 >   request to `main`, as such branches may be rewritten. An activity that does not go back to the creation
 >   of the branch is enough when it records no force-push of the branch, and goes back to a head the pull
 >   request above it has. When it is not enough, or cannot be read, the pull request above the branch is
->   restacked only if it is built on the latest head of the branch, and keeps the commits the branch dropped
->   before, if any. Otherwise, the action leaves the pull requests as they are. The heads a branch had before
->   it was force-pushed are not in the clone, so the action fetches them by their SHA, and leaves the pull
->   requests above it as they are if one cannot be fetched. Restack them locally with `gh stack rebase`.
+>   restacked only if it is built on the latest head of the branch, or on the head it had before the push that
+>   triggered the run, and keeps the commits the branch dropped before, if any. Otherwise, the action leaves
+>   the pull requests as they are. The heads a branch had before it was force-pushed are not in the clone, so
+>   the action fetches them by their SHA, and leaves the pull requests above it as they are if one cannot be
+>   fetched. Restack them locally with `gh stack rebase`.
 > * A base branch without a pull request of its own, like `main`, is expected to only move forward. The action
 >   reads only its force-pushes, to find the commits it dropped, and skips the heads it cannot fetch, or all of
 >   them if the activity endpoint is not available. If reading them fails otherwise, the bottom pull request is
@@ -603,6 +605,11 @@ jobs:
 >   not have into the bottom pull request, like `git rebase` does, while `gh stack rebase` drops them.
 > * A restack resolves only the `atlas.sum` file of the `dir` input. If the stack and the branch it targets
 >   both change another migration directory, restack it locally.
+> * In other formats than Atlas's, like `golang-migrate` or `flyway`, the action replays the commits of the pull
+>   requests, but cannot move their migration files on top, as `atlas migrate rebase` renames only files of the
+>   Atlas format. A pull request whose migrations do not sort after the ones below it, or have their versions, is
+>   left as it is, and the run fails. Files without a version, like the repeatable migrations of Flyway, are not
+>   ordered: the restack replays their changes, and regenerates `atlas.sum`.
 {{- end }}
 {{- with action . "migrate/hash" }}
 ### `ariga/atlas-action/{{ .ID }}`

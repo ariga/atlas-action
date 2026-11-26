@@ -48,15 +48,21 @@ func TestIssueCommentBody(t *testing.T) {
 }
 
 func TestOpenPullRequests(t *testing.T) {
-	var queries []url.Values
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var (
+		queries []url.Values
+		srv     *httptest.Server
+	)
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/repos/owner/repo/pulls", r.URL.Path)
 		queries = append(queries, r.URL.Query())
 		var prs []map[string]any
 		switch r.URL.Query().Get("page") {
-		case "1":
-			// A full page, so the next page is read.
+		case "":
+			// The Link header points to the next page, as GitHub does.
+			q := r.URL.Query()
+			q.Set("page", "2")
+			w.Header().Set("Link", fmt.Sprintf(`<%s/repos/owner/repo/pulls?%s>; rel="next"`, srv.URL, q.Encode()))
 			for i := range 100 {
 				prs = append(prs, map[string]any{"number": i + 1, "head": map[string]any{"ref": "feat/a+b"}, "base": map[string]any{"ref": "main"}, "stack": nil})
 			}
@@ -80,13 +86,13 @@ func TestOpenPullRequests(t *testing.T) {
 	require.Equal(t, &PullRequest{Number: 1, Ref: "feat/a+b", Base: "main"}, prs[0])
 	require.Equal(t, &PullRequest{Number: 101, URL: "https://github.com/owner/repo/pull/101", Commit: "abc", Ref: "feat/a+b", Base: "feat/base", Stack: 7}, prs[100])
 	require.Len(t, queries, 2)
-	require.Equal(t, url.Values{"state": {"open"}, "head": {"owner:feat/a+b"}, "per_page": {"100"}, "page": {"1"}}, queries[0])
-	require.Equal(t, "2", queries[1].Get("page"))
+	require.Equal(t, url.Values{"state": {"open"}, "head": {"owner:feat/a+b"}, "per_page": {"100"}}, queries[0])
+	require.Equal(t, url.Values{"state": {"open"}, "head": {"owner:feat/a+b"}, "per_page": {"100"}, "page": {"2"}}, queries[1])
 
 	queries = nil
 	_, err = client.OpenPullRequests(t.Context(), "", "main")
 	require.NoError(t, err)
-	require.Equal(t, url.Values{"state": {"open"}, "base": {"main"}, "per_page": {"100"}, "page": {"1"}}, queries[0])
+	require.Equal(t, url.Values{"state": {"open"}, "base": {"main"}, "per_page": {"100"}}, queries[0])
 }
 
 func TestStack(t *testing.T) {

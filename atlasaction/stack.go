@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net/url"
 	"os"
 	"os/exec"
@@ -78,6 +79,9 @@ type (
 		commit   string // The fork point.
 		upstream string // The upstream to replay the commits after the fork point from.
 		reason   string // Why the fork point is not trusted, empty if it is known to be exact.
+		// others holds the heads of the branch below that the layer also has, which neither contain the fork point nor
+		// each other, like after the layer merged an old copy of that branch. The replay skips their commits too.
+		others []string
 	}
 )
 
@@ -102,13 +106,9 @@ func (a *Actions) migrateAutoRebaseStacks(ctx context.Context, tc *TriggerContex
 	if sc == nil {
 		return errors.New(`the "stack" input is supported only for repositories hosted on GitHub`)
 	}
-	// Some CI platforms report the branch as a full ref.
-	branch := strings.TrimPrefix(tc.Branch, "refs/heads/")
-	if branch == "" {
+	if tc.Branch == "" {
 		return errors.New("failed to determine the branch the action runs on")
 	}
-	tc = new(*tc)
-	tc.Branch = branch
 	stacks, single, lookupErr, err := a.branchStacks(ctx, sc, tc)
 	if err != nil {
 		return err
@@ -456,6 +456,10 @@ open:
 			return nil, fmt.Errorf("pull request #%d targets %q, not the branch of #%d (%s) listed below it", l.Number, l.Base, below.Number, below.Branch)
 		}
 	}
+	// The bottom one targets the base of the stack, or, until GitHub retargets it, the branch that merged below it.
+	if l := layers[0]; l.Base != s.Base && (merged == nil || l.Base != merged.Branch) {
+		return nil, fmt.Errorf("pull request #%d targets %q, not the base of the stack %q", l.Number, l.Base, s.Base)
+	}
 	r.Infof("Stack #%d: %s", s.Number, describeStack(s.Base, layers))
 	if err := r.fetch(ctx, s.Base, merged, layers); err != nil {
 		return nil, err
@@ -512,12 +516,7 @@ open:
 		}
 		if l.new, err = r.restackLayer(ctx, l, parent, parentName); err != nil {
 			// Discard the changes of the failed layer, before the next stack is restacked.
-			if _, rerr := r.git(ctx, "reset", "--quiet", "--hard"); rerr != nil {
-				err = errors.Join(err, rerr)
-			}
-			if cerr := r.clean(ctx); cerr != nil {
-				err = errors.Join(err, cerr)
-			}
+			err = errors.Join(err, r.discard(ctx))
 			return nil, fmt.Errorf("#%d (%s): %w. %s", l.Number, l.Branch, err, stackHint)
 		}
 	}
@@ -610,6 +609,10 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 	case below != nil:
 		tips, skip = append(tips, below.old), below.old
 		now, held = append(now, below.old), append(held, below.old)
+		// The push that triggered the run may have rewritten the branch below, after the layer was built on it.
+		if r.tc.Before != "" && r.tc.Branch == below.Branch && r.tc.Commit == below.old {
+			tips, held = append(tips, r.tc.Before), append(held, r.tc.Before)
+		}
 		hist(below.Branch, below.old)
 	default:
 		now, held = append(now, trunk), append(held, trunk)
@@ -623,6 +626,9 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 		// A trunk without a pull request is expected to only move forward, but the layer may
 		// hold commits of the merged pull request below it, that are not in the trunk.
 		mb, err := r.git(ctx, "merge-base", trunk, l.old)
+		if exit, ok := errors.AsType[*exec.ExitError](err); ok && exit.ExitCode() == 1 {
+			return nil, fmt.Errorf("#%d (%s): no commit in common with %s", l.Number, l.Branch, s.Base)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -693,10 +699,37 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 		f.reason = fmt.Sprintf("cannot fetch the heads %s had: %v", name, fetchErr)
 		return f, nil
 	}
+	// The layer may also have heads of the branch below that do not contain the fork point, like after it merged an
+	// old copy of that branch. Their commits are not the layer's either, so they are checked like the ones up to it.
+	if len(cands) > 1 {
+		out, err := r.git(ctx, append([]string{"merge-base", "--independent", f.commit}, cands...)...)
+		if err != nil {
+			return nil, err
+		}
+		for _, h := range strings.Fields(out) {
+			if h == f.commit {
+				continue
+			}
+			// The commits of the trunk are never replayed, nor lost.
+			if inTrunk, err := r.gitTest(ctx, "merge-base", "--is-ancestor", h, trunk); err != nil {
+				return nil, err
+			} else if !inTrunk {
+				f.others = append(f.others, h)
+			}
+		}
+	}
 	// The branch below dropped these commits, or they were moved to the layer. Git cannot tell which.
-	dropped, err := r.dropped(ctx, f.commit, now, trunk)
-	if err != nil {
-		return nil, err
+	var dropped []string
+	for _, h := range append([]string{f.commit}, f.others...) {
+		d, err := r.dropped(ctx, h, now, trunk)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range d {
+			if !slices.Contains(dropped, c) {
+				dropped = append(dropped, c)
+			}
+		}
 	}
 	if len(dropped) > 0 {
 		f.reason = fmt.Sprintf("it has commits that %s no longer has, which a restack would drop: %s", name, strings.Join(dropped, ", "))
@@ -811,7 +844,8 @@ func (r *restacker) fetchMissing(ctx context.Context, commits []string) error {
 		return nil
 	}
 	// A commit the remote does not have fails the fetch of all of them, so they are fetched one by one then.
-	args := []string{"fetch", "--quiet", "--no-tags", "--no-recurse-submodules", r.remote}
+	// The commits come from the API, and must not be read as options.
+	args := []string{"fetch", "--quiet", "--no-tags", "--no-recurse-submodules", r.remote, "--"}
 	if _, err = r.git(ctx, append(args, missing...)...); err == nil || len(missing) == 1 {
 		return err
 	}
@@ -922,13 +956,7 @@ func (r *restacker) unversioned(files []string) []string {
 
 // splitNUL splits the NUL-terminated output of a git command.
 func splitNUL(b []byte) []string {
-	var s []string
-	for e := range bytes.SplitSeq(b, []byte{0}) {
-		if len(e) > 0 {
-			s = append(s, string(e))
-		}
-	}
-	return s
+	return strings.FieldsFunc(string(b), func(r rune) bool { return r == 0 })
 }
 
 // firstConflict returns the index of the lowest layer whose migration directory does not
@@ -986,6 +1014,13 @@ func (r *restacker) allOnTop(ctx context.Context, trunk string, layers []*layerS
 		if !r.onTop(ps, cs, true) {
 			return false, nil
 		}
+		mb, err := r.git(ctx, "merge-base", parent, l.old)
+		if err != nil {
+			return false, nil
+		}
+		if stale, err := r.stale(ctx, mb, parent, ps, cs); err != nil || stale {
+			return false, err
+		}
 		parent = l.old
 	}
 	return true, nil
@@ -1009,7 +1044,8 @@ func (r *restacker) upToDate(ctx context.Context, parent string, l *layerState) 
 	case !r.onTop(ps, cs, false):
 		return false, nil
 	case r.onTop(ps, cs, true):
-		return true, nil
+		stale, err := r.stale(ctx, l.fork.commit, parent, ps, cs)
+		return !stale, err
 	default:
 		return r.gitTest(ctx, "diff-tree", "-r", "--quiet", l.fork.commit, parent, "--", r.sqlSpec(), r.sumSpec())
 	}
@@ -1027,18 +1063,58 @@ func (r *restacker) onTop(p, c migrate.HashFile, hashes bool) bool {
 			return false
 		}
 	}
-	if !r.atlas {
-		return true
-	}
 	return !slices.ContainsFunc(c[len(p):], func(f struct{ N, H string }) bool {
 		return slices.ContainsFunc(p, func(pf struct{ N, H string }) bool { return fileVersion(pf.N) == fileVersion(f.N) })
 	})
 }
 
+// stale reports whether the parent changed migrations since the commit the layer was built on, in a way its sums do
+// not show: the layer has files on top of the ones of the parent that the commit it was built on already had, like when
+// the parent removed its last migrations since, or, in other formats, the parent changed its files without a version.
+func (r *restacker) stale(ctx context.Context, base, parent string, ps, cs migrate.HashFile) (bool, error) {
+	bs, err := r.sumAt(ctx, base)
+	if err != nil {
+		return false, err
+	}
+	switch {
+	case slices.ContainsFunc(cs[len(ps):], func(f struct{ N, H string }) bool {
+		return slices.ContainsFunc(bs, func(b struct{ N, H string }) bool { return b.N == f.N })
+	}):
+		return true, nil
+	case r.atlas:
+		return false, nil
+	}
+	bb, err := r.blobs(ctx, base)
+	if err != nil {
+		return false, err
+	}
+	pb, err := r.blobs(ctx, parent)
+	if err != nil {
+		return false, err
+	}
+	versioned := func(name, _ string) bool { return !unversioned(name) }
+	maps.DeleteFunc(bb, versioned)
+	maps.DeleteFunc(pb, versioned)
+	return !maps.Equal(bb, pb), nil
+}
+
+// versioned leaves out the files of other formats that have no version, like the repeatable migrations of Flyway
+// (R__name.sql), which are applied by name and listed after the versioned files, so their hashes chain after them.
+func (r *restacker) versioned(hf migrate.HashFile) migrate.HashFile {
+	if r.atlas {
+		return hf
+	}
+	return slices.DeleteFunc(hf, func(f struct{ N, H string }) bool { return unversioned(f.N) })
+}
+
+// unversioned reports whether the name is of a migration file without a version, like R__name.sql in Flyway.
+func unversioned(name string) bool {
+	return path.Ext(name) == ".sql" && !strings.ContainsAny(fileVersion(name), "0123456789")
+}
+
 // fileVersion returns the version of a migration file in the Atlas format.
 func fileVersion(name string) string {
-	v, _, _ := strings.Cut(strings.TrimSuffix(name, ".sql"), "_")
-	return v
+	return migrate.NewLocalFile(name, nil).Version()
 }
 
 // sumAt returns the atlas.sum of the migration directory at the given commit, or nil if it has none.
@@ -1048,15 +1124,8 @@ func (r *restacker) sumAt(ctx context.Context, c string) (migrate.HashFile, erro
 	if err != nil || !ok {
 		return nil, err
 	}
-	b, err := r.gitRaw(ctx, "show", c+":"+name)
-	if err != nil {
-		return nil, err
-	}
-	var hf migrate.HashFile
-	if err := hf.UnmarshalText(b); err != nil {
-		return nil, fmt.Errorf("failed to read %s at %s: %w", name, short(c), err)
-	}
-	return hf, nil
+	hf, err := r.hashFileFrom(ctx, c, name)
+	return r.versioned(hf), err
 }
 
 // restackLayer replays the own commits of the layer onto the parent commit, and moves its
@@ -1065,7 +1134,11 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 	// The rebase skips the commits its upstream has, but not the ones of the commit it replays onto.
 	// An upstream that merges both also skips the commits the parent has, like the ones of the trunk
 	// that the layer merged, which the trunk may have reverted since.
-	upstream, err := r.git(ctx, "commit-tree", "-p", l.fork.upstream, "-p", parent, "-m", "upstream", parent+"^{tree}")
+	args := []string{"commit-tree", "-p", l.fork.upstream}
+	for _, h := range l.fork.others {
+		args = append(args, "-p", h)
+	}
+	upstream, err := r.git(ctx, append(args, "-p", parent, "-m", "upstream", parent+"^{tree}")...)
 	if err != nil {
 		return "", err
 	}
@@ -1219,12 +1292,33 @@ func (r *restacker) checkMerges(ctx context.Context, upstream string, l *layerSt
 		if n := len(strings.Fields(parents)); n > 2 {
 			return fmt.Errorf("merge commit %s merges %d commits, and a restack drops it without checking it for changes of its own", short(m), n)
 		}
-		// The changes of a merge commit, compared with merging its parents again.
-		b, err := r.gitRaw(ctx, "show", "--no-show-signature", "--no-relative", "--remerge-diff", "--format=", "--name-only", "-z", m)
+		// The changes of a merge commit, compared with merging its parents again. Exact renames of migration files, like
+		// the ones of the action's rebase of a pull request that is not stacked, are left out: the restack moves them again.
+		b, err := r.gitRaw(ctx, "show", "--no-show-signature", "--no-relative", "--remerge-diff", "--format=", "--name-status", "-M100%", "-z", m)
 		if err != nil {
 			return fmt.Errorf("failed to check merge commit %s, which a restack drops (git 2.36 or later is required): %w", short(m), err)
 		}
-		files := slices.DeleteFunc(splitNUL(b), func(f string) bool { return f == r.sumPath() })
+		var files []string
+		for fs := splitNUL(b); len(fs) > 1; fs = fs[2:] {
+			status, name := fs[0], fs[1]
+			if status[0] == 'R' || status[0] == 'C' {
+				if fs = fs[1:]; len(fs) < 2 {
+					break
+				}
+				if status == "R100" && r.migrationFile(name) && r.migrationFile(fs[1]) {
+					// A file of the merged branch, like a migration of the trunk, is not the layer's to rename.
+					if merged, err := r.gitTest(ctx, "rev-parse", "--verify", "--quiet", m+"^2:"+name); err != nil {
+						return err
+					} else if !merged {
+						continue
+					}
+				}
+				name = fs[1]
+			}
+			if name != r.sumPath() {
+				files = append(files, name)
+			}
+		}
 		if len(files) > 0 {
 			return fmt.Errorf("merge commit %s has changes of its own in %s, which a restack drops", short(m), strings.Join(files, ", "))
 		}
@@ -1373,7 +1467,7 @@ func (r *restacker) sumFile() (migrate.HashFile, error) {
 	if err := hf.UnmarshalText(b); err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", migrate.HashFileName, err)
 	}
-	return hf, nil
+	return r.versioned(hf), nil
 }
 
 // fetch fetches the trunk, the open layers and the head of the top merged layer.
@@ -1466,13 +1560,8 @@ func (r *restacker) installMergeDriver(ctx context.Context) (func() error, error
 	}, nil
 }
 
-// discard aborts a merge in progress, and discards the changes in the working tree.
+// discard discards the changes in the working tree, and a merge in progress, which "git reset --hard" also ends.
 func (r *restacker) discard(ctx context.Context) error {
-	if _, err := r.git(ctx, "rev-parse", "--verify", "--quiet", "MERGE_HEAD"); err == nil {
-		if _, err := r.git(ctx, "merge", "--abort"); err != nil {
-			return err
-		}
-	}
 	if _, err := r.git(ctx, "reset", "--quiet", "--hard"); err != nil {
 		return err
 	}
@@ -1484,6 +1573,11 @@ func (r *restacker) discard(ctx context.Context) error {
 func (r *restacker) clean(ctx context.Context) error {
 	_, err := r.git(ctx, "clean", "--quiet", "--force", "--", r.sqlSpec())
 	return err
+}
+
+// migrationFile reports whether the path, relative to the repository root, is a migration file of the directory.
+func (r *restacker) migrationFile(name string) bool {
+	return path.Dir(name) == r.rel && path.Ext(name) == ".sql"
 }
 
 // sqlSpec returns the pathspec of the migration files.
