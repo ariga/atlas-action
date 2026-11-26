@@ -372,8 +372,9 @@ func (r *restacker) run(ctx context.Context, stacks []*Stack) (pushed bool, curr
 	case out != "":
 		return false, "", fmt.Errorf("restacking requires a clean working tree, found changes in:\n%s", out)
 	}
-	// Migration files that git does not track are hashed with the directory.
-	switch out, err := r.git(ctx, "status", "--porcelain", "--untracked-files=all", "--", r.sqlSpec()); {
+	// Atlas hashes every migration file of the directory, also the ones git does not track or ignores (!!),
+	// which a restack would leave out of the commits it pushes.
+	switch out, err := r.git(ctx, "status", "--porcelain", "--untracked-files=all", "--ignored", "--", r.sqlSpec()); {
 	case err != nil:
 		return false, "", err
 	case out != "":
@@ -895,8 +896,16 @@ func (r *restacker) dropped(ctx context.Context, fork string, heads []string, tr
 	var lost []string
 	for l := range strings.SplitSeq(out, "\n") {
 		c, subject, _ := strings.Cut(l, " ")
-		if patches[c] || subject == r.message {
+		if patches[c] {
 			continue
+		}
+		// Each restack makes the commits of the action again, unless someone added changes of their own to one.
+		if subject == r.message {
+			if ok, err := r.actionCommit(ctx, c); err != nil {
+				return nil, err
+			} else if ok {
+				continue
+			}
 		}
 		files, err := r.changedFiles(ctx, c)
 		if err != nil {
@@ -1063,6 +1072,9 @@ func (r *restacker) allOnTop(ctx context.Context, trunk string, merged *StackLay
 		if !r.onTop(ps, cs, true) {
 			return false, nil
 		}
+		if ok, err := r.orderedAt(ctx, parent, l.old); err != nil || !ok {
+			return false, err
+		}
 		// Only the trunk is known to move forward without the history. The layer must have the head of the branch below,
 		// which may have been rewritten since the layer was built on it.
 		if i > 0 {
@@ -1105,6 +1117,9 @@ func (r *restacker) upToDate(ctx context.Context, parent string, l *layerState) 
 	}
 	cs, err := r.sumAt(ctx, l.old)
 	if err != nil {
+		return false, err
+	}
+	if ok, err := r.orderedAt(ctx, parent, l.old); err != nil || !ok {
 		return false, err
 	}
 	switch {
@@ -1151,12 +1166,7 @@ func (r *restacker) stale(ctx context.Context, base, parent string, ps, cs migra
 	case r.atlas:
 		return false, nil
 	}
-	spec := r.sqlSpec()
-	if r.flyway {
-		// Flyway also reads the files in subdirectories.
-		spec = ":(top,glob)" + path.Join(r.rel, "**", "*.sql")
-	}
-	out, err := r.gitRaw(ctx, "diff-tree", "-r", "--name-only", "-z", "--no-renames", base, parent, "--", spec)
+	out, err := r.gitRaw(ctx, "diff-tree", "-r", "--name-only", "-z", "--no-renames", base, parent, "--", r.sqlSpec())
 	if err != nil {
 		return false, err
 	}
@@ -1262,7 +1272,15 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 	if err != nil {
 		return "", err
 	}
-	if !r.onTop(ps, cs, true) {
+	pnames, err := r.names(ctx, parent)
+	if err != nil {
+		return "", err
+	}
+	cnames, err := r.names(ctx, "HEAD")
+	if err != nil {
+		return "", err
+	}
+	if !r.onTop(ps, cs, true) || !r.ordered(pnames, cnames) {
 		if !r.atlas {
 			return "", fmt.Errorf("its migrations must be moved on top of the ones of %s, which `atlas migrate rebase` supports only for the %q format", parentName, formatAtlas)
 		}
@@ -1270,10 +1288,10 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 		if err != nil {
 			return "", err
 		}
-		if err := r.waitClock(ctx, ps, parentName); err != nil {
+		if err := r.waitClock(ctx, pnames, parentName); err != nil {
 			return "", err
 		}
-		files, err := r.renameDuplicates(ctx, own, cs)
+		files, err := r.renameDuplicates(ctx, own, cnames)
 		if err != nil {
 			return "", err
 		}
@@ -1283,7 +1301,12 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 		if cs, err = r.sumFile(); err != nil {
 			return "", err
 		}
-		if !r.onTop(ps, cs, true) {
+		// The renames are not staged yet: the names are read from the working tree.
+		wnames, err := r.dirNames()
+		if err != nil {
+			return "", err
+		}
+		if !r.onTop(ps, cs, true) || !r.ordered(pnames, wnames) {
 			return "", fmt.Errorf("its migrations are not on top of the ones of %s after `atlas migrate rebase`", parentName)
 		}
 		moved := slices.Clone(own)
@@ -1322,17 +1345,12 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 // renameDuplicates gives the own files that have the version of another file a temporary version,
 // as Atlas cannot read a directory with two files of the same version, and returns the new names of
 // the own files. `atlas migrate rebase` then moves them on top, like the others.
-func (r *restacker) renameDuplicates(ctx context.Context, own []string, cs migrate.HashFile) ([]string, error) {
+func (r *restacker) renameDuplicates(ctx context.Context, own, names []string) ([]string, error) {
 	files := slices.Clone(own)
-	// Files per version, including the ones excluded from atlas.sum.
-	count := make(map[string]int, len(cs))
-	for _, f := range cs {
-		count[fileVersion(f.N)]++
-	}
-	for _, name := range own {
-		if !slices.ContainsFunc(cs, func(f struct{ N, H string }) bool { return f.N == name }) {
-			count[fileVersion(name)]++
-		}
+	// Files per version, of all the migration files of the directory, including the ones excluded from atlas.sum.
+	count := make(map[string]int, len(names))
+	for _, name := range names {
+		count[fileVersion(name)]++
 	}
 	renamed := false
 	for i, name := range own {
@@ -1383,24 +1401,17 @@ func (r *restacker) checkMerges(ctx context.Context, upstream string, l *layerSt
 			return fmt.Errorf("failed to check merge commit %s, which a restack drops (git 2.36 or later is required): %w", short(m), err)
 		}
 		var files []string
-		for fs := splitNUL(b); len(fs) > 1; fs = fs[2:] {
-			status, name := fs[0], fs[1]
-			if status[0] == 'R' || status[0] == 'C' {
-				if fs = fs[1:]; len(fs) < 2 {
-					break
+		for _, c := range changes(b) {
+			if r.migrationRename(c) {
+				// A file of the merged branch, like a migration of the trunk, is not the layer's to rename.
+				if merged, err := r.gitTest(ctx, "rev-parse", "--verify", "--quiet", m+"^2:"+c.from); err != nil {
+					return err
+				} else if !merged {
+					continue
 				}
-				if status == "R100" && r.migrationFile(name) && r.migrationFile(fs[1]) {
-					// A file of the merged branch, like a migration of the trunk, is not the layer's to rename.
-					if merged, err := r.gitTest(ctx, "rev-parse", "--verify", "--quiet", m+"^2:"+name); err != nil {
-						return err
-					} else if !merged {
-						continue
-					}
-				}
-				name = fs[1]
 			}
-			if name != r.sumPath() {
-				files = append(files, name)
+			if c.to != r.sumPath() {
+				files = append(files, c.to)
 			}
 		}
 		if len(files) > 0 {
@@ -1500,11 +1511,11 @@ func (r *restacker) blobs(ctx context.Context, c string) (map[string]string, err
 // `atlas migrate rebase` versions the files it moves from the current time. The versions it
 // writes for many files run ahead of the clock, and may overflow their fields, like
 // 20261123222860, but they still sort after the versions of earlier times.
-func (r *restacker) waitClock(ctx context.Context, ps migrate.HashFile, parentName string) error {
-	if len(ps) == 0 {
+func (r *restacker) waitClock(ctx context.Context, pnames []string, parentName string) error {
+	if len(pnames) == 0 {
 		return nil
 	}
-	latest := ps[len(ps)-1].N
+	latest := slices.Max(pnames)
 	// Versions that are not timestamps are not waited for. The files may then not end up on top.
 	v := fileVersion(latest)
 	if len(v) != len(versionLayout) || strings.Trim(v, "0123456789") != "" {
@@ -1643,6 +1654,111 @@ func (r *restacker) clean(ctx context.Context) error {
 	return err
 }
 
+// change is a file that a commit changes, as `--name-status -z` reports it: the path before and after a rename or a copy.
+type change struct{ status, from, to string }
+
+// changes parses the output of a diff with `--name-status -z`.
+func changes(b []byte) []change {
+	var cs []change
+	for fs := splitNUL(b); len(fs) > 1; {
+		c := change{status: fs[0], from: fs[1], to: fs[1]}
+		fs = fs[2:]
+		if c.status[0] == 'R' || c.status[0] == 'C' {
+			if len(fs) == 0 {
+				break
+			}
+			c.to, fs = fs[0], fs[1:]
+		}
+		cs = append(cs, c)
+	}
+	return cs
+}
+
+// migrationRename reports whether the change only renames a migration file of the directory, keeping its contents.
+func (r *restacker) migrationRename(c change) bool {
+	return c.status == "R100" && r.migrationFile(c.from) && r.migrationFile(c.to)
+}
+
+// actionCommit reports whether the commit only does what a restack does: it renames migration files of the
+// directory, keeping their contents, and updates atlas.sum.
+func (r *restacker) actionCommit(ctx context.Context, c string) (bool, error) {
+	b, err := r.gitRaw(ctx, "diff-tree", "--no-commit-id", "-r", "-z", "--name-status", "-M100%", "--root", c)
+	if err != nil {
+		return false, err
+	}
+	return !slices.ContainsFunc(changes(b), func(c change) bool { return c.to != r.sumPath() && !r.migrationRename(c) }), nil
+}
+
+// names returns the migration files of the directory at the commit, relative to it and sorted, including the ones
+// atlas.sum leaves out, which still take their place among the versions, and for Flyway, the ones of subdirectories.
+func (r *restacker) names(ctx context.Context, c string) ([]string, error) {
+	args := []string{"ls-tree", "-z", "--name-only", "--full-tree", c}
+	if r.flyway {
+		args = append(args, "-r")
+	}
+	if r.rel != "." {
+		args = append(args, "--", r.rel+"/")
+	}
+	out, err := r.gitRaw(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, n := range splitNUL(out) {
+		if n, ok := strings.CutPrefix(n, r.rel+"/"); (ok || r.rel == ".") && path.Ext(n) == ".sql" {
+			names = append(names, n)
+		}
+	}
+	slices.Sort(names)
+	return names, nil
+}
+
+// dirNames returns the migration files at the top of the directory in the working tree, sorted.
+func (r *restacker) dirNames() ([]string, error) {
+	entries, err := os.ReadDir(r.dir)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if !e.IsDir() && path.Ext(e.Name()) == ".sql" {
+			names = append(names, e.Name())
+		}
+	}
+	return names, nil
+}
+
+// ordered reports whether the migration files the layer adds have none of the versions of the parent's files, and,
+// in the Atlas format, which orders the files by name, sort after them. It also covers the files atlas.sum leaves out.
+func (r *restacker) ordered(pnames, cnames []string) bool {
+	var (
+		last     string
+		versions = make(map[string]bool)
+	)
+	for _, n := range pnames {
+		if !versionless(n) {
+			versions[r.version(n)] = true
+			last = max(last, n)
+		}
+	}
+	return !slices.ContainsFunc(cnames, func(n string) bool {
+		return !versionless(n) && !slices.Contains(pnames, n) && (versions[r.version(n)] || r.atlas && n < last)
+	})
+}
+
+// orderedAt is ordered for the migration files of the given commits.
+func (r *restacker) orderedAt(ctx context.Context, parent, c string) (bool, error) {
+	pnames, err := r.names(ctx, parent)
+	if err != nil {
+		return false, err
+	}
+	cnames, err := r.names(ctx, c)
+	if err != nil {
+		return false, err
+	}
+	return r.ordered(pnames, cnames), nil
+}
+
 // migrationFile reports whether the path, relative to the repository root, is a migration file of the directory.
 func (r *restacker) migrationFile(name string) bool {
 	return path.Dir(name) == r.rel && path.Ext(name) == ".sql"
@@ -1650,6 +1766,10 @@ func (r *restacker) migrationFile(name string) bool {
 
 // sqlSpec returns the pathspec of the migration files.
 func (r *restacker) sqlSpec() string {
+	if r.flyway {
+		// Flyway also reads the files in subdirectories.
+		return ":(top,glob)" + path.Join(r.rel, "**", "*.sql")
+	}
 	return ":(top,glob)" + path.Join(r.rel, "*.sql")
 }
 

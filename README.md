@@ -706,6 +706,9 @@ jobs:
 >   Atlas format. A pull request whose migrations do not sort after the ones below it, or have their versions, is
 >   left as it is, and the run fails. Files without a version, like the repeatable migrations of Flyway, are not
 >   ordered: the restack replays their changes, and regenerates `atlas.sum`.
+> * Atlas hashes every migration file of the directory, also the ones git does not track or ignores, which a restack
+>   would leave out of its commits. The action refuses to restack when the clone has such files, like files an earlier
+>   step of the job wrote.
 ### `ariga/atlas-action/migrate/hash`
 
 Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.

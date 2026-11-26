@@ -29,11 +29,7 @@ func TestWaitClock(t *testing.T) {
 		}
 		wait = func(names ...string) (time.Duration, error) {
 			now, slept = start, 0
-			sum := migrate.HashFile{{N: "20260101000000_init.sql"}}
-			for _, n := range names {
-				sum = append(sum, struct{ N, H string }{N: n})
-			}
-			err := r.waitClock(t.Context(), sum, "main")
+			err := r.waitClock(t.Context(), append([]string{"20260101000000_init.sql"}, names...), "main")
 			return slept, err
 		}
 	)

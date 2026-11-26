@@ -2987,6 +2987,185 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Equal(t, tips, r.tips("B"))
 	})
 
+	t.Run("ActionCommitAmended", func(t *testing.T) {
+		for _, dropped := range []bool{true, false} {
+			t.Run(fmt.Sprint("Dropped=", dropped), func(t *testing.T) {
+				r := newStackRepo(t)
+				r.branch("A", "main")
+				r.migration("A", "20260102000000", "a1")
+				r.push("A")
+				s := r.stack(73, "main", "A")
+				r.migration("main", "20260105000000", "m1")
+				r.push("main")
+				_, logs, err := r.run(s, run{branch: "main"})
+				require.NoError(t, err, logs)
+				// The developer amends the commit of the action on A with a change of their own, and keeps its subject.
+				r.git(r.dev, "fetch", "--quiet", "origin")
+				r.git(r.dev, "checkout", "--quiet", "-B", "A", "origin/A")
+				require.NoError(t, os.WriteFile(filepath.Join(r.dev, "app.txt"), []byte("X\n"), 0644))
+				r.git(r.dev, "add", "--all")
+				r.git(r.dev, "commit", "--quiet", "--amend", "--no-edit")
+				r.forcePush("A")
+				r.branch("B", "A")
+				r.migration("B", "20260106000000", "b1")
+				r.push("B")
+				s = r.stack(73, "main", "A", "B")
+				if dropped {
+					// A drops that commit, with the change: dropped, or moved to B, git cannot tell.
+					r.checkout("A")
+					r.git(r.dev, "reset", "--quiet", "--hard", "HEAD~1")
+					r.forcePush("A")
+				}
+				r.migration("main", "20260107000000", "m2")
+				r.push("main")
+				tips := r.tips("A", "B")
+				act, logs, err := r.run(s, run{branch: "main"})
+				if dropped {
+					require.Error(t, err, logs)
+					require.Regexp(t, `#2 \(B\): it has commits that #1 \(A\) no longer has, which a restack would drop: [0-9a-f]{7} \(migrations: rebase migration files\)\. Nothing was pushed`, err.Error())
+					require.Equal(t, tips, r.tips("A", "B"))
+					return
+				}
+				require.NoError(t, err, logs)
+				require.Equal(t, "true", act.output["rebased"])
+				r.requireStack("main", "A", "B")
+				require.Equal(t, "X", r.gitOut(r.origin, "show", "B:app.txt"), "the change stays")
+				// The next run has nothing to do.
+				tips = r.tips("A", "B")
+				act, logs, err = r.run(s, run{branch: "main"})
+				require.NoError(t, err, logs)
+				require.Equal(t, "false", act.output["rebased"])
+				require.Equal(t, tips, r.tips("A", "B"))
+			})
+		}
+	})
+
+	t.Run("SumIgnoredVersions", func(t *testing.T) {
+		ignored := func(name string) string {
+			return fmt.Sprintf("-- atlas:sum ignore\nINSERT INTO init VALUES (%d);\n", len(name))
+		}
+		for _, tt := range []struct {
+			name      string
+			setup     func(*stackRepo) // Makes A and the push to main.
+			wantError string
+		}{
+			{
+				// The trunk adds a migration excluded from atlas.sum, with the version of a migration of A.
+				name: "TrunkIgnoredSameVersion",
+				setup: func(r *stackRepo) {
+					r.migration("A", "20260105000000", "a1")
+					r.push("A")
+					r.migrationSQL("main", "20260105000000", "seed", ignored("seed"))
+				},
+			},
+			{
+				// A adds a migration excluded from atlas.sum, with a version before the latest migration of the trunk.
+				name: "LayerIgnoredBefore",
+				setup: func(r *stackRepo) {
+					r.migration("main", "20260105000000", "m1")
+					r.push("main")
+					r.git(r.dev, "branch", "--force", "A", "main")
+					r.migrationSQL("A", "20260103000000", "seed", ignored("seed"))
+					r.migration("A", "20260106000000", "a1")
+					r.push("A")
+					r.file("main", "app.txt", "main\n")
+				},
+			},
+			{
+				// Both add a migration excluded from atlas.sum, with the same version.
+				name: "BothIgnoredSameVersion",
+				setup: func(r *stackRepo) {
+					r.migrationSQL("A", "20260106000000", "seed2", ignored("seed2"))
+					r.push("A")
+					r.migrationSQL("main", "20260106000000", "seed", ignored("seed"))
+				},
+			},
+			{
+				// The trunk adds a migration excluded from atlas.sum, far ahead of the clock: the migrations of A cannot be
+				// placed after it, as for any other migration.
+				name: "TrunkIgnoredFarAhead",
+				setup: func(r *stackRepo) {
+					r.migration("A", "20260102000000", "a1")
+					r.push("A")
+					r.migrationSQL("main", "20991231000000", "seed", ignored("seed"))
+				},
+				wantError: "#1 (A): the latest migration of main, 20991231000000_seed.sql, is versioned more than 5m0s ahead of the clock",
+			},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				r := newStackRepo(t)
+				r.branch("A", "main")
+				tt.setup(r)
+				r.push("main")
+				s := r.stack(74, "main", "A")
+				tips := r.tips("A")
+				act, logs, err := r.run(s, run{branch: "main"})
+				if tt.wantError != "" {
+					require.ErrorContains(t, err, tt.wantError, logs)
+					require.Equal(t, tips, r.tips("A"))
+					return
+				}
+				require.NoError(t, err, logs)
+				require.Equal(t, "true", act.output["rebased"])
+				r.requireStack("main", "A")
+				// The next run has nothing to do.
+				tips = r.tips("A")
+				act, logs, err = r.run(s, run{branch: "main"})
+				require.NoError(t, err, logs)
+				require.Equal(t, "false", act.output["rebased"])
+				require.Equal(t, tips, r.tips("A"))
+			})
+		}
+	})
+
+	t.Run("UntrackedMigrationFiles", func(t *testing.T) {
+		for _, tt := range []struct {
+			name   string
+			format string
+			ignore string // A line of .gitignore, if any.
+			file   string // Untracked file of the clone of the action, relative to the migration directory.
+			want   string // Line of git status in the error.
+		}{
+			{name: "Ignored", ignore: "migrations/*_local.sql", file: "20991231000000_local.sql", want: "!! migrations/20991231000000_local.sql"},
+			{name: "FlywaySubdirectory", format: "flyway", file: "sub/V9__x.sql", want: "?? migrations/sub/V9__x.sql"},
+			{name: "FlywayIgnoredSubdirectory", format: "flyway", ignore: "migrations/local/", file: "local/V9__x.sql", want: "!! migrations/local/V9__x.sql"},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				r := newStackRepo(t)
+				inputs := map[string]string{}
+				layer, move := func() { r.migration("A", "20260102000000", "a1") }, func() { r.migration("main", "20260105000000", "m1") }
+				if tt.format != "" {
+					inputs["dir"] = "file://" + r.dir + "?format=" + tt.format
+					r.checkout("main")
+					r.git(r.dev, "rm", "--quiet", r.dir+"/20260101000000_init.sql")
+					r.formatFile("main", tt.format, "V1__init.sql")
+					layer, move = func() { r.formatFile("A", tt.format, "V3__a.sql") }, func() { r.formatFile("main", tt.format, "V2__m.sql") }
+				}
+				if tt.ignore != "" {
+					r.file("main", ".gitignore", tt.ignore+"\n")
+				}
+				r.push("main")
+				r.branch("A", "main")
+				layer()
+				r.push("A")
+				s := r.stack(75, "main", "A")
+				move()
+				r.push("main")
+				// A file that an earlier step of the job wrote, which Atlas would hash, but the restack would not commit.
+				r.git(r.ci, "fetch", "--quiet", "origin")
+				r.git(r.ci, "checkout", "--quiet", "--force", "-B", "main", "origin/main")
+				p := filepath.Join(r.ci, r.dir, tt.file)
+				require.NoError(t, os.MkdirAll(filepath.Dir(p), 0755))
+				require.NoError(t, os.WriteFile(p, []byte("SELECT 1;\n"), 0644))
+				tips := r.tips("A")
+				_, logs, err := r.run(s, run{branch: "main", keep: true, inputs: inputs})
+				require.ErrorContains(t, err, "restacking requires a clean migration directory, found changes in:", logs)
+				require.ErrorContains(t, err, tt.want)
+				require.Equal(t, tips, r.tips("A"), "nothing is pushed")
+			})
+		}
+	})
+
 	t.Run("Errors", func(t *testing.T) {
 		r := newStackRepo(t)
 		r.branch("A", "main")
