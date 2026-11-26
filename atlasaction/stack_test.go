@@ -2866,6 +2866,127 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		}
 	})
 
+	t.Run("SameSubjectOnTrunk", func(t *testing.T) {
+		for _, tt := range []struct {
+			name    string
+			subject string // Subject of the commit of main.
+			author  string // Author of the commit of main, the one of A if empty.
+			date    string // Author date of the commit of main, if set.
+			pushed  bool   // Whether B is restacked.
+		}{
+			{name: "OtherSubject", subject: "Update the README", author: "Other <other@example.com>"},
+			// The default message of GitHub's web editor: the subject and the files are the same as the commit A dropped.
+			{name: "SameSubject", subject: "Update README.md", author: "Other <other@example.com>"},
+			{name: "SameAuthor", subject: "Update README.md", date: "2026-11-01T00:00:00Z"},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				r := newStackRepo(t)
+				r.commitAs("main", "README.md", "v0\n", "add README.md", "")
+				r.push("main")
+				r.branch("A", "main")
+				r.migration("A", "20260102000000", "a1")
+				r.commitAs("A", "README.md", "A's README\n", "Update README.md", "")
+				r.branch("B", "A")
+				r.migration("B", "20260103000000", "b1")
+				r.push("A", "B")
+				s := r.stack(69, "main", "A", "B")
+				before := r.tip("A")
+				// Another commit edits README.md on main, and main gets a migration.
+				r.commitAs("main", "README.md", "main's README\n", tt.subject, tt.author)
+				if tt.date != "" {
+					r.git(r.dev, "commit", "--quiet", "--amend", "--no-edit", "--date", tt.date)
+				}
+				r.migration("main", "20260105000000", "m1")
+				r.push("main")
+				// A is rebased onto main, without its README commit: dropped, or moved to B, git cannot tell.
+				r.git(r.dev, "checkout", "--quiet", "-B", "A", "main")
+				r.migration("A", "20260106000000", "a1")
+				r.forcePush("A")
+				tips := r.tips("A", "B")
+				_, logs, err := r.run(s, run{branch: "A", before: before})
+				require.Error(t, err, logs)
+				require.Regexp(t, `#2 \(B\): it has commits that #1 \(A\) no longer has, which a restack would drop: [0-9a-f]{7} \(Update README.md\)\. Nothing was pushed`, err.Error())
+				require.Equal(t, tips, r.tips("A", "B"))
+			})
+		}
+	})
+
+	t.Run("SameSubjectOnTrunkBelowLanded", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.commitAs("main", "README.md", "v0\n", "add README.md", "")
+		r.push("main")
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		a1 := r.gitOut(r.dev, "rev-parse", "HEAD")
+		r.commitAs("A", "README.md", "A's README\n", "Update README.md", "")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.push("A", "B")
+		s := r.stack(70, "main", "A", "B")
+		// A leaves its README commit out, another commit edits README.md on main, and A lands.
+		r.checkout("A")
+		r.git(r.dev, "reset", "--quiet", "--hard", a1)
+		r.forcePush("A")
+		r.commitAs("main", "README.md", "main's README\n", "Update README.md", "Other <other@example.com>")
+		r.push("main")
+		r.land(s)
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		tips := r.tips("B")
+		_, logs, err := r.run(s, run{branch: "main"})
+		require.Error(t, err, logs)
+		require.Regexp(t, `#2 \(B\): it has commits that the merged #1 \(A\) no longer has, which a restack would drop: [0-9a-f]{7} \(Update README.md\)\. Nothing was pushed`, err.Error())
+		require.Equal(t, tips, r.tips("B"))
+	})
+
+	t.Run("TrunkAmendedCommit", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.branch("develop", "main")
+		r.commitAs("develop", "x.txt", "x1\n", "develop: x", "")
+		// An older commit, so the amend below runs at another time, and keeps the author date.
+		r.git(r.dev, "commit", "--quiet", "--amend", "--no-edit", "--date", "2026-11-01T00:00:00Z")
+		r.branch("A", "develop")
+		r.migration("A", "20260102000000", "a1")
+		r.push("develop", "A")
+		s := r.stack(71, "develop", "A")
+		before := r.tip("develop")
+		r.checkout("develop")
+		require.NoError(t, os.WriteFile(filepath.Join(r.dev, "x.txt"), []byte("x2\n"), 0644))
+		r.git(r.dev, "commit", "--quiet", "--all", "--amend", "--no-edit")
+		r.migration("develop", "20260105000000", "d1")
+		r.forcePush("develop")
+		_, logs, err := r.run(s, run{branch: "develop", before: before})
+		require.NoError(t, err, logs)
+		r.requireStack("develop", "A")
+		require.Equal(t, "x2", r.gitOut(r.origin, "show", "A:x.txt"))
+	})
+
+	t.Run("RecreatedBelowThenMerged", func(t *testing.T) {
+		r := newStackRepo(t)
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		a1 := r.gitOut(r.dev, "rev-parse", "HEAD")
+		r.commitAs("A", "debug.txt", "v1\n", "A: debug", "")
+		r.git(r.dev, "commit", "--quiet", "--amend", "--no-edit", "--date", "2026-11-01T00:00:00Z")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.push("A", "B")
+		s := r.stack(72, "main", "A", "B")
+		// A recreates its debug commit with other contents (not an amend), and lands with a merge commit. Only an amend
+		// keeps the author date, so the old commit is not known to be replaced, and B is left as it is.
+		r.checkout("A")
+		r.git(r.dev, "reset", "--quiet", "--hard", a1)
+		r.commitAs("A", "debug.txt", "v2\n", "A: debug", "")
+		r.forcePush("A")
+		r.land(s, "merge")
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		tips := r.tips("B")
+		_, logs, err := r.run(s, run{branch: "main"})
+		require.ErrorContains(t, err, "#2 (B): it has commits that the merged #1 (A) no longer has", logs)
+		require.Equal(t, tips, r.tips("B"))
+	})
+
 	t.Run("Errors", func(t *testing.T) {
 		r := newStackRepo(t)
 		r.branch("A", "main")
@@ -3140,6 +3261,21 @@ func (r *stackRepo) migrationSQL(branch, version, name, sql string) {
 	r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
 	r.git(r.dev, "add", "--all")
 	r.git(r.dev, "commit", "--quiet", "--message", fmt.Sprintf("%s: add %s", branch, name))
+}
+
+// commitAs writes a file to the branch, and commits it with the given message, and author if not empty.
+func (r *stackRepo) commitAs(branch, name, content, message, author string) {
+	r.t.Helper()
+	r.checkout(branch)
+	p := filepath.Join(r.dev, name)
+	require.NoError(r.t, os.MkdirAll(filepath.Dir(p), 0755))
+	require.NoError(r.t, os.WriteFile(p, []byte(content), 0644))
+	r.git(r.dev, "add", "--all")
+	args := []string{"commit", "--quiet", "--message", message}
+	if author != "" {
+		args = append(args, "--author", author)
+	}
+	r.git(r.dev, args...)
 }
 
 // formatFile writes a migration file of another directory format to the branch, with the given contents or a default one,

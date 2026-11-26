@@ -905,6 +905,17 @@ func (r *restacker) dropped(ctx context.Context, fork string, heads []string, tr
 		// An amend keeps the subject and the files, but may move the migration files to other versions.
 		amended := false
 		for i, h := range subjects[subject] {
+			// A commit of the trunk, like one the branch below was rebased onto, stands in only for a commit it amends:
+			// with the author and the author date an amend keeps.
+			if inTrunk, err := r.gitTest(ctx, "merge-base", "--is-ancestor", h, trunk); err != nil {
+				return nil, err
+			} else if inTrunk {
+				if a, err := r.git(ctx, "show", "--no-show-signature", "-s", "--format=%ae %at", c, h); err != nil {
+					return nil, err
+				} else if ca, ha, _ := strings.Cut(a, "\n"); ca != ha {
+					continue
+				}
+			}
 			hfiles, err := r.changedFiles(ctx, h)
 			if err != nil {
 				return nil, err
@@ -1730,8 +1741,5 @@ func stackNumbers(nums []int) string {
 }
 
 func short(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
+	return sha[:min(len(sha), 7)]
 }
