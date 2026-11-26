@@ -109,14 +109,12 @@ type (
 		OpenPullRequests(_ context.Context, head, base string) ([]*PullRequest, error)
 		// Stack returns the stack of pull requests with the given number, or nil if there is none.
 		Stack(context.Context, int) (*Stack, error)
-		// ForcePushes returns the head commits of each pull request before and after each
-		// force-push of its branch, since the pull request was opened. Pull requests whose
-		// history cannot be read in full are left out.
-		ForcePushes(_ context.Context, numbers []int) (map[int][]string, error)
-		// BranchHeads returns the commits the branch pointed to before and after each of its
-		// changes that the SCM recorded, even before a pull request was opened for it, and
-		// whether the record goes back to the creation of the branch.
-		BranchHeads(_ context.Context, branch string) (heads []string, complete bool, _ error)
+		// BranchHistory returns the heads the branch had, as the SCM recorded its
+		// changes, even before a pull request was opened for it.
+		BranchHistory(_ context.Context, branch string) (*BranchHistory, error)
+		// ForcePushes returns the heads the branch had before and after each of its
+		// force-pushes that the SCM recorded, newest first.
+		ForcePushes(_ context.Context, branch string) ([]string, error)
 	}
 	Logger interface {
 		// Infof logs an info message.
@@ -251,20 +249,22 @@ type (
 	// targets the head branch of the pull request below it.
 	Stack struct {
 		Number int          // Number of the stack.
-		Open   bool         // Whether the stack is open. A stack closes when all its pull requests merged.
 		Base   string       // Base branch of the stack, its trunk.
 		Layers []StackLayer // Pull requests of the stack, from the bottom to the top.
+	}
+	// BranchHistory is the record of the heads a branch had.
+	BranchHistory struct {
+		Heads     []string // Commits the branch pointed to before and after each recorded change, newest first.
+		Created   bool     // Whether the record goes back to the creation of the branch, and so holds every head it had.
+		Rewritten bool     // Whether the record has a force-push or a deletion of the branch.
 	}
 	// StackLayer is a pull request in a stack.
 	StackLayer struct {
 		Number int    // Pull request number.
 		Branch string // Head branch of the pull request.
 		Base   string // Base branch of the pull request.
-		// BaseCommit is the base branch commit the SCM last compared the
-		// pull request with. It may lag behind the base branch.
-		BaseCommit string
-		Open       bool // Whether the pull request is open.
-		Merged     bool // Whether the pull request was merged.
+		Open   bool   // Whether the pull request is open.
+		Merged bool   // Whether the pull request was merged.
 	}
 	// Comment holds the comment information.
 	Comment struct {

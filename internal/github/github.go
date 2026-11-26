@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -61,8 +60,7 @@ type (
 	// where the bottom one targets the stack base (its trunk) and each of the others
 	// targets the head branch of the pull request below it.
 	Stack struct {
-		Number int  `json:"number"`
-		Open   bool `json:"open"`
+		Number int `json:"number"`
 		Base   struct {
 			Ref string `json:"ref"`
 		} `json:"base"`
@@ -76,19 +74,17 @@ type (
 		MergedAt *string `json:"merged_at"`
 		Head     struct {
 			Ref string `json:"ref"`
-			SHA string `json:"sha"`
 		} `json:"head"`
-		// Base of the pull request. SHA is the base branch commit GitHub last
-		// compared the pull request with, so it may lag behind the branch.
 		Base struct {
 			Ref string `json:"ref"`
-			SHA string `json:"sha"`
 		} `json:"base"`
 	}
 	// TriggerEvent is the structure of the GitHub trigger event.
 	TriggerEvent struct {
-		// Only in case of a 'push' event. The commit the ref pointed to before the push.
-		Before string `mapstructure:"before"`
+		// Only in case of a 'push' event. The commit the ref pointed to before the push,
+		// and whether the push deleted the ref.
+		Before  string `mapstructure:"before"`
+		Deleted bool   `mapstructure:"deleted"`
 		// Only in case of an 'issue_comment' event.
 		Comment struct {
 			Body string `mapstructure:"body"`
@@ -498,165 +494,20 @@ func (c *Client) Stack(ctx context.Context, number int) (*Stack, error) {
 	return &s, nil
 }
 
-// maxForcePushPages caps the number of pages of force-pushes read for each pull request.
-const maxForcePushPages = 50
-
-// ForcePushes returns the head commits of each pull request before and after each
-// force-push of its branch, oldest first, as recorded in the timeline of the pull request.
-// A pull request whose timeline cannot be read in full is left out of the result, as
-// callers rely on the history to tell a branch that was rewritten from one that only
-// moved forward. The timeline starts when the pull request was opened.
-func (c *Client) ForcePushes(ctx context.Context, numbers []int) (map[int][]string, error) {
-	owner, name, err := c.ownerRepo()
-	if err != nil {
-		return nil, err
-	}
-	var (
-		pushes  = make(map[int][]string, len(numbers))
-		cursors = make(map[int]string, len(numbers)) // Cursor of the oldest page read so far.
-		pending = slices.Clone(numbers)
-	)
-	// The pages are read from the newest, for all the pull requests at once.
-	for page := 0; len(pending) > 0 && page < maxForcePushPages; page++ {
-		prs, err := c.forcePushPage(ctx, owner, name, pending, cursors)
-		if err != nil {
-			return nil, err
-		}
-		var next []int
-		for _, n := range pending {
-			pr := prs[fmt.Sprintf("pr%d", n)]
-			if pr == nil {
-				delete(pushes, n)
-				continue
-			}
-			heads := make([]string, 0, 2*len(pr.TimelineItems.Nodes))
-			for _, e := range pr.TimelineItems.Nodes {
-				// A force-push whose commits are gone cannot tell the heads of the branch.
-				if e.Before == nil || e.After == nil || e.Before.OID == "" || e.After.OID == "" {
-					heads = nil
-					break
-				}
-				heads = append(heads, e.Before.OID, e.After.OID)
-			}
-			if heads == nil {
-				delete(pushes, n)
-				continue
-			}
-			pushes[n] = append(heads, pushes[n]...)
-			if info := pr.TimelineItems.PageInfo; info.HasPreviousPage {
-				if info.StartCursor == "" {
-					delete(pushes, n)
-					continue
-				}
-				cursors[n] = info.StartCursor
-				next = append(next, n)
-			}
-		}
-		pending = next
-	}
-	// Pull requests with more pages than read.
-	for _, n := range pending {
-		delete(pushes, n)
-	}
-	return pushes, nil
-}
-
-type (
-	// forcePushes is a page of the force-push events of a pull request.
-	forcePushes struct {
-		TimelineItems struct {
-			PageInfo struct {
-				HasPreviousPage bool   `json:"hasPreviousPage"`
-				StartCursor     string `json:"startCursor"`
-			} `json:"pageInfo"`
-			Nodes []struct {
-				Before *struct {
-					OID string `json:"oid"`
-				} `json:"beforeCommit"`
-				After *struct {
-					OID string `json:"oid"`
-				} `json:"afterCommit"`
-			} `json:"nodes"`
-		} `json:"timelineItems"`
-	}
-)
-
-// forcePushPage reads a page of force-pushes for each of the pull requests: the newest page,
-// or the page before the cursor of the pull request.
-func (c *Client) forcePushPage(ctx context.Context, owner, name string, numbers []int, cursors map[int]string) (map[string]*forcePushes, error) {
-	var (
-		q    strings.Builder
-		vars = map[string]any{"owner": owner, "name": name}
-		decl = []string{"$owner: String!", "$name: String!"}
-	)
-	for _, n := range numbers {
-		before := ""
-		if cur, ok := cursors[n]; ok {
-			v := fmt.Sprintf("c%d", n)
-			vars[v], before = cur, ", before: $"+v
-			decl = append(decl, "$"+v+": String!")
-		}
-		fmt.Fprintf(&q, " pr%d: pullRequest(number: %d) { timelineItems(itemTypes: [HEAD_REF_FORCE_PUSHED_EVENT], last: 100%s) {"+
-			" pageInfo { hasPreviousPage startCursor } nodes { ... on HeadRefForcePushedEvent { beforeCommit { oid } afterCommit { oid } } } } }", n, n, before)
-	}
-	b, err := json.Marshal(map[string]any{
-		"query":     fmt.Sprintf("query(%s) { repository(owner: $owner, name: $name) {%s } }", strings.Join(decl, ", "), q.String()),
-		"variables": vars,
-	})
-	if err != nil {
-		return nil, err
-	}
-	var resp struct {
-		Data struct {
-			Repository map[string]*forcePushes `json:"repository"`
-		} `json:"data"`
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-	if _, err := c.do(ctx, http.MethodPost, c.graphQLURL(), b, nil, &resp); err != nil {
-		return nil, err
-	}
-	// A pull request that cannot be read is null, with an error. Others are still reported.
-	if resp.Data.Repository == nil {
-		if len(resp.Errors) > 0 {
-			return nil, fmt.Errorf("github: querying force-pushes: %s", resp.Errors[0].Message)
-		}
-		return nil, errors.New("github: querying force-pushes: no repository in the response")
-	}
-	return resp.Data.Repository, nil
-}
-
-// graphQLURL returns the URL of the GraphQL API, next to the REST API.
-func (c *Client) graphQLURL() string {
-	// GitHub Enterprise Server serves the REST API under /api/v3, and the GraphQL API under /api/graphql.
-	if base, ok := strings.CutSuffix(strings.TrimSuffix(c.baseURL, "/"), "/api/v3"); ok {
-		return base + "/api/graphql"
-	}
-	return strings.TrimSuffix(c.baseURL, "/") + "/graphql"
-}
-
 // get sends a GET request to the given path of the API and decodes the JSON response into v.
 func (c *Client) get(ctx context.Context, path string, h http.Header, v any) error {
-	_, err := c.do(ctx, http.MethodGet, c.baseURL+path, nil, h, v)
+	_, err := c.getURL(ctx, c.baseURL+path, h, v)
 	return err
 }
 
-// do sends a request to the given URL of the API, with the JSON body if not nil, decodes
-// the JSON response into v, and returns the headers of the response.
-func (c *Client) do(ctx context.Context, method, u string, body []byte, h http.Header, v any) (http.Header, error) {
-	var r io.Reader
-	if body != nil {
-		r = bytes.NewReader(body)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, u, r)
+// getURL sends a GET request to the given URL of the API, decodes the JSON
+// response into v, and returns the headers of the response.
+func (c *Client) getURL(ctx context.Context, u string, h http.Header, v any) (http.Header, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
 	maps.Copy(req.Header, h)
 	res, err := c.client.Do(req)
 	if err != nil {
@@ -670,7 +521,7 @@ func (c *Client) do(ctx context.Context, method, u string, body []byte, h http.H
 	switch res.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
-		return nil, fmt.Errorf("%w: %s %s", ErrNotFound, method, strings.TrimPrefix(u, c.baseURL))
+		return nil, fmt.Errorf("%w: GET %s", ErrNotFound, strings.TrimPrefix(u, c.baseURL))
 	default:
 		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
 	}
@@ -701,46 +552,75 @@ func (c *Client) nextPage(h http.Header) (string, error) {
 // maxActivityPages caps the number of pages of activities read for a branch.
 const maxActivityPages = 30
 
-// BranchHeads returns the commits the branch pointed to before and after each of its changes,
-// as GitHub records them in the activity of the repository: its pushes, force-pushes, merges,
-// creation and deletion. Unlike the timeline of a pull request, the activity also records the
-// changes from before the pull request of the branch was opened. complete reports whether the
-// activity goes back to the creation of the branch, and so holds every head the branch had.
-func (c *Client) BranchHeads(ctx context.Context, branch string) (heads []string, complete bool, _ error) {
+// BranchHistory is the record of the heads a branch had.
+type BranchHistory struct {
+	// Heads holds the commits the branch pointed to before and after each recorded change, newest first.
+	Heads []string
+	// Created reports whether the record goes back to the creation of the branch, and so holds every head it had.
+	Created bool
+	// Rewritten reports whether the record has a force-push or a deletion of the branch.
+	Rewritten bool
+}
+
+// BranchHistory returns the heads the branch had, as GitHub records its changes in the activity of the
+// repository: its pushes, force-pushes, merges, creation and deletion. Unlike the timeline of a pull request,
+// the activity also records the changes from before the pull request of the branch was opened.
+func (c *Client) BranchHistory(ctx context.Context, branch string) (*BranchHistory, error) {
+	return c.activity(ctx, branch, "")
+}
+
+// ForcePushes returns the heads the branch had before and after each of its force-pushes, as GitHub records
+// them in the activity of the repository, newest first.
+func (c *Client) ForcePushes(ctx context.Context, branch string) ([]string, error) {
+	h, err := c.activity(ctx, branch, "force_push")
+	if err != nil {
+		return nil, err
+	}
+	return h.Heads, nil
+}
+
+// activity reads the activity of the branch, only of the given type if not empty.
+func (c *Client) activity(ctx context.Context, branch, typ string) (*BranchHistory, error) {
 	q := url.Values{"ref": {"refs/heads/" + branch}, "direction": {"desc"}, "per_page": {"100"}}
+	if typ != "" {
+		q.Set("activity_type", typ)
+	}
 	var (
 		next = fmt.Sprintf("%s/repos/%s/activity?%s", c.baseURL, c.repo, q.Encode())
 		seen = make(map[string]bool)
+		h    = &BranchHistory{}
 		last string // Type of the oldest activity read.
 	)
 	for page := 0; next != ""; page++ {
 		if page == maxActivityPages {
-			return heads, false, nil
+			return h, nil
 		}
 		var acts []struct {
 			Before string `json:"before"`
 			After  string `json:"after"`
 			Type   string `json:"activity_type"`
 		}
-		h, err := c.do(ctx, http.MethodGet, next, nil, nil, &acts)
+		hdr, err := c.getURL(ctx, next, nil, &acts)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		for _, a := range acts {
 			// The creation and deletion of a branch have no commit on one side.
 			for _, c := range []string{a.After, a.Before} {
 				if strings.Trim(c, "0") != "" && !seen[c] {
 					seen[c] = true
-					heads = append(heads, c)
+					h.Heads = append(h.Heads, c)
 				}
 			}
+			h.Rewritten = h.Rewritten || a.Type == "force_push" || a.Type == "branch_deletion"
 			last = a.Type
 		}
-		if next, err = c.nextPage(h); err != nil {
-			return nil, false, err
+		if next, err = c.nextPage(hdr); err != nil {
+			return nil, err
 		}
 	}
-	return heads, last == "branch_creation", nil
+	h.Created = last == "branch_creation"
+	return h, nil
 }
 
 // PullRequest returns information about a pull request.

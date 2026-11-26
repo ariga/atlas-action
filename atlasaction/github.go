@@ -180,8 +180,9 @@ func (a *GitHub) GetTriggerContext(context.Context) (*TriggerContext, error) {
 		// HeadRef will be empty for push events, so we use RefName instead.
 		tc.Branch = ctx.RefName
 	}
-	// A push that created the branch has no previous commit.
-	if ctx.EventName == "push" && strings.Trim(ev.Before, "0") != "" {
+	// A push that created the branch has no previous commit. Per GitHub's docs, the run of a push
+	// that deleted one reports the default branch, and its previous commit is the deleted head.
+	if ctx.EventName == "push" && !ev.Deleted && strings.Trim(ev.Before, "0") != "" {
 		tc.Before = ev.Before
 	}
 	switch {
@@ -323,14 +324,18 @@ func (c *GitHubClient) OpenPullRequests(ctx context.Context, head, base string) 
 	return r, nil
 }
 
-// ForcePushes implements StackClient.
-func (c *GitHubClient) ForcePushes(ctx context.Context, numbers []int) (map[int][]string, error) {
-	return c.Client.ForcePushes(ctx, numbers)
+// BranchHistory implements StackClient.
+func (c *GitHubClient) BranchHistory(ctx context.Context, branch string) (*BranchHistory, error) {
+	h, err := c.Client.BranchHistory(ctx, branch)
+	if err != nil {
+		return nil, err
+	}
+	return &BranchHistory{Heads: h.Heads, Created: h.Created, Rewritten: h.Rewritten}, nil
 }
 
-// BranchHeads implements StackClient.
-func (c *GitHubClient) BranchHeads(ctx context.Context, branch string) ([]string, bool, error) {
-	return c.Client.BranchHeads(ctx, branch)
+// ForcePushes implements StackClient.
+func (c *GitHubClient) ForcePushes(ctx context.Context, branch string) ([]string, error) {
+	return c.Client.ForcePushes(ctx, branch)
 }
 
 // Stack implements StackClient.
@@ -342,15 +347,14 @@ func (c *GitHubClient) Stack(ctx context.Context, number int) (*Stack, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &Stack{Number: s.Number, Open: s.Open, Base: s.Base.Ref}
+	r := &Stack{Number: s.Number, Base: s.Base.Ref}
 	for _, pr := range s.PullRequests {
 		r.Layers = append(r.Layers, StackLayer{
-			Number:     pr.Number,
-			Branch:     pr.Head.Ref,
-			Base:       pr.Base.Ref,
-			BaseCommit: pr.Base.SHA,
-			Open:       pr.State == "open",
-			Merged:     pr.MergedAt != nil,
+			Number: pr.Number,
+			Branch: pr.Head.Ref,
+			Base:   pr.Base.Ref,
+			Open:   pr.State == "open",
+			Merged: pr.MergedAt != nil,
 		})
 	}
 	return r, nil
