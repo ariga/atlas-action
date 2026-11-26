@@ -87,12 +87,16 @@ jobs:
           path: .github/azure-devops/ariga.atlas-action-*.vsix
   # Sync the built binaries to the release CDN (R2 and S3).
   # Runs in the "release" environment so the release credentials are scoped to it.
+  # S3 is accessed with GitHub OIDC: the role's trust policy must allow the subject
+  # "repo:ariga/atlas-action:environment:release" with the audience "sts.amazonaws.com".
+  # The role ARN is the AWS_ROLE_ARN secret of the "release" environment.
   upload:
     needs: build
     runs-on: ubuntu-latest
     environment: release
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -104,8 +108,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
-          aws-access-key-id: ${{ secrets.RELEASE_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.RELEASE_AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
       - name: Install rclone
         run: |

@@ -7,6 +7,9 @@ jobs:
   sync:
     name: Sync Code to GitLab
     runs-on: ubuntu-latest
+    # The "release" environment holds GITLAB_SYNC_KEY. A job in a reusable workflow
+    # only sees environment secrets if it declares the environment itself.
+    environment: release
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
