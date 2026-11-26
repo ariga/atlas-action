@@ -463,8 +463,11 @@ func (t *TeamCity) lintReport(r *atlasexec.SummaryReport, tagPrefix string) (int
 
 // GetType implements [Action].
 func (t *TeamCity) GetType() atlasexec.TriggerType {
-	return atlasexec.TriggerType("TEAMCITY")
+	return triggerTypeTeamCity
 }
+
+// triggerTypeTeamCity is the trigger type of TeamCity, which atlasexec does not define.
+const triggerTypeTeamCity atlasexec.TriggerType = "TEAMCITY"
 
 // GetTriggerContext implements [Action].
 func (t *TeamCity) GetTriggerContext(context.Context) (*TriggerContext, error) {

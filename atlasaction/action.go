@@ -108,12 +108,13 @@ type (
 		// (if not empty), and whose base is the given branch (if not empty).
 		OpenPullRequests(_ context.Context, head, base string) ([]*PullRequest, error)
 		// Stack returns the stack of pull requests with the given number, or nil if there is none.
-		Stack(context.Context, int) (*Stack, error)
+		Stack(_ context.Context, number int) (*Stack, error)
 		// BranchHistory returns the heads the branch had, as the SCM recorded its
 		// changes, even before a pull request was opened for it.
 		BranchHistory(_ context.Context, branch string) (*BranchHistory, error)
 		// ForcePushes returns the heads the branch had before and after each of its
-		// force-pushes that the SCM recorded, newest first.
+		// force-pushes that the SCM recorded, newest first. The error wraps
+		// github.ErrNotFound if the SCM does not record the changes of branches.
 		ForcePushes(_ context.Context, branch string) ([]string, error)
 	}
 	Logger interface {

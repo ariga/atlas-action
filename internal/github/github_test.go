@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,8 +50,8 @@ func TestIssueCommentBody(t *testing.T) {
 func TestOpenPullRequests(t *testing.T) {
 	var queries []url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/repos/owner/repo/pulls", r.URL.Path)
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/repos/owner/repo/pulls", r.URL.Path)
 		queries = append(queries, r.URL.Query())
 		var prs []map[string]any
 		switch r.URL.Query().Get("page") {
@@ -68,7 +69,7 @@ func TestOpenPullRequests(t *testing.T) {
 				"stack":    map[string]any{"number": 7, "position": 2, "size": 3, "base": map[string]any{"ref": "main", "sha": "def"}},
 			})
 		}
-		require.NoError(t, json.NewEncoder(w).Encode(prs))
+		assert.NoError(t, json.NewEncoder(w).Encode(prs))
 	}))
 	defer srv.Close()
 	client, err := NewClient("owner/repo", WithBaseURL(srv.URL))
@@ -90,9 +91,9 @@ func TestOpenPullRequests(t *testing.T) {
 
 func TestStack(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "2026-03-10", r.Header.Get("X-GitHub-Api-Version"))
-		require.Equal(t, "application/vnd.github+json", r.Header.Get("Accept"))
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "2026-03-10", r.Header.Get("X-GitHub-Api-Version"))
+		assert.Equal(t, "application/vnd.github+json", r.Header.Get("Accept"))
 		switch r.URL.Path {
 		case "/repos/owner/repo/stacks/4":
 			// Trimmed response of GET /repos/{owner}/{repo}/stacks/{stack_number}.
@@ -106,7 +107,7 @@ func TestStack(t *testing.T) {
     {"number": 2, "head": {"ref": "t0-b", "sha": "fec76bf"}, "base": {"ref": "main", "sha": "4e76e0c"}, "state": "open", "merged_at": null, "draft": true}
   ]
 }`))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -138,7 +139,7 @@ func TestBranchHistory(t *testing.T) {
 		next    map[string]string // Link header of each page, by its cursor.
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, http.MethodGet, r.Method)
 		if r.URL.Path != "/repos/owner/repo/activity" && r.URL.Path != "/repositories/1/activity" {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -149,7 +150,7 @@ func TestBranchHistory(t *testing.T) {
 			w.Header().Set("Link", l)
 		}
 		_, err := w.Write([]byte(pages[cur]))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer srv.Close()
 	client, err := NewClient("owner/repo", WithBaseURL(srv.URL))

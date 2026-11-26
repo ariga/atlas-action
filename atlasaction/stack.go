@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/url"
 	"os"
@@ -46,7 +47,6 @@ type (
 		*Actions
 		tc      *TriggerContext
 		sc      StackClient
-		branch  string // Branch the action runs on.
 		remote  string
 		dirURL  string
 		dir     string // Migration directory, relative to the working directory.
@@ -107,7 +107,8 @@ func (a *Actions) migrateAutoRebaseStacks(ctx context.Context, tc *TriggerContex
 	if branch == "" {
 		return errors.New("failed to determine the branch the action runs on")
 	}
-	tc = func(c TriggerContext) *TriggerContext { c.Branch = branch; return &c }(*tc)
+	tc = new(*tc)
+	tc.Branch = branch
 	stacks, single, lookupErr, err := a.branchStacks(ctx, sc, tc)
 	if err != nil {
 		return err
@@ -256,7 +257,7 @@ func (a *Actions) targetStacks(ctx context.Context, sc StackClient, branch strin
 		slices.Sort(missing)
 		errs = append(errs, fmt.Errorf("none of the stacks of the pull requests that target %q was found (%s)", branch, stackNumbers(missing)))
 	}
-	slices.SortFunc(stacks, func(a, b *Stack) int { return cmp.Compare(a.Number, b.Number) })
+	slices.SortFunc(stacks, func(x, y *Stack) int { return cmp.Compare(x.Number, y.Number) })
 	return stacks, errors.Join(errs...)
 }
 
@@ -272,7 +273,6 @@ func (a *Actions) newRestacker(ctx context.Context, tc *TriggerContext, sc Stack
 		Actions:  a,
 		tc:       tc,
 		sc:       sc,
-		branch:   tc.Branch,
 		remote:   a.GetInputDefault("remote", "origin"),
 		dirURL:   u.String(),
 		dir:      filepath.Join(u.Host, u.Path),
@@ -294,11 +294,11 @@ func (a *Actions) newRestacker(ctx context.Context, tc *TriggerContext, sc Stack
 		},
 	}
 	r.message = fmt.Sprintf("%s: rebase migration files", r.dir)
-	if v, err := r.git(ctx, "--version"); err != nil {
+	v, err := r.git(ctx, "--version")
+	if err != nil {
 		return nil, err
-	} else {
-		a.Infof("auto-rebase stacks with %s", v)
 	}
+	a.Infof("auto-rebase stacks with %s", v)
 	switch out, err := r.git(ctx, "rev-parse", "--is-shallow-repository"); {
 	case err != nil:
 		return nil, err
@@ -331,17 +331,17 @@ func repoPath(top, dir string) (string, error) {
 		}
 		abs = filepath.Join(cwd, dir)
 		// The directory is hashed in the working tree, but git does not follow symbolic links.
-		if real, err := filepath.EvalSymlinks(abs); err == nil && real != abs {
+		if resolved, err := filepath.EvalSymlinks(abs); err == nil && resolved != abs {
 			return "", fmt.Errorf("restacking does not support a migration directory that is a symbolic link, or under one: %q", dir)
 		}
-	} else if real, err := filepath.EvalSymlinks(abs); err == nil {
-		abs = real
+	} else if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = resolved
 	}
 	if t, err := filepath.EvalSymlinks(top); err == nil {
 		top = t
 	}
 	rel, err := filepath.Rel(top, abs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	if err != nil || !filepath.IsLocal(rel) {
 		return "", fmt.Errorf("migration directory %q is outside of the git repository", dir)
 	}
 	if strings.ContainsAny(rel, " \t\r\n\"'\\*?[]!#:") {
@@ -385,7 +385,7 @@ func (r *restacker) run(ctx context.Context, stacks []*Stack) (pushed bool, curr
 		rerr := restore()
 		args := start
 		if current != "" {
-			args = []string{"switch", "--quiet", "--discard-changes", "--force-create", r.branch, current}
+			args = []string{"switch", "--quiet", "--discard-changes", "--force-create", r.tc.Branch, current}
 		}
 		_, cerr := r.git(ctx, args...)
 		err = errors.Join(err, rerr, cerr, r.clean(ctx))
@@ -408,7 +408,7 @@ func (r *restacker) run(ctx context.Context, stacks []*Stack) (pushed bool, curr
 				continue
 			}
 			pushed = true
-			if l.Branch == r.branch {
+			if l.Branch == r.tc.Branch {
 				current = l.new
 			}
 			r.moved[l.Branch] = l.old
@@ -634,7 +634,7 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 			tips, held, skip = append(tips, old), append(held, old), old
 		}
 		// The push that triggered the run may have rewritten the trunk, even one without a pull request.
-		if r.tc.Before != "" && r.branch == s.Base && r.tc.Commit == start {
+		if r.tc.Before != "" && r.tc.Branch == s.Base && r.tc.Commit == start {
 			tips, held = append(tips, r.tc.Before), append(held, r.tc.Before)
 		}
 		ok, err := r.baseHasPR(ctx, s.Base)
@@ -687,7 +687,7 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 	}
 	name := belowName(s.Base, below, merged)
 	if f.commit == "" {
-		return nil, fmt.Errorf("#%d (%s): no commit in common with %s", l.Number, l.Branch, belowName("", below, merged))
+		return nil, fmt.Errorf("#%d (%s): no commit in common with %s", l.Number, l.Branch, name)
 	}
 	if fetchErr != nil {
 		f.reason = fmt.Sprintf("cannot fetch the heads %s had: %v", name, fetchErr)
@@ -724,11 +724,11 @@ func (r *restacker) trunkRewrites(ctx context.Context, branch string) (heads []s
 	}
 	heads, err := r.sc.ForcePushes(ctx, branch)
 	switch {
-	case errors.Is(err, github.ErrNotFound):
-		r.Warningf("failed to read the force-pushes of branch %q: %v", branch, err)
 	case err != nil:
 		r.Warningf("failed to read the force-pushes of branch %q: %v", branch, err)
-		return nil, fmt.Sprintf("the force-pushes of branch %q cannot be read", branch)
+		if !errors.Is(err, github.ErrNotFound) {
+			return nil, fmt.Sprintf("the force-pushes of branch %q cannot be read", branch)
+		}
 	default:
 		if err := r.fetchMissing(ctx, heads); err != nil {
 			r.Warningf("failed to fetch some of the heads branch %q was force-pushed from: %v", branch, err)
@@ -750,13 +750,9 @@ func (r *restacker) forkCandidates(ctx context.Context, layer string, heads []st
 		// "--not" does not apply to the revisions read from the standard input.
 		fmt.Fprintf(&in, "^%s\n", h)
 	}
-	cmd := r.CmdExecutor(ctx, "git", "rev-list", "--boundary", "--ignore-missing", layer, "--stdin")
-	cmd.Stdin = strings.NewReader(in.String())
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	out, err := r.gitInput(ctx, strings.NewReader(in.String()), "rev-list", "--boundary", "--ignore-missing", layer, "--stdin")
 	if err != nil {
-		return nil, fmt.Errorf("git rev-list: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return nil, err
 	}
 	if len(bytes.TrimSpace(out)) == 0 {
 		return []string{layer}, nil
@@ -801,11 +797,9 @@ func (r *restacker) fetchMissing(ctx context.Context, commits []string) error {
 	if len(commits) == 0 {
 		return nil
 	}
-	cmd := r.CmdExecutor(ctx, "git", "cat-file", "--batch-check=%(objectname)")
-	cmd.Stdin = strings.NewReader(strings.Join(commits, "\n") + "\n")
-	out, err := cmd.Output()
+	out, err := r.gitInput(ctx, strings.NewReader(strings.Join(commits, "\n")+"\n"), "cat-file", "--batch-check=%(objectname)")
 	if err != nil {
-		return fmt.Errorf("git cat-file: %w", err)
+		return err
 	}
 	var missing []string
 	for l := range strings.SplitSeq(string(out), "\n") {
@@ -817,7 +811,7 @@ func (r *restacker) fetchMissing(ctx context.Context, commits []string) error {
 		return nil
 	}
 	// A commit the remote does not have fails the fetch of all of them, so they are fetched one by one then.
-	args := []string{"fetch", "--quiet", "--no-tags", r.remote}
+	args := []string{"fetch", "--quiet", "--no-tags", "--no-recurse-submodules", r.remote}
 	if _, err = r.git(ctx, append(args, missing...)...); err == nil || len(missing) == 1 {
 		return err
 	}
@@ -836,7 +830,7 @@ func (r *restacker) fetchMissing(ctx context.Context, commits []string) error {
 // and the changes of atlas.sum are left out, as each restack rewrites them.
 func (r *restacker) dropped(ctx context.Context, fork string, heads []string, trunk string) ([]string, error) {
 	// The commits the trunk has are not lost, even when the branch below no longer has them.
-	out, err := r.git(ctx, append([]string{"log", "--no-merges", "--format=%H %s", fork, "--not", trunk}, heads...)...)
+	out, err := r.git(ctx, append([]string{"log", "--no-show-signature", "--no-merges", "--format=%H %s", fork, "--not", trunk}, heads...)...)
 	if err != nil || out == "" {
 		return nil, err
 	}
@@ -852,7 +846,7 @@ func (r *restacker) dropped(ctx context.Context, fork string, heads []string, tr
 			}
 		}
 	}
-	s, err := r.git(ctx, append(append([]string{"log", "--no-merges", "--format=%H %s"}, heads...), "--not", fork)...)
+	s, err := r.git(ctx, append(append([]string{"log", "--no-show-signature", "--no-merges", "--format=%H %s"}, heads...), "--not", fork)...)
 	if err != nil {
 		return nil, err
 	}
@@ -893,7 +887,7 @@ func (r *restacker) dropped(ctx context.Context, fork string, heads []string, tr
 		// Whether a head has the files the commit changes as they are at the fork point.
 		kept := len(specs) == 0
 		for i := 0; !kept && i < len(heads); i++ {
-			if kept, err = r.gitTest(ctx, append([]string{"diff", "--quiet", fork, heads[i], "--"}, specs...)...); err != nil {
+			if kept, err = r.gitTest(ctx, append([]string{"diff-tree", "-r", "--quiet", fork, heads[i], "--"}, specs...)...); err != nil {
 				return nil, err
 			}
 		}
@@ -959,7 +953,7 @@ func (r *restacker) firstConflict(ctx context.Context, base, trunk string, layer
 		}
 		if first >= 0 {
 			// Whether the own commits of the layer change its migrations.
-			same, err := r.gitTest(ctx, "diff", "--quiet", l.fork.commit, l.old, "--", r.sqlSpec(), r.sumSpec())
+			same, err := r.gitTest(ctx, "diff-tree", "-r", "--quiet", l.fork.commit, l.old, "--", r.sqlSpec(), r.sumSpec())
 			if err != nil {
 				return 0, err
 			}
@@ -1017,7 +1011,7 @@ func (r *restacker) upToDate(ctx context.Context, parent string, l *layerState) 
 	case r.onTop(ps, cs, true):
 		return true, nil
 	default:
-		return r.gitTest(ctx, "diff", "--quiet", l.fork.commit, parent, "--", r.sqlSpec(), r.sumSpec())
+		return r.gitTest(ctx, "diff-tree", "-r", "--quiet", l.fork.commit, parent, "--", r.sqlSpec(), r.sumSpec())
 	}
 }
 
@@ -1083,9 +1077,11 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 		return "", err
 	}
 	r.Infof("#%d (%s): replaying %s commit(s) onto %s (%s)", l.Number, l.Branch, commits, parentName, short(parent))
+	// The configuration of the machine must not keep the merge commits, or move the local branches.
 	if _, err := r.git(ctx, "-c", "merge."+sumMergeDriver+".name=atlas-action", "-c", "merge."+sumMergeDriver+".driver=true",
+		"-c", "rebase.rebaseMerges=false", "-c", "rebase.updateRefs=false",
 		"rebase", "--quiet", "--onto", parent, upstream, l.old); err != nil {
-		out, _ := r.gitRaw(ctx, "diff", "--name-only", "-z", "--diff-filter=U")
+		out, _ := r.gitRaw(ctx, "diff-files", "--name-only", "-z", "--diff-filter=U")
 		if _, aerr := r.git(ctx, "rebase", "--abort"); aerr != nil {
 			err = errors.Join(err, aerr)
 		}
@@ -1145,7 +1141,7 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 	if _, err := r.git(ctx, "add", "--all", "--", r.sqlSpec(), r.sumSpec()); err != nil {
 		return "", fmt.Errorf("failed to stage changes: %w", err)
 	}
-	switch same, err := r.gitTest(ctx, "diff", "--cached", "--quiet"); {
+	switch same, err := r.gitTest(ctx, "diff-index", "--cached", "--quiet", "HEAD", "--"); {
 	case err != nil:
 		return "", err
 	case same:
@@ -1156,7 +1152,7 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 		}
 		args := []string{"commit", "--quiet", "--message", r.message}
 		// Amend the commit of an earlier run, so each layer keeps a single commit of the action.
-		if subject, err := r.git(ctx, "log", "-1", "--format=%s", "HEAD"); err == nil && subject == r.message && head != parent {
+		if subject, err := r.git(ctx, "log", "--no-show-signature", "--max-count=1", "--format=%s", "HEAD"); err == nil && subject == r.message && head != parent {
 			args = []string{"commit", "--quiet", "--amend", "--no-edit"}
 		}
 		if _, err := r.git(ctx, args...); err != nil {
@@ -1224,7 +1220,7 @@ func (r *restacker) checkMerges(ctx context.Context, upstream string, l *layerSt
 			return fmt.Errorf("merge commit %s merges %d commits, and a restack drops it without checking it for changes of its own", short(m), n)
 		}
 		// The changes of a merge commit, compared with merging its parents again.
-		b, err := r.gitRaw(ctx, "show", "--remerge-diff", "--format=", "--name-only", "-z", m)
+		b, err := r.gitRaw(ctx, "show", "--no-show-signature", "--no-relative", "--remerge-diff", "--format=", "--name-only", "-z", m)
 		if err != nil {
 			return fmt.Errorf("failed to check merge commit %s, which a restack drops (git 2.36 or later is required): %w", short(m), err)
 		}
@@ -1305,19 +1301,16 @@ func (r *restacker) ownFiles(ctx context.Context, l *layerState, parent, parentN
 	return own, nil
 }
 
-// blobName returns the name of the file with the given blob, if any.
+// blobName returns the name of the file with the given blob, the first in sorted order
+// if several files have it, or an empty string if none has it.
 func blobName(blobs map[string]string, blob string) string {
-	var names []string
+	var name string
 	for n, b := range blobs {
-		if b == blob {
-			names = append(names, n)
+		if b == blob && (name == "" || n < name) {
+			name = n
 		}
 	}
-	slices.Sort(names)
-	if len(names) == 0 {
-		return ""
-	}
-	return names[0]
+	return name
 }
 
 // blobs returns the blob of each file in the migration directory at the given commit.
@@ -1385,7 +1378,7 @@ func (r *restacker) sumFile() (migrate.HashFile, error) {
 
 // fetch fetches the trunk, the open layers and the head of the top merged layer.
 func (r *restacker) fetch(ctx context.Context, base string, merged *StackLayer, layers []*layerState) error {
-	args := []string{"fetch", "--quiet", "--no-tags", r.remote, fmt.Sprintf("+refs/heads/%s:%s", base, r.remoteRef(base))}
+	args := []string{"fetch", "--quiet", "--no-tags", "--no-recurse-submodules", r.remote, fmt.Sprintf("+refs/heads/%s:%s", base, r.remoteRef(base))}
 	for _, l := range layers {
 		args = append(args, fmt.Sprintf("+refs/heads/%s:%s", l.Branch, r.remoteRef(l.Branch)))
 	}
@@ -1401,7 +1394,7 @@ func (r *restacker) fetch(ctx context.Context, base string, merged *StackLayer, 
 	}
 	if merged != nil {
 		// GitHub keeps the head of merged pull requests, even after their branch is deleted.
-		if _, err := r.git(ctx, "fetch", "--quiet", "--no-tags", r.remote,
+		if _, err := r.git(ctx, "fetch", "--quiet", "--no-tags", "--no-recurse-submodules", r.remote,
 			fmt.Sprintf("+refs/pull/%d/head:%s", merged.Number, r.mergedRef(merged))); err != nil {
 			r.Warningf("failed to fetch the head of the merged pull request #%d: %v", merged.Number, err)
 		}
@@ -1425,20 +1418,17 @@ func (r *restacker) push(ctx context.Context, s *Stack, layers []*layerState) er
 		return nil
 	}
 	args := append(append([]string{"push", "--atomic"}, leases...), r.remote)
-	cmd := r.CmdExecutor(ctx, "git", append(args, refs...)...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	if _, err := r.git(ctx, append(args, refs...)...); err != nil {
 		for _, l := range layers {
 			l.new = l.old
 		}
 		// A branch was pushed after it was fetched. The workflow run of that
 		// push, or the next one, restacks the stack with the new commits.
-		if strings.Contains(stderr.String(), "(stale info)") {
-			r.Warningf("Stack #%d changed while it was restacked, nothing was pushed:\n%s", s.Number, strings.TrimSpace(stderr.String()))
+		if strings.Contains(err.Error(), "(stale info)") {
+			r.Warningf("Stack #%d changed while it was restacked, nothing was pushed: %v", s.Number, err)
 			return nil
 		}
-		return fmt.Errorf("failed to push %s (nothing was pushed): %w: %s", strings.Join(names, ", "), err, strings.TrimSpace(stderr.String()))
+		return fmt.Errorf("failed to push %s (nothing was pushed): %w", strings.Join(names, ", "), err)
 	}
 	r.Infof("Pushed %s", strings.Join(names, ", "))
 	return nil
@@ -1529,7 +1519,13 @@ func (r *restacker) git(ctx context.Context, args ...string) (string, error) {
 
 // gitRaw runs a git command and returns its output.
 func (r *restacker) gitRaw(ctx context.Context, args ...string) ([]byte, error) {
+	return r.gitInput(ctx, nil, args...)
+}
+
+// gitInput runs a git command with the given standard input, and returns its output.
+func (r *restacker) gitInput(ctx context.Context, stdin io.Reader, args ...string) ([]byte, error) {
 	cmd := r.CmdExecutor(ctx, "git", args...)
+	cmd.Stdin = stdin
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -1544,17 +1540,11 @@ func (r *restacker) gitRaw(ctx context.Context, args ...string) ([]byte, error) 
 
 // gitTest runs a git command that reports a condition with its exit code: 0 for true, and 1 for false.
 func (r *restacker) gitTest(ctx context.Context, args ...string) (bool, error) {
-	cmd := r.CmdExecutor(ctx, "git", args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	err := cmd.Run()
+	_, err := r.gitRaw(ctx, args...)
 	if exit, ok := errors.AsType[*exec.ExitError](err); ok && exit.ExitCode() == 1 {
 		return false, nil
 	}
-	if err != nil {
-		return false, fmt.Errorf("git %s: %w: %s", gitCommand(args), err, strings.TrimSpace(stderr.String()))
-	}
-	return true, nil
+	return err == nil, err
 }
 
 // gitCommand returns the git command in the arguments, after the global options.

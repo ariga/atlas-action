@@ -484,7 +484,8 @@ func (c *Client) OpenPullRequests(ctx context.Context, head, base string) ([]*Pu
 	}
 }
 
-// Stack returns the stack of pull requests with the given number.
+// Stack returns the stack of pull requests with the given number. The error wraps
+// ErrNotFound if the repository has no such stack.
 func (c *Client) Stack(ctx context.Context, number int) (*Stack, error) {
 	var s Stack
 	h := http.Header{"X-Github-Api-Version": {stackAPIVersion}}
@@ -565,12 +566,14 @@ type BranchHistory struct {
 // BranchHistory returns the heads the branch had, as GitHub records its changes in the activity of the
 // repository: its pushes, force-pushes, merges, creation and deletion. Unlike the timeline of a pull request,
 // the activity also records the changes from before the pull request of the branch was opened.
+// The error wraps ErrNotFound if the activity of the repository is not available.
 func (c *Client) BranchHistory(ctx context.Context, branch string) (*BranchHistory, error) {
 	return c.activity(ctx, branch, "")
 }
 
 // ForcePushes returns the heads the branch had before and after each of its force-pushes, as GitHub records
-// them in the activity of the repository, newest first.
+// them in the activity of the repository, newest first. The error wraps ErrNotFound if the
+// activity of the repository is not available.
 func (c *Client) ForcePushes(ctx context.Context, branch string) ([]string, error) {
 	h, err := c.activity(ctx, branch, "force_push")
 	if err != nil {
@@ -606,10 +609,10 @@ func (c *Client) activity(ctx context.Context, branch, typ string) (*BranchHisto
 		}
 		for _, a := range acts {
 			// The creation and deletion of a branch have no commit on one side.
-			for _, c := range []string{a.After, a.Before} {
-				if strings.Trim(c, "0") != "" && !seen[c] {
-					seen[c] = true
-					h.Heads = append(h.Heads, c)
+			for _, sha := range []string{a.After, a.Before} {
+				if strings.Trim(sha, "0") != "" && !seen[sha] {
+					seen[sha] = true
+					h.Heads = append(h.Heads, sha)
 				}
 			}
 			h.Rewritten = h.Rewritten || a.Type == "force_push" || a.Type == "branch_deletion"

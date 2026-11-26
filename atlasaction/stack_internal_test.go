@@ -66,7 +66,7 @@ func TestWaitClock(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
-func TestVersions(t *testing.T) {
+func TestOnTop(t *testing.T) {
 	r := &restacker{atlas: true}
 	sum := func(names ...string) migrate.HashFile {
 		hf := make(migrate.HashFile, len(names))
