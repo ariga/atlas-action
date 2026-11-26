@@ -28,30 +28,50 @@ test:
 	@OUTPUT=$$(./atlas-action --version); \
 	echo "$$OUTPUT" | grep -iq "$(VERSION)" && echo "Version=$$OUTPUT" || (echo "unexpected output: $$OUTPUT, expected to include: $(VERSION)"; exit 1)
 
+# Publish the release binaries and scripts to the CDN: S3 (release.ariga.io)
+# and R2 (a mirror).
+#
+# Keys named after a full version or a commit are immutable, the bucket policy
+# only accepts them with "If-None-Match: *". They are written by s3-put-once.sh
+# first, which treats an existing key with identical content as already
+# published (a re-run) and fails on different content. Only then are the
+# rolling "-$(MAJOR_VER)" keys, which change on every release, overwritten.
+# For every key S3 comes before R2, so a conflict aborts before R2 is touched.
+#
+# Every command is its own recipe line: make stops at the first one that fails.
+S3_BUCKET   ?= release.ariga.io
+R2_BUCKET   ?= atlas-binaries
+S3_PUT_ONCE  = bash .github/scripts/s3-put-once.sh $(S3_BUCKET)
+S3_DEST      = s3://$(S3_BUCKET)/atlas-action
+R2_DEST      = r2:$(R2_BUCKET)/atlas-action
+
 .PHONY: s3-upload
 s3-upload: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
-	aws s3 cp ./scripts/shim.sh s3://release.ariga.io/atlas-action/scripts-$(VERSION)/shim.sh; \
-	aws s3 cp ./scripts/setup-atlas.sh s3://release.ariga.io/atlas-action/scripts-$(VERSION)/setup-atlas.sh; \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(VERSION); \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(MAJOR_VER); \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(BINARY_NAME)-$(FULL_COMMIT); \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION); \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(MAJOR_VER); \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(FULL_COMMIT); \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(VERSION); \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER); \
-	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) s3://release.ariga.io/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(FULL_COMMIT); \
-	rclone copyto ./scripts/shim.sh r2:atlas-binaries/atlas-action/scripts-$(VERSION)/shim.sh; \
-	rclone copyto ./scripts/setup-atlas.sh r2:atlas-binaries/atlas-action/scripts-$(VERSION)/setup-atlas.sh; \
-	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(BINARY_NAME)-$(VERSION); \
-	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(BINARY_NAME)-$(MAJOR_VER); \
-	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(BINARY_NAME)-$(FULL_COMMIT); \
-	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION); \
-	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(MAJOR_VER); \
-	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(FULL_COMMIT); \
-	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(VERSION); \
-	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER); \
-	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) r2:atlas-binaries/atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(FULL_COMMIT);
+	@echo "==> S3: write-once keys"
+	$(S3_PUT_ONCE) atlas-action/scripts-$(VERSION)/shim.sh ./scripts/shim.sh application/x-sh
+	$(S3_PUT_ONCE) atlas-action/scripts-$(VERSION)/setup-atlas.sh ./scripts/setup-atlas.sh application/x-sh
+	$(S3_PUT_ONCE) atlas-action/$(BINARY_NAME)-$(VERSION) ./$(ATLAS_BIN_LINUX_AMD64) binary/octet-stream
+	$(S3_PUT_ONCE) atlas-action/$(BINARY_NAME)-$(FULL_COMMIT) ./$(ATLAS_BIN_LINUX_AMD64) binary/octet-stream
+	$(S3_PUT_ONCE) atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION) ./$(ATLAS_BIN_LINUX_AMD64) binary/octet-stream
+	$(S3_PUT_ONCE) atlas-action/$(ATLAS_BIN_LINUX_AMD64)-$(FULL_COMMIT) ./$(ATLAS_BIN_LINUX_AMD64) binary/octet-stream
+	$(S3_PUT_ONCE) atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(VERSION) ./$(ATLAS_BIN_LINUX_ARM64) binary/octet-stream
+	$(S3_PUT_ONCE) atlas-action/$(ATLAS_BIN_LINUX_ARM64)-$(FULL_COMMIT) ./$(ATLAS_BIN_LINUX_ARM64) binary/octet-stream
+	@echo "==> R2: write-once keys"
+	rclone copyto ./scripts/shim.sh $(R2_DEST)/scripts-$(VERSION)/shim.sh
+	rclone copyto ./scripts/setup-atlas.sh $(R2_DEST)/scripts-$(VERSION)/setup-atlas.sh
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) $(R2_DEST)/$(BINARY_NAME)-$(VERSION)
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) $(R2_DEST)/$(BINARY_NAME)-$(FULL_COMMIT)
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) $(R2_DEST)/$(ATLAS_BIN_LINUX_AMD64)-$(VERSION)
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) $(R2_DEST)/$(ATLAS_BIN_LINUX_AMD64)-$(FULL_COMMIT)
+	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) $(R2_DEST)/$(ATLAS_BIN_LINUX_ARM64)-$(VERSION)
+	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) $(R2_DEST)/$(ATLAS_BIN_LINUX_ARM64)-$(FULL_COMMIT)
+	@echo "==> S3 and R2: rolling $(MAJOR_VER) keys"
+	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) $(S3_DEST)/$(BINARY_NAME)-$(MAJOR_VER)
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) $(R2_DEST)/$(BINARY_NAME)-$(MAJOR_VER)
+	aws s3 cp ./$(ATLAS_BIN_LINUX_AMD64) $(S3_DEST)/$(ATLAS_BIN_LINUX_AMD64)-$(MAJOR_VER)
+	rclone copyto ./$(ATLAS_BIN_LINUX_AMD64) $(R2_DEST)/$(ATLAS_BIN_LINUX_AMD64)-$(MAJOR_VER)
+	aws s3 cp ./$(ATLAS_BIN_LINUX_ARM64) $(S3_DEST)/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER)
+	rclone copyto ./$(ATLAS_BIN_LINUX_ARM64) $(R2_DEST)/$(ATLAS_BIN_LINUX_ARM64)-$(MAJOR_VER)
 
 .PHONY: docker
 docker: $(ATLAS_BIN_LINUX_AMD64) $(ATLAS_BIN_LINUX_ARM64)
