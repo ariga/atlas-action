@@ -267,7 +267,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		s := r.stack(36, "main", "A", "B")
 		r.checkout("A")
 		require.NoError(t, os.WriteFile(filepath.Join(r.dev, r.dir, "20260102000000_a1.sql"), []byte("CREATE TABLE a1 (id bigint);\n"), 0644))
-		r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+		r.hashDir(filepath.Join(r.dev, r.dir))
 		r.git(r.dev, "commit", "--quiet", "--all", "--amend", "--no-edit")
 		r.forcePush("A")
 		r.land(s)
@@ -292,7 +292,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		s := r.stack(51, "main", "A", "B")
 		r.checkout("A")
 		require.NoError(t, os.WriteFile(filepath.Join(r.dev, r.dir, "20260102000000_a1.sql"), []byte("CREATE TABLE a1 (id bigint);\n"), 0644))
-		r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+		r.hashDir(filepath.Join(r.dev, r.dir))
 		r.git(r.dev, "commit", "--quiet", "--all", "--amend", "--allow-empty-message", "--no-edit")
 		r.forcePush("A")
 		r.migration("main", "20260105000000", "m1")
@@ -965,7 +965,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		unnamed := func(version, sql string) {
 			r.checkout("A")
 			require.NoError(t, os.WriteFile(filepath.Join(r.dev, r.dir, version+".sql"), []byte(sql), 0644))
-			r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+			r.hashDir(filepath.Join(r.dev, r.dir))
 			r.git(r.dev, "add", "--all")
 			r.git(r.dev, "commit", "--quiet", "--message", "add migration")
 		}
@@ -1143,7 +1143,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 					require.NoError(t, os.MkdirAll(filepath.Join(r.dev, "shared"), 0755))
 					require.NoError(t, os.WriteFile(filepath.Join(r.dev, "shared", "x.sql"), []byte("CREATE TABLE x (id int);\n"), 0644))
 					require.NoError(t, os.Symlink("../shared/x.sql", filepath.Join(r.dev, r.dir, "20260101000100_link.sql")))
-					r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+					r.hashDir(filepath.Join(r.dev, r.dir))
 					r.git(r.dev, "add", "--all")
 					r.git(r.dev, "commit", "--quiet", "--message", "main: link")
 					r.push("main")
@@ -1480,7 +1480,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Join(r.dev, "shared"), 0755))
 			require.NoError(t, os.WriteFile(filepath.Join(r.dev, "shared", "x.sql"), []byte("CREATE TABLE x (id int);\n"), 0644))
 			require.NoError(t, os.Symlink("../shared/x.sql", filepath.Join(r.dev, r.dir, "20260101000100_link.sql")))
-			r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+			r.hashDir(filepath.Join(r.dev, r.dir))
 			r.git(r.dev, "add", "--all")
 			r.git(r.dev, "commit", "--quiet", "--message", "main: link")
 			r.push("main")
@@ -1585,7 +1585,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				rewrite: func(r *stackRepo) {
 					r.checkout("A")
 					require.NoError(r.t, os.WriteFile(filepath.Join(r.dev, r.dir, "20260102000000_a1.sql"), []byte("CREATE TABLE a1 (id bigint);\n"), 0644))
-					r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+					r.hashDir(filepath.Join(r.dev, r.dir))
 					r.git(r.dev, "commit", "--quiet", "--all", "--amend", "--no-edit")
 				},
 				want: []string{"init", "m1", "a1", "b1"},
@@ -2082,7 +2082,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		r.git(r.dev, "fetch", "--quiet", "origin")
 		r.git(r.dev, "checkout", "--quiet", "-B", "A", "origin/A")
 		r.git(r.dev, "reset", "--quiet", "--hard", "HEAD~1")
-		r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+		r.hashDir(filepath.Join(r.dev, r.dir))
 		r.atlas(r.dev, "migrate", "rebase", "--dir", "file://"+r.dir, "20260102000000")
 		r.git(r.dev, "add", "--all")
 		r.git(r.dev, "commit", "--quiet", "--message", "A: rebase a1")
@@ -2255,7 +2255,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 			if err := r.tryGit(r.dev, "merge", "--quiet", "--no-edit", "origin/main"); err == nil {
 				t.Log("no atlas.sum conflict")
 			} else {
-				r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+				r.hashDir(filepath.Join(r.dev, r.dir))
 				r.git(r.dev, "add", "--all")
 				r.git(r.dev, "commit", "--quiet", "--no-edit")
 			}
@@ -2322,7 +2322,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		if err := r.tryGit(r.dev, "merge", "--quiet", "--no-edit", "origin/main"); err == nil {
 			t.Fatal("expected an atlas.sum conflict")
 		}
-		r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+		r.hashDir(filepath.Join(r.dev, r.dir))
 		r.git(r.dev, "add", "--all")
 		r.git(r.dev, "commit", "--quiet", "--no-edit")
 		r.push("A")
@@ -2867,7 +2867,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 			dir := filepath.Join(r.dev, "other")
 			require.NoError(t, os.MkdirAll(dir, 0755))
 			require.NoError(t, os.WriteFile(filepath.Join(dir, version+"_"+name+".sql"), []byte("CREATE TABLE "+name+" (id int);\n"), 0644))
-			r.atlas(r.dev, "migrate", "hash", "--dir", "file://other")
+			r.hashDir(filepath.Join(r.dev, "other"))
 			r.git(r.dev, "add", "--all")
 			r.git(r.dev, "commit", "--quiet", "--message", branch+": add "+name)
 		}
@@ -3053,7 +3053,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				// B merges the other head of A, so it has both.
 				r.checkout("B")
 				require.Error(t, r.tryGit(r.dev, "merge", "--quiet", "--no-ff", "--no-edit", merge), "atlas.sum conflicts")
-				r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+				r.hashDir(filepath.Join(r.dev, r.dir))
 				r.git(r.dev, "add", "--all")
 				r.git(r.dev, "commit", "--quiet", "--no-edit")
 				r.push("B")
@@ -3322,7 +3322,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		r.checkout("A")
 		require.Error(t, r.tryGit(r.dev, "merge", "--quiet", "--no-ff", "--no-commit", "main"), "atlas.sum conflicts")
 		r.git(r.dev, "mv", r.dir+"/20260105000000_m1.sql", r.dir+"/20260106000000_m1.sql")
-		r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+		r.hashDir(filepath.Join(r.dev, r.dir))
 		r.git(r.dev, "add", "--all")
 		r.git(r.dev, "commit", "--quiet", "--no-edit")
 		r.push("A")
@@ -3465,7 +3465,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				sql := "CREATE TABLE a1 (id int);\n"
 				if tt.moved {
 					r.git(r.dev, "mv", r.dir+"/20260102000000_a1.sql", r.dir+"/20260102000100_a1.sql")
-					r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+					r.hashDir(filepath.Join(r.dev, r.dir))
 					r.git(r.dev, "add", "--all")
 					r.git(r.dev, "commit", "--quiet", "--message", botMessage)
 				} else {
@@ -3485,7 +3485,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				r.checkout("A")
 				r.git(r.dev, "reset", "--quiet", "--hard", "origin/main")
 				require.NoError(t, os.WriteFile(filepath.Join(r.dev, r.dir, "20260106000000_a1.sql"), []byte(sql), 0644))
-				r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+				r.hashDir(filepath.Join(r.dev, r.dir))
 				r.git(r.dev, "add", "--all")
 				r.git(r.dev, "commit", "--quiet", "--message", "A: add a1 (squashed)")
 				r.forcePush("A")
@@ -3990,7 +3990,7 @@ func newStackRepo(t *testing.T, dir ...string) *stackRepo {
 	mdir := filepath.Join(r.dev, r.dir)
 	require.NoError(t, os.MkdirAll(mdir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(mdir, "20260101000000_init.sql"), []byte("CREATE TABLE init (id int);\n"), 0644))
-	r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+	r.hashDir(filepath.Join(r.dev, r.dir))
 	r.git(r.dev, "add", "--all")
 	r.git(r.dev, "commit", "--quiet", "--message", "init")
 	r.push("main")
@@ -4083,7 +4083,7 @@ func (r *stackRepo) migrationSQL(branch, version, name, sql string) {
 	dir := filepath.Join(r.dev, r.dir)
 	require.NoError(r.t, os.MkdirAll(dir, 0755))
 	require.NoError(r.t, os.WriteFile(filepath.Join(dir, version+"_"+name+".sql"), []byte(sql), 0644))
-	r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+	r.hashDir(filepath.Join(r.dev, r.dir))
 	r.git(r.dev, "add", "--all")
 	r.git(r.dev, "commit", "--quiet", "--message", fmt.Sprintf("%s: add %s", branch, name))
 }
@@ -4125,7 +4125,7 @@ func (r *stackRepo) formatFile(branch, format, name string, sql ...string) {
 func (r *stackRepo) hash(branch string) {
 	r.t.Helper()
 	r.checkout(branch)
-	r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+	r.hashDir(filepath.Join(r.dev, r.dir))
 	r.git(r.dev, "commit", "--quiet", "--all", "--message", fmt.Sprintf("%s: hash", branch))
 }
 
@@ -4142,7 +4142,7 @@ func (r *stackRepo) attributes(branch, attr string) {
 	r.t.Helper()
 	r.file(branch, ".gitattributes", attr)
 	r.refresh(branch)
-	r.atlas(r.dev, "migrate", "hash", "--dir", "file://"+r.dir)
+	r.hashDir(filepath.Join(r.dev, r.dir))
 	r.git(r.dev, "add", "--all")
 	if r.tryGit(r.dev, "diff", "--cached", "--quiet") != nil {
 		r.git(r.dev, "commit", "--quiet", "--message", branch+": hash")
@@ -4162,6 +4162,16 @@ func (r *stackRepo) atlas(dir string, args ...string) {
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	require.NoError(r.t, err, "atlas %s: %s", strings.Join(args, " "), out)
+}
+
+// hashDir writes the atlas.sum of the migration directory, as `atlas migrate hash` does, with the library it runs.
+func (r *stackRepo) hashDir(dir string) {
+	r.t.Helper()
+	d, err := migrate.NewLocalDir(dir)
+	require.NoError(r.t, err)
+	sum, err := d.Checksum()
+	require.NoError(r.t, err)
+	require.NoError(r.t, migrate.WriteSumFile(d, sum))
 }
 
 // push pushes the branches of the developer clone.
@@ -4281,21 +4291,20 @@ func (r *stackRepo) requireStack(base string, branches ...string) {
 		ps, cs := r.sum(parent), r.sum(b)
 		require.GreaterOrEqual(r.t, len(cs), len(ps), "%s keeps the migrations of %s", b, parent)
 		require.Equal(r.t, ps, cs[:len(ps)], "%s extends the migrations of %s", b, parent)
-		dir := filepath.Join(r.t.TempDir(), b)
-		r.git("", "clone", "--quiet", "--branch", b, r.origin, dir)
-		r.atlas(dir, "migrate", "validate", "--dir", "file://"+r.dir)
+		require.NoError(r.t, r.validate(b))
 	}
 }
 
-// validate runs `atlas migrate validate` on a fresh clone of the remote branch.
+// validate checks the atlas.sum of a fresh clone of the remote branch, as `atlas migrate validate` does.
 func (r *stackRepo) validate(branch string) error {
 	r.t.Helper()
 	dir := filepath.Join(r.t.TempDir(), branch)
 	r.git("", "clone", "--quiet", "--branch", branch, r.origin, dir)
-	cmd := exec.Command("atlas", "migrate", "validate", "--dir", "file://"+r.dir)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s: %w: %s", branch, err, out)
+	// The library that `atlas migrate validate` runs, without a dev database.
+	d, err := migrate.NewLocalDir(filepath.Join(dir, r.dir))
+	require.NoError(r.t, err)
+	if err := migrate.Validate(d); err != nil {
+		return fmt.Errorf("%s: %w", branch, err)
 	}
 	return nil
 }

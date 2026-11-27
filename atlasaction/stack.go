@@ -1127,8 +1127,7 @@ func (r *restacker) upToDate(ctx context.Context, parent string, l *layerState) 
 }
 
 // onTop reports whether the hash file c starts with all the files of p, with the same hashes
-// if requested, and whether none of the files it adds has the version of a file of p. Atlas
-// orders the files by name, but rejects a directory with two files of the same version.
+// if requested. The callers check the versions of the files c adds with ordered.
 func (r *restacker) onTop(p, c migrate.HashFile, hashes bool) bool {
 	if len(p) > len(c) {
 		return false
@@ -1138,9 +1137,7 @@ func (r *restacker) onTop(p, c migrate.HashFile, hashes bool) bool {
 			return false
 		}
 	}
-	return !slices.ContainsFunc(c[len(p):], func(f struct{ N, H string }) bool {
-		return slices.ContainsFunc(p, func(pf struct{ N, H string }) bool { return r.version(pf.N) == r.version(f.N) })
-	})
+	return true
 }
 
 // stale reports whether the parent changed migrations since the commit the layer was built on, in a way its sums do
