@@ -8,6 +8,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"ariga.io/atlas/sql/migrate"
@@ -17,20 +18,15 @@ import (
 func TestWaitClock(t *testing.T) {
 	var (
 		start = time.Date(2026, 11, 23, 23, 23, 0, 0, time.UTC)
-		now   time.Time
-		slept time.Duration
-		r     = &restacker{
-			Actions: &Actions{Action: NewGitHub(func(string) string { return "" }, io.Discard)},
-			now:     func() time.Time { return now },
-			sleep: func(_ context.Context, d time.Duration) error {
-				now, slept = now.Add(d), slept+d
-				return nil
-			},
-		}
-		wait = func(names ...string) (time.Duration, error) {
-			now, slept = start, 0
-			err := r.waitClock(t.Context(), append([]string{"20260101000000_init.sql"}, names...), "main")
-			return slept, err
+		r     = &restacker{Actions: &Actions{Action: NewGitHub(func(string) string { return "" }, io.Discard)}}
+		// wait runs waitClock from the start time, on the fake clock of a synctest bubble, and returns how long it waited.
+		wait = func(names ...string) (d time.Duration, err error) {
+			synctest.Test(t, func(t *testing.T) {
+				time.Sleep(time.Until(start))
+				err = r.waitClock(t.Context(), append([]string{"20260101000000_init.sql"}, names...), "main")
+				d = time.Since(start)
+			})
+			return d, err
 		}
 	)
 	// Behind the clock, or not a timestamp.
@@ -57,9 +53,12 @@ func TestWaitClock(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 5*time.Minute, d)
 	// The run is canceled.
-	r.sleep = func(ctx context.Context, _ time.Duration) error { return context.Canceled }
-	_, err = wait("20261123232305_a.sql")
-	require.ErrorIs(t, err, context.Canceled)
+	synctest.Test(t, func(t *testing.T) {
+		time.Sleep(time.Until(start))
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		require.ErrorIs(t, r.waitClock(ctx, []string{"20260101000000_init.sql", "20261123232305_a.sql"}, "main"), context.Canceled)
+	})
 }
 
 func TestOnTop(t *testing.T) {

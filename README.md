@@ -613,8 +613,11 @@ GitHub rebases the pull requests above it, but a rebase cannot resolve conflicti
   conflicts in other files, has a merge commit with changes of its own or with more than two parents (which a
   rebase drops), edits migration files of the pull request below it once that pull request's migrations change,
   has commits the pull request below it no longer has (they may have been dropped there, or moved up, like when a
-  branch is split into a stack), or its commits cannot be told apart, nothing is pushed, and the run fails with
-  the reason. Resolve it locally with `gh stack rebase`.
+  branch is split into a stack; an amend keeps a commit, but a new commit with the same message does not replace
+  it), adds a checkpoint file (which lacks the migrations the restack places below it), would get an `atlas.sum`
+  that does not match the files a checkout writes (like when git attributes change their line endings), or its
+  commits cannot be told apart, nothing is pushed, and the run fails with the reason. Resolve it locally with
+  `gh stack rebase`.
 * It does nothing when the migrations of the stack do not conflict, even if the stack is not linear, and
   leaves the rebase to GitHub, which can rebase the stack from the pull request.
 * A pull request that is not stacked, and targets the base branch, is rebased as without the input.
@@ -695,7 +698,8 @@ jobs:
 > * A base branch without a pull request of its own, like `main`, is expected to only move forward. The action
 >   reads only its force-pushes, to find the commits it dropped, and skips the heads it cannot fetch, or all of
 >   them if the activity endpoint is not available. If reading them fails otherwise, the bottom pull request is
->   restacked only if it is built on the head the branch had before the push that triggered the run.
+>   restacked only if it is built on the head the branch had before the push that triggered the run, or on the
+>   head of the pull request that merged into it.
 > * When the base branch of a stack is deleted, like after its pull request merged, GitHub moves the stack onto a
 >   new base without rebasing it. A restack then replays the commits of the deleted branch that the new base does
 >   not have into the bottom pull request, like `git rebase` does, while `gh stack rebase` drops them.
@@ -709,6 +713,7 @@ jobs:
 > * Atlas hashes every migration file of the directory, also the ones git does not track or ignores, which a restack
 >   would leave out of its commits. The action refuses to restack when the clone has such files, like files an earlier
 >   step of the job wrote.
+> * The `latest_version` output is set only when the run restacks the branch it runs on.
 ### `ariga/atlas-action/migrate/hash`
 
 Automatically resolves `atlas.sum` out of sync issues by re-generating the `atlas.sum` file based on the current state of the migration directory.

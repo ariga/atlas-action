@@ -55,8 +55,6 @@ type (
 		atlas   bool   // Whether the directory has the default Atlas format.
 		flyway  bool   // Whether the directory has the Flyway format.
 		message string // Message of the commits that fix the migration directory.
-		now     func() time.Time
-		sleep   func(context.Context, time.Duration) error
 		// moved holds the heads the branches had before this run restacked them,
 		// for the stacks that are based on them.
 		moved map[string]string
@@ -283,17 +281,6 @@ func (a *Actions) newRestacker(ctx context.Context, tc *TriggerContext, sc Stack
 		hasPR:    make(map[string]bool),
 		history:  make(map[string]*BranchHistory),
 		rewrites: make(map[string][]string),
-		now:      time.Now,
-		sleep: func(ctx context.Context, d time.Duration) error {
-			t := time.NewTimer(d)
-			defer t.Stop()
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-t.C:
-				return nil
-			}
-		},
 	}
 	r.message = fmt.Sprintf("%s: rebase migration files", r.dir)
 	v, err := r.git(ctx, "--version")
@@ -862,41 +849,57 @@ func (r *restacker) fetchMissing(ctx context.Context, commits []string) error {
 }
 
 // dropped returns the commits up to the fork point that none of the given heads has, nor a counterpart
-// of: a commit with the same patch, like after a rebase, or with the same subject and files, like after
-// an amend, or the same contents of the files it changes, like after a squash. The commits of the action
+// of: a commit with the same patch, like after a rebase, or with the same author, author date, subject and
+// files, like after an amend, or the same contents of the files it changes, like after a squash. The commits of the action
 // and the changes of atlas.sum are left out, as each restack rewrites them.
 func (r *restacker) dropped(ctx context.Context, fork string, heads []string, trunk string) ([]string, error) {
-	// The commits the trunk has are not lost, even when the branch below no longer has them.
-	out, err := r.git(ctx, append([]string{"log", "--no-show-signature", "--no-merges", "--format=%H %s", fork, "--not", trunk}, heads...)...)
+	// The commits the trunk has are not lost, even when the branch below no longer has them. A NUL separates the subject,
+	// which may be empty, and lose its space to the trimmed output. An amend keeps the author, the author date and the
+	// subject, the key that follows the hash.
+	format := "--format=%H %ae %at%x00%s"
+	out, err := r.git(ctx, append([]string{"log", "--no-show-signature", "--no-merges", format, fork, "--not", trunk}, heads...)...)
 	if err != nil || out == "" {
 		return nil, err
 	}
-	patches := make(map[string]bool) // Commits whose patch a head has.
+	// Commits whose patch is on the other side: the ones up to the fork point that a head has, like after a rebase, and
+	// the ones of the heads that the fork point has, like the replays of a rebase.
+	twins := make(map[string]bool)
 	for _, h := range heads {
-		c, err := r.git(ctx, "cherry", h, fork)
+		c, err := r.git(ctx, "log", "--no-show-signature", "--no-merges", "--cherry-mark", "--format=%m%H", fork+"..."+h)
 		if err != nil {
 			return nil, err
 		}
 		for l := range strings.SplitSeq(c, "\n") {
-			if sha, ok := strings.CutPrefix(l, "- "); ok {
-				patches[sha] = true
+			if sha, ok := strings.CutPrefix(l, "="); ok {
+				twins[sha] = true
 			}
 		}
 	}
-	s, err := r.git(ctx, append(append([]string{"log", "--no-show-signature", "--no-merges", "--format=%H %s"}, heads...), "--not", fork)...)
+	s, err := r.git(ctx, append(append([]string{"log", "--no-show-signature", "--no-merges", format}, heads...), "--not", fork)...)
 	if err != nil {
 		return nil, err
 	}
-	subjects := make(map[string][]string) // Commits the heads have since the fork point, by their subjects.
+	// Commits the heads have since the fork point, by their keys. A replayed commit stands in for its own original only.
+	amends := make(map[string][]string)
 	for l := range strings.SplitSeq(s, "\n") {
-		if c, subject, ok := strings.Cut(l, " "); ok {
-			subjects[subject] = append(subjects[subject], c)
+		if c, k, ok := strings.Cut(l, " "); ok && !twins[c] {
+			amends[k] = append(amends[k], c)
+		}
+	}
+	// Commits with the same key, like after `git rebase --reset-author-date`, cannot be told apart by an amend: each
+	// of them is kept only by its patch, or by its files.
+	same := make(map[string]int)
+	for l := range strings.SplitSeq(out, "\n") {
+		_, k, _ := strings.Cut(l, " ")
+		if same[k]++; same[k] > 1 {
+			delete(amends, k)
 		}
 	}
 	var lost []string
 	for l := range strings.SplitSeq(out, "\n") {
-		c, subject, _ := strings.Cut(l, " ")
-		if patches[c] {
+		c, k, _ := strings.Cut(l, " ")
+		_, subject, _ := strings.Cut(k, "\x00")
+		if twins[c] {
 			continue
 		}
 		// Each restack makes the commits of the action again, unless someone added changes of their own to one.
@@ -911,27 +914,17 @@ func (r *restacker) dropped(ctx context.Context, fork string, heads []string, tr
 		if err != nil {
 			return nil, err
 		}
-		// An amend keeps the subject and the files, but may move the migration files to other versions.
+		// An amend keeps the key and the files, but may move the migration files to other versions. Another commit with
+		// the same subject and files, like a second "Update README.md", is not the same change.
 		amended := false
-		for i, h := range subjects[subject] {
-			// A commit of the trunk, like one the branch below was rebased onto, stands in only for a commit it amends:
-			// with the author and the author date an amend keeps.
-			if inTrunk, err := r.gitTest(ctx, "merge-base", "--is-ancestor", h, trunk); err != nil {
-				return nil, err
-			} else if inTrunk {
-				if a, err := r.git(ctx, "show", "--no-show-signature", "-s", "--format=%ae %at", c, h); err != nil {
-					return nil, err
-				} else if ca, ha, _ := strings.Cut(a, "\n"); ca != ha {
-					continue
-				}
-			}
+		for i, h := range amends[k] {
 			hfiles, err := r.changedFiles(ctx, h)
 			if err != nil {
 				return nil, err
 			}
 			if amended = slices.Equal(r.unversioned(files), r.unversioned(hfiles)); amended {
 				// A commit of the heads stands in for one commit only.
-				subjects[subject] = slices.Delete(subjects[subject], i, i+1)
+				amends[k] = slices.Delete(amends[k], i, i+1)
 				break
 			}
 		}
@@ -1250,7 +1243,9 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 		"rebase", "--quiet", "--onto", parent, upstream, l.old); err != nil {
 		out, _ := r.gitRaw(ctx, "diff-files", "--name-only", "-z", "--diff-filter=U")
 		if _, aerr := r.git(ctx, "rebase", "--abort"); aerr != nil {
-			err = errors.Join(err, aerr)
+			// Do not leave the rebase in progress for the next stack.
+			_, qerr := r.git(ctx, "rebase", "--quit")
+			return "", errors.Join(fmt.Errorf("failed to replay its commits onto %s: %w", parentName, err), aerr, qerr)
 		}
 		if files := splitNUL(out); len(files) > 0 {
 			msg := fmt.Sprintf("conflicts with %s in %s", parentName, strings.Join(files, ", "))
@@ -1279,6 +1274,21 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 	cnames, err := r.names(ctx, "HEAD")
 	if err != nil {
 		return "", err
+	}
+	// A new database starts from the last checkpoint, which holds the schema of the migrations before it. A checkpoint
+	// the layer adds lacks the migrations the parent got since the layer was built, wherever it is placed.
+	for _, n := range cnames {
+		if !r.atlas || slices.Contains(pnames, n) {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(r.dir, filepath.FromSlash(n)))
+		if err != nil {
+			return "", err
+		}
+		// Atlas reads the directive also with CRLF line endings.
+		if migrate.NewLocalFile(n, bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))).IsCheckpoint() {
+			return "", fmt.Errorf("it adds the checkpoint %s, which must be recreated on top of the migrations of %s", n, parentName)
+		}
 	}
 	if !r.onTop(ps, cs, true) || !r.ordered(pnames, cnames) {
 		if !r.atlas {
@@ -1318,7 +1328,8 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 		}
 		r.Infof("#%d (%s): renamed %s, to place them on top of %s", l.Number, l.Branch, strings.Join(moved, ", "), parentName)
 	}
-	if _, err := r.git(ctx, "add", "--all", "--", r.sqlSpec(), r.sumSpec()); err != nil {
+	// A new name may match .gitignore, while atlas.sum lists it.
+	if _, err := r.git(ctx, "add", "--all", "--force", "--", r.sqlSpec(), r.sumSpec()); err != nil {
 		return "", fmt.Errorf("failed to stage changes: %w", err)
 	}
 	switch same, err := r.gitTest(ctx, "diff-index", "--cached", "--quiet", "HEAD", "--"); {
@@ -1339,7 +1350,89 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 			return "", fmt.Errorf("failed to commit changes: %w", err)
 		}
 	}
+	if err := r.checkoutSum(ctx); err != nil {
+		return "", err
+	}
 	return r.git(ctx, "rev-parse", "HEAD")
+}
+
+// checkoutSum reports an error if the atlas.sum of HEAD does not match the migration files as a checkout of HEAD writes
+// them, which `atlas migrate validate` checks on a clone. Git attributes, like line endings or filters, may write other
+// bytes than the ones Atlas hashed in the clone of the run.
+func (r *restacker) checkoutSum(ctx context.Context) error {
+	tmp, err := os.MkdirTemp("", "atlas-restack-")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+	out, err := r.gitRaw(ctx, "ls-files", "-z", "--", r.sqlSpec(), r.sumSpec())
+	if err != nil {
+		return err
+	}
+	// The paths are relative to the working directory, and checked out under the prefix by their paths in the repository.
+	// A fresh clone does not have the line-ending settings of the machine of the run.
+	noEOL := []string{"-c", "core.autocrlf=false", "-c", "core.eol=lf"}
+	if _, err := r.gitInput(ctx, bytes.NewReader(out), append(noEOL, "checkout-index", "-z", "--stdin", "--ignore-skip-worktree-bits",
+		"--prefix="+tmp+string(filepath.Separator))...); err != nil {
+		return err
+	}
+	dir := filepath.Join(tmp, filepath.FromSlash(r.rel))
+	// A symbolic link to a file outside of the directory does not resolve in the checkout. Write the file it links to
+	// as a checkout writes it, or as the working tree has it if git does not track it.
+	err = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.Type()&fs.ModeSymlink == 0 {
+			return err
+		}
+		if _, err := os.Stat(p); err == nil {
+			return nil
+		}
+		var (
+			b       []byte
+			tracked bool
+		)
+		if t, err := os.Readlink(p); err == nil && !filepath.IsAbs(t) {
+			if rt, err := filepath.Rel(tmp, filepath.Join(filepath.Dir(p), t)); err == nil && filepath.IsLocal(rt) {
+				b, err = r.gitRaw(ctx, append(noEOL, "cat-file", "--filters", "HEAD:"+filepath.ToSlash(rt))...)
+				tracked = err == nil
+			}
+		}
+		if !tracked {
+			rel, err := filepath.Rel(dir, p)
+			if err != nil {
+				return err
+			}
+			if b, err = os.ReadFile(filepath.Join(r.dir, rel)); err != nil {
+				return err
+			}
+		}
+		if err := os.Remove(p); err != nil {
+			return err
+		}
+		return os.WriteFile(p, b, 0o644)
+	})
+	if err != nil {
+		return err
+	}
+	want, err := os.ReadFile(filepath.Join(dir, migrate.HashFileName))
+	if err != nil {
+		return err
+	}
+	u, err := url.Parse(r.dirURL)
+	if err != nil {
+		return err
+	}
+	u.Host, u.Path = "", filepath.ToSlash(dir)
+	if err := r.Atlas.MigrateHash(ctx, &atlasexec.MigrateHashParams{DirURL: u.String()}); err != nil {
+		return fmt.Errorf("failed to run `atlas migrate hash` on a checkout: %w", err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, migrate.HashFileName))
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(bytes.ReplaceAll(want, []byte("\r\n"), []byte("\n")), got) {
+		return fmt.Errorf("its %s would not match the migration files of a checkout, which git attributes like line endings change", migrate.HashFileName)
+	}
+	return nil
 }
 
 // renameDuplicates gives the own files that have the version of another file a temporary version,
@@ -1521,16 +1614,18 @@ func (r *restacker) waitClock(ctx context.Context, pnames []string, parentName s
 	if len(v) != len(versionLayout) || strings.Trim(v, "0123456789") != "" {
 		return nil
 	}
-	if v >= r.now().UTC().Add(maxClockWait).Format(versionLayout) {
+	if v >= time.Now().UTC().Add(maxClockWait).Format(versionLayout) {
 		return fmt.Errorf("the latest migration of %s, %s, is versioned more than %s ahead of the clock", parentName, latest, maxClockWait)
 	}
-	if v < r.now().UTC().Format(versionLayout) {
+	if v < time.Now().UTC().Format(versionLayout) {
 		return nil
 	}
 	r.Infof("Waiting for the clock to pass the latest migration version of %s, %s", parentName, v)
-	for v >= r.now().UTC().Format(versionLayout) {
-		if err := r.sleep(ctx, time.Second); err != nil {
-			return err
+	for v >= time.Now().UTC().Format(versionLayout) {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
 		}
 	}
 	return nil
@@ -1647,10 +1742,10 @@ func (r *restacker) discard(ctx context.Context) error {
 	return r.clean(ctx)
 }
 
-// clean removes the migration files that git does not track, which a failed restack may leave.
+// clean removes the migration files that git does not track, ignored ones included, which a failed restack may leave.
 // The migration directory had none when the run started.
 func (r *restacker) clean(ctx context.Context) error {
-	_, err := r.git(ctx, "clean", "--quiet", "--force", "--", r.sqlSpec())
+	_, err := r.git(ctx, "clean", "--quiet", "--force", "-x", "--", r.sqlSpec())
 	return err
 }
 
@@ -1808,12 +1903,11 @@ func (r *restacker) gitRaw(ctx context.Context, args ...string) ([]byte, error) 
 func (r *restacker) gitInput(ctx context.Context, stdin io.Reader, args ...string) ([]byte, error) {
 	cmd := r.CmdExecutor(ctx, "git", args...)
 	cmd.Stdin = stdin
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	// Output keeps the standard error in the error of a failed command.
 	out, err := cmd.Output()
 	if err != nil {
-		if msg := strings.TrimSpace(stderr.String()); msg != "" {
-			return nil, fmt.Errorf("git %s: %w: %s", gitCommand(args), err, msg)
+		if exit, ok := errors.AsType[*exec.ExitError](err); ok && len(bytes.TrimSpace(exit.Stderr)) > 0 {
+			return nil, fmt.Errorf("git %s: %w: %s", gitCommand(args), err, bytes.TrimSpace(exit.Stderr))
 		}
 		return nil, fmt.Errorf("git %s: %w", gitCommand(args), err)
 	}
