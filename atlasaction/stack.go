@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net/url"
 	"os"
 	"os/exec"
@@ -63,8 +64,6 @@ type (
 		// history caches the heads each branch had, for the stacks that share the
 		// branch, like the trunk of several stacks. It is nil if unknown.
 		history map[string]*BranchHistory
-		// rewrites caches the heads each trunk without a pull request had around its force-pushes.
-		rewrites map[string][]string
 	}
 	// layerState is the state of a layer while its stack is restacked.
 	layerState struct {
@@ -112,8 +111,16 @@ func (a *Actions) migrateAutoRebaseStacks(ctx context.Context, tc *TriggerContex
 	if err != nil {
 		return err
 	}
-	var branchErr error
+	var (
+		branchErr error
+		// Head of the branch before its rebase. The commit of the run is not one on pull_request events: it is
+		// the test merge of the pull request, or the head of the base branch.
+		head string
+	)
 	if single {
+		if out, err := a.exec(ctx, "git", "rev-parse", "--verify", "--quiet", "refs/remotes/"+a.GetInputDefault("remote", "origin")+"/"+tc.Branch+"^{commit}"); err == nil {
+			head = strings.TrimSpace(string(out))
+		}
 		if branchErr = a.migrateAutoRebaseBranch(ctx, tc); branchErr != nil && len(stacks) > 0 {
 			a.Warningf("failed to rebase %q, restacking the stacks that target it: %v", tc.Branch, branchErr)
 		}
@@ -133,10 +140,10 @@ func (a *Actions) migrateAutoRebaseStacks(ctx context.Context, tc *TriggerContex
 		if err := r.discard(ctx); err != nil {
 			return errors.Join(branchErr, lookupErr, err)
 		}
-	} else if single && tc.Commit != "" {
+	} else if single && head != "" {
 		// The rebase of the branch moves it like a restack, and the stacks on it are built on the head it had.
-		if head, err := r.git(ctx, "rev-parse", "--verify", "--quiet", r.remoteRef(tc.Branch)); err == nil && head != tc.Commit {
-			r.moved[tc.Branch] = tc.Commit
+		if h, err := r.git(ctx, "rev-parse", "--verify", "--quiet", r.remoteRef(tc.Branch)); err == nil && h != head {
+			r.moved[tc.Branch] = head
 		}
 	}
 	pushed, current, err := r.run(ctx, stacks)
@@ -269,18 +276,17 @@ func (a *Actions) newRestacker(ctx context.Context, tc *TriggerContext, sc Stack
 		return nil, fmt.Errorf(`the "stack" input requires a local migration directory (file://), got %q`, u.Redacted())
 	}
 	r := &restacker{
-		Actions:  a,
-		tc:       tc,
-		sc:       sc,
-		remote:   a.GetInputDefault("remote", "origin"),
-		dirURL:   u.String(),
-		dir:      filepath.Join(u.Host, u.Path),
-		atlas:    u.Query().Get("format") == "" || u.Query().Get("format") == formatAtlas,
-		flyway:   u.Query().Get("format") == "flyway",
-		moved:    make(map[string]string),
-		hasPR:    make(map[string]bool),
-		history:  make(map[string]*BranchHistory),
-		rewrites: make(map[string][]string),
+		Actions: a,
+		tc:      tc,
+		sc:      sc,
+		remote:  a.GetInputDefault("remote", "origin"),
+		dirURL:  u.String(),
+		dir:     filepath.Join(u.Host, u.Path),
+		atlas:   u.Query().Get("format") == "" || u.Query().Get("format") == formatAtlas,
+		flyway:  u.Query().Get("format") == "flyway",
+		moved:   make(map[string]string),
+		hasPR:   make(map[string]bool),
+		history: make(map[string]*BranchHistory),
 	}
 	r.message = fmt.Sprintf("%s: rebase migration files", r.dir)
 	v, err := r.git(ctx, "--version")
@@ -424,7 +430,9 @@ func (r *restacker) restack(ctx context.Context, s *Stack) ([]*layerState, error
 open:
 	for i, l := range s.Layers {
 		switch {
-		case l.Merged:
+		// Only a merged pull request below the open ones is their base. One above them, like after its commits
+		// were pushed to the branch below it, ends the stack like a closed one.
+		case l.Merged && len(layers) == 0:
 			merged = &s.Layers[i]
 		case l.Open:
 			layers = append(layers, &layerState{StackLayer: l})
@@ -510,7 +518,7 @@ open:
 			return nil, fmt.Errorf("#%d (%s): %w. %s", l.Number, l.Branch, err, stackHint)
 		}
 	}
-	return layers, r.push(ctx, s, layers)
+	return layers, r.push(ctx, s, trunk, layers)
 }
 
 // belowName names what the layer was built on.
@@ -742,9 +750,7 @@ func (r *restacker) forkPoint(ctx context.Context, s *Stack, l, below *layerStat
 // out, and so are all of them if the activity is not available (404). If reading the activity fails otherwise,
 // it returns why, as a gap in the history of the trunk.
 func (r *restacker) trunkRewrites(ctx context.Context, branch string) (heads []string, gap string) {
-	if heads, ok := r.rewrites[branch]; ok {
-		return heads, ""
-	}
+	// Not cached for the run: the trunk may be force-pushed while the stacks on it are restacked.
 	heads, err := r.sc.ForcePushes(ctx, branch)
 	switch {
 	case err != nil:
@@ -757,7 +763,6 @@ func (r *restacker) trunkRewrites(ctx context.Context, branch string) (heads []s
 			r.Warningf("failed to fetch some of the heads branch %q was force-pushed from: %v", branch, err)
 		}
 	}
-	r.rewrites[branch] = heads
 	return heads, ""
 }
 
@@ -914,15 +919,17 @@ func (r *restacker) dropped(ctx context.Context, fork string, heads []string, tr
 		if err != nil {
 			return nil, err
 		}
-		// An amend keeps the key and the files, but may move the migration files to other versions. Another commit with
-		// the same subject and files, like a second "Update README.md", is not the same change.
+		// An amend keeps the key and the files, but may add files, like a test asked for in a review, and move the
+		// migration files to other versions. Another commit with the same subject and files, like a second "Update
+		// README.md", is not the same change.
 		amended := false
 		for i, h := range amends[k] {
 			hfiles, err := r.changedFiles(ctx, h)
 			if err != nil {
 				return nil, err
 			}
-			if amended = slices.Equal(r.unversioned(files), r.unversioned(hfiles)); amended {
+			hu := r.unversioned(hfiles)
+			if amended = !slices.ContainsFunc(r.unversioned(files), func(f string) bool { return !slices.Contains(hu, f) }); amended {
 				// A commit of the heads stands in for one commit only.
 				amends[k] = slices.Delete(amends[k], i, i+1)
 				break
@@ -1079,7 +1086,7 @@ func (r *restacker) allOnTop(ctx context.Context, trunk string, merged *StackLay
 		if err != nil {
 			return false, nil
 		}
-		if stale, err := r.stale(ctx, mb, parent, ps, cs); err != nil || stale {
+		if stale, err := r.stale(ctx, mb, parent, l.old, ps, cs); err != nil || stale {
 			return false, err
 		}
 		if i == 0 && merged != nil {
@@ -1089,7 +1096,7 @@ func (r *restacker) allOnTop(ctx context.Context, trunk string, merged *StackLay
 			if err != nil {
 				return false, nil
 			}
-			if stale, err := r.stale(ctx, mb, mb, ps, cs); err != nil || stale {
+			if stale, err := r.stale(ctx, mb, mb, l.old, ps, cs); err != nil || stale {
 				return false, err
 			}
 		}
@@ -1119,7 +1126,7 @@ func (r *restacker) upToDate(ctx context.Context, parent string, l *layerState) 
 	case !r.onTop(ps, cs, false):
 		return false, nil
 	case r.onTop(ps, cs, true):
-		stale, err := r.stale(ctx, l.fork.commit, parent, ps, cs)
+		stale, err := r.stale(ctx, l.fork.commit, parent, l.old, ps, cs)
 		return !stale, err
 	default:
 		return r.gitTest(ctx, "diff-tree", "-r", "--quiet", l.fork.commit, parent, "--", r.sqlSpec(), r.sumSpec())
@@ -1140,27 +1147,40 @@ func (r *restacker) onTop(p, c migrate.HashFile, hashes bool) bool {
 	return true
 }
 
-// stale reports whether the parent changed migrations since the commit the layer was built on, in a way its sums do
-// not show: the layer has files on top of the ones of the parent that the commit it was built on already had, like when
-// the parent removed its last migrations since, or, in other formats, the parent changed its files without a version.
-func (r *restacker) stale(ctx context.Context, base, parent string, ps, cs migrate.HashFile) (bool, error) {
+// stale reports whether the parent changed migrations since the commit the layer (head c) was built on, in a way its
+// sums do not show: the layer has files on top of the ones of the parent that the commit it was built on already had,
+// like when the parent removed its last migrations since; the parent added or removed a file that the layer did not,
+// like a file atlas.sum leaves out, whose name Atlas still chains into the hashes of the files after it; or, in other
+// formats, the parent changed its files without a version.
+func (r *restacker) stale(ctx context.Context, base, parent, c string, ps, cs migrate.HashFile) (bool, error) {
 	bs, err := r.sumAt(ctx, base)
 	if err != nil {
 		return false, err
 	}
-	switch {
-	case slices.ContainsFunc(cs[len(ps):], func(f struct{ N, H string }) bool {
+	if slices.ContainsFunc(cs[len(ps):], func(f struct{ N, H string }) bool {
 		return slices.ContainsFunc(bs, func(b struct{ N, H string }) bool { return b.N == f.N })
-	}):
+	}) {
 		return true, nil
-	case r.atlas:
-		return false, nil
 	}
-	out, err := r.gitRaw(ctx, "diff-tree", "-r", "--name-only", "-z", "--no-renames", base, parent, "--", r.sqlSpec())
+	out, err := r.gitRaw(ctx, "diff-tree", "-r", "--name-status", "-z", "--no-renames", base, parent, "--", r.sqlSpec())
 	if err != nil {
 		return false, err
 	}
-	return slices.ContainsFunc(splitNUL(out), versionless), nil
+	for _, ch := range changes(out) {
+		if !r.atlas && versionless(ch.to) {
+			return true, nil
+		}
+		if ch.status == "A" || ch.status == "D" {
+			has, err := r.gitTest(ctx, "rev-parse", "--quiet", "--verify", c+":"+ch.to)
+			if err != nil {
+				return false, err
+			}
+			if has != (ch.status == "A") {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 // versioned leaves out the files of other formats that have no version, like the repeatable migrations of Flyway
@@ -1287,11 +1307,17 @@ func (r *restacker) restackLayer(ctx context.Context, l *layerState, parent, par
 			return "", fmt.Errorf("it adds the checkpoint %s, which must be recreated on top of the migrations of %s", n, parentName)
 		}
 	}
+	// Other formats may have files with the same contents, like the down files of golang-migrate.
+	if r.atlas {
+		if err := r.copies(ctx, l, parent, parentName); err != nil {
+			return "", err
+		}
+	}
 	if !r.onTop(ps, cs, true) || !r.ordered(pnames, cnames) {
 		if !r.atlas {
 			return "", fmt.Errorf("its migrations must be moved on top of the ones of %s, which `atlas migrate rebase` supports only for the %q format", parentName, formatAtlas)
 		}
-		own, err := r.ownFiles(ctx, l, parent, parentName, ps)
+		own, err := r.ownFiles(ctx, parent, parentName, ps)
 		if err != nil {
 			return "", err
 		}
@@ -1512,10 +1538,9 @@ func (r *restacker) checkMerges(ctx context.Context, upstream string, l *layerSt
 }
 
 // ownFiles returns the migration files the layer adds on top of the parent, and fails if
-// the layer edits, removes or duplicates the parent's migration files, as these cannot be
-// fixed by moving the layer's files. A file is a duplicate if the restack created it: it
-// has the contents of a file of the parent, unlike the files the layer had before.
-func (r *restacker) ownFiles(ctx context.Context, l *layerState, parent, parentName string, ps migrate.HashFile) ([]string, error) {
+// the layer edits or removes the parent's migration files, as these cannot be fixed by
+// moving the layer's files.
+func (r *restacker) ownFiles(ctx context.Context, parent, parentName string, ps migrate.HashFile) ([]string, error) {
 	ptree, err := r.blobs(ctx, parent)
 	if err != nil {
 		return nil, err
@@ -1524,11 +1549,7 @@ func (r *restacker) ownFiles(ctx context.Context, l *layerState, parent, parentN
 	if err != nil {
 		return nil, err
 	}
-	otree, err := r.blobs(ctx, l.old)
-	if err != nil {
-		return nil, err
-	}
-	var own, edited, removed, dups []string
+	var own, edited, removed []string
 	for _, f := range ps {
 		switch b, ok := ctree[f.N]; {
 		case !ok:
@@ -1536,6 +1557,40 @@ func (r *restacker) ownFiles(ctx context.Context, l *layerState, parent, parentN
 		case b != ptree[f.N]:
 			edited = append(edited, f.N)
 		}
+	}
+	// Including the files excluded from atlas.sum, as their versions still sort them.
+	for name := range ctree {
+		if _, ok := ptree[name]; !ok && path.Ext(name) == ".sql" {
+			own = append(own, name)
+		}
+	}
+	switch {
+	case len(edited) > 0:
+		return nil, fmt.Errorf("it edits migration files of %s: %s", parentName, strings.Join(edited, ", "))
+	case len(removed) > 0:
+		return nil, fmt.Errorf("it removes migration files of %s: %s", parentName, strings.Join(removed, ", "))
+	case len(own) == 0:
+		return nil, fmt.Errorf("its migration directory does not extend the one of %s", parentName)
+	}
+	slices.Sort(own)
+	return own, nil
+}
+
+// copies fails if the replay gave the layer a copy of a migration file of the parent, including the ones atlas.sum
+// leaves out, which Atlas still runs. A layer may have copies of its own, like a migration it adds again: a file is a
+// copy if the layer has more files with its contents than before. Empty files do nothing, and are not copies.
+func (r *restacker) copies(ctx context.Context, l *layerState, parent, parentName string) error {
+	ptree, err := r.blobs(ctx, parent)
+	if err != nil {
+		return err
+	}
+	ctree, err := r.blobs(ctx, "HEAD")
+	if err != nil {
+		return err
+	}
+	otree, err := r.blobs(ctx, l.old)
+	if err != nil {
+		return err
 	}
 	count := func(tree map[string]string, blob string) (n int) {
 		for _, b := range tree {
@@ -1545,35 +1600,26 @@ func (r *restacker) ownFiles(ctx context.Context, l *layerState, parent, parentN
 		}
 		return n
 	}
-	add := func(name string) {
-		b := ctree[name]
-		// A layer may have copies of its own, like a migration it adds again, but the restack must not add any
-		// copy of the parent's migration files.
-		if i := slices.IndexFunc(ps, func(f struct{ N, H string }) bool { return ptree[f.N] == b }); i >= 0 && count(ctree, b) > count(otree, b) {
-			dups = append(dups, fmt.Sprintf("%s (same as %s)", name, ps[i].N))
-		} else {
-			own = append(own, name)
+	var dups []string
+	for name, b := range ctree {
+		if _, ok := ptree[name]; ok || path.Ext(name) != ".sql" || count(ctree, b) <= count(otree, b) {
+			continue
+		}
+		if fi, err := os.Stat(filepath.Join(r.dir, name)); err == nil && fi.Size() == 0 {
+			continue
+		}
+		for _, n := range slices.Sorted(maps.Keys(ptree)) {
+			if ptree[n] == b && path.Ext(n) == ".sql" {
+				dups = append(dups, fmt.Sprintf("%s (same as %s)", name, n))
+				break
+			}
 		}
 	}
-	// Including the files excluded from atlas.sum, as their versions still sort them.
-	for name := range ctree {
-		if _, ok := ptree[name]; !ok && path.Ext(name) == ".sql" {
-			add(name)
-		}
-	}
-	switch {
-	case len(edited) > 0:
-		return nil, fmt.Errorf("it edits migration files of %s: %s", parentName, strings.Join(edited, ", "))
-	case len(removed) > 0:
-		return nil, fmt.Errorf("it removes migration files of %s: %s", parentName, strings.Join(removed, ", "))
-	case len(dups) > 0:
+	if len(dups) > 0 {
 		slices.Sort(dups)
-		return nil, fmt.Errorf("it has copies of migration files of %s: %s", parentName, strings.Join(dups, ", "))
-	case len(own) == 0:
-		return nil, fmt.Errorf("its migration directory does not extend the one of %s", parentName)
+		return fmt.Errorf("it has copies of migration files of %s: %s", parentName, strings.Join(dups, ", "))
 	}
-	slices.Sort(own)
-	return own, nil
+	return nil
 }
 
 // blobs returns the blob of each file in the migration directory at the given commit.
@@ -1668,17 +1714,22 @@ func (r *restacker) fetch(ctx context.Context, base string, merged *StackLayer, 
 }
 
 // push pushes the restacked branches at once, if the remote branches did not move since they were fetched.
-func (r *restacker) push(ctx context.Context, s *Stack, layers []*layerState) error {
-	var leases, refs, names []string
+// The trunk and the layers the restack did not change are pushed as they are, so that a push to one of them
+// since the fetch, like a force-push that dropped commits the restack was built on, fails the push.
+func (r *restacker) push(ctx context.Context, s *Stack, trunk string, layers []*layerState) error {
+	var (
+		leases = []string{fmt.Sprintf("--force-with-lease=refs/heads/%s:%s", s.Base, trunk)}
+		refs   = []string{fmt.Sprintf("%s:refs/heads/%s", trunk, s.Base)}
+		names  []string
+	)
 	for _, l := range layers {
-		if l.old == l.new {
-			continue
-		}
 		leases = append(leases, fmt.Sprintf("--force-with-lease=refs/heads/%s:%s", l.Branch, l.old))
 		refs = append(refs, fmt.Sprintf("%s:refs/heads/%s", l.new, l.Branch))
-		names = append(names, fmt.Sprintf("%s (%s..%s)", l.Branch, short(l.old), short(l.new)))
+		if l.old != l.new {
+			names = append(names, fmt.Sprintf("%s (%s..%s)", l.Branch, short(l.old), short(l.new)))
+		}
 	}
-	if len(refs) == 0 {
+	if len(names) == 0 {
 		r.Infof("Nothing to push")
 		return nil
 	}

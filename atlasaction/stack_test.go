@@ -222,6 +222,33 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Equal(t, []string{"B: add b1", botMessage}, r.log("main", "B"), "only the commits of B are replayed")
 	})
 
+	t.Run("MergedAboveOpen", func(t *testing.T) {
+		// The commits of C were pushed to B, so GitHub lists C as merged, above the open A and B. C is not what A was
+		// built on: A and B are restacked with their own commits, and C is left as it is.
+		r := newStackRepo(t)
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.branch("C", "B")
+		r.migration("C", "20260104000000", "c1")
+		r.push("A", "B", "C")
+		s := r.stack(10, "main", "A", "B", "C")
+		r.git(r.dev, "branch", "--force", "B", "C")
+		r.push("B")
+		s.Layers[2].Merged, s.Layers[2].Open = true, false
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		tips := r.tips("C")
+		act, logs, err := r.run(s, run{branch: "main"})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("main", "A", "B")
+		require.Equal(t, []string{"A: add a1", botMessage}, r.log("main", "A"), "A keeps its commits")
+		require.Equal(t, []string{"init", "m1", "a1", "b1", "c1"}, r.names("B"))
+		require.Equal(t, tips, r.tips("C"), "C is left as it is")
+	})
+
 	t.Run("RewrittenBelowAndMerged", func(t *testing.T) {
 		for _, history := range []bool{true, false} {
 			t.Run(fmt.Sprint("History=", history), func(t *testing.T) {
@@ -562,6 +589,120 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Equal(t, []string{"B: add b1", "B: late.txt", botMessage}, r.log("A", "B"))
 	})
 
+	t.Run("LowerLayerForcePushedDuringRun", func(t *testing.T) {
+		// A gets z.txt and a migration, and only B is restacked on it. Before the push, the developer force-pushes A
+		// without z.txt. B must not be pushed on the head A no longer has.
+		r := newStackRepo(t)
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.push("A", "B")
+		s := r.stack(10, "main", "A", "B")
+		a0 := r.tip("A")
+		r.file("A", "z.txt", "z\n")
+		r.migration("A", "20260105000000", "a2")
+		r.push("A")
+		a1 := r.tip("A")
+		var raced bool
+		racer := func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			if name == "git" && len(args) > 0 && args[0] == "push" && !raced {
+				raced = true
+				r.checkout("A")
+				r.git(r.dev, "reset", "--quiet", "--hard", a0)
+				r.migration("A", "20260105000000", "a2")
+				r.forcePush("A")
+			}
+			return exec.CommandContext(ctx, name, args...)
+		}
+		tipB := r.tip("B")
+		_, logs, err := r.run(s, run{branch: "A", before: a0, exec: racer})
+		require.True(t, raced)
+		require.NoError(t, err, logs)
+		require.Contains(t, logs, "Stack #10 changed while it was restacked, nothing was pushed")
+		require.Equal(t, tipB, r.tip("B"), "B is not pushed on the old head of A")
+		// The run of the force-push restacks B on the new head of A.
+		_, logs, err = r.run(s, run{branch: "A", before: a1})
+		require.NoError(t, err, logs)
+		r.requireStack("main", "A", "B")
+		require.Equal(t, []string{"B: add b1", botMessage}, r.log("A", "B"))
+	})
+
+	t.Run("TrunkForcePushedBeforePush", func(t *testing.T) {
+		// While A is restacked on main, main is force-pushed without y.txt. A must not be pushed on the head
+		// main no longer has.
+		r := newStackRepo(t)
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		r.push("A")
+		s := r.stack(1, "main", "A")
+		t0 := r.tip("main")
+		r.file("main", "y.txt", "y\n")
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		t1 := r.tip("main")
+		var raced bool
+		racer := func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			if name == "git" && len(args) > 0 && args[0] == "push" && !raced {
+				raced = true
+				r.checkout("main")
+				r.git(r.dev, "reset", "--quiet", "--hard", t0)
+				r.migration("main", "20260105000000", "m1")
+				r.forcePush("main")
+			}
+			return exec.CommandContext(ctx, name, args...)
+		}
+		tipA := r.tip("A")
+		_, logs, err := r.run(s, run{branch: "main", before: t0, exec: racer})
+		require.True(t, raced)
+		require.NoError(t, err, logs)
+		require.Contains(t, logs, "Stack #1 changed while it was restacked, nothing was pushed")
+		require.Equal(t, tipA, r.tip("A"), "A is not pushed on the old head of main")
+		// The run of the force-push restacks A on the new main.
+		_, logs, err = r.run(s, run{branch: "main", before: t1})
+		require.NoError(t, err, logs)
+		r.requireStack("main", "A")
+		require.Empty(t, r.gitOut(r.origin, "ls-tree", "A", "--", "y.txt"), "A does not get y.txt, which main dropped")
+	})
+
+	t.Run("TrunkForcePushedDuringRun", func(t *testing.T) {
+		// Two stacks target main. While the first one is restacked, main is force-pushed without y.txt, which B was
+		// built on. The second stack must not bring y.txt back.
+		r := newStackRepo(t)
+		r.file("main", "y.txt", "y\n")
+		r.push("main")
+		p := r.gitOut(r.dev, "rev-parse", "main~1")
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		r.branch("B", "main")
+		r.migration("B", "20260103000000", "b1")
+		r.push("A", "B")
+		stacks := []*atlasaction.Stack{r.stackAt(1, 1, "main", "A"), r.stackAt(2, 2, "main", "B")}
+		before := r.tip("main")
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		m1 := r.tip("main")
+		var raced bool
+		racer := func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			if name == "git" && len(args) > 0 && args[0] == "push" && !raced {
+				raced = true
+				r.checkout("main")
+				r.git(r.dev, "reset", "--quiet", "--hard", p)
+				r.git(r.dev, "cherry-pick", m1)
+				r.forcePush("main")
+			}
+			return exec.CommandContext(ctx, name, args...)
+		}
+		tipB := r.tip("B")
+		_, logs, err := r.run(nil, run{branch: "main", before: before, stacks: stacks, exec: racer})
+		require.True(t, raced)
+		require.ErrorContains(t, err, "#2 (B): it has commits that main no longer has", logs)
+		// The run of the force-push refuses too, and B is never restacked with y.txt on top of the new main.
+		_, logs, err = r.run(nil, run{branch: "main", before: m1, stacks: stacks})
+		require.ErrorContains(t, err, "#2 (B): it has commits that main no longer has", logs)
+		require.Equal(t, tipB, r.tip("B"))
+	})
+
 	t.Run("Stacks", func(t *testing.T) {
 		r := newStackRepo(t)
 		r.file("main", "app.txt", "base\n")
@@ -766,6 +907,32 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.Equal(t, "v2", r.gitOut(r.origin, "show", "B:app.txt"))
 	})
 
+	t.Run("AmendedBelowAddsFile", func(t *testing.T) {
+		// As AmendedBelow, and the amend also adds a file, like a test asked for in a review.
+		r := newStackRepo(t)
+		r.branch("A", "main")
+		r.checkout("A")
+		require.NoError(t, os.WriteFile(filepath.Join(r.dev, "app.txt"), []byte("v1\n"), 0644))
+		r.migration("A", "20260102000000", "a1")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.push("A", "B")
+		s := r.stack(26, "main", "A", "B")
+		r.checkout("A")
+		require.NoError(t, os.WriteFile(filepath.Join(r.dev, "app.txt"), []byte("v2\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(r.dev, "app_test.txt"), []byte("test\n"), 0644))
+		r.git(r.dev, "add", "--all")
+		r.git(r.dev, "commit", "--quiet", "--amend", "--no-edit")
+		r.forcePush("A")
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		_, logs, err := r.run(s, run{branch: "main"})
+		require.NoError(t, err, logs)
+		r.requireStack("main", "A", "B")
+		require.Equal(t, []string{"B: add b1", botMessage}, r.log("A", "B"))
+		require.Equal(t, "test", r.gitOut(r.origin, "show", "B:app_test.txt"))
+	})
+
 	t.Run("MovedCommitSameSubject", func(t *testing.T) {
 		// B is built on a commit "Update README.md" of A, which the developer moves to B: A drops it. A later gets
 		// another commit with that subject and file, like a second edit in the web editor, which is not the same change.
@@ -870,54 +1037,41 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 
 	t.Run("SiblingsSameDateNewCommit", func(t *testing.T) {
 		// As SiblingsSameDate/OtherPatch, and A then gets another "Update README.md" commit with the author and the author
-		// date of the dropped one: made with `git commit -C` of the replayed sibling, or with that date.
-		for _, tt := range []struct {
-			name string
-			args func(date string) []string
-		}{
-			{name: "ReuseMessage", args: func(string) []string { return []string{"-C", "HEAD"} }},
-			{name: "Date", args: func(date string) []string {
-				return []string{"--message", "Update README.md", "--date", "@" + date + " +0000"}
-			}},
-		} {
-			t.Run(tt.name, func(t *testing.T) {
-				r := newStackRepo(t)
-				filler := strings.Repeat("filler\n", 10)
-				readme := "# app\n\nintro\n" + filler + "footer\n"
-				r.file("main", "README.md", readme)
-				r.push("main")
-				r.branch("A", "main")
-				r.migration("A", "20260102000000", "a1")
-				readme += "\n## Feature B\n"
-				r.commitAs("A", "README.md", readme, "Update README.md", "")
-				r.commitAs("A", "README.md", strings.Replace(readme, "footer\n", "footer v2\n", 1), "Update README.md", "")
-				r.checkout("A")
-				r.git(r.dev, "rebase", "--quiet", "--force-rebase", "--reset-author-date", "main")
-				x := r.gitOut(r.dev, "rev-parse", "A~1")
-				date := r.gitOut(r.dev, "show", "-s", "--format=%at", x)
-				r.branch("B", "A")
-				r.migration("B", "20260103000000", "b1")
-				r.push("A", "B")
-				s := r.stack(49, "main", "A", "B")
-				r.checkout("A")
-				require.Error(t, r.tryGit(r.dev, "rebase", "--quiet", "--onto", x+"~1", x, "A"))
-				require.NoError(t, os.WriteFile(filepath.Join(r.dev, "README.md"), []byte("# app\n\nintro\n"+filler+"footer v2\n"), 0644))
-				r.git(r.dev, "add", "README.md")
-				r.git(r.dev, "-c", "core.editor=true", "rebase", "--continue")
-				require.NoError(t, os.WriteFile(filepath.Join(r.dev, "README.md"), []byte("# app\n\nintro v3\n"+filler+"footer v2\n"), 0644))
-				r.git(r.dev, "add", "README.md")
-				r.git(r.dev, append([]string{"commit", "--quiet"}, tt.args(date)...)...)
-				r.forcePush("A")
-				before := r.tip("main")
-				r.migration("main", "20260105000000", "m1")
-				r.push("main")
-				tips := r.tips("A", "B")
-				_, logs, err := r.run(s, run{branch: "main", before: before})
-				require.Error(t, err, logs)
-				require.Regexp(t, `#2 \(B\): it has commits that #1 \(A\) no longer has, which a restack would drop: [0-9a-f]{7} \(Update README\.md\)`, err.Error())
-				require.Equal(t, tips, r.tips("A", "B"), "nothing is pushed")
-			})
-		}
+		// date of the dropped one, made with `git commit -C` of the replayed sibling.
+		r := newStackRepo(t)
+		filler := strings.Repeat("filler\n", 10)
+		readme := "# app\n\nintro\n" + filler + "footer\n"
+		r.file("main", "README.md", readme)
+		r.push("main")
+		r.branch("A", "main")
+		r.migration("A", "20260102000000", "a1")
+		readme += "\n## Feature B\n"
+		r.commitAs("A", "README.md", readme, "Update README.md", "")
+		r.commitAs("A", "README.md", strings.Replace(readme, "footer\n", "footer v2\n", 1), "Update README.md", "")
+		r.checkout("A")
+		r.git(r.dev, "rebase", "--quiet", "--force-rebase", "--reset-author-date", "main")
+		x := r.gitOut(r.dev, "rev-parse", "A~1")
+		r.branch("B", "A")
+		r.migration("B", "20260103000000", "b1")
+		r.push("A", "B")
+		s := r.stack(49, "main", "A", "B")
+		r.checkout("A")
+		require.Error(t, r.tryGit(r.dev, "rebase", "--quiet", "--onto", x+"~1", x, "A"))
+		require.NoError(t, os.WriteFile(filepath.Join(r.dev, "README.md"), []byte("# app\n\nintro\n"+filler+"footer v2\n"), 0644))
+		r.git(r.dev, "add", "README.md")
+		r.git(r.dev, "-c", "core.editor=true", "rebase", "--continue")
+		require.NoError(t, os.WriteFile(filepath.Join(r.dev, "README.md"), []byte("# app\n\nintro v3\n"+filler+"footer v2\n"), 0644))
+		r.git(r.dev, "add", "README.md")
+		r.git(r.dev, "commit", "--quiet", "-C", "HEAD")
+		r.forcePush("A")
+		before := r.tip("main")
+		r.migration("main", "20260105000000", "m1")
+		r.push("main")
+		tips := r.tips("A", "B")
+		_, logs, err := r.run(s, run{branch: "main", before: before})
+		require.Error(t, err, logs)
+		require.Regexp(t, `#2 \(B\): it has commits that #1 \(A\) no longer has, which a restack would drop: [0-9a-f]{7} \(Update README\.md\)`, err.Error())
+		require.Equal(t, tips, r.tips("A", "B"), "nothing is pushed")
 	})
 
 	t.Run("AmendNextToSameDateSibling", func(t *testing.T) {
@@ -1167,20 +1321,6 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				setup: func(r *stackRepo) {
 					r.checkout("A")
 					r.migrationSQL("A", "20260102000001", "seed", "-- atlas:sum ignore\nINSERT INTO init VALUES (1);\n")
-					r.push("A")
-				},
-				run: run{branch: "main"},
-				check: func(t *testing.T, r *stackRepo, _ *mockAction) {
-					files := r.gitOut(r.origin, "ls-tree", "--name-only", "A", "migrations/")
-					require.Regexp(t, `migrations/20260105000000_m1.sql\nmigrations/\d{14}_a1.sql\nmigrations/\d{14}_seed.sql`, files)
-				},
-			},
-			{
-				// Atlas reads the directive on the first line, after any prefix.
-				name: "SumIgnoreHashComment",
-				setup: func(r *stackRepo) {
-					r.checkout("A")
-					r.migrationSQL("A", "20260102000001", "seed", "#atlas:sum ignore\nINSERT INTO init VALUES (1);\n")
 					r.push("A")
 				},
 				run: run{branch: "main"},
@@ -1944,7 +2084,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 	t.Run("TrunkMergedInLayer", func(t *testing.T) {
 		// A layer merged the trunk, and the trunk reverted some of it later. The restack replays only the commits
 		// of the layer, and does not bring back what the trunk removed.
-		t.Run("BottomAfterSquash", func(t *testing.T) {
+		t.Run("Bottom", func(t *testing.T) {
 			r := newStackRepo(t)
 			r.file("main", "app.txt", "v1\n")
 			r.push("main")
@@ -1961,35 +2101,7 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 			r.checkout("B")
 			r.git(r.dev, "merge", "--quiet", "--no-ff", "--message", "Merge main into B", "main")
 			r.push("B")
-			// A lands with a squash merge, then the trunk removes feature.txt and gets a migration.
-			r.land(s)
-			r.checkout("main")
-			r.git(r.dev, "rm", "--quiet", "feature.txt")
-			r.git(r.dev, "commit", "--quiet", "--message", "main: revert feature")
-			r.migration("main", "20260105000000", "m1")
-			r.push("main")
-			_, logs, err := r.run(s, run{branch: "main"})
-			require.NoError(t, err, logs)
-			r.requireStack("main", "B")
-			require.Empty(t, r.gitOut(r.origin, "ls-tree", "B", "--", "feature.txt"), "feature.txt, which main removed, is not brought back to B")
-			require.NotContains(t, r.log("main", "B"), "A: feature.txt", logs)
-		})
-		t.Run("BottomTrunkChange", func(t *testing.T) {
-			r := newStackRepo(t)
-			r.file("main", "app.txt", "v1\n")
-			r.push("main")
-			r.branch("A", "main")
-			r.migration("A", "20260102000000", "a1")
-			r.file("A", "feature.txt", "A\n")
-			r.branch("B", "A")
-			r.migration("B", "20260103000000", "b1")
-			r.push("A", "B")
-			s := r.stack(43, "main", "A", "B")
-			r.file("main", "other.txt", "o\n")
-			r.push("main")
-			r.checkout("B")
-			r.git(r.dev, "merge", "--quiet", "--no-ff", "--message", "Merge main into B", "main")
-			r.push("B")
+			// A lands with a squash merge, then the trunk removes feature.txt and other.txt, which B merged, and gets a migration.
 			r.land(s)
 			r.checkout("main")
 			r.git(r.dev, "rm", "--quiet", "feature.txt", "other.txt")
@@ -1998,9 +2110,11 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 			r.push("main")
 			_, logs, err := r.run(s, run{branch: "main"})
 			require.NoError(t, err, logs)
+			r.requireStack("main", "B")
 			for _, f := range []string{"feature.txt", "other.txt"} {
 				require.Empty(t, r.gitOut(r.origin, "ls-tree", "B", "--", f), "%s, which main removed, is not brought back to B", f)
 			}
+			require.NotContains(t, r.log("main", "B"), "A: feature.txt", logs)
 		})
 		t.Run("Upper", func(t *testing.T) {
 			r := newStackRepo(t)
@@ -2123,33 +2237,71 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 	})
 
 	t.Run("CopiedMigration", func(t *testing.T) {
-		// B cherry-picked a2 from A, then A moved a2 to a new version. The restack would leave B with two
-		// copies of a2, so it refuses.
+		// B cherry-picked a2 from A, then A moved a2 to a new version, above or below the copy of B. The restack would
+		// leave B with two copies of a2, so it refuses, also when the files of B already sort on top and need no move.
+		for name, version := range map[string]string{"Above": "20260104000000", "Below": "20260102000050"} {
+			t.Run(name, func(t *testing.T) {
+				r := newStackRepo(t)
+				r.branch("A", "main")
+				r.migration("A", "20260102000000", "a1")
+				r.branch("B", "A")
+				r.migration("B", "20260103000000", "b1")
+				r.push("A", "B")
+				s := r.stack(52, "main", "A", "B")
+				r.migration("A", "20260102000100", "a2")
+				a2 := r.gitOut(r.dev, "rev-parse", "HEAD")
+				r.push("A")
+				r.checkout("B")
+				r.git(r.dev, "cherry-pick", "--strategy-option=theirs", a2)
+				r.hash("B")
+				r.push("B")
+				// A moves a2 to a new version, in place.
+				r.checkout("A")
+				r.git(r.dev, "reset", "--quiet", "--hard", "HEAD~1")
+				r.migration("A", version, "a2")
+				r.forcePush("A")
+				tips := r.tips("A", "B")
+				_, logs, err := r.run(s, run{branch: "A"})
+				require.Error(t, err, logs)
+				require.ErrorContains(t, err, "copies of migration files")
+				require.Equal(t, tips, r.tips("A", "B"))
+			})
+		}
+	})
+
+	t.Run("EmptyMigrationsNotCopies", func(t *testing.T) {
+		// A has an empty migration, and the trunk adds another one since. Empty files run nothing, and are not copies.
 		r := newStackRepo(t)
 		r.branch("A", "main")
-		r.migration("A", "20260102000000", "a1")
-		r.branch("B", "A")
-		r.migration("B", "20260103000000", "b1")
-		r.push("A", "B")
-		s := r.stack(52, "main", "A", "B")
-		r.migration("A", "20260102000100", "a2")
-		a2 := r.gitOut(r.dev, "rev-parse", "HEAD")
+		r.migrationSQL("A", "20260106000000", "draft", "")
 		r.push("A")
-		r.checkout("B")
-		r.git(r.dev, "cherry-pick", "--strategy-option=theirs", a2)
-		r.hash("B")
-		r.push("B")
-		// A moves a2 to a new version, in place.
-		r.checkout("A")
-		r.git(r.dev, "reset", "--quiet", "--hard", "HEAD~1")
-		r.migration("A", "20260104000000", "a2")
-		r.forcePush("A")
-		tips := r.tips("A", "B")
-		_, logs, err := r.run(s, run{branch: "A"})
-		require.Error(t, err, logs)
-		require.ErrorContains(t, err, "copies of migration files")
-		require.Equal(t, tips, r.tips("A", "B"))
+		s := r.stack(53, "main", "A")
+		r.migrationSQL("main", "20260105000000", "m1", "")
+		r.push("main")
+		act, logs, err := r.run(s, run{branch: "main"})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
+		r.requireStack("main", "A")
+	})
 
+	t.Run("GolangMigrateSameDownFiles", func(t *testing.T) {
+		// In other formats, files may have the same contents, like the down files of golang-migrate.
+		r := newStackRepo(t)
+		r.checkout("main")
+		r.git(r.dev, "rm", "--quiet", r.dir+"/20260101000000_init.sql")
+		r.formatFile("main", "golang-migrate", "1_init.up.sql")
+		r.push("main")
+		r.branch("A", "main")
+		r.formatFile("A", "golang-migrate", "3_a.up.sql")
+		r.formatFile("A", "golang-migrate", "3_a.down.sql", "-- irreversible\n")
+		r.push("A")
+		s := r.stack(61, "main", "A")
+		r.formatFile("main", "golang-migrate", "2_m.up.sql")
+		r.formatFile("main", "golang-migrate", "2_m.down.sql", "-- irreversible\n")
+		r.push("main")
+		act, logs, err := r.run(s, run{branch: "main", inputs: map[string]string{"dir": "file://" + r.dir + "?format=golang-migrate"}})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"])
 	})
 
 	t.Run("DirtyClone", func(t *testing.T) {
@@ -2597,6 +2749,36 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				r.requireStack("A", "B")
 			})
 		}
+	})
+
+	t.Run("SingleOnPullRequestEvent", func(t *testing.T) {
+		// B has a pull request to main that is not stacked, the stack on B merged main, and B gets a migration. On a
+		// pull_request event, the commit of the run is the test merge of the pull request of B, not a head of B.
+		r := newStackRepo(t)
+		r.file("main", "app.txt", "v1\n")
+		r.push("main")
+		r.branch("B", "main")
+		r.migration("B", "20260102000000", "b1")
+		r.push("B")
+		r.branch("L1", "B")
+		r.migration("L1", "20260103000000", "l1")
+		r.file("main", "x.txt", "x\n")
+		r.push("main")
+		r.checkout("L1")
+		r.git(r.dev, "merge", "--quiet", "--no-ff", "--message", "Merge main into L1", "main")
+		r.push("L1")
+		s := r.stackAt(42, 2, "B", "L1")
+		r.migration("B", "20260102000100", "b2")
+		r.push("B")
+		r.git(r.dev, "checkout", "--quiet", "-B", "prmerge", "main")
+		r.git(r.dev, "merge", "--quiet", "--no-ff", "--message", "Merge B into main", "B")
+		merge := r.gitOut(r.dev, "rev-parse", "HEAD")
+		r.git(r.dev, "push", "--quiet", "origin", "prmerge:refs/pull/1/merge")
+		r.git(r.ci, "fetch", "--quiet", "origin", "+refs/pull/1/merge:refs/remotes/pull/1/merge")
+		act, logs, err := r.run(s, run{branch: "B", commit: merge, keep: true, prs: []*atlasaction.PullRequest{{Number: 1, Ref: "B", Base: "main"}}})
+		require.NoError(t, err, logs)
+		require.Equal(t, "true", act.output["rebased"], logs)
+		r.requireStack("B", "L1")
 	})
 
 	t.Run("TrunkForcePushes", func(t *testing.T) {
@@ -3162,15 +3344,15 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				want: []string{"R__other.sql", "R__view.sql", "V1__init.sql", "V3__a.sql", "atlas.sum"}},
 			// Flyway versions separate their parts with dots or underscores, and compare their numbers.
 			{name: "FlywaySubVersion", format: "flyway", trunk: []string{"V2__init.sql"}, layer: "V2_1__a.sql"},
-			{name: "FlywayDateVersion", format: "flyway", trunk: []string{"V2026_01_01__init.sql"}, layer: "V2026_01_02__a.sql"},
+			// Flyway compares the numbers of the parts: V2026_1_2 is V2026_01_02.
+			{name: "FlywayLeadingZero", format: "flyway", trunk: []string{"V2026_01_01__init.sql"}, layer: "V2026_1_2__a.sql", move: "V2026_01_02__m.sql",
+				wantError: "#1 (A): its migrations must be moved on top of the ones of main, which `atlas migrate rebase` supports only for the \"atlas\" format"},
 			{name: "FlywaySortedVersions", format: "flyway", trunk: []string{"V2__init.sql"}, layer: "V2_2__a.sql", move: "V2_1__m.sql",
 				want: []string{"V2_1__m.sql", "V2_2__a.sql", "V2__init.sql", "atlas.sum"}},
 			{name: "FlywaySameVersion", format: "flyway", trunk: []string{"V2__init.sql"}, layer: "V2_1__a.sql", move: "V2.1__m.sql",
 				wantError: "#1 (A): its migrations must be moved on top of the ones of main, which `atlas migrate rebase` supports only for the \"atlas\" format"},
-			// Flyway drops the trailing zero parts of a version: V2.0 and V2_0 are V2.
-			{name: "FlywayTrailingZeroDot", format: "flyway", trunk: []string{"V1__init.sql"}, layer: "V2.0__a.sql", move: "V2__m.sql",
-				wantError: "#1 (A): its migrations must be moved on top of the ones of main, which `atlas migrate rebase` supports only for the \"atlas\" format"},
-			{name: "FlywayTrailingZeroUnderscore", format: "flyway", trunk: []string{"V1__init.sql"}, layer: "V2_0__a.sql", move: "V2__m.sql",
+			// Flyway drops the trailing zero parts of a version: V2.0 is V2.
+			{name: "FlywayTrailingZero", format: "flyway", trunk: []string{"V1__init.sql"}, layer: "V2.0__a.sql", move: "V2__m.sql",
 				wantError: "#1 (A): its migrations must be moved on top of the ones of main, which `atlas migrate rebase` supports only for the \"atlas\" format"},
 			// Flyway also reads the files of subdirectories.
 			{name: "FlywaySubdirRepeatable", format: "flyway", trunk: []string{"V1__init.sql", "views/R__view.sql"}, layer: "V3__a.sql", move: "views/R__view.sql", moveSQL: "SELECT 2;\n",
@@ -3715,6 +3897,30 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				},
 			},
 			{
+				// The trunk adds a migration excluded from atlas.sum before the migration of A, and its atlas.sum does not
+				// change. Atlas still chains the name of the file into the hashes of the files after it.
+				name: "TrunkIgnoredBelow",
+				setup: func(r *stackRepo) {
+					r.migration("A", "20260105000000", "a1")
+					r.push("A")
+					r.migrationSQL("main", "20260103000000", "seed", ignored("seed"))
+				},
+			},
+			{
+				// The trunk removes a migration excluded from atlas.sum, that A was built on.
+				name: "TrunkRemovesIgnored",
+				setup: func(r *stackRepo) {
+					r.migrationSQL("main", "20260103000000", "seed", ignored("seed"))
+					r.push("main")
+					r.git(r.dev, "branch", "--force", "A", "main")
+					r.migration("A", "20260105000000", "a1")
+					r.push("A")
+					r.checkout("main")
+					r.git(r.dev, "rm", "--quiet", r.dir+"/20260103000000_seed.sql")
+					r.git(r.dev, "commit", "--quiet", "--message", "main: remove seed")
+				},
+			},
+			{
 				// The trunk adds a migration excluded from atlas.sum, far ahead of the clock: the migrations of A cannot be
 				// placed after it, as for any other migration.
 				name: "TrunkIgnoredFarAhead",
@@ -3749,6 +3955,30 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				require.Equal(t, "false", act.output["rebased"])
 				require.Equal(t, tips, r.tips("A"))
 			})
+		}
+	})
+
+	t.Run("LayerRemovesIgnored", func(t *testing.T) {
+		// A removes a migration excluded from atlas.sum, which the trunk still has. A is up to date, and is not
+		// restacked on every run.
+		r := newStackRepo(t)
+		r.migrationSQL("main", "20260103000000", "seed", "-- atlas:sum ignore\nINSERT INTO init VALUES (1);\n")
+		r.push("main")
+		r.branch("A", "main")
+		r.checkout("A")
+		r.git(r.dev, "rm", "--quiet", r.dir+"/20260103000000_seed.sql")
+		r.git(r.dev, "commit", "--quiet", "--message", "A: remove seed")
+		r.migration("A", "20260105000000", "a1")
+		r.push("A")
+		s := r.stack(75, "main", "A")
+		r.file("main", "app.txt", "main\n")
+		r.push("main")
+		tips := r.tips("A")
+		for range 2 {
+			act, logs, err := r.run(s, run{branch: "main"})
+			require.NoError(t, err, logs)
+			require.Equal(t, "false", act.output["rebased"], logs)
+			require.Equal(t, tips, r.tips("A"))
 		}
 	})
 
