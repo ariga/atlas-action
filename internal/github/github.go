@@ -8,9 +8,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -48,9 +52,38 @@ type (
 		Body   string
 		Commit string
 		Ref    string
+		Base   string // Base branch of the pull request.
+		Stack  int    // Number of the stack the pull request belongs to, or 0 if it is not stacked.
+	}
+	// Stack is a stack of pull requests: a chain of pull requests in the same repository,
+	// where the bottom one targets the stack base (its trunk) and each of the others
+	// targets the head branch of the pull request below it.
+	Stack struct {
+		Number int `json:"number"`
+		Base   struct {
+			Ref string `json:"ref"`
+		} `json:"base"`
+		// PullRequests of the stack, from the bottom to the top.
+		PullRequests []StackPullRequest `json:"pull_requests"`
+	}
+	// StackPullRequest is a pull request in a stack.
+	StackPullRequest struct {
+		Number   int     `json:"number"`
+		State    string  `json:"state"` // Either "open" or "closed".
+		MergedAt *string `json:"merged_at"`
+		Head     struct {
+			Ref string `json:"ref"`
+		} `json:"head"`
+		Base struct {
+			Ref string `json:"ref"`
+		} `json:"base"`
 	}
 	// TriggerEvent is the structure of the GitHub trigger event.
 	TriggerEvent struct {
+		// Only in case of a 'push' event. The commit the ref pointed to before the push,
+		// and whether the push deleted the ref.
+		Before  string `mapstructure:"before"`
+		Deleted bool   `mapstructure:"deleted"`
 		// Only in case of an 'issue_comment' event.
 		Comment struct {
 			Body string `mapstructure:"body"`
@@ -383,16 +416,214 @@ type pullRequest struct {
 		Ref string `json:"ref"`
 		SHA string `json:"sha"`
 	} `json:"head"`
+	Base struct {
+		Ref string `json:"ref"`
+	} `json:"base"`
+	// Stack is set only when the pull request belongs to a stack.
+	Stack *struct {
+		Number int `json:"number"`
+	} `json:"stack"`
 }
 
 func (p pullRequest) PullRequest() *PullRequest {
-	return &PullRequest{
+	pr := &PullRequest{
 		Number: p.Number,
 		URL:    p.URL,
 		Body:   p.Body,
 		Commit: p.Head.SHA,
 		Ref:    p.Head.Ref,
+		Base:   p.Base.Ref,
 	}
+	if p.Stack != nil {
+		pr.Stack = p.Stack.Number
+	}
+	return pr
+}
+
+// ErrNotFound is returned when the GitHub API responds with 404 Not Found.
+var ErrNotFound = errors.New("github: not found")
+
+const (
+	// stackAPIVersion is the REST API version that documents the endpoints of stacked pull requests.
+	stackAPIVersion = "2026-03-10"
+	// maxPages caps the number of pages a listing reads.
+	maxPages = 100
+)
+
+// OpenPullRequests returns the open pull requests of the repository whose head is the
+// given branch (if not empty) and whose base is the given branch (if not empty).
+func (c *Client) OpenPullRequests(ctx context.Context, head, base string) ([]*PullRequest, error) {
+	q := url.Values{"state": {"open"}, "per_page": {"100"}}
+	if head != "" {
+		owner, _, err := c.ownerRepo()
+		if err != nil {
+			return nil, err
+		}
+		q.Set("head", owner+":"+head)
+	}
+	if base != "" {
+		q.Set("base", base)
+	}
+	var prs []*PullRequest
+	more, err := pages(ctx, c, fmt.Sprintf("%s/repos/%s/pulls?%s", c.baseURL, c.repo, q.Encode()), maxPages, func(page []pullRequest) {
+		for _, p := range page {
+			prs = append(prs, p.PullRequest())
+		}
+	})
+	switch {
+	case err != nil:
+		return nil, err
+	case more:
+		return nil, fmt.Errorf("github: more than %d pages of open pull requests", maxPages)
+	}
+	return prs, nil
+}
+
+// Stack returns the stack of pull requests with the given number. The error wraps
+// ErrNotFound if the repository has no such stack.
+func (c *Client) Stack(ctx context.Context, number int) (*Stack, error) {
+	var s Stack
+	h := http.Header{"X-Github-Api-Version": {stackAPIVersion}}
+	if _, err := c.getURL(ctx, fmt.Sprintf("%s/repos/%s/stacks/%d", c.baseURL, c.repo, number), h, &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+// getURL sends a GET request to the given URL of the API, decodes the JSON
+// response into v, and returns the headers of the response.
+func (c *Client) getURL(ctx context.Context, u string, h http.Header, v any) (http.Header, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	maps.Copy(req.Header, h)
+	res, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling GitHub API: %w", err)
+	}
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+	switch res.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return nil, fmt.Errorf("%w: GET %s", ErrNotFound, strings.TrimPrefix(u, c.baseURL))
+	default:
+		return nil, fmt.Errorf("unexpected status code %v: with body: %v", res.StatusCode, string(b))
+	}
+	if err := json.Unmarshal(b, v); err != nil {
+		return nil, fmt.Errorf("unmarshalling response body: %w", err)
+	}
+	return res.Header, nil
+}
+
+// reNextLink matches the URL of the next page in a Link header.
+var reNextLink = regexp.MustCompile(`<([^>]+)>;\s*rel="next"`)
+
+// nextPage returns the URL of the next page from the Link header of a response, or an empty
+// string if there is none. It fails if the URL is outside of the API, as the client sends the
+// token with every request.
+func (c *Client) nextPage(h http.Header) (string, error) {
+	for _, l := range h.Values("Link") {
+		if m := reNextLink.FindStringSubmatch(l); m != nil {
+			if !strings.HasPrefix(m[1], strings.TrimSuffix(c.baseURL, "/")+"/") {
+				return "", fmt.Errorf("github: the next page %q is outside of the API", m[1])
+			}
+			return m[1], nil
+		}
+	}
+	return "", nil
+}
+
+// pages reads the pages of a listing from the given URL, following the Link header of each response, and
+// passes the items of each page to add. It stops after max pages, and reports whether more pages are left.
+func pages[T any](ctx context.Context, c *Client, u string, max int, add func([]T)) (more bool, err error) {
+	for n := 0; u != ""; n++ {
+		if n == max {
+			return true, nil
+		}
+		var items []T
+		h, err := c.getURL(ctx, u, nil, &items)
+		if err != nil {
+			return false, err
+		}
+		add(items)
+		if u, err = c.nextPage(h); err != nil {
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+// maxActivityPages caps the number of pages of activities read for a branch.
+const maxActivityPages = 30
+
+// BranchHistory is the record of the heads a branch had.
+type BranchHistory struct {
+	// Heads holds the commits the branch pointed to before and after each recorded change, newest first.
+	Heads []string
+	// Created reports whether the record goes back to the creation of the branch, and so holds every head it had.
+	Created bool
+	// Rewritten reports whether the record has a force-push or a deletion of the branch.
+	Rewritten bool
+}
+
+// BranchHistory returns the heads the branch had, as GitHub records its changes in the activity of the
+// repository: its pushes, force-pushes, merges, creation and deletion. Unlike the timeline of a pull request,
+// the activity also records the changes from before the pull request of the branch was opened.
+// The error wraps ErrNotFound if the activity of the repository is not available.
+func (c *Client) BranchHistory(ctx context.Context, branch string) (*BranchHistory, error) {
+	return c.activity(ctx, branch, "")
+}
+
+// ForcePushes returns the heads the branch had before and after each of its force-pushes, as GitHub records
+// them in the activity of the repository, newest first. The error wraps ErrNotFound if the
+// activity of the repository is not available.
+func (c *Client) ForcePushes(ctx context.Context, branch string) ([]string, error) {
+	h, err := c.activity(ctx, branch, "force_push")
+	if err != nil {
+		return nil, err
+	}
+	return h.Heads, nil
+}
+
+// activity reads the activity of the branch, only of the given type if not empty.
+func (c *Client) activity(ctx context.Context, branch, typ string) (*BranchHistory, error) {
+	q := url.Values{"ref": {"refs/heads/" + branch}, "direction": {"desc"}, "per_page": {"100"}}
+	if typ != "" {
+		q.Set("activity_type", typ)
+	}
+	var (
+		seen = make(map[string]bool)
+		h    = &BranchHistory{}
+		last string // Type of the oldest activity read.
+	)
+	more, err := pages(ctx, c, fmt.Sprintf("%s/repos/%s/activity?%s", c.baseURL, c.repo, q.Encode()), maxActivityPages, func(acts []struct {
+		Before string `json:"before"`
+		After  string `json:"after"`
+		Type   string `json:"activity_type"`
+	}) {
+		for _, a := range acts {
+			// The creation and deletion of a branch have no commit on one side.
+			for _, sha := range []string{a.After, a.Before} {
+				if strings.Trim(sha, "0") != "" && !seen[sha] {
+					seen[sha] = true
+					h.Heads = append(h.Heads, sha)
+				}
+			}
+			h.Rewritten = h.Rewritten || a.Type == "force_push" || a.Type == "branch_deletion"
+			last = a.Type
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	h.Created = !more && last == "branch_creation"
+	return h, nil
 }
 
 // PullRequest returns information about a pull request.

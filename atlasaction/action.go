@@ -102,6 +102,21 @@ type (
 		// CommentSchemaLint comments on the pull request with the schema lint report.
 		CommentSchemaLint(context.Context, *TriggerContext, *SchemaLintReport) error
 	}
+	// StackClient is implemented by the SCM clients that support stacked pull requests.
+	StackClient interface {
+		// OpenPullRequests returns the open pull requests whose head is the given branch
+		// (if not empty), and whose base is the given branch (if not empty).
+		OpenPullRequests(_ context.Context, head, base string) ([]*PullRequest, error)
+		// Stack returns the stack of pull requests with the given number, or nil if there is none.
+		Stack(_ context.Context, number int) (*Stack, error)
+		// BranchHistory returns the heads the branch had, as the SCM recorded its
+		// changes, even before a pull request was opened for it.
+		BranchHistory(_ context.Context, branch string) (*BranchHistory, error)
+		// ForcePushes returns the heads the branch had before and after each of its
+		// force-pushes that the SCM recorded, newest first. The error wraps
+		// github.ErrNotFound if the SCM does not record the changes of branches.
+		ForcePushes(_ context.Context, branch string) ([]string, error)
+	}
 	Logger interface {
 		// Infof logs an info message.
 		Infof(string, ...interface{})
@@ -206,6 +221,7 @@ type (
 		DefaultBranch string                    // DefaultBranch is the default branch of the repository.
 		Branch        string                    // Current Branch name.
 		Commit        string                    // Commit SHA.
+		Before        string                    // Commit SHA the branch pointed to before the push that triggered the action, if known.
 		Actor         *Actor                    // Actor is the user who triggered the action.
 		RerunCmd      string                    // RerunCmd is the command to rerun the action.
 
@@ -226,6 +242,30 @@ type (
 		Body   string // Body (description) of the pull request.
 		Commit string // Latest commit SHA.
 		Ref    string
+		Base   string // Base branch of the pull request, if known.
+		Stack  int    // Number of the stack the pull request belongs to, or 0 if it is not stacked.
+	}
+	// Stack is a stack of pull requests: a chain of pull requests in the same repository,
+	// where the bottom one targets the stack base (its trunk), and each of the others
+	// targets the head branch of the pull request below it.
+	Stack struct {
+		Number int          // Number of the stack.
+		Base   string       // Base branch of the stack, its trunk.
+		Layers []StackLayer // Pull requests of the stack, from the bottom to the top.
+	}
+	// BranchHistory is the record of the heads a branch had.
+	BranchHistory struct {
+		Heads     []string // Commits the branch pointed to before and after each recorded change, newest first.
+		Created   bool     // Whether the record goes back to the creation of the branch, and so holds every head it had.
+		Rewritten bool     // Whether the record has a force-push or a deletion of the branch.
+	}
+	// StackLayer is a pull request in a stack.
+	StackLayer struct {
+		Number int    // Pull request number.
+		Branch string // Head branch of the pull request.
+		Base   string // Base branch of the pull request.
+		Open   bool   // Whether the pull request is open.
+		Merged bool   // Whether the pull request was merged.
 	}
 	// Comment holds the comment information.
 	Comment struct {
@@ -738,6 +778,14 @@ func (a *Actions) MigrateAutoRebase(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if a.GetBoolInput("stack") {
+		return a.migrateAutoRebaseStacks(ctx, tc)
+	}
+	return a.migrateAutoRebaseBranch(ctx, tc)
+}
+
+// migrateAutoRebaseBranch rebases the migration files of the branch onto the base branch.
+func (a *Actions) migrateAutoRebaseBranch(ctx context.Context, tc *TriggerContext) error {
 	var (
 		remote     = a.GetInputDefault("remote", "origin")
 		currBranch = tc.Branch

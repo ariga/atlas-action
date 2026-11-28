@@ -20,6 +20,7 @@ import (
 	"slices"
 	"strings"
 
+	"ariga.io/atlas/atlasexec"
 	"gopkg.in/yaml.v3"
 )
 
@@ -48,6 +49,9 @@ type (
 		Required    bool     `yaml:"required,omitempty"`    // Is this input required?
 		Label       string   `yaml:"label,omitempty"`       // Label for the input field
 		Description string   `yaml:"description,omitempty"` // Markdown description of the input
+		// CI lists the CI platforms that have the input, by the trigger type their action
+		// reports (see knownCI). An input that lists none is available on all of them.
+		CI []atlasexec.TriggerType `yaml:"ci,omitempty"`
 	}
 	ActionOutput struct {
 		Type        string `yaml:"type,omitempty"` // e.g., "string", "boolean", "number", etc.
@@ -63,7 +67,38 @@ func ParseManifest() (*ActionsManifest, error) {
 	if err != nil {
 		return nil, err
 	}
+	for _, act := range actions.Actions {
+		for name, in := range act.Inputs {
+			for _, ci := range in.CI {
+				if !slices.Contains(knownCI, ci) {
+					return nil, fmt.Errorf("action %s: input %s: unknown CI %q", act.ID, name, ci)
+				}
+			}
+		}
+	}
 	return &actions, nil
+}
+
+// knownCI holds the CI platforms the actions are generated for.
+var knownCI = []atlasexec.TriggerType{
+	atlasexec.TriggerTypeGithubAction,
+	atlasexec.TriggerTypeGitlab,
+	atlasexec.TriggerTypeCircleCIOrb,
+	atlasexec.TriggerTypeAzureDevOps,
+	atlasexec.TriggerTypeBitbucket,
+	triggerTypeTeamCity,
+}
+
+// forCI returns the manifest with the inputs that are available on the CI platform.
+func (a ActionsManifest) forCI(ci atlasexec.TriggerType) ActionsManifest {
+	acts := slices.Clone(a.Actions)
+	for i := range acts {
+		acts[i].Inputs = maps.Clone(acts[i].Inputs)
+		maps.DeleteFunc(acts[i].Inputs, func(_ string, in ActionInput) bool {
+			return len(in.CI) > 0 && !slices.Contains(in.CI, ci)
+		})
+	}
+	return ActionsManifest{Actions: acts}
 }
 
 func (a ActionsManifest) AsOptions() map[string]string {
@@ -167,6 +202,7 @@ func (a ActionInput) GitLabType() string {
 // the action.yml file inside it. The action.yml file is generated using the
 // "action-yml.tmpl" template.
 func (a ActionsManifest) GitHubManifests(path string) error {
+	a = a.forCI(atlasexec.TriggerTypeGithubAction)
 	write := func(a ActionSpec) error {
 		dir := filepath.Join(path, a.ID)
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -191,6 +227,7 @@ func (a ActionsManifest) GitHubManifests(path string) error {
 }
 
 func (a ActionsManifest) GitLabTemplates(path string) error {
+	a = a.forCI(atlasexec.TriggerTypeGitlab)
 	write := func(a ActionSpec) error {
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return fmt.Errorf("creating directory %s: %w", path, err)
@@ -248,6 +285,7 @@ func needGitHubEnv(id string) bool {
 
 // OrbTemplates writes the actions and setup command to the given path as CircleCI orb command YAML files.
 func (a ActionsManifest) OrbTemplates(path string) error {
+	a = a.forCI(atlasexec.TriggerTypeCircleCIOrb)
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return fmt.Errorf("creating directory %s: %w", path, err)
 	}
@@ -288,6 +326,7 @@ func (a ActionsManifest) OrbTemplates(path string) error {
 
 // TeamCityTemplates writes the actions to the given path as TeamCity build configuration templates.
 func (a ActionsManifest) TeamCityTemplates(path string) error {
+	a = a.forCI(triggerTypeTeamCity)
 	write := func(a ActionSpec) error {
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return fmt.Errorf("creating directory %s: %w", path, err)
@@ -315,25 +354,28 @@ func (a ActionsManifest) TeamCityTemplates(path string) error {
 // It creates a file with the given path and writes the action data using the
 // "azure-task-json.tmpl" template.
 func (a ActionsManifest) AzureTaskJSON(w io.Writer) error {
-	return templates.ExecuteTemplate(w, "task-json.tmpl", a)
+	return templates.ExecuteTemplate(w, "task-json.tmpl", a.forCI(atlasexec.TriggerTypeAzureDevOps))
 }
 
 // MarkdownDocs writes the actions to the given path as Markdown documentation files.
 func (a ActionsManifest) MarkdownDocs(path string) error {
-	write := func(doc string) error {
+	write := func(doc string, ci atlasexec.TriggerType) error {
 		f, err := os.OpenFile(filepath.Join(path, doc), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 		if err != nil {
 			return fmt.Errorf("opening file %s: %w", path, err)
 		}
 		defer f.Close()
-		return templates.ExecuteTemplate(f, doc, a)
+		return templates.ExecuteTemplate(f, doc, a.forCI(ci))
 	}
-	for _, doc := range []string{
-		"azure.mdx",
-		"bitbucket.mdx",
+	for _, d := range []struct {
+		name string
+		ci   atlasexec.TriggerType
+	}{
+		{"azure.mdx", atlasexec.TriggerTypeAzureDevOps},
+		{"bitbucket.mdx", atlasexec.TriggerTypeBitbucket},
 	} {
-		if err := write(doc); err != nil {
-			return fmt.Errorf("writing doc %s: %w", doc, err)
+		if err := write(d.name, d.ci); err != nil {
+			return fmt.Errorf("writing doc %s: %w", d.name, err)
 		}
 	}
 	return nil
@@ -346,7 +388,7 @@ func (a ActionsManifest) MarkdownREADME(path string) error {
 		return fmt.Errorf("opening file %s: %w", path, err)
 	}
 	defer file.Close()
-	return templates.ExecuteTemplate(file, "readme-md.tmpl", a)
+	return templates.ExecuteTemplate(file, "readme-md.tmpl", a.forCI(atlasexec.TriggerTypeGithubAction))
 }
 
 func SortedInputs[Map ~map[K]V, K cmp.Ordered, V any](m Map, orders []K) iter.Seq2[K, V] {
