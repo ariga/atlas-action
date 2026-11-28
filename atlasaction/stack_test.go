@@ -1308,6 +1308,22 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 				},
 			},
 			{
+				// The migration links to shared/alias.sql, which links to shared/x.sql.
+				name: "SymlinkChain",
+				setup: func(r *stackRepo) {
+					r.checkout("main")
+					require.NoError(t, os.MkdirAll(filepath.Join(r.dev, "shared"), 0755))
+					require.NoError(t, os.WriteFile(filepath.Join(r.dev, "shared", "x.sql"), []byte("CREATE TABLE x (id int);\n"), 0644))
+					require.NoError(t, os.Symlink("x.sql", filepath.Join(r.dev, "shared", "alias.sql")))
+					require.NoError(t, os.Symlink("../shared/alias.sql", filepath.Join(r.dev, r.dir, "20260101000100_link.sql")))
+					r.hashDir(filepath.Join(r.dev, r.dir))
+					r.git(r.dev, "add", "--all")
+					r.git(r.dev, "commit", "--quiet", "--message", "main: link")
+					r.push("main")
+				},
+				run: run{branch: "main"},
+			},
+			{
 				name: "SymlinkedWorkingDirectory",
 				setup: func(r *stackRepo) {
 					link := filepath.Join(t.TempDir(), "link")
@@ -1613,33 +1629,41 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		}
 	})
 	t.Run("CheckoutLineEndings", func(t *testing.T) {
-		t.Run("Symlink", func(t *testing.T) {
-			// A migration of the trunk links to shared/x.sql, and A sets an attribute that changes its line endings.
-			r := newStackRepo(t)
-			r.checkout("main")
-			require.NoError(t, os.MkdirAll(filepath.Join(r.dev, "shared"), 0755))
-			require.NoError(t, os.WriteFile(filepath.Join(r.dev, "shared", "x.sql"), []byte("CREATE TABLE x (id int);\n"), 0644))
-			require.NoError(t, os.Symlink("../shared/x.sql", filepath.Join(r.dev, r.dir, "20260101000100_link.sql")))
-			r.hashDir(filepath.Join(r.dev, r.dir))
-			r.git(r.dev, "add", "--all")
-			r.git(r.dev, "commit", "--quiet", "--message", "main: link")
-			r.push("main")
-			r.branch("A", "main")
-			r.attributes("A", "shared/*.sql text eol=crlf\n")
-			r.migration("A", "20260102000000", "a1")
-			r.push("A")
-			s := r.stack(46, "main", "A")
-			r.refresh("main")
-			r.migration("main", "20260105000000", "m1")
-			r.push("main")
-			for _, b := range []string{"main", "A"} {
-				require.NoError(t, r.validate(b), "before the run")
-			}
-			tips := r.tips("A")
-			_, logs, err := r.run(s, run{branch: "main"})
-			require.ErrorContains(t, err, "#1 (A): its atlas.sum would not match the migration files of a checkout", logs)
-			require.Equal(t, tips, r.tips("A"), "nothing is pushed")
-		})
+		for name, target := range map[string]string{
+			"Symlink":          "../shared/x.sql",
+			"SymlinkChain":     "../shared/alias.sql", // A link to shared/x.sql.
+			"SymlinkDirectory": "../linked/x.sql",     // linked is a link to shared.
+		} {
+			t.Run(name, func(t *testing.T) {
+				// A migration of the trunk links to shared/x.sql, and A sets an attribute that changes its line endings.
+				r := newStackRepo(t)
+				r.checkout("main")
+				require.NoError(t, os.MkdirAll(filepath.Join(r.dev, "shared"), 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(r.dev, "shared", "x.sql"), []byte("CREATE TABLE x (id int);\n"), 0644))
+				require.NoError(t, os.Symlink("x.sql", filepath.Join(r.dev, "shared", "alias.sql")))
+				require.NoError(t, os.Symlink("shared", filepath.Join(r.dev, "linked")))
+				require.NoError(t, os.Symlink(target, filepath.Join(r.dev, r.dir, "20260101000100_link.sql")))
+				r.hashDir(filepath.Join(r.dev, r.dir))
+				r.git(r.dev, "add", "--all")
+				r.git(r.dev, "commit", "--quiet", "--message", "main: link")
+				r.push("main")
+				r.branch("A", "main")
+				r.attributes("A", "shared/*.sql text eol=crlf\n")
+				r.migration("A", "20260102000000", "a1")
+				r.push("A")
+				s := r.stack(46, "main", "A")
+				r.refresh("main")
+				r.migration("main", "20260105000000", "m1")
+				r.push("main")
+				for _, b := range []string{"main", "A"} {
+					require.NoError(t, r.validate(b), "before the run")
+				}
+				tips := r.tips("A")
+				_, logs, err := r.run(s, run{branch: "main"})
+				require.ErrorContains(t, err, "#1 (A): its atlas.sum would not match the migration files of a checkout", logs)
+				require.Equal(t, tips, r.tips("A"), "nothing is pushed")
+			})
+		}
 		t.Run("RunnerAutoCRLF", func(t *testing.T) {
 			// The migrations were committed with CRLF, and the clone of the run has core.autocrlf=true, like on Windows. The
 			// restack renames a1, and git stores the new path with LF on the runner only.
@@ -2779,6 +2803,42 @@ func TestMigrateAutoRebaseStack(t *testing.T) {
 		require.NoError(t, err, logs)
 		require.Equal(t, "true", act.output["rebased"], logs)
 		r.requireStack("B", "L1")
+	})
+
+	t.Run("FailedSingleRebaseKeepsChanges", func(t *testing.T) {
+		// B has a pull request to main that is not stacked, and a stack on it. An earlier step of the workflow changed
+		// app.txt, which main changed too, so the merge of the rebase of B fails. The restack refuses the changes, as
+		// it does after a rebase that did not fail, and does not discard them.
+		r := newStackRepo(t)
+		r.file("main", "app.txt", "v1\n")
+		r.push("main")
+		r.branch("B", "main")
+		r.migration("B", "20260102000000", "b1")
+		r.push("B")
+		r.branch("L1", "B")
+		r.migration("L1", "20260103000000", "l1")
+		r.push("L1")
+		s := r.stackAt(42, 2, "B", "L1")
+		r.file("main", "app.txt", "v2\n")
+		r.push("main")
+		tips := r.tips("B", "L1")
+		var changed atomic.Bool
+		_, logs, err := r.run(s, run{
+			branch: "B",
+			prs:    []*atlasaction.PullRequest{{Number: 1, Ref: "B", Base: "main"}},
+			exec: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+				if changed.CompareAndSwap(false, true) {
+					require.NoError(t, os.WriteFile(filepath.Join(r.ci, "app.txt"), []byte("local\n"), 0644))
+				}
+				return exec.CommandContext(ctx, name, args...)
+			},
+		})
+		require.ErrorContains(t, err, "conflict found but no conflicting files found", logs)
+		require.ErrorContains(t, err, "restacking requires a clean working tree", logs)
+		b, rerr := os.ReadFile(filepath.Join(r.ci, "app.txt"))
+		require.NoError(t, rerr)
+		require.Equal(t, "local\n", string(b), "the changes of the checkout are kept")
+		require.Equal(t, tips, r.tips("B", "L1"), "nothing is pushed")
 	})
 
 	t.Run("TrunkForcePushes", func(t *testing.T) {

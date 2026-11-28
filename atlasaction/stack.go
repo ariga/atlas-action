@@ -112,11 +112,21 @@ func (a *Actions) migrateAutoRebaseStacks(ctx context.Context, tc *TriggerContex
 		return err
 	}
 	var (
+		r         *restacker
+		rerr      error
 		branchErr error
 		// Head of the branch before its rebase. The commit of the run is not one on pull_request events: it is
 		// the test merge of the pull request, or the head of the base branch.
 		head string
+		// Whether the checkout had changes before the rebase of the branch. The restack refuses them, and a failed
+		// rebase must not discard them.
+		dirty bool
 	)
+	if len(stacks) > 0 {
+		if r, rerr = a.newRestacker(ctx, tc, sc); rerr == nil && single {
+			dirty = r.checkClean(ctx) != nil
+		}
+	}
 	if single {
 		if out, err := a.exec(ctx, "git", "rev-parse", "--verify", "--quiet", "refs/remotes/"+a.GetInputDefault("remote", "origin")+"/"+tc.Branch+"^{commit}"); err == nil {
 			head = strings.TrimSpace(string(out))
@@ -131,16 +141,16 @@ func (a *Actions) migrateAutoRebaseStacks(ctx context.Context, tc *TriggerContex
 		}
 		return errors.Join(branchErr, lookupErr)
 	}
-	r, err := a.newRestacker(ctx, tc, sc)
-	if err != nil {
-		return errors.Join(branchErr, lookupErr, err)
+	if rerr != nil {
+		return errors.Join(branchErr, lookupErr, rerr)
 	}
-	if branchErr != nil {
+	switch {
+	case branchErr != nil && !dirty:
 		// Leave the merge that the failed rebase may have left in progress.
 		if err := r.discard(ctx); err != nil {
 			return errors.Join(branchErr, lookupErr, err)
 		}
-	} else if single && head != "" {
+	case branchErr == nil && single && head != "":
 		// The rebase of the branch moves it like a restack, and the stacks on it are built on the head it had.
 		if h, err := r.git(ctx, "rev-parse", "--verify", "--quiet", r.remoteRef(tc.Branch)); err == nil && h != head {
 			r.moved[tc.Branch] = head
@@ -359,19 +369,8 @@ func (r *restacker) run(ctx context.Context, stacks []*Stack) (pushed bool, curr
 	} else {
 		return false, "", err
 	}
-	switch out, err := r.git(ctx, "status", "--porcelain", "--untracked-files=no"); {
-	case err != nil:
+	if err := r.checkClean(ctx); err != nil {
 		return false, "", err
-	case out != "":
-		return false, "", fmt.Errorf("restacking requires a clean working tree, found changes in:\n%s", out)
-	}
-	// Atlas hashes every migration file of the directory, also the ones git does not track or ignores (!!),
-	// which a restack would leave out of the commits it pushes.
-	switch out, err := r.git(ctx, "status", "--porcelain", "--untracked-files=all", "--ignored", "--", r.sqlSpec()); {
-	case err != nil:
-		return false, "", err
-	case out != "":
-		return false, "", fmt.Errorf("restacking requires a clean migration directory, found changes in:\n%s", out)
 	}
 	restore, err := r.installMergeDriver(ctx)
 	if err != nil {
@@ -1400,8 +1399,16 @@ func (r *restacker) checkoutSum(ctx context.Context) error {
 		return err
 	}
 	dir := filepath.Join(tmp, filepath.FromSlash(r.rel))
+	top, err := r.git(ctx, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return err
+	}
+	if t, err := filepath.EvalSymlinks(top); err == nil {
+		top = t
+	}
 	// A symbolic link to a file outside of the directory does not resolve in the checkout. Write the file it links to
-	// as a checkout writes it, or as the working tree has it if git does not track it.
+	// as a checkout writes it, or as the working tree has it if git does not track it. The working tree has the links
+	// of HEAD, and resolves a chain of links, or a link to a directory, as a clone does.
 	err = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.Type()&fs.ModeSymlink == 0 {
 			return err
@@ -1409,22 +1416,25 @@ func (r *restacker) checkoutSum(ctx context.Context) error {
 		if _, err := os.Stat(p); err == nil {
 			return nil
 		}
+		rel, err := filepath.Rel(dir, p)
+		if err != nil {
+			return err
+		}
 		var (
 			b       []byte
 			tracked bool
+			link    = filepath.Join(r.dir, rel)
 		)
-		if t, err := os.Readlink(p); err == nil && !filepath.IsAbs(t) {
-			if rt, err := filepath.Rel(tmp, filepath.Join(filepath.Dir(p), t)); err == nil && filepath.IsLocal(rt) {
-				b, err = r.gitRaw(ctx, append(noEOL, "cat-file", "--filters", "HEAD:"+filepath.ToSlash(rt))...)
-				tracked = err == nil
+		if t, err := filepath.Abs(link); err == nil {
+			if t, err = filepath.EvalSymlinks(t); err == nil {
+				if rt, err := filepath.Rel(top, t); err == nil && filepath.IsLocal(rt) {
+					b, err = r.gitRaw(ctx, append(noEOL, "cat-file", "--filters", "HEAD:"+filepath.ToSlash(rt))...)
+					tracked = err == nil
+				}
 			}
 		}
 		if !tracked {
-			rel, err := filepath.Rel(dir, p)
-			if err != nil {
-				return err
-			}
-			if b, err = os.ReadFile(filepath.Join(r.dir, rel)); err != nil {
+			if b, err = os.ReadFile(link); err != nil {
 				return err
 			}
 		}
@@ -1780,6 +1790,25 @@ func (r *restacker) installMergeDriver(ctx context.Context) (func() error, error
 		}
 		return os.WriteFile(name, orig, 0644)
 	}, nil
+}
+
+// checkClean reports an error if the working tree has changes, or the migration directory has files that git does not track.
+func (r *restacker) checkClean(ctx context.Context) error {
+	switch out, err := r.git(ctx, "status", "--porcelain", "--untracked-files=no"); {
+	case err != nil:
+		return err
+	case out != "":
+		return fmt.Errorf("restacking requires a clean working tree, found changes in:\n%s", out)
+	}
+	// Atlas hashes every migration file of the directory, also the ones git does not track or ignores (!!),
+	// which a restack would leave out of the commits it pushes.
+	switch out, err := r.git(ctx, "status", "--porcelain", "--untracked-files=all", "--ignored", "--", r.sqlSpec()); {
+	case err != nil:
+		return err
+	case out != "":
+		return fmt.Errorf("restacking requires a clean migration directory, found changes in:\n%s", out)
+	}
+	return nil
 }
 
 // discard discards the changes in the working tree, and a merge in progress, which "git reset --hard" also ends.
